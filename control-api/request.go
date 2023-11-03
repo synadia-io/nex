@@ -62,40 +62,6 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	return req, nil
 }
 
-/*
-func NewRunRequest(
-	workloadName string,
-	workloadDescription string,
-	bytes []byte,
-	env map[string]string,
-	senderPublicXkey nkeys.KeyPair,
-	claimsIssuer nkeys.KeyPair,
-	targetPublicKey string,
-	jsDomain string) (*RunRequest, error) {
-
-	workloadJwt, err := CreateWorkloadJwt(bytes, workloadName, claimsIssuer)
-	if err != nil {
-		return nil, err
-	}
-	encryptedEnv, err := EncryptRequestEnvironment(senderPublicXkey, targetPublicKey, env)
-	if err != nil {
-		return nil, err
-	}
-	senderPublic, _ := senderPublicXkey.PublicKey()
-
-	req := &RunRequest{
-		Description:     workloadDescription,
-		WorkloadType:    "elf",
-		Location:        url.URL{},
-		WorkloadJwt:     workloadJwt,
-		Environment:     encryptedEnv,
-		SenderPublicKey: senderPublic,
-		JsDomain:        jsDomain,
-	}
-
-	return req, nil
-}*/
-
 func (request *RunRequest) Validate(myKey nkeys.KeyPair) error {
 	fmt.Printf("%v", request)
 	claims, err := jwt.DecodeGeneric(request.WorkloadJwt)
