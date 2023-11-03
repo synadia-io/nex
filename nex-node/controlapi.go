@@ -74,14 +74,12 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
 		var request controlapi.RunRequest
 		err := json.Unmarshal(m.Data, &request)
-		if err != nil {
-			api.log.WithError(err).Error("Invalid run request format")
-			return
-		}
 
-		err = request.DecryptRequestEnvironment(api.xk)
+		request.Validate(api.xk)
 		if err != nil {
-			api.log.WithError(err).Error("Invalid workload environment")
+			api.log.WithError(err).Error("Invalid run request")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid run request: %s", err))
+			return
 		}
 
 		// TODO: once we support another location, change this to "GetPayload"
@@ -168,11 +166,11 @@ func summarizeMachines(vms *map[string]runningFirecracker) []controlapi.MachineS
 			Healthy: true, // TODO cache last health status
 			Uptime:  myUptime(now.Sub(v.machineStarted)),
 			Workload: controlapi.WorkloadSummary{
-				Name:         v.workloadSpecification.WorkloadName,
+				Name:         v.workloadSpecification.DecodedClaims.Name,
 				Description:  v.workloadSpecification.Description,
 				Runtime:      myUptime(now.Sub(v.workloadStarted)),
 				WorkloadType: v.workloadSpecification.WorkloadType,
-				Hash:         v.workloadSpecification.WorkloadHash,
+				Hash:         v.workloadSpecification.DecodedClaims.Data["hash"].(string),
 			},
 		}
 
@@ -203,4 +201,10 @@ func myUptime(d time.Duration) string {
 		return fmt.Sprintf("%dm%ds", tmins, tsecs%60)
 	}
 	return fmt.Sprintf("%ds", tsecs)
+}
+
+func respondFail(responseType string, m *nats.Msg, reason string) {
+	env := controlapi.NewEnvelope(responseType, []byte{}, &reason)
+	jenv, _ := json.Marshal(env)
+	m.Respond(jenv)
 }

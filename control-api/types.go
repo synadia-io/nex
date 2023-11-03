@@ -1,7 +1,5 @@
 package controlapi
 
-import "net/url"
-
 const (
 	APIPrefix = "$NEX"
 )
@@ -14,21 +12,6 @@ const (
 	TagArch          = "nex.arch"
 	TagCPUs          = "nex.cpucount"
 )
-
-type RunRequest struct {
-	WorkloadName string  `json:"name"`
-	Description  string  `json:"description,omitempty"`
-	WorkloadType string  `json:"type"`
-	Location     url.URL `json:"location"`
-	WorkloadHash string  `json:"workload_hash"`
-	// A base64-encoded byte array that contains a json-serialized map[string]string.
-	Environment     string `json:"environment"`
-	SenderPublicKey string `json:"sender_public_key"`
-	// If the payload indicates an object store bucket & key, JS domain can be supplied
-	JsDomain string `json:"jsdomain,omitempty"`
-
-	workloadEnvironment map[string]string `json:"-"`
-}
 
 type RunResponse struct {
 	Started   bool   `json:"started"`
