@@ -2,7 +2,7 @@
 Turn your NATS infrastructure into a distributed workload deployment and execution engine.
 
 * [nex-agent](./nex-agent) - Agent that runs inside a Firecracker VM, responsible for running untrusted workloads. Not something end users need to interact with.
-* [nex-node](./nex-node) - Service running on a NEX node. Exposes a control API, starts/tops firecracker processes, communicates within the agent inside each process.
+* [nex-node](./nex-node) - Service running on a NEX node. Exposes a control API, starts/stops firecracker processes, communicates within the agent inside each process.
 * [control-api](./control-api/) - The API for communicating with and remotely controlling NEX nodes
 * [nex-cli](./nex-cli) - CLI for communicating with NEX nodes
 * [fc-image](./fc-image/) - Tools for building the rootfs (ext4) file system for use in firecracker VMs
@@ -25,3 +25,8 @@ Building a statically linked 🦀 Rust binary involves using cargo to build agai
 For other languages, check the language documentation or community.
 
 Once your static executable is ready to run, you can use the [CLI](./nex-cli/) or the [Control API](./control-api/) to launch it.
+
+## Architecture
+The following diagram provides a (rough) view of the various components of the system. Here, `nex-node` processes all attach to a NATS system. Each `nex-node` process is responsible for spinning up multiple firecracker VMs. Within each firecracker VM is a `nex-agent` process, and spawned by each `nex-agent` process is a _single_, untrusted workload (executable).
+
+![NEX architecture](./nex-arch.png)
