@@ -47,10 +47,11 @@ type PingResponse struct {
 }
 
 type InfoResponse struct {
-	Version  string            `json:"version"`
-	Uptime   string            `json:"uptime"`
-	Tags     map[string]string `json:"tags,omitempty"`
-	Machines []MachineSummary  `json:"machines"`
+	Version    string            `json:"version"`
+	Uptime     string            `json:"uptime"`
+	PublicXKey string            `json:"public_xkey"`
+	Tags       map[string]string `json:"tags,omitempty"`
+	Machines   []MachineSummary  `json:"machines"`
 }
 
 type MachineSummary struct {
