@@ -4,14 +4,12 @@ import (
 	"github.com/choria-io/fisk"
 )
 
-func RunWorkload(opts *Options) func(*fisk.ParseContext) error {
-	_, err := generateConnectionFromOpts(opts)
+func RunWorkload(ctx *fisk.ParseContext) error {
+	_, err := generateConnectionFromOpts()
 	if err != nil {
-		return errorClosure(err)
+		return err
 	}
 	//	nodeClient := controlapi.NewApiClient(nc, opts.Timeout)
+	return nil
 
-	return func(ctx *fisk.ParseContext) error {
-		return nil
-	}
 }

@@ -7,27 +7,27 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-func generateConnectionFromOpts(opts *Options) (*nats.Conn, error) {
-	if len(strings.TrimSpace(opts.Servers)) == 0 {
-		opts.Servers = nats.DefaultURL
+func generateConnectionFromOpts() (*nats.Conn, error) {
+	if len(strings.TrimSpace(Opts.Servers)) == 0 {
+		Opts.Servers = nats.DefaultURL
 	}
 	ctxOpts := []natscontext.Option{
-		natscontext.WithServerURL(opts.Servers),
-		natscontext.WithCreds(opts.Creds),
-		natscontext.WithNKey(opts.Nkey),
-		natscontext.WithCertificate(opts.TlsCert),
-		natscontext.WithKey(opts.TlsKey),
-		natscontext.WithCA(opts.TlsCA),
+		natscontext.WithServerURL(Opts.Servers),
+		natscontext.WithCreds(Opts.Creds),
+		natscontext.WithNKey(Opts.Nkey),
+		natscontext.WithCertificate(Opts.TlsCert),
+		natscontext.WithKey(Opts.TlsKey),
+		natscontext.WithCA(Opts.TlsCA),
 	}
 
-	if opts.TlsFirst {
+	if Opts.TlsFirst {
 		ctxOpts = append(ctxOpts, natscontext.WithTLSHandshakeFirst())
 	}
 
-	if opts.Username != "" && opts.Password == "" {
-		ctxOpts = append(ctxOpts, natscontext.WithToken(opts.Username))
+	if Opts.Username != "" && Opts.Password == "" {
+		ctxOpts = append(ctxOpts, natscontext.WithToken(Opts.Username))
 	} else {
-		ctxOpts = append(ctxOpts, natscontext.WithUser(opts.Username), natscontext.WithPassword(opts.Password))
+		ctxOpts = append(ctxOpts, natscontext.WithUser(Opts.Username), natscontext.WithPassword(Opts.Password))
 	}
 
 	natsContext, err := natscontext.New("nexnode", false, ctxOpts...)
@@ -41,7 +41,7 @@ func generateConnectionFromOpts(opts *Options) (*nats.Conn, error) {
 		return nil, err
 	}
 
-	conn, err := nats.Connect(opts.Servers, natsOpts...)
+	conn, err := nats.Connect(Opts.Servers, natsOpts...)
 	if err != nil {
 		return nil, err
 	}

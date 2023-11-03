@@ -6,6 +6,10 @@ import (
 	"github.com/choria-io/fisk"
 )
 
+var (
+	Opts = &Options{}
+)
+
 // Options configure the CLI
 type Options struct {
 	Servers string

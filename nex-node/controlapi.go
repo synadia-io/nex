@@ -140,12 +140,14 @@ func handlePing(api *ApiListener) func(m *nats.Msg) {
 
 func handleInfo(api *ApiListener) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
+		pubX, _ := api.xk.PublicKey()
 		now := time.Now().UTC()
 		res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
-			Version:  VERSION,
-			Uptime:   myUptime(now.Sub(api.start)),
-			Tags:     api.tags,
-			Machines: summarizeMachines(&api.mgr.allVms),
+			Version:    VERSION,
+			PublicXKey: pubX,
+			Uptime:     myUptime(now.Sub(api.start)),
+			Tags:       api.tags,
+			Machines:   summarizeMachines(&api.mgr.allVms),
 		}, nil)
 		raw, err := json.Marshal(res)
 		if err != nil {
