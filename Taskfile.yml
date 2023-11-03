@@ -1,0 +1,22 @@
+# https://taskfile.dev
+# to install `go install github.com/go-task/task/v3/cmd/task@latest`
+
+version: "3"
+
+interval: 200ms
+
+vars:
+  NAME: "nex"
+
+tasks:
+  agent-api:
+    dir: agent-api
+    sources:
+      - "*.proto"
+    generates:
+      - "*.pb.go"
+    cmds:
+      - protoc --proto_path=./ --go_out=./ --go_opt=paths=source_relative --go-grpc_out=./ --go-grpc_opt=paths=source_relative ./*.proto
+
+  gen:
+    deps: [agent-api]

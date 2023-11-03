@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package api;
+
+option go_package = "github.com/ConnectEverything/nex/agentapi";
+
+message AgentStartedEvent {
+    string agent_version = 1;
+}
+
+message WorkloadStartedEvent {    
+    string name = 2;
+    int32 total_bytes = 3;
+}
+
+message WorkloadStoppedEvent {    
+    string name = 2;
+    int32 code = 3;
+    string message = 4;
+}
+
+message AgentStoppedEvent {
+    string message = 1;
+    int32 code = 2;
+}

@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package api;
+
+option go_package = "github.com/ConnectEverything/nex/agentapi";
+
+import "events.proto";
+import "google/protobuf/timestamp.proto";
+
+//import "google/protobuf/duration.proto";
+
+// The communication protocol by which the node service (outer process) communicates with
+// the inner (firecracker-bound) agent process
+service NexAgent {
+    rpc GetHealth(Void) returns (HealthReply) {}
+    rpc SetExecutionEnvironment(ExecutionEnvironment) returns (ExecutionEnvironmentReply) {}
+    rpc SubscribeToLogs(Void) returns (stream LogEntry) {}
+    rpc SubscribeToEvents(Void) returns (stream AgentEvent) {}
+    rpc SubmitWorkload(stream Workload) returns (WorkloadAck) {}
+}
+
+message Workload {
+    oneof chunk_type {
+        bytes chunk = 1;
+        WorkloadMetadata header = 2;
+    }
+}
+
+message WorkloadMetadata {
+    string hash = 1;
+    string name = 2;
+    int32 total_bytes = 3;
+}
+
+message WorkloadAck {
+    bool error = 1;
+    string message = 2;
+}
+
+message LogEntry {
+    string source = 1;
+    LogLevel level = 2;
+    string text = 3;
+}
+
+message ExecutionEnvironment {
+    string workload_nats_url = 1;
+    map<string, string> vars = 2;
+    bool force_restart = 3;
+    
+    oneof nats_credentials {
+        UserPasswordCreds user_and_pass = 5;
+        UserJwtCreds jwt_and_seed = 6;
+        string seed_only = 7;
+    }
+    
+}
+
+message ExecutionEnvironmentReply {
+    bool success = 1;
+    
+}
+
+message HealthReply {
+    bool healthy = 1;
+    string agent_version = 2;
+}
+
+message AgentEvent {
+    google.protobuf.Timestamp event_time = 1;    
+    oneof data {
+        AgentStartedEvent agent_started = 2;        
+        WorkloadStartedEvent workload_started = 3;
+        WorkloadStoppedEvent workload_stopped = 4;        
+        AgentStoppedEvent agent_stopped = 5;
+    }
+}
+
+message UserPasswordCreds {
+    string username = 1;
+    string password = 2;
+}
+
+message UserJwtCreds {
+    string jwt = 1;
+    string seed = 2;
+}
+
+message Void{}
+
+enum LogLevel {
+    LEVEL_PANIC = 0;
+    LEVEL_FATAL = 1;
+    LEVEL_ERROR = 2;
+    LEVEL_WARN = 3;
+    LEVEL_INFO = 4;
+    LEVEL_DEBUG = 5;
+    LEVEL_TRACE = 6;
+}
