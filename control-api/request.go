@@ -1,9 +1,7 @@
 package controlapi
 
 import (
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,7 +37,7 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	for _, o := range opts {
 		reqOpts = o(reqOpts)
 	}
-	workloadJwt, err := CreateWorkloadJwt(reqOpts.bytes, reqOpts.workloadName, reqOpts.claimsIssuer)
+	workloadJwt, err := CreateWorkloadJwt(reqOpts.hash, reqOpts.workloadName, reqOpts.claimsIssuer)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +50,7 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	req := &RunRequest{
 		Description:     reqOpts.workloadDescription,
 		WorkloadType:    "elf",
-		Location:        url.URL{},
+		Location:        reqOpts.location,
 		WorkloadJwt:     workloadJwt,
 		Environment:     encryptedEnv,
 		SenderPublicKey: senderPublic,
@@ -62,6 +60,8 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	return req, nil
 }
 
+// This will validate a request's workload JWT, decrypt the request environment. It will not
+// perform a comparison of the hash found in the claims with a recipient's expected hash
 func (request *RunRequest) Validate(myKey nkeys.KeyPair) error {
 	fmt.Printf("%v", request)
 	claims, err := jwt.DecodeGeneric(request.WorkloadJwt)
@@ -88,13 +88,7 @@ func (request *RunRequest) Validate(myKey nkeys.KeyPair) error {
 
 }
 
-func CreateWorkloadJwt(filebytes []byte, name string, issuer nkeys.KeyPair) (string, error) {
-	hasher := sha256.New()
-	_, err := hasher.Write(filebytes)
-	if err != nil {
-		return "", err
-	}
-	hash := hex.EncodeToString(hasher.Sum(nil))
+func CreateWorkloadJwt(hash string, name string, issuer nkeys.KeyPair) (string, error) {
 	genericClaims := jwt.NewGenericClaims(name)
 	genericClaims.Data["hash"] = hash
 
@@ -132,16 +126,18 @@ func (request *RunRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair
 type requestOptions struct {
 	workloadName        string
 	workloadDescription string
-	bytes               []byte
+	location            url.URL
 	env                 map[string]string
 	senderPublicXkey    nkeys.KeyPair
 	claimsIssuer        nkeys.KeyPair
 	targetPublicKey     string
 	jsDomain            string
+	hash                string
 }
 
 type RequestOption func(o requestOptions) requestOptions
 
+// Name of the workload. Conforms to the same name rules as the services API
 func WorkloadName(name string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.workloadName = name
@@ -149,6 +145,20 @@ func WorkloadName(name string) RequestOption {
 	}
 }
 
+// Location of the workload. For files in NATS object stores, use nats://BUCKET/key
+func Location(fileUrl string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		nurl, err := url.Parse(fileUrl)
+		if err != nil {
+			o.location = url.URL{}
+		} else {
+			o.location = *nurl
+		}
+		return o
+	}
+}
+
+// Description of the workload to run
 func WorkloadDescription(name string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.workloadDescription = name
@@ -156,13 +166,7 @@ func WorkloadDescription(name string) RequestOption {
 	}
 }
 
-func FileBytes(bytes []byte) RequestOption {
-	return func(o requestOptions) requestOptions {
-		o.bytes = bytes
-		return o
-	}
-}
-
+// Set the map of environment variables to be used by the workload
 func Environment(env map[string]string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.env = env
@@ -170,6 +174,8 @@ func Environment(env map[string]string) RequestOption {
 	}
 }
 
+// This is the sender's xkey. The public key will be placed on the request while the private key will be used
+// to encrypt the environment variables
 func SenderXKey(xkey nkeys.KeyPair) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.senderPublicXkey = xkey
@@ -177,6 +183,8 @@ func SenderXKey(xkey nkeys.KeyPair) RequestOption {
 	}
 }
 
+// Sets the public key of the recipient (An `Nxxx` server key). This must be set properly or the recipient of the request
+// will be unable to decrypt the environment variables
 func TargetPublicKey(key string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.targetPublicKey = key
@@ -184,6 +192,7 @@ func TargetPublicKey(key string) RequestOption {
 	}
 }
 
+// An account key used to sign the JWT that accompanies the request and asserts the hash of the file
 func Issuer(issuerAccountKey nkeys.KeyPair) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.claimsIssuer = issuerAccountKey
@@ -191,6 +200,7 @@ func Issuer(issuerAccountKey nkeys.KeyPair) RequestOption {
 	}
 }
 
+// Optionally set a JetStream domain that will be used to locate an object store when necessary
 func JsDomain(domain string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.jsDomain = domain
@@ -198,12 +208,20 @@ func JsDomain(domain string) RequestOption {
 	}
 }
 
+// Sets a single environment value
 func EnvironmentValue(key string, value string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		if o.env == nil {
 			o.env = make(map[string]string)
 		}
 		o.env[key] = value
+		return o
+	}
+}
+
+func Checksum(hash string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.hash = hash
 		return o
 	}
 }

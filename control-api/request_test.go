@@ -9,7 +9,6 @@ import (
 func TestEncryption(t *testing.T) {
 
 	myKey, _ := nkeys.CreateCurveKeys()
-	//myPk, _ := myKey.PublicKey()
 
 	recipientKey, _ := nkeys.CreateCurveKeys()
 	recipientPk, _ := recipientKey.PublicKey()
@@ -19,11 +18,12 @@ func TestEncryption(t *testing.T) {
 	request, _ := NewRunRequest(
 		WorkloadName("testworkload"),
 		WorkloadDescription("testy mctesto"),
-		FileBytes([]byte{1, 2, 3, 4, 5}),
+		Checksum("hashbrowns"),
 		EnvironmentValue("NATS_URL", "nats://127.0.0.1:4222"),
 		EnvironmentValue("TOP_SECRET_LUGGAGE", "12345"),
 		SenderXKey(myKey),
 		Issuer(issuerAccount),
+		Location("nats://MUHBUCKET/muhfile"),
 		TargetPublicKey(recipientPk),
 	)
 
