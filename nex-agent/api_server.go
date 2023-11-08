@@ -25,10 +25,6 @@ func (api *AgentApiServer) GetHealth(ctx context.Context, in *agentapi.Void) (*a
 	}, nil
 }
 
-func (api *AgentApiServer) SetExecutionEnvironment(ctx context.Context, in *agentapi.ExecutionEnvironment) (*agentapi.ExecutionEnvironmentReply, error) {
-	return nil, nil
-}
-
 func (api *AgentApiServer) SubscribeToLogs(in *agentapi.Void, stream agentapi.NexAgent_SubscribeToLogsServer) error {
 	for {
 		entry := <-agentLogs
@@ -125,7 +121,7 @@ func (api *AgentApiServer) SubmitWorkload(stream agentapi.NexAgent_SubmitWorkloa
 		return stream.SendAndClose(&agentapi.WorkloadAck{Error: true, Message: msg})
 	}
 
-	err = RunWorkload(hdr.Name, hdr.TotalBytes, tempFile)
+	err = RunWorkload(hdr.Name, hdr.TotalBytes, tempFile, hdr.RuntimeEnvironment)
 	if err != nil {
 		return stream.SendAndClose(&agentapi.WorkloadAck{Error: true, Message: fmt.Sprintf("Failed to await program execution: %s", err)})
 	}

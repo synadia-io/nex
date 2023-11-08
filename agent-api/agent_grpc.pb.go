@@ -19,11 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	NexAgent_GetHealth_FullMethodName               = "/api.NexAgent/GetHealth"
-	NexAgent_SetExecutionEnvironment_FullMethodName = "/api.NexAgent/SetExecutionEnvironment"
-	NexAgent_SubscribeToLogs_FullMethodName         = "/api.NexAgent/SubscribeToLogs"
-	NexAgent_SubscribeToEvents_FullMethodName       = "/api.NexAgent/SubscribeToEvents"
-	NexAgent_SubmitWorkload_FullMethodName          = "/api.NexAgent/SubmitWorkload"
+	NexAgent_GetHealth_FullMethodName         = "/api.NexAgent/GetHealth"
+	NexAgent_SubscribeToLogs_FullMethodName   = "/api.NexAgent/SubscribeToLogs"
+	NexAgent_SubscribeToEvents_FullMethodName = "/api.NexAgent/SubscribeToEvents"
+	NexAgent_SubmitWorkload_FullMethodName    = "/api.NexAgent/SubmitWorkload"
 )
 
 // NexAgentClient is the client API for NexAgent service.
@@ -31,7 +30,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type NexAgentClient interface {
 	GetHealth(ctx context.Context, in *Void, opts ...grpc.CallOption) (*HealthReply, error)
-	SetExecutionEnvironment(ctx context.Context, in *ExecutionEnvironment, opts ...grpc.CallOption) (*ExecutionEnvironmentReply, error)
 	SubscribeToLogs(ctx context.Context, in *Void, opts ...grpc.CallOption) (NexAgent_SubscribeToLogsClient, error)
 	SubscribeToEvents(ctx context.Context, in *Void, opts ...grpc.CallOption) (NexAgent_SubscribeToEventsClient, error)
 	SubmitWorkload(ctx context.Context, opts ...grpc.CallOption) (NexAgent_SubmitWorkloadClient, error)
@@ -48,15 +46,6 @@ func NewNexAgentClient(cc grpc.ClientConnInterface) NexAgentClient {
 func (c *nexAgentClient) GetHealth(ctx context.Context, in *Void, opts ...grpc.CallOption) (*HealthReply, error) {
 	out := new(HealthReply)
 	err := c.cc.Invoke(ctx, NexAgent_GetHealth_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *nexAgentClient) SetExecutionEnvironment(ctx context.Context, in *ExecutionEnvironment, opts ...grpc.CallOption) (*ExecutionEnvironmentReply, error) {
-	out := new(ExecutionEnvironmentReply)
-	err := c.cc.Invoke(ctx, NexAgent_SetExecutionEnvironment_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +155,6 @@ func (x *nexAgentSubmitWorkloadClient) CloseAndRecv() (*WorkloadAck, error) {
 // for forward compatibility
 type NexAgentServer interface {
 	GetHealth(context.Context, *Void) (*HealthReply, error)
-	SetExecutionEnvironment(context.Context, *ExecutionEnvironment) (*ExecutionEnvironmentReply, error)
 	SubscribeToLogs(*Void, NexAgent_SubscribeToLogsServer) error
 	SubscribeToEvents(*Void, NexAgent_SubscribeToEventsServer) error
 	SubmitWorkload(NexAgent_SubmitWorkloadServer) error
@@ -179,9 +167,6 @@ type UnimplementedNexAgentServer struct {
 
 func (UnimplementedNexAgentServer) GetHealth(context.Context, *Void) (*HealthReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHealth not implemented")
-}
-func (UnimplementedNexAgentServer) SetExecutionEnvironment(context.Context, *ExecutionEnvironment) (*ExecutionEnvironmentReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetExecutionEnvironment not implemented")
 }
 func (UnimplementedNexAgentServer) SubscribeToLogs(*Void, NexAgent_SubscribeToLogsServer) error {
 	return status.Errorf(codes.Unimplemented, "method SubscribeToLogs not implemented")
@@ -219,24 +204,6 @@ func _NexAgent_GetHealth_Handler(srv interface{}, ctx context.Context, dec func(
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(NexAgentServer).GetHealth(ctx, req.(*Void))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _NexAgent_SetExecutionEnvironment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ExecutionEnvironment)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(NexAgentServer).SetExecutionEnvironment(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: NexAgent_SetExecutionEnvironment_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(NexAgentServer).SetExecutionEnvironment(ctx, req.(*ExecutionEnvironment))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -319,10 +286,6 @@ var NexAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHealth",
 			Handler:    _NexAgent_GetHealth_Handler,
-		},
-		{
-			MethodName: "SetExecutionEnvironment",
-			Handler:    _NexAgent_SetExecutionEnvironment_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

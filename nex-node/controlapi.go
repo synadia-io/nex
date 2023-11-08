@@ -74,8 +74,13 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
 		var request controlapi.RunRequest
 		err := json.Unmarshal(m.Data, &request)
+		if err != nil {
+			api.log.WithError(err).Error("Failed to deserialize run request")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deserialize run request: %s", err))
+		}
 
-		request.Validate(api.xk)
+		// If this passes, `DecodedClaims` contains values and WorkloadEnvironment is decrypted
+		err = request.Validate(api.xk)
 		if err != nil {
 			api.log.WithError(err).Error("Invalid run request")
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid run request: %s", err))
@@ -102,9 +107,8 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 
 		res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 			Started:   true,
-			PublicKey: "Nxxx",
-			Issuer:    "Axxx",
-			Hash:      "browns",
+			Name:      request.DecodedClaims.Subject,
+			Issuer:    request.DecodedClaims.Issuer,
 			MachineId: runningVm.vmmID,
 		}, nil)
 		raw, err := json.Marshal(res)

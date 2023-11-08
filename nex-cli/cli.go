@@ -1,13 +1,13 @@
 package nexcli
 
 import (
+	"net/url"
 	"time"
-
-	"github.com/choria-io/fisk"
 )
 
 var (
-	Opts = &Options{}
+	Opts    = &Options{}
+	RunOpts = &RunOptions{Env: make(map[string]string)}
 )
 
 // Options configure the CLI
@@ -39,8 +39,12 @@ type Options struct {
 	TlsFirst bool
 }
 
-func errorClosure(err error) func(*fisk.ParseContext) error {
-	return func(ctx *fisk.ParseContext) error {
-		return err
-	}
+type RunOptions struct {
+	TargetNode        string
+	WorkloadUrl       *url.URL
+	Name              string
+	Description       string
+	PublisherXkeyFile string
+	ClaimsIssuerFile  string
+	Env               map[string]string
 }

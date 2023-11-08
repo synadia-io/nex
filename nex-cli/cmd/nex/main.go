@@ -40,9 +40,14 @@ func main() {
 	nodes_info.Action(cli.NodeInfo)
 
 	run := ncli.Command("run", "Run a workload on a target node")
-	run.Arg("id", "Public key of the node to run the workload").Required().String()
-	run.Arg("file", "Path to local file to upload and run").File()
-	run.Arg("url", "URL pointing to the file to run").URL()
+	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&cli.RunOpts.WorkloadUrl)
+	run.Arg("id", "Public key of the target node to run the workload").Required().StringVar(&cli.RunOpts.TargetNode)
+
+	run.Flag("xkey", "Publisher's Xkey required to encrypt environment").Required().ExistingFileVar(&cli.RunOpts.PublisherXkeyFile)
+	run.Flag("issuer", "Path to a seed key to sign the workload JWT as the issuer").Required().ExistingFileVar(&cli.RunOpts.ClaimsIssuerFile)
+	run.Arg("env", "Environment variables to pass to workload").StringMapVar(&cli.RunOpts.Env)
+	run.Flag("name", "Name of the workload. Must be alphabetic (lowercase)").Required().StringVar(&cli.RunOpts.Name)
+	run.Flag("description", "Description of the workload").StringVar(&cli.RunOpts.Description)
 	run.Action(cli.RunWorkload)
 
 	ncli.MustParseWithUsage(os.Args[1:])

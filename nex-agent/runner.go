@@ -4,21 +4,30 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
 
-func RunWorkload(name string, totalBytes int32, tempFile *os.File) error {
+func RunWorkload(name string, totalBytes int32, tempFile *os.File, runtimeEnvironment map[string]string) error {
 	// This has to be backgrounded because the workload could be a long-running process/service
 	go func() {
 		cmd := exec.Command(tempFile.Name())
 		cmd.Stdout = &logEmitter{stderr: false}
 		cmd.Stderr = &logEmitter{stderr: true}
+
+		envVars := make([]string, len(runtimeEnvironment))
+		for k, v := range runtimeEnvironment {
+			item := fmt.Sprintf("%s=%s", strings.ToUpper(k), v)
+			envVars = append(envVars, item)
+		}
+		cmd.Env = envVars
 		err := cmd.Start()
 
 		if err != nil {
-			// TODO: handle error
-			fmt.Println(err)
+			msg := fmt.Sprintf("Failed to start workload: %s", err)
+			LogError(msg)
+			PublishWorkloadStopped(name, true, msg)
 			return
 		}
 		PublishWorkloadStarted(name, totalBytes)

@@ -16,9 +16,8 @@ const (
 type RunResponse struct {
 	Started   bool   `json:"started"`
 	MachineId string `json:"machine_id"`
-	PublicKey string `json:"public_key"`
 	Issuer    string `json:"issuer"`
-	Hash      string `json:"hash"`
+	Name      string `json:"name"`
 }
 
 type PingResponse struct {

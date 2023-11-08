@@ -12,8 +12,7 @@ import "google/protobuf/timestamp.proto";
 // The communication protocol by which the node service (outer process) communicates with
 // the inner (firecracker-bound) agent process
 service NexAgent {
-    rpc GetHealth(Void) returns (HealthReply) {}
-    rpc SetExecutionEnvironment(ExecutionEnvironment) returns (ExecutionEnvironmentReply) {}
+    rpc GetHealth(Void) returns (HealthReply) {}    
     rpc SubscribeToLogs(Void) returns (stream LogEntry) {}
     rpc SubscribeToEvents(Void) returns (stream AgentEvent) {}
     rpc SubmitWorkload(stream Workload) returns (WorkloadAck) {}
@@ -30,6 +29,7 @@ message WorkloadMetadata {
     string hash = 1;
     string name = 2;
     int32 total_bytes = 3;
+    map<string, string> runtime_environment = 4;
 }
 
 message WorkloadAck {
@@ -41,24 +41,6 @@ message LogEntry {
     string source = 1;
     LogLevel level = 2;
     string text = 3;
-}
-
-message ExecutionEnvironment {
-    string workload_nats_url = 1;
-    map<string, string> vars = 2;
-    bool force_restart = 3;
-    
-    oneof nats_credentials {
-        UserPasswordCreds user_and_pass = 5;
-        UserJwtCreds jwt_and_seed = 6;
-        string seed_only = 7;
-    }
-    
-}
-
-message ExecutionEnvironmentReply {
-    bool success = 1;
-    
 }
 
 message HealthReply {
@@ -74,16 +56,6 @@ message AgentEvent {
         WorkloadStoppedEvent workload_stopped = 4;        
         AgentStoppedEvent agent_stopped = 5;
     }
-}
-
-message UserPasswordCreds {
-    string username = 1;
-    string password = 2;
-}
-
-message UserJwtCreds {
-    string jwt = 1;
-    string seed = 2;
 }
 
 message Void{}
