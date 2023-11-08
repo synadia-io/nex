@@ -28,8 +28,8 @@ func TestEncryption(t *testing.T) {
 	)
 
 	request.DecryptRequestEnvironment(recipientKey)
-	if request.workloadEnvironment["TOP_SECRET_LUGGAGE"] != "12345" {
-		t.Fatalf("Expected a good luggage password, found %s", request.workloadEnvironment["TOP_SECRET_LUGGAGE"])
+	if request.WorkloadEnvironment["TOP_SECRET_LUGGAGE"] != "12345" {
+		t.Fatalf("Expected a good luggage password, found %s", request.WorkloadEnvironment["TOP_SECRET_LUGGAGE"])
 	}
 
 	err := request.Validate(recipientKey)

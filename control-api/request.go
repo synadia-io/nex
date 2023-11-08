@@ -21,10 +21,11 @@ type RunRequest struct {
 	// A base64-encoded byte array that contains an encrypted json-serialized map[string]string.
 	Environment     string `json:"environment"`
 	SenderPublicKey string `json:"sender_public_key"`
+	TargetNode      string `json:"target_node"`
 	// If the payload indicates an object store bucket & key, JS domain can be supplied
 	JsDomain string `json:"jsdomain,omitempty"`
 
-	workloadEnvironment map[string]string `json:"-"`
+	WorkloadEnvironment map[string]string `json:"-"`
 	DecodedClaims       jwt.GenericClaims `json:"-"`
 }
 
@@ -37,15 +38,17 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	for _, o := range opts {
 		reqOpts = o(reqOpts)
 	}
+	// TODO: ensure that all the required fields are here
+
 	workloadJwt, err := CreateWorkloadJwt(reqOpts.hash, reqOpts.workloadName, reqOpts.claimsIssuer)
 	if err != nil {
 		return nil, err
 	}
-	encryptedEnv, err := EncryptRequestEnvironment(reqOpts.senderPublicXkey, reqOpts.targetPublicKey, reqOpts.env)
+	encryptedEnv, err := EncryptRequestEnvironment(reqOpts.senderXkey, reqOpts.targetPublicXKey, reqOpts.env)
 	if err != nil {
 		return nil, err
 	}
-	senderPublic, _ := reqOpts.senderPublicXkey.PublicKey()
+	senderPublic, _ := reqOpts.senderXkey.PublicKey()
 
 	req := &RunRequest{
 		Description:     reqOpts.workloadDescription,
@@ -54,6 +57,7 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 		WorkloadJwt:     workloadJwt,
 		Environment:     encryptedEnv,
 		SenderPublicKey: senderPublic,
+		TargetNode:      reqOpts.targetPublicXKey,
 		JsDomain:        reqOpts.jsDomain,
 	}
 
@@ -119,7 +123,7 @@ func (request *RunRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair
 		return err
 	}
 	// "I can't believe I can do this" - Every Rust developer ever.
-	request.workloadEnvironment = cleanEnv
+	request.WorkloadEnvironment = cleanEnv
 	return nil
 }
 
@@ -128,9 +132,9 @@ type requestOptions struct {
 	workloadDescription string
 	location            url.URL
 	env                 map[string]string
-	senderPublicXkey    nkeys.KeyPair
+	senderXkey          nkeys.KeyPair
 	claimsIssuer        nkeys.KeyPair
-	targetPublicKey     string
+	targetPublicXKey    string
 	jsDomain            string
 	hash                string
 }
@@ -178,16 +182,16 @@ func Environment(env map[string]string) RequestOption {
 // to encrypt the environment variables
 func SenderXKey(xkey nkeys.KeyPair) RequestOption {
 	return func(o requestOptions) requestOptions {
-		o.senderPublicXkey = xkey
+		o.senderXkey = xkey
 		return o
 	}
 }
 
-// Sets the public key of the recipient (An `Nxxx` server key). This must be set properly or the recipient of the request
+// Sets the public key of the recipient (A public curve key). This must be set properly or the recipient of the request
 // will be unable to decrypt the environment variables
-func TargetPublicKey(key string) RequestOption {
+func TargetPublicXKey(key string) RequestOption {
 	return func(o requestOptions) requestOptions {
-		o.targetPublicKey = key
+		o.targetPublicXKey = key
 		return o
 	}
 }

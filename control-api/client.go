@@ -18,6 +18,34 @@ func NewApiClient(nc *nats.Conn, timeout time.Duration) *apiClient {
 	return &apiClient{nc: nc, timeout: timeout}
 }
 
+func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
+	var response RunResponse
+	bytes, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := api.nc.Request(fmt.Sprintf("%s.RUN.%s", APIPrefix, request.TargetNode), bytes, api.timeout)
+	if err != nil {
+		return nil, err
+	}
+	env, err := extractEnvelope(resp.Data)
+	if err != nil {
+		return nil, err
+	}
+	if env.Error != nil {
+		return nil, fmt.Errorf("%v", env.Error)
+	}
+	respBytes, err := json.Marshal(env.Data)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(respBytes, &response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
 func (api *apiClient) NodeInfo(id string) (*InfoResponse, error) {
 	var response InfoResponse
 	resp, err := api.nc.Request(fmt.Sprintf("%s.INFO.%s", APIPrefix, id), []byte{}, api.timeout)
@@ -27,6 +55,9 @@ func (api *apiClient) NodeInfo(id string) (*InfoResponse, error) {
 	env, err := extractEnvelope(resp.Data)
 	if err != nil {
 		return nil, err
+	}
+	if env.Error != nil {
+		return nil, fmt.Errorf("%v", env.Error)
 	}
 	bytes, err := json.Marshal(env.Data)
 	if err != nil {

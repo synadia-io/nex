@@ -9,7 +9,7 @@ import (
 
 func generateConnectionFromOpts() (*nats.Conn, error) {
 	if len(strings.TrimSpace(Opts.Servers)) == 0 {
-		Opts.Servers = nats.DefaultURL
+		Opts.Servers = "0.0.0.0:4222"
 	}
 	ctxOpts := []natscontext.Option{
 		natscontext.WithServerURL(Opts.Servers),
