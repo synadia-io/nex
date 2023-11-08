@@ -10,8 +10,6 @@ import (
 )
 
 func RunWorkload(ctx *fisk.ParseContext) error {
-	fmt.Printf("%v\n", Opts)
-	fmt.Printf("%v\n", RunOpts)
 	nc, err := generateConnectionFromOpts()
 	if err != nil {
 		return err
@@ -21,7 +19,6 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 	// Get node info so we can get public xkey from the target for env encryption
 	nodeInfo, err := nodeClient.NodeInfo(RunOpts.TargetNode)
 	if err != nil {
-		fmt.Println("SUCK")
 		return err
 	}
 
@@ -51,8 +48,10 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 		controlapi.Environment(RunOpts.Env),
 		controlapi.Issuer(issuerKp),
 		controlapi.SenderXKey(xkey),
-		controlapi.TargetPublicXKey(RunOpts.TargetNode),
+		controlapi.TargetNode(RunOpts.TargetNode),
+		controlapi.TargetPublicXKey(targetPublicXkey),
 		controlapi.WorkloadName(RunOpts.Name),
+		controlapi.Checksum("abc12345TODOmakethisreal"),
 		controlapi.WorkloadDescription(RunOpts.Description),
 	)
 	if err != nil {

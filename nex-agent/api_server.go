@@ -87,11 +87,6 @@ func (api *AgentApiServer) SubmitWorkload(stream agentapi.NexAgent_SubmitWorkloa
 			if err != nil {
 				return stream.SendAndClose(&agentapi.WorkloadAck{Error: true, Message: fmt.Sprintf("Failed to write file chunk: %s", err)})
 			}
-			agentLogs <- &agentapi.LogEntry{
-				Source: "nex-agent",
-				Level:  agentapi.LogLevel_LEVEL_DEBUG,
-				Text:   fmt.Sprintf("Received workload chunk %d bytes", len(chunk.Chunk)),
-			}
 			totalBytesReceived += len(chunk.Chunk)
 		case *agentapi.Workload_Header:
 			agentLogs <- &agentapi.LogEntry{

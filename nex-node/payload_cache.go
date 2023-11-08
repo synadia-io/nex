@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	controlapi "github.com/ConnectEverything/nex/control-api"
@@ -31,6 +32,7 @@ func (c *payloadCache) GetPayloadFromBucket(request *controlapi.RunRequest) (*os
 
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
+	c.log.WithField("bucket", bucket).WithField("key", key).Info("Attempting object store download")
 	opts := []nats.JSOpt{}
 	if len(strings.TrimSpace(request.JsDomain)) != 0 {
 		opts = append(opts, nats.APIPrefix(request.JsDomain))
@@ -41,21 +43,25 @@ func (c *payloadCache) GetPayloadFromBucket(request *controlapi.RunRequest) (*os
 	}
 	store, err := js.ObjectStore(bucket)
 	if err != nil {
+		c.log.WithError(err).WithField("bucket", bucket).Error("Failed to bind to specified object store")
 		return nil, err
 	}
-	filename := fmt.Sprintf("%s.%s", bucket, key)
-	_, err = store.GetInfo(filename)
+
+	filename := fmt.Sprintf("%s.%s.bin", bucket, key)
+	fname := filepath.Join(c.rootDir, filename)
+	_, err = store.GetInfo(key)
 	if err != nil {
+		c.log.WithError(err).WithField("key", key).Error("Failed to locate workload binary")
 		return nil, err
 	}
 	// TODO: examine objInfo.Digest to get file hash to compare against locally hashed file
-	err = store.GetFile(key, filename)
+	err = store.GetFile(key, fname)
 	if err != nil {
 		return nil, err
 	}
-	c.log.WithField("filename", filename).WithField("bucket", bucket).WithField("key", key).Info("Downloaded workload bytes from bucket")
+	c.log.WithField("filename", fname).WithField("bucket", bucket).WithField("key", key).Info("Downloaded workload bytes from bucket")
 
-	elfFile, err := elf.Open(filename)
+	elfFile, err := elf.Open(fname)
 	if err != nil {
 		c.log.WithError(err).Error("Failed to verify downloaded file is a static-linked elf binary")
 	}
@@ -68,7 +74,7 @@ func (c *payloadCache) GetPayloadFromBucket(request *controlapi.RunRequest) (*os
 		c.log.Info("✅ Verified static-linked ELF binary")
 	}
 
-	return os.Open(filename)
+	return os.Open(fname)
 }
 
 func verifyStatic(elf *elf.File) error {

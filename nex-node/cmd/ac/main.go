@@ -35,7 +35,7 @@ func main() {
 
 	fmt.Println("Submitting workload")
 
-	ack, err := ac.PostWorkload("/home/kevin/lab/firecracker/testworkload/workload")
+	ack, err := ac.PostWorkload("/home/kevin/lab/firecracker/testworkload/workload", make(map[string]string))
 	if err != nil {
 		fmt.Println(err)
 		panic(err)

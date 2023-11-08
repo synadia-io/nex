@@ -76,6 +76,7 @@ func (m *MachineManager) PublicKey() string {
 
 func (m *MachineManager) TakeFromPool() (*runningFirecracker, error) {
 	running := <-m.warmVms
+	m.allVms[running.vmmID] = running
 	return &running, nil
 }
 

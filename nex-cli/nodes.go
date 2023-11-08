@@ -3,6 +3,7 @@ package nexcli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/choria-io/fisk"
@@ -50,6 +51,12 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 	cols.AddRowf("Xkey", info.PublicXKey)
 	cols.AddRow("Version", info.Version)
 	cols.AddRow("Uptime", info.Uptime)
+
+	taglist := make([]string, 0)
+	for k, v := range info.Tags {
+		taglist = append(taglist, fmt.Sprintf("%s=%s", k, v))
+	}
+	cols.AddRow("Tags", strings.Join(taglist, ", "))
 
 	cols.AddSectionTitle("Workloads:")
 	cols.Indent(2)

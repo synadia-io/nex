@@ -57,7 +57,7 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 		WorkloadJwt:     workloadJwt,
 		Environment:     encryptedEnv,
 		SenderPublicKey: senderPublic,
-		TargetNode:      reqOpts.targetPublicXKey,
+		TargetNode:      reqOpts.targetNode,
 		JsDomain:        reqOpts.jsDomain,
 	}
 
@@ -66,29 +66,30 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 
 // This will validate a request's workload JWT, decrypt the request environment. It will not
 // perform a comparison of the hash found in the claims with a recipient's expected hash
-func (request *RunRequest) Validate(myKey nkeys.KeyPair) error {
+func (request *RunRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims, error) {
 	fmt.Printf("%v", request)
 	claims, err := jwt.DecodeGeneric(request.WorkloadJwt)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("could not decode workload JWT: %s", err)
 	}
 	request.DecodedClaims = *claims
+	fmt.Printf("decodeed claims %+v\n", request.DecodedClaims)
 	if !validWorkloadName.MatchString(claims.Subject) {
-		return fmt.Errorf("workload name claim ('%s') does not match requirements of all lowercase letters", claims.Subject)
+		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements of all lowercase letters", claims.Subject)
 	}
 
 	err = request.DecryptRequestEnvironment(myKey)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to decrypt request environment: %s", err)
 	}
 
 	var vr jwt.ValidationResults
 	claims.Validate(&vr)
 	if len(vr.Issues) > 0 || len(vr.Errors()) > 0 {
-		return errors.New("standard claims within JWT are not valid")
+		return nil, errors.New("standard claims within JWT are not valid")
 	}
 
-	return nil
+	return claims, nil
 
 }
 
@@ -137,6 +138,7 @@ type requestOptions struct {
 	targetPublicXKey    string
 	jsDomain            string
 	hash                string
+	targetNode          string
 }
 
 type RequestOption func(o requestOptions) requestOptions
@@ -145,6 +147,14 @@ type RequestOption func(o requestOptions) requestOptions
 func WorkloadName(name string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.workloadName = name
+		return o
+	}
+}
+
+// Sets the target execution engine node (a public key of type "server") for this requet
+func TargetNode(publicKey string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.targetNode = publicKey
 		return o
 	}
 }

@@ -24,7 +24,7 @@ func TestEncryption(t *testing.T) {
 		SenderXKey(myKey),
 		Issuer(issuerAccount),
 		Location("nats://MUHBUCKET/muhfile"),
-		TargetPublicKey(recipientPk),
+		TargetPublicXKey(recipientPk),
 	)
 
 	request.DecryptRequestEnvironment(recipientKey)
@@ -32,7 +32,7 @@ func TestEncryption(t *testing.T) {
 		t.Fatalf("Expected a good luggage password, found %s", request.WorkloadEnvironment["TOP_SECRET_LUGGAGE"])
 	}
 
-	err := request.Validate(recipientKey)
+	_, err := request.Validate(recipientKey)
 	if err != nil {
 		t.Fatalf("Expected no error, but got one: %s", err)
 	}

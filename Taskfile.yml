@@ -39,8 +39,15 @@ tasks:
     cmds:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
+  echo-service:
+    dir: examples/echoservice
+    sources:
+      - "*.go"
+    cmds:
+      - go build -tags netgo -ldflags '-extldflags "-static"'
+
   gen:
     deps: [agent-api]
 
   build:
-    deps: [nex-agent, nex-node, nex-cli]
+    deps: [nex-agent, nex-node, nex-cli, echo-service]

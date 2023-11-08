@@ -22,17 +22,7 @@ type runningFirecracker struct {
 	agentClient           agentapi.AgentClient
 	workloadStarted       time.Time
 	machineStarted        time.Time
-	workloadSpecification *controlapi.RunRequest
-}
-
-func (vm *runningFirecracker) SubmitWorkload(file *os.File, request controlapi.RunRequest) error {
-	_, err := vm.agentClient.PostWorkload(file.Name())
-	if err != nil {
-		return err
-	}
-	vm.workloadStarted = time.Now().UTC()
-	vm.workloadSpecification = &request
-	return nil
+	workloadSpecification controlapi.RunRequest
 }
 
 func (vm *runningFirecracker) Subscribe() (<-chan *agentapi.LogEntry, <-chan *agentapi.AgentEvent, error) {
