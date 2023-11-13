@@ -14,10 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	workloadSpecs = make(map[string]controlapi.RunRequest)
-)
-
 type ApiListener struct {
 	mgr          *MachineManager
 	nc           *nats.Conn
@@ -132,7 +128,6 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			Issuer:    runningVm.workloadSpecification.DecodedClaims.Issuer,
 			MachineId: runningVm.vmmID,
 		}, nil)
-		fmt.Printf("%+v\n", res)
 		raw, err := json.Marshal(res)
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal ping response")

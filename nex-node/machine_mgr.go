@@ -139,7 +139,7 @@ func (m *MachineManager) fillPool() {
 				return
 			}
 			go dispatchLogs(vm, m.kp, m.nc, logs, m.log)
-			go dispatchEvents(vm, m.kp, m.nc, events, m.log)
+			go dispatchEvents(m, vm, m.kp, m.nc, events, m.log)
 
 			// Add the new microVM to the pool.
 			// If the pool is full, this line will block until a slot is available.
@@ -169,7 +169,7 @@ func dispatchLogs(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, logs 
 	}
 }
 
-func dispatchEvents(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, events <-chan *agentapi.AgentEvent, log *logrus.Logger) {
+func dispatchEvents(m *MachineManager, vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, events <-chan *agentapi.AgentEvent, log *logrus.Logger) {
 	pk, _ := kp.PublicKey()
 	for {
 		event := <-events
@@ -178,7 +178,11 @@ func dispatchEvents(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, eve
 		log.WithField("vmid", vm.vmmID).
 			WithField("event_type", eventType).
 			WithField("ip", vm.ip).
-			Info("Received event from agent")
+			Debug("Received event from agent")
+		if eventType == "agent_stopped" || eventType == "workload_stopped" {
+			delete(m.allVms, vm.vmmID)
+			vm.shutDown()
+		}
 	}
 }
 
