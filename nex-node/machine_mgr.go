@@ -2,6 +2,7 @@ package nexnode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 
 const (
 	eventSubjectPrefix = "$NEX.events"
+	logSubjectPrefix   = "$NEX.logs"
 )
 
 type MachineManagerConfiguration struct {
@@ -32,6 +34,12 @@ type MachineManager struct {
 	log         *logrus.Logger
 	allVms      map[string]runningFirecracker
 	warmVms     chan runningFirecracker
+}
+
+type emittedLog struct {
+	Text      string       `json:"text"`
+	Level     logrus.Level `json:"level"`
+	MachineId string       `json:"machine_id"`
 }
 
 func (m *MachineManager) Start() error {
@@ -130,7 +138,7 @@ func (m *MachineManager) fillPool() {
 				m.log.WithError(err).Error("Failed to get channels from client for gRPC subscriptions")
 				return
 			}
-			go dispatchLogs(vm, logs, m.log)
+			go dispatchLogs(vm, m.kp, m.nc, logs, m.log)
 			go dispatchEvents(vm, m.kp, m.nc, events, m.log)
 
 			// Add the new microVM to the pool.
@@ -142,19 +150,31 @@ func (m *MachineManager) fillPool() {
 	}
 }
 
-func dispatchLogs(vm *runningFirecracker, logs <-chan *agentapi.LogEntry, log *logrus.Logger) {
+func dispatchLogs(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, logs <-chan *agentapi.LogEntry, log *logrus.Logger) {
+	pk, _ := kp.PublicKey()
 	for {
 		entry := <-logs
 		lvl := getLogrusLevel(entry)
+		emitLog := emittedLog{
+			Text:      entry.Text,
+			Level:     lvl,
+			MachineId: vm.vmmID,
+		}
+		logBytes, _ := json.Marshal(emitLog)
+		workloadName := vm.workloadSpecification.DecodedClaims.Subject
+		// $NEX.LOGS.{host}.{workload}.{vm}
+		nc.Publish(fmt.Sprintf("%s.%s.%s.%s", logSubjectPrefix, pk, workloadName, vm.vmmID), logBytes)
 		log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).Log(lvl, entry.Text)
+
 	}
 }
 
 func dispatchEvents(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, events <-chan *agentapi.AgentEvent, log *logrus.Logger) {
+	pk, _ := kp.PublicKey()
 	for {
 		event := <-events
 		eventType := getEventType(event)
-		nc.Publish(fmt.Sprintf("%s.%s", eventSubjectPrefix, eventType), agentEventToCloudEvent(vm, kp, event, eventType))
+		nc.Publish(fmt.Sprintf("%s.%s", eventSubjectPrefix, eventType), agentEventToCloudEvent(vm, pk, event, eventType))
 		log.WithField("vmid", vm.vmmID).
 			WithField("event_type", eventType).
 			WithField("ip", vm.ip).
@@ -198,8 +218,7 @@ func getLogrusLevel(entry *agentapi.LogEntry) logrus.Level {
 	}
 }
 
-func agentEventToCloudEvent(vm *runningFirecracker, kp nkeys.KeyPair, event *agentapi.AgentEvent, eventType string) []byte {
-	pk, _ := kp.PublicKey()
+func agentEventToCloudEvent(vm *runningFirecracker, pk string, event *agentapi.AgentEvent, eventType string) []byte {
 	cloudevent := cloudevents.NewEvent()
 
 	cloudevent.SetSource(fmt.Sprintf("%s-%s", pk, vm.vmmID))

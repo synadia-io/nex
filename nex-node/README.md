@@ -66,3 +66,26 @@ Here's a look at the `fcnet.conflist` file that we use as a default. This gives 
 }
 ```
 If you want to add additional constraints and rules to the `fcnet` definition, consult the CNI documentation as we use just plain CNI configuration files here.
+
+## Observing Events
+You can monitor events coming out of the node and workloads running within the node by subscribing on the following subject pattern:
+
+```
+$NEX.events.{event_type}
+```
+
+The payload of these events is a **CloudEvents** envelope containing an inner JSON object for the `data` field.
+
+## Observing Logs
+You can subscribe to log emissions without console access by using the following subject pattern:
+
+```
+$NEX.logs.{host}.{workload}.{vmId}
+```
+
+This gives you the flexibility of monitoring everything from a given host, workload, or vmID. For example, if you want to see
+an aggregate of all logs emitted by the `bankservice` workload throughout an entire system, you could just subscribe to:
+
+```
+$NEX.logs.*.bankservice.*
+```
