@@ -27,7 +27,7 @@ func NewPayloadCache(nc *nats.Conn, log *logrus.Logger, dir string) *payloadCach
 	}
 }
 
-func (c *payloadCache) GetPayloadFromBucket(request *controlapi.RunRequest) (*os.File, error) {
+func (c *payloadCache) GetPayload(request *controlapi.RunRequest) (*os.File, error) {
 	// TODO - check for locally cached version
 
 	bucket := request.Location.Host

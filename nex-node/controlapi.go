@@ -86,41 +86,36 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deserialize run request: %s", err))
 		}
 
-		// If this passes, `DecodedClaims` contains values and WorkloadEnvironment is decrypted
 		decodedClaims, err := request.Validate(api.xk)
 		if err != nil {
 			api.log.WithError(err).Error("Invalid run request")
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid run request: %s", err))
 			return
 		}
-		fmt.Printf("POST VALIDATION: %+v\n", request)
 		request.DecodedClaims = *decodedClaims
 
-		// TODO: once we support another location, change this to "GetPayload"
-		payloadFile, err := api.payloadCache.GetPayloadFromBucket(&request)
+		payloadFile, err := api.payloadCache.GetPayload(&request)
 		if err != nil {
 			api.log.WithError(err).Error("Failed to read payload from specified location")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to download workload bytes from specified location: %s", err))
 			return
 		}
 
 		runningVm, err := api.mgr.TakeFromPool()
 		if err != nil {
 			api.log.WithError(err).Error("Failed to get warm VM from pool")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to pull warm VM from ready pool: %s", err))
 			return
 		}
 
-		// NOTE this makes a copy of request
 		_, err = runningVm.agentClient.PostWorkload(payloadFile.Name(), request.WorkloadEnvironment)
 		if err != nil {
+			api.log.WithError(err).Error("Failed to start workload in VM")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to submit workload to agent process: %s", err))
 			return
 		}
 		runningVm.workloadStarted = time.Now().UTC()
 		runningVm.workloadSpecification = request
-
-		if err != nil {
-			api.log.WithError(err).Error("Failed to start workload in VM")
-		}
-		fmt.Printf("NEW workload spec claims %+v\n", runningVm.workloadSpecification.DecodedClaims)
 
 		res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 			Started:   true,
@@ -130,7 +125,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 		}, nil)
 		raw, err := json.Marshal(res)
 		if err != nil {
-			api.log.WithError(err).Error("Failed to marshal ping response")
+			api.log.WithError(err).Error("Failed to marshal run response")
 		} else {
 			m.Respond(raw)
 		}
