@@ -91,6 +91,7 @@ func (m *MachineManager) TakeFromPool() (*runningFirecracker, error) {
 func (m *MachineManager) PublishCloudEvent(eventType string, data interface{}) {
 	pk, _ := m.kp.PublicKey()
 	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetID(uuid.NewString())
 	cloudevent.SetType(eventType)
 	cloudevent.SetSource(pk)
@@ -227,6 +228,7 @@ func agentEventToCloudEvent(vm *runningFirecracker, pk string, event *agentapi.A
 
 	cloudevent.SetSource(fmt.Sprintf("%s-%s", pk, vm.vmmID))
 	cloudevent.SetID(uuid.NewString())
+	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(eventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(event.Data)
