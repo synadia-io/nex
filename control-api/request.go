@@ -67,13 +67,12 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 // This will validate a request's workload JWT, decrypt the request environment. It will not
 // perform a comparison of the hash found in the claims with a recipient's expected hash
 func (request *RunRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims, error) {
-	fmt.Printf("%v", request)
+
 	claims, err := jwt.DecodeGeneric(request.WorkloadJwt)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode workload JWT: %s", err)
 	}
 	request.DecodedClaims = *claims
-	fmt.Printf("decodeed claims %+v\n", request.DecodedClaims)
 	if !validWorkloadName.MatchString(claims.Subject) {
 		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements of all lowercase letters", claims.Subject)
 	}

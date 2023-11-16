@@ -1,0 +1,25 @@
+{
+    "kernel_path": "/home/kevin/lab/firecracker/vmlinux-5.10",
+    "rootfs_path": "/home/kevin/lab/firecracker/rootfs.ext4",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "rate_limiters": {
+        "bandwidth": {
+            "one_time_burst": 1048576,
+            "refill_time": 500,
+            "size": 1048576
+        },
+        "iops": {
+            "one_time_burst": 100,
+            "refill_time": 1000,
+            "size": 100
+        }
+    }
+}

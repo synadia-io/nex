@@ -7,6 +7,7 @@ import (
 	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
+	controlapi "github.com/ConnectEverything/nex/control-api"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -44,6 +45,7 @@ type emittedLog struct {
 
 func (m *MachineManager) Start() error {
 	m.log.Info("Virtual machine manager starting")
+	specMap = make(map[string]controlapi.RunRequest)
 	go m.fillPool()
 
 	return nil
@@ -139,7 +141,7 @@ func (m *MachineManager) fillPool() {
 				m.log.WithError(err).Error("Failed to get channels from client for gRPC subscriptions")
 				return
 			}
-			go dispatchLogs(vm, m.kp, m.nc, logs, m.log)
+			go dispatchLogs(vm.vmmID, vm.ip.String(), m.kp, m.nc, logs, m.log)
 			go dispatchEvents(m, vm, m.kp, m.nc, events, m.log)
 
 			// Add the new microVM to the pool.
@@ -151,21 +153,27 @@ func (m *MachineManager) fillPool() {
 	}
 }
 
-func dispatchLogs(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, logs <-chan *agentapi.LogEntry, log *logrus.Logger) {
+func dispatchLogs(vmId string, ip string, kp nkeys.KeyPair, nc *nats.Conn, logs <-chan *agentapi.LogEntry, log *logrus.Logger) {
 	pk, _ := kp.PublicKey()
 	for {
 		entry := <-logs
+		spec := specMap[vmId]
+		workloadName := spec.DecodedClaims.Subject
 		lvl := getLogrusLevel(entry)
 		emitLog := emittedLog{
 			Text:      entry.Text,
 			Level:     lvl,
-			MachineId: vm.vmmID,
+			MachineId: vmId,
 		}
 		logBytes, _ := json.Marshal(emitLog)
-		workloadName := vm.workloadSpecification.DecodedClaims.Subject
 		// $NEX.LOGS.{host}.{workload}.{vm}
-		nc.Publish(fmt.Sprintf("%s.%s.%s.%s", logSubjectPrefix, pk, workloadName, vm.vmmID), logBytes)
-		log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).Log(lvl, entry.Text)
+		subject := fmt.Sprintf("%s.%s.%s.%s", logSubjectPrefix, pk, workloadName, vmId)
+		fmt.Printf("SUBJECT: %s\n", subject)
+		err := nc.Publish(subject, logBytes)
+		if err != nil {
+			log.WithField("vmid", vmId).WithField("ip", ip).WithField("subject", subject).Warn("Failed to publish log on logs subject")
+		}
+		log.WithField("vmid", vmId).WithField("ip", ip).Log(lvl, entry.Text)
 
 	}
 }

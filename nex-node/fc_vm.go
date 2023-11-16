@@ -23,9 +23,9 @@ import (
 func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningFirecracker, error) {
 	vmmID := xid.New().String()
 
-	copy(config.RootFsPath, "/tmp/rootfs-"+vmmID+".ext4")
-
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
+	copy(config.RootFsPath, *fcCfg.Drives[0].PathOnHost)
+
 	if err != nil {
 		log.Errorf("Error: %s", err)
 		return nil, err
@@ -59,8 +59,6 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 		cmd := firecracker.VMCommandBuilder{}.
 			WithBin(firecrackerBinary).
 			WithSocketPath(fcCfg.SocketPath).
-			// WithStdin(os.Stdin).
-			// WithStdout(os.Stdout).
 			WithStderr(os.Stderr).
 			Build(ctx)
 
@@ -80,9 +78,9 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 		return nil, fmt.Errorf("failed to start machine: %v", err)
 	}
 
-	log.WithField("ip", m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.IPAddr.IP).Info("machine started")
-
 	ip := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.IPAddr.IP
+	log.WithField("ip", ip).Info("machine started")
+
 	return &runningFirecracker{
 		vmmCtx:         vmmCtx,
 		vmmCancel:      vmmCancel,
@@ -105,6 +103,7 @@ func copy(src string, dst string) error {
 
 func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracker.Config, error) {
 	socket := getSocketPath(id)
+	rootPath := getRootFsPath(id)
 
 	return firecracker.Config{
 		SocketPath:      socket,
@@ -112,7 +111,7 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 		LogPath:         fmt.Sprintf("%s.log", socket),
 		Drives: []models.Drive{{
 			DriveID:      firecracker.String("1"),
-			PathOnHost:   firecracker.String("/tmp/rootfs-" + id + ".ext4"),
+			PathOnHost:   &rootPath,
 			IsRootDevice: firecracker.Bool(true),
 			IsReadOnly:   firecracker.Bool(false),
 			// RateLimiter: firecracker.NewRateLimiter(
@@ -145,6 +144,13 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 		},
 		MmdsVersion: firecracker.MMDSv2,
 	}, nil
+}
+
+func getRootFsPath(vmmID string) string {
+	filename := fmt.Sprintf("rootfs-%s.ext4", vmmID)
+	dir := os.TempDir()
+
+	return filepath.Join(dir, filename)
 }
 
 func getSocketPath(vmmID string) string {

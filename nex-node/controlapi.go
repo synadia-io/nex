@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"time"
 
@@ -93,6 +94,11 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			return
 		}
 		request.DecodedClaims = *decodedClaims
+		if !validateIssuer(request.DecodedClaims.Issuer, api.mgr.config.ValidIssuers) {
+			err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
+			api.log.WithError(err).Error("Workload validation failed")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
+		}
 
 		payloadFile, err := api.payloadCache.GetPayload(&request)
 		if err != nil {
@@ -107,6 +113,9 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to pull warm VM from ready pool: %s", err))
 			return
 		}
+		runningVm.workloadStarted = time.Now().UTC()
+		runningVm.workloadSpecification = request
+		specMap[runningVm.vmmID] = request
 
 		_, err = runningVm.agentClient.PostWorkload(payloadFile.Name(), request.WorkloadEnvironment)
 		if err != nil {
@@ -114,8 +123,6 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to submit workload to agent process: %s", err))
 			return
 		}
-		runningVm.workloadStarted = time.Now().UTC()
-		runningVm.workloadSpecification = request
 
 		res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 			Started:   true,
@@ -178,7 +185,6 @@ func summarizeMachines(vms *map[string]runningFirecracker) []controlapi.MachineS
 	machines := make([]controlapi.MachineSummary, 0)
 	now := time.Now().UTC()
 	for _, v := range *vms {
-		fmt.Printf("VM: %+v\n", v)
 		machine := controlapi.MachineSummary{
 			Id:      v.vmmID,
 			Healthy: true, // TODO cache last health status
@@ -195,6 +201,13 @@ func summarizeMachines(vms *map[string]runningFirecracker) []controlapi.MachineS
 		machines = append(machines, machine)
 	}
 	return machines
+}
+
+func validateIssuer(issuer string, validIssuers []string) bool {
+	if len(validIssuers) == 0 {
+		return true
+	}
+	return slices.Contains(validIssuers, issuer)
 }
 
 // This is the same uptime code as the NATS server, for consistency

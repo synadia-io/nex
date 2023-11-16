@@ -13,8 +13,8 @@ func RunWorkload(name string, totalBytes int32, tempFile *os.File, runtimeEnviro
 	// This has to be backgrounded because the workload could be a long-running process/service
 	go func() {
 		cmd := exec.Command(tempFile.Name())
-		cmd.Stdout = &logEmitter{stderr: false}
-		cmd.Stderr = &logEmitter{stderr: true}
+		cmd.Stdout = &logEmitter{stderr: false, name: name}
+		cmd.Stderr = &logEmitter{stderr: true, name: name}
 
 		envVars := make([]string, len(runtimeEnvironment))
 		for k, v := range runtimeEnvironment {
@@ -34,7 +34,7 @@ func RunWorkload(name string, totalBytes int32, tempFile *os.File, runtimeEnviro
 		err = cmd.Wait()
 		msg := ""
 		if err != nil {
-			msg = fmt.Sprintf("%v", err)
+			msg = fmt.Sprintf("Workload stopped unexpectedly: %s", err)
 		} else {
 			msg = "OK"
 		}
@@ -47,6 +47,7 @@ func RunWorkload(name string, totalBytes int32, tempFile *os.File, runtimeEnviro
 
 type logEmitter struct {
 	stderr bool
+	name   string
 }
 
 func (l *logEmitter) Write(bytes []byte) (int, error) {
@@ -57,7 +58,7 @@ func (l *logEmitter) Write(bytes []byte) (int, error) {
 		lvl = agentapi.LogLevel_LEVEL_DEBUG
 	}
 	entry := &agentapi.LogEntry{
-		Source: "workload",
+		Source: l.name,
 		Level:  lvl,
 		Text:   string(bytes),
 	}

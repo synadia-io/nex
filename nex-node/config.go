@@ -7,13 +7,13 @@ import (
 )
 
 type NodeConfiguration struct {
-	KernelPath          string          `json:"kernel_path"`
-	RootFsPath          string          `json:"rootfs_path"`
-	MachinePoolSize     int             `json:"machine_pool_size"`
-	CNI                 CNIDefinition   `json:"cni"`
-	MachineTemplate     MachineTemplate `json:"machine_template"`
-	RateLimiters        *Limiters       `json:"rate_limiters,omitempty"`
-	RequesterPublicKeys []string        `json:"requester_public_keys"`
+	KernelPath      string          `json:"kernel_path"`
+	RootFsPath      string          `json:"rootfs_path"`
+	MachinePoolSize int             `json:"machine_pool_size"`
+	CNI             CNIDefinition   `json:"cni"`
+	MachineTemplate MachineTemplate `json:"machine_template"`
+	RateLimiters    *Limiters       `json:"rate_limiters,omitempty"`
+	ValidIssuers    []string        `json:"valid_issuers,omitempty"`
 }
 
 type Limiters struct {

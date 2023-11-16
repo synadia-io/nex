@@ -12,6 +12,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	specMap map[string]controlapi.RunRequest
+)
+
 // Represents an instance of a single firecracker VM containing the nex agent.
 type runningFirecracker struct {
 	vmmCtx                context.Context
@@ -44,7 +48,8 @@ func (vm runningFirecracker) shutDown() {
 	if err != nil {
 		log.WithError(err).Warn("Failed to delete firecracker socket")
 	}
-	err = os.Remove("/tmp/rootfs-" + vm.vmmID + ".ext4")
+	rootFs := getRootFsPath(vm.vmmID)
+	err = os.Remove(rootFs)
 	if err != nil {
 		log.WithError(err).Warn("Failed to delete firecracker rootfs")
 	}

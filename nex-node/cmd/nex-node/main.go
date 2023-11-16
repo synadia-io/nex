@@ -34,7 +34,7 @@ func main() {
 	log.SetReportCaller(false)
 
 	lvl, ok := os.LookupEnv("LOG_LEVEL")
-	// LOG_LEVEL not set, let's default to debug
+
 	if !ok || len(strings.TrimSpace(lvl)) == 0 {
 		lvl = "debug"
 	}
@@ -85,7 +85,7 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 
 	nc, err := generateConnectionFromOpts(opts)
 	if err != nil {
-		fmt.Println("Failed to connect to NATS", err)
+		log.WithError(err).Error("Failed to connect to NATS")
 		os.Exit(1)
 	}
 
@@ -93,7 +93,7 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 
 	config, err := nex.LoadNodeConfiguration(opts.MachineConfigFile)
 	if err != nil {
-		fmt.Println("Failed to load machine configuration file", err)
+		log.WithError(err).WithField("file", opts.MachineConfigFile).Error("Failed to load machine configuration file")
 		os.Exit(1)
 	}
 

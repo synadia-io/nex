@@ -1,0 +1,17 @@
+{
+    "kernel_path": "/home/kevin/lab/firecracker/vmlinux-5.10",
+    "rootfs_path": "/home/kevin/lab/firecracker/rootfs.ext4",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "valid_issuers": [
+        "AARBEQDCEKB7NYZLZRXAOAF6QGYGCN636VTN45USLIIW4QLG7Z2MBGH4",
+        "ABAGWNQ5V5H6LVODYATY5Q27OBQASRLSUG23FYBDWUR5BFI5UIMQ5GOQ"
+    ]
+}

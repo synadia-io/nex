@@ -28,6 +28,8 @@ func main() {
 		req.Respond(req.Data())
 	}
 
+	fmt.Println("Starting echo service")
+
 	_, err = services.AddService(nc, services.Config{
 		Name:    "EchoService",
 		Version: "1.0.0",
