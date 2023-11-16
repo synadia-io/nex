@@ -9,6 +9,7 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
+// Submits a run request for the given workload to the specified node
 func RunWorkload(ctx *fisk.ParseContext) error {
 	nc, err := generateConnectionFromOpts()
 	if err != nil {
@@ -23,7 +24,6 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 	}
 
 	targetPublicXkey := nodeInfo.PublicXKey
-	fmt.Println(targetPublicXkey)
 
 	issuerSeed, err := os.ReadFile(RunOpts.ClaimsIssuerFile)
 	if err != nil {
@@ -60,6 +60,7 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 
 	resp, err := nodeClient.StartWorkload(request)
 	if err != nil {
+		fmt.Printf("⛔ Workload run request failed to submit: %s\n", err)
 		return err
 	}
 
@@ -68,5 +69,9 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 }
 
 func renderRunResponse(resp *controlapi.RunResponse) {
-	fmt.Printf("%v", resp)
+	if resp.Started {
+		fmt.Printf("🚀 Workload '%s' accepted. You can now refer to this workload with ID: %s\n", resp.Name, resp.MachineId)
+	} else {
+		fmt.Println("⛔ Workload rejected")
+	}
 }

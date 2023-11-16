@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// Node configuration is used to configure the node process as well as the virtual machines it
+// produces
 type NodeConfiguration struct {
 	KernelPath      string          `json:"kernel_path"`
 	RootFsPath      string          `json:"rootfs_path"`
@@ -16,16 +18,20 @@ type NodeConfiguration struct {
 	ValidIssuers    []string        `json:"valid_issuers,omitempty"`
 }
 
+// A set of rate limiters. These fields are identical to those in firecracker rate limiter configuration
 type Limiters struct {
 	Bandwidth  *TokenBucket `json:"bandwidth,omitempty"`
 	Operations *TokenBucket `json:"iops,omitempty"`
 }
 
+// Defines a reference to the CNI network name, which is defined and configured in a {network}.conflist file, as per
+// CNI convention
 type CNIDefinition struct {
 	NetworkName   string `json:"network_name"`
 	InterfaceName string `json:"interface_name"`
 }
 
+// Defines the CPU and memory usage of a machine to be configured when it is added to the pool
 type MachineTemplate struct {
 	VcpuCount  int `json:"vcpu_count"`
 	MemSizeMib int `json:"memsize_mib"`
@@ -65,6 +71,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 	}
 }
 
+// Retrieves the node configuration from the specified file
 func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
 	bytes, err := os.ReadFile(configFilePath)
 	if err != nil {
@@ -101,6 +108,6 @@ type CliOptions struct {
 	Nkey string
 	// TlsFirst configures theTLSHandshakeFirst behavior in nats.go
 	TlsFirst bool
-	// Path to the file containing virtual machine management settings
-	MachineConfigFile string
+	// Path to the file containing virtual machine management settings and node-wide settings
+	NodeConfigFile string
 }

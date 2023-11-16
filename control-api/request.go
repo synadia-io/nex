@@ -33,6 +33,8 @@ var (
 	validWorkloadName = regexp.MustCompile(`^[a-z]+$`)
 )
 
+// Creates a new run request based on the supplied options. Note that there is a fluent API function
+// for each available option
 func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	reqOpts := requestOptions{}
 	for _, o := range opts {
@@ -232,6 +234,7 @@ func EnvironmentValue(key string, value string) RequestOption {
 	}
 }
 
+// Sets the hash of the workload payload for verification purposes
 func Checksum(hash string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.hash = hash

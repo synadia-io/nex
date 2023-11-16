@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
-	controlapi "github.com/ConnectEverything/nex/control-api"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -20,12 +20,8 @@ const (
 	logSubjectPrefix   = "$NEX.logs"
 )
 
-type MachineManagerConfiguration struct {
-	MachinePoolSize int
-	RootFsPath      string
-	KernelPath      string
-}
-
+// The machine manager is responsible for the pool of warm firecracker VMs. This includes starting new
+// VMs, stopping VMs, and pulling VMs from the pool on demand
 type MachineManager struct {
 	rootContext context.Context
 	rootCancel  context.CancelFunc
@@ -33,38 +29,28 @@ type MachineManager struct {
 	kp          nkeys.KeyPair
 	nc          *nats.Conn
 	log         *logrus.Logger
-	allVms      map[string]runningFirecracker
-	warmVms     chan runningFirecracker
+	allVms      map[string]*runningFirecracker
+	warmVms     chan *runningFirecracker
 }
 
-type emittedLog struct {
-	Text      string       `json:"text"`
-	Level     logrus.Level `json:"level"`
-	MachineId string       `json:"machine_id"`
-}
-
+// Starts the machine manager. Publishes a node started event and starts the goroutine responsible for
+// keeping the firecracker VM pool full
 func (m *MachineManager) Start() error {
 	m.log.Info("Virtual machine manager starting")
-	specMap = make(map[string]controlapi.RunRequest)
 	go m.fillPool()
+	m.PublishNodeStarted()
 
 	return nil
 }
 
+// Stops the machine manager, which will in turn stop all firecracker VMs and attempt to clean
+// up any applicable resources
 func (m *MachineManager) Stop() error {
 	m.log.Info("Virtual machine manager stopping")
-	// TODO: move this to shared struct if we add fields
-	evt := struct {
-		Id       string `json:"id"`
-		Graceful bool   `json:"graceful"`
-	}{
-		Id:       m.PublicKey(),
-		Graceful: true,
-	}
-	m.PublishCloudEvent("node_stopped", evt)
 
 	m.rootCancel() // stops the pool from refilling
 	for _, vm := range m.allVms {
+		m.PublishMachineStopped(vm)
 		vm.shutDown()
 	}
 	// Now empty the leftovers in the pool
@@ -75,6 +61,7 @@ func (m *MachineManager) Stop() error {
 	return nil
 }
 
+// Retrieves the machine manager's public key, which comes from a key pair of type server (Nxxx)
 func (m *MachineManager) PublicKey() string {
 	pk, err := m.kp.PublicKey()
 	if err != nil {
@@ -84,30 +71,13 @@ func (m *MachineManager) PublicKey() string {
 	}
 }
 
+// Called by a consumer looking to submit a workload into a virtual machine. Prior to that, the machine
+// must be taken out of the pool. Taking a machine out of the pool unblocks a goroutine that will automatically
+// replenish
 func (m *MachineManager) TakeFromPool() (*runningFirecracker, error) {
 	running := <-m.warmVms
 	m.allVms[running.vmmID] = running
-	return &running, nil
-}
-
-func (m *MachineManager) PublishCloudEvent(eventType string, data interface{}) {
-	pk, _ := m.kp.PublicKey()
-	cloudevent := cloudevents.NewEvent()
-	cloudevent.SetTime(time.Now().UTC())
-	cloudevent.SetID(uuid.NewString())
-	cloudevent.SetType(eventType)
-	cloudevent.SetSource(pk)
-	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-	cloudevent.SetData(data)
-	raw, err := cloudevent.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
-
-	// TODO: in the future, consider using a queue so we can buffer events when
-	// disconnected
-	m.nc.Publish(fmt.Sprintf("%s.%s", eventSubjectPrefix, eventType), raw)
-	m.nc.Flush()
+	return running, nil
 }
 
 func (m *MachineManager) fillPool() {
@@ -141,39 +111,42 @@ func (m *MachineManager) fillPool() {
 				m.log.WithError(err).Error("Failed to get channels from client for gRPC subscriptions")
 				return
 			}
-			go dispatchLogs(vm.vmmID, vm.ip.String(), m.kp, m.nc, logs, m.log)
+
+			go dispatchLogs(vm, m.kp, m.nc, logs, m.log)
 			go dispatchEvents(m, vm, m.kp, m.nc, events, m.log)
 
 			// Add the new microVM to the pool.
 			// If the pool is full, this line will block until a slot is available.
-			m.warmVms <- *vm
+			m.warmVms <- vm
 			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
-			m.allVms[vm.vmmID] = *vm
+			m.allVms[vm.vmmID] = vm
 		}
 	}
 }
 
-func dispatchLogs(vmId string, ip string, kp nkeys.KeyPair, nc *nats.Conn, logs <-chan *agentapi.LogEntry, log *logrus.Logger) {
+func dispatchLogs(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, logs <-chan *agentapi.LogEntry, log *logrus.Logger) {
 	pk, _ := kp.PublicKey()
 	for {
 		entry := <-logs
-		spec := specMap[vmId]
-		workloadName := spec.DecodedClaims.Subject
+		workloadName := vm.workloadSpecification.DecodedClaims.Subject
 		lvl := getLogrusLevel(entry)
-		emitLog := emittedLog{
-			Text:      entry.Text,
-			Level:     lvl,
-			MachineId: vmId,
+
+		if len(strings.TrimSpace(workloadName)) != 0 {
+			emitLog := emittedLog{
+				Text:      entry.Text,
+				Level:     lvl,
+				MachineId: vm.vmmID,
+			}
+			logBytes, _ := json.Marshal(emitLog)
+			// $NEX.LOGS.{host}.{workload}.{vm}
+			subject := fmt.Sprintf("%s.%s.%s.%s", logSubjectPrefix, pk, workloadName, vm.vmmID)
+			err := nc.Publish(subject, logBytes)
+			if err != nil {
+				log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).WithField("subject", subject).Warn("Failed to publish log on logs subject")
+			}
 		}
-		logBytes, _ := json.Marshal(emitLog)
-		// $NEX.LOGS.{host}.{workload}.{vm}
-		subject := fmt.Sprintf("%s.%s.%s.%s", logSubjectPrefix, pk, workloadName, vmId)
-		fmt.Printf("SUBJECT: %s\n", subject)
-		err := nc.Publish(subject, logBytes)
-		if err != nil {
-			log.WithField("vmid", vmId).WithField("ip", ip).WithField("subject", subject).Warn("Failed to publish log on logs subject")
-		}
-		log.WithField("vmid", vmId).WithField("ip", ip).Log(lvl, entry.Text)
+
+		log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).Log(lvl, entry.Text)
 
 	}
 }
@@ -183,7 +156,8 @@ func dispatchEvents(m *MachineManager, vm *runningFirecracker, kp nkeys.KeyPair,
 	for {
 		event := <-events
 		eventType := getEventType(event)
-		nc.Publish(fmt.Sprintf("%s.%s", eventSubjectPrefix, eventType), agentEventToCloudEvent(vm, pk, event, eventType))
+		m.PublishCloudEvent(eventType, agentEventToCloudEvent(vm, pk, event, eventType))
+		//nc.Publish(fmt.Sprintf("%s.%s", eventSubjectPrefix, eventType), )
 		log.WithField("vmid", vm.vmmID).
 			WithField("event_type", eventType).
 			WithField("ip", vm.ip).
@@ -231,7 +205,7 @@ func getLogrusLevel(entry *agentapi.LogEntry) logrus.Level {
 	}
 }
 
-func agentEventToCloudEvent(vm *runningFirecracker, pk string, event *agentapi.AgentEvent, eventType string) []byte {
+func agentEventToCloudEvent(vm *runningFirecracker, pk string, event *agentapi.AgentEvent, eventType string) cloudevents.Event {
 	cloudevent := cloudevents.NewEvent()
 
 	cloudevent.SetSource(fmt.Sprintf("%s-%s", pk, vm.vmmID))
@@ -241,7 +215,5 @@ func agentEventToCloudEvent(vm *runningFirecracker, pk string, event *agentapi.A
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(event.Data)
 
-	raw, _ := cloudevent.MarshalJSON()
-
-	return raw
+	return cloudevent
 }

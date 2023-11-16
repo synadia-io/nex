@@ -22,7 +22,7 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 		nc:          nc,
 		log:         log,
 		kp:          server,
-		allVms:      make(map[string]runningFirecracker),
-		warmVms:     make(chan runningFirecracker, config.MachinePoolSize-1),
+		allVms:      make(map[string]*runningFirecracker),
+		warmVms:     make(chan *runningFirecracker, config.MachinePoolSize-1),
 	}
 }

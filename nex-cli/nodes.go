@@ -46,6 +46,7 @@ func NodeInfo(ctx *fisk.ParseContext) error {
 
 func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 	cols := newColumns("NEX Node Information")
+
 	defer cols.Frender(os.Stdout)
 	cols.AddRow("Node", id)
 	cols.AddRowf("Xkey", info.PublicXKey)
@@ -58,17 +59,32 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 	}
 	cols.AddRow("Tags", strings.Join(taglist, ", "))
 
-	cols.AddSectionTitle("Workloads:")
-	cols.Indent(2)
-	for _, m := range info.Machines {
+	if info.Memory != nil {
+		cols.AddSectionTitle("Memory in kB")
+		cols.Indent(2)
+
 		cols.Println()
-		cols.AddRow("Id", m.Id)
-		cols.AddRow("Healthy", m.Healthy)
-		cols.AddRow("Runtime", m.Uptime)
-		cols.AddRow("Name", m.Workload.Name)
-		cols.AddRow("Description", m.Workload.Description)
+		cols.AddRow("Free", info.Memory.MemFree)
+		cols.AddRow("Available", info.Memory.MemAvailable)
+		cols.AddRow("Total", info.Memory.MemTotal)
+
+		cols.Indent(0)
 	}
-	cols.Indent(0)
+
+	if len(info.Machines) > 0 {
+		cols.AddSectionTitle("Workloads")
+		cols.Indent(2)
+		for _, m := range info.Machines {
+			cols.Println()
+			cols.AddRow("Id", m.Id)
+			cols.AddRow("Healthy", m.Healthy)
+			cols.AddRow("Runtime", m.Uptime)
+			cols.AddRow("Name", m.Workload.Name)
+			cols.AddRow("Description", m.Workload.Description)
+		}
+		cols.Indent(0)
+	}
+
 }
 
 func renderNodeList(nodes []controlapi.PingResponse) {

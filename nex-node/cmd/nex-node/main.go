@@ -9,7 +9,6 @@ import (
 	"strings"
 	"syscall"
 
-	nex "github.com/ConnectEverything/nex/nex-node"
 	nexnode "github.com/ConnectEverything/nex/nex-node"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/jsm.go/natscontext"
@@ -45,12 +44,12 @@ func main() {
 	// set global log level
 	log.SetLevel(ll)
 
-	opts := &nex.CliOptions{}
+	opts := &nexnode.CliOptions{}
 
 	ncli := fisk.New("nex-node", help)
 	ncli.Author("Synadia Communications")
 	ncli.UsageWriter(os.Stdout)
-	ncli.Version(nex.VERSION)
+	ncli.Version(nexnode.VERSION)
 	ncli.HelpFlag.Short('h')
 	ncli.WithCheats().CheatCommand.Hidden()
 
@@ -64,13 +63,13 @@ func main() {
 	ncli.Flag("tlsca", "TLS certificate authority chain file").Envar("NATS_CA").PlaceHolder("FILE").ExistingFileVar(&opts.TlsCA)
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("5s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&opts.Timeout)
-	ncli.Flag("machineconfig", "Path to the machine management configuration file").Required().ExistingFileVar(&opts.MachineConfigFile)
+	ncli.Flag("config", "Path to the node configuration file").Required().ExistingFileVar(&opts.NodeConfigFile)
 
 	ncli.Command("up", "Starts the node execution engine")
 	ncli.Command("preflight", "Examines the environment to verify pre-requisites")
 
 	cmd := ncli.MustParseWithUsage(os.Args[1:])
-	opts.ConnectionName = "nex-node " + nex.VERSION
+	opts.ConnectionName = "nex-node " + nexnode.VERSION
 	switch cmd {
 	case "up":
 		cmdUp(opts, ctx, cancel, log)
@@ -91,30 +90,22 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 
 	log.Infof("Established node NATS connection to: %s", opts.Servers)
 
-	config, err := nex.LoadNodeConfiguration(opts.MachineConfigFile)
+	config, err := nexnode.LoadNodeConfiguration(opts.NodeConfigFile)
 	if err != nil {
-		log.WithError(err).WithField("file", opts.MachineConfigFile).Error("Failed to load machine configuration file")
+		log.WithError(err).WithField("file", opts.NodeConfigFile).Error("Failed to load node configuration file")
 		os.Exit(1)
 	}
 
-	log.Infof("Loaded machine management configuration from '%s'", opts.MachineConfigFile)
+	log.Infof("Loaded node configuration from '%s'", opts.NodeConfigFile)
 
-	manager := nex.NewMachineManager(ctx, cancel, nc, config, log)
+	manager := nexnode.NewMachineManager(ctx, cancel, nc, config, log)
 	setupSignalHandlers(log, manager)
 	err = manager.Start()
 	if err != nil {
 		panic(err)
 	}
-	nodeStart := struct {
-		Version string `json:"version"`
-		Id      string `json:"id"`
-	}{
-		Version: nex.VERSION,
-		Id:      manager.PublicKey(),
-	}
-	manager.PublishCloudEvent("node_started", nodeStart)
 
-	api := nex.NewApiListener(nc, log, manager, make(map[string]string))
+	api := nexnode.NewApiListener(nc, log, manager, make(map[string]string))
 	api.Start()
 }
 
@@ -137,7 +128,7 @@ func clearMyApiSockets() {
 	}
 }
 
-func setupSignalHandlers(log *logrus.Logger, manager *nex.MachineManager) {
+func setupSignalHandlers(log *logrus.Logger, manager *nexnode.MachineManager) {
 	go func() {
 		// Clear some default handlers installed by the firecracker SDK:
 		signal.Reset(os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
@@ -161,7 +152,7 @@ func setupSignalHandlers(log *logrus.Logger, manager *nex.MachineManager) {
 	}()
 }
 
-func generateConnectionFromOpts(opts *nex.CliOptions) (*nats.Conn, error) {
+func generateConnectionFromOpts(opts *nexnode.CliOptions) (*nats.Conn, error) {
 	if len(strings.TrimSpace(opts.Servers)) == 0 {
 		opts.Servers = nats.DefaultURL
 	}

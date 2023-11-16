@@ -12,10 +12,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	specMap map[string]controlapi.RunRequest
-)
-
 // Represents an instance of a single firecracker VM containing the nex agent.
 type runningFirecracker struct {
 	vmmCtx                context.Context
@@ -41,13 +37,17 @@ func (vm *runningFirecracker) Subscribe() (<-chan *agentapi.LogEntry, <-chan *ag
 	return logs, evts, nil
 }
 
-func (vm runningFirecracker) shutDown() {
-	log.WithField("ip", vm.ip).Info("stopping")
+func (vm *runningFirecracker) shutDown() {
+	log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).Info("Machine stopping")
 	vm.machine.StopVMM()
 	err := os.Remove(vm.machine.Cfg.SocketPath)
 	if err != nil {
 		log.WithError(err).Warn("Failed to delete firecracker socket")
 	}
+
+	// NOTE: we're not deleting the firecracker machine logs ... they're in a tempfs so they'll eventually
+	// go away
+
 	rootFs := getRootFsPath(vm.vmmID)
 	err = os.Remove(rootFs)
 	if err != nil {

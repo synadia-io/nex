@@ -28,11 +28,18 @@ type PingResponse struct {
 	Tags            map[string]string `json:"tags,omitempty"`
 }
 
+type MemoryStat struct {
+	MemTotal     int `json:"total"`
+	MemFree      int `json:"free"`
+	MemAvailable int `json:"available"`
+}
+
 type InfoResponse struct {
 	Version    string            `json:"version"`
 	Uptime     string            `json:"uptime"`
 	PublicXKey string            `json:"public_xkey"`
 	Tags       map[string]string `json:"tags,omitempty"`
+	Memory     *MemoryStat       `json:"memory,omitempty"`
 	Machines   []MachineSummary  `json:"machines"`
 }
 

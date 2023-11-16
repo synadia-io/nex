@@ -70,6 +70,13 @@ func (api *ApiListener) PublicKey() string {
 }
 
 func (api *ApiListener) Start() error {
+	// API subjects:
+	// $NEX.PING
+	// $NEX.PING.{node}
+	// $NEX.INFO.{namespace}.{node}
+	// $NEX.RUN.{namespace}.{node}
+	// $NEX.STOP.{namespace}.{node}
+
 	api.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
 	api.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
 	api.nc.Subscribe(controlapi.APIPrefix+".INFO."+api.nodeId, handleInfo(api))
@@ -115,7 +122,6 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 		}
 		runningVm.workloadStarted = time.Now().UTC()
 		runningVm.workloadSpecification = request
-		specMap[runningVm.vmmID] = request
 
 		_, err = runningVm.agentClient.PostWorkload(payloadFile.Name(), request.WorkloadEnvironment)
 		if err != nil {
@@ -126,7 +132,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 
 		res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 			Started:   true,
-			Name:      runningVm.workloadSpecification.DecodedClaims.Name,
+			Name:      runningVm.workloadSpecification.DecodedClaims.Subject,
 			Issuer:    runningVm.workloadSpecification.DecodedClaims.Issuer,
 			MachineId: runningVm.vmmID,
 		}, nil)
@@ -136,7 +142,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 		} else {
 			m.Respond(raw)
 		}
-		api.mgr.allVms[runningVm.vmmID] = *runningVm
+		//api.mgr.allVms[runningVm.vmmID] = *runningVm
 	}
 }
 
@@ -164,12 +170,14 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
 		pubX, _ := api.xk.PublicKey()
 		now := time.Now().UTC()
+		stats, _ := ReadMemoryStats()
 		res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
 			Version:    VERSION,
 			PublicXKey: pubX,
 			Uptime:     myUptime(now.Sub(api.start)),
 			Tags:       api.tags,
 			Machines:   summarizeMachines(&api.mgr.allVms),
+			Memory:     stats,
 		}, nil)
 		raw, err := json.Marshal(res)
 		if err != nil {
@@ -181,7 +189,7 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 
 }
 
-func summarizeMachines(vms *map[string]runningFirecracker) []controlapi.MachineSummary {
+func summarizeMachines(vms *map[string]*runningFirecracker) []controlapi.MachineSummary {
 	machines := make([]controlapi.MachineSummary, 0)
 	now := time.Now().UTC()
 	for _, v := range *vms {
