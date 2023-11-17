@@ -23,6 +23,7 @@ type runningFirecracker struct {
 	workloadStarted       time.Time
 	machineStarted        time.Time
 	workloadSpecification controlapi.RunRequest
+	namespace             string
 }
 
 func (vm *runningFirecracker) Subscribe() (<-chan *agentapi.LogEntry, <-chan *agentapi.AgentEvent, error) {

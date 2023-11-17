@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *MachineManager) PublishCloudEvent(eventType string, event cloudevents.Event) {
+func (m *MachineManager) PublishCloudEvent(eventType string, namespace string, event cloudevents.Event) {
 	event.SetType(eventType) // force this to always be consistent
 
 	raw, err := event.MarshalJSON()
@@ -21,7 +21,7 @@ func (m *MachineManager) PublishCloudEvent(eventType string, event cloudevents.E
 
 	// TODO: in the future, consider using a queue so we can buffer events when
 	// disconnected
-	m.nc.Publish(fmt.Sprintf("%s.%s", eventSubjectPrefix, eventType), raw)
+	m.nc.Publish(fmt.Sprintf("%s.%s.%s", eventSubjectPrefix, namespace, eventType), raw)
 	m.nc.Flush()
 }
 
@@ -45,7 +45,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 		cloudevent.SetData(workloadStopped)
 
-		m.PublishCloudEvent("workload_stopped", cloudevent)
+		m.PublishCloudEvent("workload_stopped", vm.namespace, cloudevent)
 
 		emitLog := emittedLog{
 			Text:      "Workload stopped",
@@ -54,7 +54,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		}
 		logBytes, _ := json.Marshal(emitLog)
 
-		subject := fmt.Sprintf("%s.%s.%s.%s", logSubjectPrefix, m.PublicKey(), workloadName, vm.vmmID)
+		subject := fmt.Sprintf("%s.%s.%s.%s.%s", logSubjectPrefix, vm.namespace, m.PublicKey(), workloadName, vm.vmmID)
 		m.nc.Publish(subject, logBytes)
 		m.nc.Flush()
 	}
@@ -77,7 +77,7 @@ func (m *MachineManager) PublishNodeStarted() {
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(nodeStart)
 
-	m.PublishCloudEvent("node_started", cloudevent)
+	m.PublishCloudEvent("node_started", "system", cloudevent)
 }
 
 func (m *MachineManager) PublishNodeStopped() {
@@ -98,7 +98,7 @@ func (m *MachineManager) PublishNodeStopped() {
 	cloudevent.SetType("node_stopped")
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(evt)
-	m.PublishCloudEvent("node_stopped", cloudevent)
+	m.PublishCloudEvent("node_stopped", "system", cloudevent)
 }
 
 type emittedLog struct {

@@ -138,15 +138,15 @@ func dispatchLogs(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, logs 
 				MachineId: vm.vmmID,
 			}
 			logBytes, _ := json.Marshal(emitLog)
-			// $NEX.LOGS.{host}.{workload}.{vm}
-			subject := fmt.Sprintf("%s.%s.%s.%s", logSubjectPrefix, pk, workloadName, vm.vmmID)
+			// $NEX.LOGS.{namespace}.{host}.{workload}.{vm}
+			subject := fmt.Sprintf("%s.%s.%s.%s.%s", logSubjectPrefix, vm.namespace, pk, workloadName, vm.vmmID)
 			err := nc.Publish(subject, logBytes)
 			if err != nil {
 				log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).WithField("subject", subject).Warn("Failed to publish log on logs subject")
 			}
 		}
 
-		log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).Log(lvl, entry.Text)
+		log.WithField("namespace", vm.namespace).WithField("vmid", vm.vmmID).WithField("ip", vm.ip).Log(lvl, entry.Text)
 
 	}
 }
@@ -156,11 +156,11 @@ func dispatchEvents(m *MachineManager, vm *runningFirecracker, kp nkeys.KeyPair,
 	for {
 		event := <-events
 		eventType := getEventType(event)
-		m.PublishCloudEvent(eventType, agentEventToCloudEvent(vm, pk, event, eventType))
-		//nc.Publish(fmt.Sprintf("%s.%s", eventSubjectPrefix, eventType), )
+		m.PublishCloudEvent(eventType, vm.namespace, agentEventToCloudEvent(vm, pk, event, eventType))
 		log.WithField("vmid", vm.vmmID).
 			WithField("event_type", eventType).
 			WithField("ip", vm.ip).
+			WithField("namespace", vm.namespace).
 			Debug("Received event from agent")
 		if eventType == "agent_stopped" || eventType == "workload_stopped" {
 			delete(m.allVms, vm.vmmID)

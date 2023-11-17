@@ -9,13 +9,25 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
+// API subjects:
+// $NEX.PING
+// $NEX.PING.{node}
+// $NEX.INFO.{namespace}.{node}
+// $NEX.RUN.{namespace}.{node}
+// $NEX.STOP.{namespace}.{node}
+
 type apiClient struct {
-	nc      *nats.Conn
-	timeout time.Duration
+	nc        *nats.Conn
+	timeout   time.Duration
+	namespace string
 }
 
 func NewApiClient(nc *nats.Conn, timeout time.Duration) *apiClient {
-	return &apiClient{nc: nc, timeout: timeout}
+	return &apiClient{nc: nc, timeout: timeout, namespace: "default"}
+}
+
+func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace string) *apiClient {
+	return &apiClient{nc: nc, timeout: timeout, namespace: namespace}
 }
 
 func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
@@ -24,7 +36,7 @@ func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := api.nc.Request(fmt.Sprintf("%s.RUN.%s", APIPrefix, request.TargetNode), bytes, api.timeout)
+	resp, err := api.nc.Request(fmt.Sprintf("%s.RUN.%s.%s", APIPrefix, api.namespace, request.TargetNode), bytes, api.timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -46,9 +58,9 @@ func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
 	return &response, nil
 }
 
-func (api *apiClient) NodeInfo(id string) (*InfoResponse, error) {
+func (api *apiClient) NodeInfo(nodeId string) (*InfoResponse, error) {
 	var response InfoResponse
-	resp, err := api.nc.Request(fmt.Sprintf("%s.INFO.%s", APIPrefix, id), []byte{}, api.timeout)
+	resp, err := api.nc.Request(fmt.Sprintf("%s.INFO.%s.%s", APIPrefix, api.namespace, nodeId), []byte{}, api.timeout)
 	if err != nil {
 		return nil, err
 	}

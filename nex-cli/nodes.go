@@ -33,7 +33,7 @@ func NodeInfo(ctx *fisk.ParseContext) error {
 	if err != nil {
 		return err
 	}
-	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout)
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace)
 	id := ctx.SelectedCommand.Model().Args[0].Value.String()
 	nodeInfo, err := nodeClient.NodeInfo(id)
 	if err != nil {

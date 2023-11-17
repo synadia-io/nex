@@ -37,6 +37,8 @@ type Options struct {
 	SocksProxy string
 	// TlsFirst configures theTLSHandshakeFirst behavior in nats.go
 	TlsFirst bool
+	// Namespace for scoping workload requests
+	Namespace string
 }
 
 type RunOptions struct {

@@ -30,6 +30,7 @@ func main() {
 	ncli.Flag("tlsca", "TLS certificate authority chain file").Envar("NATS_CA").PlaceHolder("FILE").ExistingFileVar(&cli.Opts.TlsCA)
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&cli.Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&cli.Opts.Timeout)
+	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&cli.Opts.Namespace)
 
 	nodes := ncli.Command("node", "Interact with execution engine nodes")
 	nodes_ls := nodes.Command("ls", "List nodes")

@@ -15,7 +15,7 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 	if err != nil {
 		return err
 	}
-	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout)
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace)
 
 	// Get node info so we can get public xkey from the target for env encryption
 	nodeInfo, err := nodeClient.NodeInfo(RunOpts.TargetNode)

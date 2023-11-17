@@ -71,7 +71,7 @@ func (c *payloadCache) GetPayload(request *controlapi.RunRequest) (*os.File, err
 		c.log.WithError(err).Error("❌ Invalid ELF binary")
 		return nil, err
 	} else {
-		c.log.Info("✅ Verified static-linked ELF binary")
+		c.log.WithField("key", key).Info("✅ Verified static-linked ELF binary")
 	}
 
 	return os.Open(fname)

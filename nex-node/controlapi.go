@@ -7,11 +7,13 @@ import (
 	"runtime"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -70,28 +72,37 @@ func (api *ApiListener) PublicKey() string {
 }
 
 func (api *ApiListener) Start() error {
-	// API subjects:
-	// $NEX.PING
-	// $NEX.PING.{node}
-	// $NEX.INFO.{namespace}.{node}
-	// $NEX.RUN.{namespace}.{node}
-	// $NEX.STOP.{namespace}.{node}
 
 	api.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
 	api.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
-	api.nc.Subscribe(controlapi.APIPrefix+".INFO."+api.nodeId, handleInfo(api))
-	api.nc.Subscribe(controlapi.APIPrefix+".RUN."+api.nodeId, handleRun(api))
+	api.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, handleInfo(api))
+	api.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
+	api.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
+
 	api.log.WithField("id", api.nodeId).WithField("version", VERSION).Info("NATS execution engine awaiting commands")
 	return nil
 }
 
+func handleStop(api *ApiListener) func(m *nats.Msg) {
+	return func(m *nats.Msg) {
+
+	}
+}
+
 func handleRun(api *ApiListener) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
+		namespace, err := extractNamespace(m.Subject)
+		if err != nil {
+			api.log.WithError(err).Error("Invalid subject for workload run")
+			respondFail(controlapi.RunResponseType, m, "Invalid subject for workload run")
+			return
+		}
 		var request controlapi.RunRequest
-		err := json.Unmarshal(m.Data, &request)
+		err = json.Unmarshal(m.Data, &request)
 		if err != nil {
 			api.log.WithError(err).Error("Failed to deserialize run request")
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deserialize run request: %s", err))
+			return
 		}
 
 		decodedClaims, err := request.Validate(api.xk)
@@ -121,7 +132,10 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			return
 		}
 		runningVm.workloadStarted = time.Now().UTC()
+		runningVm.namespace = namespace
 		runningVm.workloadSpecification = request
+
+		api.log.WithField("vmid", runningVm.vmmID).WithField("namespace", namespace).Info("Submitting workload to VM")
 
 		_, err = runningVm.agentClient.PostWorkload(payloadFile.Name(), request.WorkloadEnvironment)
 		if err != nil {
@@ -168,6 +182,12 @@ func handlePing(api *ApiListener) func(m *nats.Msg) {
 
 func handleInfo(api *ApiListener) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
+		namespace, err := extractNamespace(m.Subject)
+		if err != nil {
+			api.log.WithError(err).Error("Failed to extract namespace for info request")
+			respondFail(controlapi.InfoResponseType, m, "Failed to extract namespace for info request")
+			return
+		}
 		pubX, _ := api.xk.PublicKey()
 		now := time.Now().UTC()
 		stats, _ := ReadMemoryStats()
@@ -176,7 +196,7 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 			PublicXKey: pubX,
 			Uptime:     myUptime(now.Sub(api.start)),
 			Tags:       api.tags,
-			Machines:   summarizeMachines(&api.mgr.allVms),
+			Machines:   summarizeMachines(&api.mgr.allVms, namespace),
 			Memory:     stats,
 		}, nil)
 		raw, err := json.Marshal(res)
@@ -189,24 +209,26 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 
 }
 
-func summarizeMachines(vms *map[string]*runningFirecracker) []controlapi.MachineSummary {
+func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []controlapi.MachineSummary {
 	machines := make([]controlapi.MachineSummary, 0)
 	now := time.Now().UTC()
 	for _, v := range *vms {
-		machine := controlapi.MachineSummary{
-			Id:      v.vmmID,
-			Healthy: true, // TODO cache last health status
-			Uptime:  myUptime(now.Sub(v.machineStarted)),
-			Workload: controlapi.WorkloadSummary{
-				Name:         v.workloadSpecification.DecodedClaims.Subject,
-				Description:  v.workloadSpecification.Description,
-				Runtime:      myUptime(now.Sub(v.workloadStarted)),
-				WorkloadType: v.workloadSpecification.WorkloadType,
-				//Hash:         v.workloadSpecification.DecodedClaims.Data["hash"].(string),
-			},
-		}
+		if v.namespace == namespace {
+			machine := controlapi.MachineSummary{
+				Id:      v.vmmID,
+				Healthy: true, // TODO cache last health status
+				Uptime:  myUptime(now.Sub(v.machineStarted)),
+				Workload: controlapi.WorkloadSummary{
+					Name:         v.workloadSpecification.DecodedClaims.Subject,
+					Description:  v.workloadSpecification.Description,
+					Runtime:      myUptime(now.Sub(v.workloadStarted)),
+					WorkloadType: v.workloadSpecification.WorkloadType,
+					//Hash:         v.workloadSpecification.DecodedClaims.Data["hash"].(string),
+				},
+			}
 
-		machines = append(machines, machine)
+			machines = append(machines, machine)
+		}
 	}
 	return machines
 }
@@ -246,4 +268,14 @@ func respondFail(responseType string, m *nats.Msg, reason string) {
 	env := controlapi.NewEnvelope(responseType, []byte{}, &reason)
 	jenv, _ := json.Marshal(env)
 	m.Respond(jenv)
+}
+
+func extractNamespace(subject string) (string, error) {
+	tokens := strings.Split(subject, ".")
+	// we need at least $NEX.{op}.{namespace}
+	if len(tokens) < 3 {
+		// this shouldn't ever happen if our subscriptions are defined properly
+		return "", errors.Errorf("Invalid subject - could not detect a namespace")
+	}
+	return tokens[2], nil
 }
