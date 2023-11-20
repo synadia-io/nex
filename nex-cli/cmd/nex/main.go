@@ -51,5 +51,12 @@ func main() {
 	run.Flag("description", "Description of the workload").StringVar(&cli.RunOpts.Description)
 	run.Action(cli.RunWorkload)
 
+	stop := ncli.Command("stop", "Stop a running workload")
+	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&cli.StopOpts.TargetNode)
+	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&cli.StopOpts.WorkloadId)
+	stop.Flag("name", "Name of the workload to stop").Required().StringVar(&cli.StopOpts.WorkloadName)
+	stop.Flag("issuer", "Path to the issuer seed key originally used to start the workload").Required().ExistingFileVar(&cli.StopOpts.ClaimsIssuerFile)
+	stop.Action(cli.StopWorkload)
+
 	ncli.MustParseWithUsage(os.Args[1:])
 }

@@ -34,7 +34,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 			VmId   string `json:"vmid"`
 		}{
 			Name:   workloadName,
-			Reason: "Node shutdown",
+			Reason: "Workload shutdown requested",
 			VmId:   vm.vmmID,
 		}
 

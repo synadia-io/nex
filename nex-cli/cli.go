@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	Opts    = &Options{}
-	RunOpts = &RunOptions{Env: make(map[string]string)}
+	Opts     = &Options{}
+	RunOpts  = &RunOptions{Env: make(map[string]string)}
+	StopOpts = &StopOptions{}
 )
 
 // Options configure the CLI
@@ -49,4 +50,11 @@ type RunOptions struct {
 	PublisherXkeyFile string
 	ClaimsIssuerFile  string
 	Env               map[string]string
+}
+
+type StopOptions struct {
+	TargetNode       string
+	WorkloadName     string
+	WorkloadId       string
+	ClaimsIssuerFile string
 }

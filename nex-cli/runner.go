@@ -9,6 +9,34 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
+// Issues a request to stop a running workload
+func StopWorkload(ctx *fisk.ParseContext) error {
+	nc, err := generateConnectionFromOpts()
+	if err != nil {
+		return err
+	}
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace)
+
+	issuerSeed, err := os.ReadFile(StopOpts.ClaimsIssuerFile)
+	if err != nil {
+		return err
+	}
+
+	issuerKp, err := nkeys.FromSeed(issuerSeed)
+	if err != nil {
+		return err
+	}
+	stopRequest, err := controlapi.NewStopRequest(StopOpts.WorkloadId, StopOpts.WorkloadName, StopOpts.TargetNode, issuerKp)
+	resp, err := nodeClient.StopWorkload(stopRequest)
+	if err != nil {
+		fmt.Printf("⛔ Workload stop request failed: %s\n", err)
+		return err
+	}
+
+	renderStopResponse(resp)
+	return nil
+}
+
 // Submits a run request for the given workload to the specified node
 func RunWorkload(ctx *fisk.ParseContext) error {
 	nc, err := generateConnectionFromOpts()
@@ -73,5 +101,13 @@ func renderRunResponse(resp *controlapi.RunResponse) {
 		fmt.Printf("🚀 Workload '%s' accepted. You can now refer to this workload with ID: %s\n", resp.Name, resp.MachineId)
 	} else {
 		fmt.Println("⛔ Workload rejected")
+	}
+}
+
+func renderStopResponse(resp *controlapi.StopResponse) {
+	if resp.Stopped {
+		fmt.Printf("✅ Workload '%s' stopped.\n", resp.Name)
+	} else {
+		fmt.Println("⛔ Workload failed to stop")
 	}
 }

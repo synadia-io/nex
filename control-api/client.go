@@ -22,59 +22,46 @@ type apiClient struct {
 	namespace string
 }
 
+// Creates a new client to communicate with a group of NEX nodes
 func NewApiClient(nc *nats.Conn, timeout time.Duration) *apiClient {
-	return &apiClient{nc: nc, timeout: timeout, namespace: "default"}
+	return NewApiClientWithNamespace(nc, timeout, "default")
 }
 
+// Creates a new client to communicate with a group of NEX nodes all within a given namespace
 func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace string) *apiClient {
 	return &apiClient{nc: nc, timeout: timeout, namespace: namespace}
 }
 
-func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
-	var response RunResponse
-	bytes, err := json.Marshal(request)
+// Attempts to stop a running workload. This can fail for a wide variety of reasons, the most common
+// is likely to be security validation that prevents one issuer from issuing a stop request for
+// another issuer's workload
+func (api *apiClient) StopWorkload(stopRequest *StopRequest) (*StopResponse, error) {
+	subject := fmt.Sprintf("%s.STOP.%s.%s", APIPrefix, api.namespace, stopRequest.TargetNode)
+	fmt.Println(subject)
+	bytes, err := api.performRequest(subject, stopRequest)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := api.nc.Request(fmt.Sprintf("%s.RUN.%s.%s", APIPrefix, api.namespace, request.TargetNode), bytes, api.timeout)
-	if err != nil {
-		return nil, err
-	}
-	env, err := extractEnvelope(resp.Data)
-	if err != nil {
-		return nil, err
-	}
-	if env.Error != nil {
-		return nil, fmt.Errorf("%v", env.Error)
-	}
-	respBytes, err := json.Marshal(env.Data)
-	if err != nil {
-		return nil, err
-	}
-	err = json.Unmarshal(respBytes, &response)
+
+	var response StopResponse
+	err = json.Unmarshal(bytes, &response)
 	if err != nil {
 		return nil, err
 	}
 	return &response, nil
+
 }
 
-func (api *apiClient) NodeInfo(nodeId string) (*InfoResponse, error) {
-	var response InfoResponse
-	resp, err := api.nc.Request(fmt.Sprintf("%s.INFO.%s.%s", APIPrefix, api.namespace, nodeId), []byte{}, api.timeout)
+// Attempts to start a workload. The workload URI, at the moment, must always point to a NATS object store
+// bucket in the form of `nats://{bucket}/{key}`
+func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
+	subject := fmt.Sprintf("%s.RUN.%s.%s", APIPrefix, api.namespace, request.TargetNode)
+	bytes, err := api.performRequest(subject, request)
 	if err != nil {
 		return nil, err
 	}
-	env, err := extractEnvelope(resp.Data)
-	if err != nil {
-		return nil, err
-	}
-	if env.Error != nil {
-		return nil, fmt.Errorf("%v", env.Error)
-	}
-	bytes, err := json.Marshal(env.Data)
-	if err != nil {
-		return nil, err
-	}
+
+	var response RunResponse
 	err = json.Unmarshal(bytes, &response)
 	if err != nil {
 		return nil, err
@@ -82,6 +69,24 @@ func (api *apiClient) NodeInfo(nodeId string) (*InfoResponse, error) {
 	return &response, nil
 }
 
+// Requests information for a given node within the client's namespace
+func (api *apiClient) NodeInfo(nodeId string) (*InfoResponse, error) {
+	subject := fmt.Sprintf("%s.INFO.%s.%s", APIPrefix, api.namespace, nodeId)
+	bytes, err := api.performRequest(subject, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response InfoResponse
+	err = json.Unmarshal(bytes, &response)
+	if err != nil {
+		return nil, err
+	}
+	return &response, nil
+}
+
+// Attempts to list all nodes. Note that this operation returns all visible nodes regardless of
+// namespace
 func (api *apiClient) ListNodes() ([]PingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
@@ -113,6 +118,34 @@ func (api *apiClient) ListNodes() ([]PingResponse, error) {
 
 	<-ctx.Done()
 	return responses, nil
+}
+
+// Helper that submits data, gets a standard envelope back, and returns the inner data
+// payload as JSON
+func (api *apiClient) performRequest(subject string, raw interface{}) ([]byte, error) {
+	var bytes []byte
+	var err error
+	if raw == nil {
+		bytes = []byte{}
+	} else {
+		bytes, err = json.Marshal(raw)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	resp, err := api.nc.Request(subject, bytes, api.timeout)
+	if err != nil {
+		return nil, err
+	}
+	env, err := extractEnvelope(resp.Data)
+	if err != nil {
+		return nil, err
+	}
+	if env.Error != nil {
+		return nil, fmt.Errorf("%v", env.Error)
+	}
+	return json.Marshal(env.Data)
 }
 
 func extractEnvelope(data []byte) (*Envelope, error) {

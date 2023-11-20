@@ -75,6 +75,8 @@ func (api *ApiListener) Start() error {
 
 	api.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
 	api.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
+
+	// Namespaced subscriptions, the * below is for the namespace
 	api.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, handleInfo(api))
 	api.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
 	api.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
@@ -85,6 +87,61 @@ func (api *ApiListener) Start() error {
 
 func handleStop(api *ApiListener) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
+		namespace, err := extractNamespace(m.Subject)
+		if err != nil {
+			api.log.WithError(err).Error("Invalid subject for workload stop")
+			respondFail(controlapi.StopResponseType, m, "Invalid subject for workload stop")
+			return
+		}
+		var request controlapi.StopRequest
+		err = json.Unmarshal(m.Data, &request)
+		if err != nil {
+			api.log.WithError(err).Error("Failed to deserialize stop request")
+			respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Unable to deserialize stop request: %s", err))
+			return
+		}
+
+		vm := api.mgr.LookupMachine(request.WorkloadId)
+		if vm == nil {
+			api.log.WithField("vmid", request.WorkloadId).Error("Stop request: no such workload")
+			respondFail(controlapi.StopResponseType, m, "No such workload")
+			return
+		}
+
+		if vm.namespace != namespace {
+			api.log.
+				WithField("namespace", vm.namespace).
+				WithField("targetnamespace", namespace).
+				Error("Namespace mismatch on workload stop request")
+			respondFail(controlapi.StopResponseType, m, "No such workload") // do not expose ID existence to avoid existence probes
+			return
+		}
+
+		err = request.Validate(&vm.workloadSpecification.DecodedClaims)
+		if err != nil {
+			api.log.WithError(err).Error("Failed to validate stop request")
+			respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
+			return
+		}
+
+		err = api.mgr.StopMachine(request.WorkloadId)
+		if err != nil {
+			api.log.WithError(err).Error("Failed to stop workload")
+			respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
+		}
+
+		res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
+			Stopped:   true,
+			Name:      vm.workloadSpecification.DecodedClaims.Subject,
+			Issuer:    vm.workloadSpecification.DecodedClaims.Issuer,
+			MachineId: vm.vmmID,
+		}, nil)
+		raw, err := json.Marshal(res)
+		if err != nil {
+			api.log.WithError(err).Error("Failed to marshal run response")
+		} else {
+			m.Respond(raw)
+		}
 
 	}
 }
@@ -156,7 +213,6 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 		} else {
 			m.Respond(raw)
 		}
-		//api.mgr.allVms[runningVm.vmmID] = *runningVm
 	}
 }
 

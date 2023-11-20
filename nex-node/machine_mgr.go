@@ -3,6 +3,7 @@ package nexnode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -61,6 +62,18 @@ func (m *MachineManager) Stop() error {
 	return nil
 }
 
+// Stops a single machine. Will return an error if called with a non-existent workload/vm ID
+func (m *MachineManager) StopMachine(vmId string) error {
+	vm, exists := m.allVms[vmId]
+	if !exists {
+		return errors.New("no such workload")
+	}
+	m.PublishMachineStopped(vm)
+	vm.shutDown()
+	delete(m.allVms, vmId)
+	return nil
+}
+
 // Retrieves the machine manager's public key, which comes from a key pair of type server (Nxxx)
 func (m *MachineManager) PublicKey() string {
 	pk, err := m.kp.PublicKey()
@@ -69,6 +82,15 @@ func (m *MachineManager) PublicKey() string {
 	} else {
 		return pk
 	}
+}
+
+// Looks up a virtual machine by workload/vm ID. Returns nil if machine doesn't exist
+func (m *MachineManager) LookupMachine(vmId string) *runningFirecracker {
+	vm, exists := m.allVms[vmId]
+	if !exists {
+		return nil
+	}
+	return vm
 }
 
 // Called by a consumer looking to submit a workload into a virtual machine. Prior to that, the machine
