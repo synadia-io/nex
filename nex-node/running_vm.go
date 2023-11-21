@@ -39,10 +39,11 @@ func (vm *runningFirecracker) Subscribe() (<-chan *agentapi.LogEntry, <-chan *ag
 }
 
 func (vm *runningFirecracker) shutDown() {
+
 	log.WithField("vmid", vm.vmmID).
-		WithField("namespace", vm.namespace).
 		WithField("ip", vm.ip).
 		Info("Machine stopping")
+
 	vm.machine.StopVMM()
 	err := os.Remove(vm.machine.Cfg.SocketPath)
 	if err != nil {

@@ -192,9 +192,15 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 		runningVm.namespace = namespace
 		runningVm.workloadSpecification = request
 
-		api.log.WithField("vmid", runningVm.vmmID).WithField("namespace", namespace).Info("Submitting workload to VM")
+		workloadName := runningVm.workloadSpecification.DecodedClaims.Subject
 
-		_, err = runningVm.agentClient.PostWorkload(payloadFile.Name(), request.WorkloadEnvironment)
+		api.log.
+			WithField("vmid", runningVm.vmmID).
+			WithField("namespace", namespace).
+			WithField("workload", workloadName).
+			Info("Submitting workload to VM")
+
+		_, err = runningVm.agentClient.PostWorkload(workloadName, payloadFile.Name(), request.WorkloadEnvironment)
 		if err != nil {
 			api.log.WithError(err).Error("Failed to start workload in VM")
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to submit workload to agent process: %s", err))
@@ -203,7 +209,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 
 		res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 			Started:   true,
-			Name:      runningVm.workloadSpecification.DecodedClaims.Subject,
+			Name:      workloadName,
 			Issuer:    runningVm.workloadSpecification.DecodedClaims.Issuer,
 			MachineId: runningVm.vmmID,
 		}, nil)

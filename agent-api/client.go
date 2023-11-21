@@ -90,7 +90,7 @@ func (c AgentClient) Health() (bool, string, error) {
 	return health.Healthy, health.AgentVersion, nil
 }
 
-func (c AgentClient) PostWorkload(workloadPath string, env map[string]string) (*WorkloadAck, error) {
+func (c AgentClient) PostWorkload(workloadName string, workloadPath string, env map[string]string) (*WorkloadAck, error) {
 	f, err := os.Open(workloadPath)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (c AgentClient) PostWorkload(workloadPath string, env map[string]string) (*
 			Header: &WorkloadMetadata{
 				Hash:               fmt.Sprintf("%x", h.Sum(nil)),
 				RuntimeEnvironment: env,
-				Name:               workloadPath,
+				Name:               workloadName,
 				TotalBytes:         int32(info.Size()),
 			},
 		},

@@ -58,5 +58,15 @@ func main() {
 	stop.Flag("issuer", "Path to the issuer seed key originally used to start the workload").Required().ExistingFileVar(&cli.StopOpts.ClaimsIssuerFile)
 	stop.Action(cli.StopWorkload)
 
+	logs := ncli.Command("logs", "Live monitor workload log emissions")
+	logs.Flag("node", "Public key of the nex node to filter on").Default("*").StringVar(&cli.WatchOpts.NodeId)
+	logs.Flag("workload_name", "Name of the workload to filter on").Default("*").StringVar(&cli.WatchOpts.WorkloadName)
+	logs.Flag("workload_id", "ID of the workload machine to filter on").Default("*").StringVar(&cli.WatchOpts.WorkloadId)
+	logs.Flag("level", "Log level filter").Default("debug").StringVar(&cli.WatchOpts.LogLevel)
+	logs.Action(cli.WatchLogs)
+
+	evts := ncli.Command("events", "Live monitor events from nex nodes")
+	evts.Action(cli.WatchEvents)
+
 	ncli.MustParseWithUsage(os.Args[1:])
 }

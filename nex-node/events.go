@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	controlapi "github.com/ConnectEverything/nex/control-api"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -61,10 +62,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 }
 
 func (m *MachineManager) PublishNodeStarted() {
-	nodeStart := struct {
-		Version string `json:"version"`
-		Id      string `json:"id"`
-	}{
+	nodeStart := controlapi.NodeStartedEvent{
 		Version: VERSION,
 		Id:      m.PublicKey(),
 	}
@@ -73,21 +71,17 @@ func (m *MachineManager) PublishNodeStarted() {
 	cloudevent.SetSource(m.PublicKey())
 	cloudevent.SetID(uuid.NewString())
 	cloudevent.SetTime(time.Now().UTC())
-	cloudevent.SetType("node_stopped")
+	cloudevent.SetType(controlapi.NodeStartedEventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(nodeStart)
 
-	m.PublishCloudEvent("node_started", "system", cloudevent)
+	m.PublishCloudEvent(controlapi.NodeStartedEventType, "system", cloudevent)
 }
 
 func (m *MachineManager) PublishNodeStopped() {
 	cloudevent := cloudevents.NewEvent()
 
-	// TODO: move this to shared struct if we add fields
-	evt := struct {
-		Id       string `json:"id"`
-		Graceful bool   `json:"graceful"`
-	}{
+	evt := controlapi.NodeStoppedEvent{
 		Id:       m.PublicKey(),
 		Graceful: true,
 	}
@@ -95,10 +89,10 @@ func (m *MachineManager) PublishNodeStopped() {
 	cloudevent.SetSource(m.PublicKey())
 	cloudevent.SetID(uuid.NewString())
 	cloudevent.SetTime(time.Now().UTC())
-	cloudevent.SetType("node_stopped")
+	cloudevent.SetType(controlapi.NodeStoppedEventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(evt)
-	m.PublishCloudEvent("node_stopped", "system", cloudevent)
+	m.PublishCloudEvent(controlapi.NodeStoppedEventType, "system", cloudevent)
 }
 
 type emittedLog struct {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
+	controlapi "github.com/ConnectEverything/nex/control-api"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
@@ -54,10 +55,15 @@ func (m *MachineManager) Stop() error {
 		m.PublishMachineStopped(vm)
 		vm.shutDown()
 	}
+	m.PublishNodeStopped()
+	time.Sleep(100 * time.Millisecond)
 	// Now empty the leftovers in the pool
 	for vm := range m.warmVms {
 		vm.shutDown()
 	}
+
+	// Wipe the VM list just in case
+	m.allVms = make(map[string]*runningFirecracker)
 
 	return nil
 }
@@ -235,7 +241,36 @@ func agentEventToCloudEvent(vm *runningFirecracker, pk string, event *agentapi.A
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(eventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-	cloudevent.SetData(event.Data)
+
+	// ACL so we don't bleed inner details of control mechanisms onto public event streams
+
+	var data interface{}
+	switch typ := event.Data.(type) {
+	case *agentapi.AgentEvent_AgentStarted:
+		data = controlapi.AgentStartedEvent{
+			AgentVersion: typ.AgentStarted.AgentVersion,
+		}
+	case *agentapi.AgentEvent_AgentStopped:
+		data = controlapi.AgentStoppedEvent{
+			Message: typ.AgentStopped.Message,
+			Code:    int(typ.AgentStopped.Code),
+		}
+	case *agentapi.AgentEvent_WorkloadStarted:
+		data = controlapi.WorkloadStartedEvent{
+			Name:       typ.WorkloadStarted.Name,
+			TotalBytes: int(typ.WorkloadStarted.TotalBytes),
+		}
+	case *agentapi.AgentEvent_WorkloadStopped:
+		data = controlapi.WorkloadStoppedEvent{
+			Name:    typ.WorkloadStopped.Name,
+			Code:    int(typ.WorkloadStopped.Code),
+			Message: typ.WorkloadStopped.Message,
+		}
+	default:
+		data = struct{}{}
+	}
+
+	cloudevent.SetData(data)
 
 	return cloudevent
 }

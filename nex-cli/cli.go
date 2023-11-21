@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	Opts     = &Options{}
-	RunOpts  = &RunOptions{Env: make(map[string]string)}
-	StopOpts = &StopOptions{}
+	Opts      = &Options{}
+	RunOpts   = &RunOptions{Env: make(map[string]string)}
+	StopOpts  = &StopOptions{}
+	WatchOpts = &WatchOptions{}
 )
 
 // Options configure the CLI
@@ -57,4 +58,11 @@ type StopOptions struct {
 	WorkloadName     string
 	WorkloadId       string
 	ClaimsIssuerFile string
+}
+
+type WatchOptions struct {
+	NodeId       string
+	WorkloadId   string
+	WorkloadName string
+	LogLevel     string
 }
