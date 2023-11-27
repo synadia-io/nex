@@ -9,13 +9,15 @@ import (
 // Node configuration is used to configure the node process as well as the virtual machines it
 // produces
 type NodeConfiguration struct {
-	KernelPath      string          `json:"kernel_path"`
-	RootFsPath      string          `json:"rootfs_path"`
-	MachinePoolSize int             `json:"machine_pool_size"`
-	CNI             CNIDefinition   `json:"cni"`
-	MachineTemplate MachineTemplate `json:"machine_template"`
-	RateLimiters    *Limiters       `json:"rate_limiters,omitempty"`
-	ValidIssuers    []string        `json:"valid_issuers,omitempty"`
+	KernelPath       string          `json:"kernel_path"`
+	RootFsPath       string          `json:"rootfs_path"`
+	MachinePoolSize  int             `json:"machine_pool_size"`
+	CNI              CNIDefinition   `json:"cni"`
+	MachineTemplate  MachineTemplate `json:"machine_template"`
+	RateLimiters     *Limiters       `json:"rate_limiters,omitempty"`
+	ValidIssuers     []string        `json:"valid_issuers,omitempty"`
+	InternalNodeHost string          `json:"internal_node_host,omitempty"`
+	InternalNodePort int             `json:"internal_node_port"`
 }
 
 // A set of rate limiters. These fields are identical to those in firecracker rate limiter configuration
@@ -68,6 +70,10 @@ func DefaultNodeConfiguration() NodeConfiguration {
 			MemSizeMib: 256,
 		},
 		RateLimiters: nil,
+		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the inside of the firecracker VM--. This is not necessarily the address
+		// on which the internal NATS server is actually listening on inside the node.
+		InternalNodeHost: "192.168.127.1",
+		InternalNodePort: 9222,
 	}
 }
 
@@ -77,7 +83,7 @@ func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
 	if err != nil {
 		return nil, err
 	}
-	var config NodeConfiguration
+	config := DefaultNodeConfiguration()
 	err = json.Unmarshal(bytes, &config)
 	if err != nil {
 		return nil, err

@@ -21,13 +21,6 @@ type RunResponse struct {
 	Name      string `json:"name"`
 }
 
-type StopResponse struct {
-	Stopped   bool   `json:"started"`
-	MachineId string `json:"machine_id"`
-	Issuer    string `json:"issuer"`
-	Name      string `json:"name"`
-}
-
 type PingResponse struct {
 	NodeId          string            `json:"node_id"`
 	Version         string            `json:"version"`

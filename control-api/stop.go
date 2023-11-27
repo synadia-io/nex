@@ -13,8 +13,14 @@ type StopRequest struct {
 	TargetNode  string `json:"target_node"`
 }
 
+type StopResponse struct {
+	Stopped   bool   `json:"stopped"`
+	MachineId string `json:"machine_id"`
+	Issuer    string `json:"issuer"`
+	Name      string `json:"name"`
+}
+
 func NewStopRequest(workloadId string, name string, targetNode string, issuer nkeys.KeyPair) (*StopRequest, error) {
-	fmt.Printf("%s %s %+v", workloadId, name, issuer)
 	claims := jwt.NewGenericClaims(name)
 	jwtText, err := claims.Encode(issuer)
 	if err != nil {

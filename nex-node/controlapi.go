@@ -3,7 +3,6 @@ package nexnode
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"runtime"
 	"slices"
 	"strconv"
@@ -17,18 +16,17 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// The API listener is the command and control interface for the node server
 type ApiListener struct {
-	mgr          *MachineManager
-	nc           *nats.Conn
-	log          *logrus.Logger
-	payloadCache *payloadCache
-	nodeId       string
-	start        time.Time
-	xk           nkeys.KeyPair
-	tags         map[string]string
+	mgr    *MachineManager
+	log    *logrus.Logger
+	nodeId string
+	start  time.Time
+	xk     nkeys.KeyPair
+	tags   map[string]string
 }
 
-func NewApiListener(nc *nats.Conn, log *logrus.Logger, mgr *MachineManager, tags map[string]string) *ApiListener {
+func NewApiListener(log *logrus.Logger, mgr *MachineManager, tags map[string]string) *ApiListener {
 	pub, _ := mgr.kp.PublicKey()
 	efftags := tags
 	efftags[controlapi.TagOS] = runtime.GOOS
@@ -48,21 +46,13 @@ func NewApiListener(nc *nats.Conn, log *logrus.Logger, mgr *MachineManager, tags
 
 	log.WithField("public_xkey", xkPub).Info("Use this key as the recipient for encrypted run requests")
 
-	dname, err := os.MkdirTemp("", "nexnode")
-	if err != nil {
-		log.WithError(err).Error("Failed to create temp directory for workload cache")
-		return nil
-	}
-
 	return &ApiListener{
-		mgr:          mgr,
-		nc:           nc,
-		log:          log,
-		nodeId:       pub,
-		xk:           kp,
-		payloadCache: NewPayloadCache(nc, log, dname),
-		start:        time.Now().UTC(),
-		tags:         tags,
+		mgr:    mgr,
+		log:    log,
+		nodeId: pub,
+		xk:     kp,
+		start:  time.Now().UTC(),
+		tags:   tags,
 	}
 }
 
@@ -73,13 +63,13 @@ func (api *ApiListener) PublicKey() string {
 
 func (api *ApiListener) Start() error {
 
-	api.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
-	api.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
+	api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
+	api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
 
 	// Namespaced subscriptions, the * below is for the namespace
-	api.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, handleInfo(api))
-	api.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
-	api.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
+	api.mgr.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, handleInfo(api))
+	api.mgr.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
+	api.mgr.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
 
 	api.log.WithField("id", api.nodeId).WithField("version", VERSION).Info("NATS execution engine awaiting commands")
 	return nil
@@ -175,10 +165,10 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
 		}
 
-		payloadFile, err := api.payloadCache.GetPayload(&request)
+		err = api.mgr.CacheWorkload(&request)
 		if err != nil {
-			api.log.WithError(err).Error("Failed to read payload from specified location")
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to download workload bytes from specified location: %s", err))
+			api.log.WithError(err).Error("Failed to cache workload bytes")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))
 			return
 		}
 
@@ -188,11 +178,8 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to pull warm VM from ready pool: %s", err))
 			return
 		}
-		runningVm.workloadStarted = time.Now().UTC()
-		runningVm.namespace = namespace
-		runningVm.workloadSpecification = request
 
-		workloadName := runningVm.workloadSpecification.DecodedClaims.Subject
+		workloadName := request.DecodedClaims.Subject
 
 		api.log.
 			WithField("vmid", runningVm.vmmID).
@@ -200,12 +187,14 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			WithField("workload", workloadName).
 			Info("Submitting workload to VM")
 
-		_, err = runningVm.agentClient.PostWorkload(workloadName, payloadFile.Name(), request.WorkloadEnvironment)
+		err = api.mgr.DispatchWork(runningVm, workloadName, namespace, request)
+
 		if err != nil {
 			api.log.WithError(err).Error("Failed to start workload in VM")
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to submit workload to agent process: %s", err))
 			return
 		}
+		api.log.WithField("workload", workloadName).WithField("vmid", runningVm.vmmID).Info("Work accepted")
 
 		res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 			Started:   true,

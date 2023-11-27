@@ -17,7 +17,7 @@ func main() {
 	if len(strings.TrimSpace(natsUrl)) == 0 {
 		natsUrl = nats.DefaultURL
 	}
-	fmt.Printf("Using NATS url '%s'", natsUrl)
+	fmt.Printf("Echo service using NATS url '%s'\n", natsUrl)
 	nc, err := nats.Connect(natsUrl)
 	if err != nil {
 		panic(err)

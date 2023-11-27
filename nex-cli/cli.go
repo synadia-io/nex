@@ -6,11 +6,18 @@ import (
 )
 
 var (
-	Opts      = &Options{}
-	RunOpts   = &RunOptions{Env: make(map[string]string)}
-	StopOpts  = &StopOptions{}
-	WatchOpts = &WatchOptions{}
+	Opts       = &Options{}
+	RunOpts    = &RunOptions{Env: make(map[string]string)}
+	DevRunOpts = &DevRunOptions{}
+	StopOpts   = &StopOptions{}
+	WatchOpts  = &WatchOptions{}
 )
+
+type DevRunOptions struct {
+	Filename string
+	// Stop a workload with the same name on a target
+	AutoStop bool
+}
 
 // Options configure the CLI
 type Options struct {
@@ -51,6 +58,7 @@ type RunOptions struct {
 	PublisherXkeyFile string
 	ClaimsIssuerFile  string
 	Env               map[string]string
+	DevMode           bool
 }
 
 type StopOptions struct {

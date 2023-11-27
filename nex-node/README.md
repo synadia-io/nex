@@ -20,6 +20,19 @@ Because `nex-node` utilizes firecracker VMs, ⚠️ _it can only run on 64-bit L
 
 As you run this and create warm VMs to reside in the pool, you'll be allocating IP addresses from the firecracker network CNI device (defaults to `fcnet`). This means that eventually you'll run out of IP addresses during development. To clear them, you can purge your `/var/lib/cni/networks/{device}` directory. This will start IP allocation back at `.2` (`.1` is the host).
 
+Additionally, while running and testing this you may end up with a large amount of idle/dormant `veth` devices. To remove them all, you can use the following script:
+
+```bash
+for name in $(ifconfig -a | sed 's/[ \t].*//;/^\(lo\|\)$/d' | grep veth)
+do
+    echo $name
+    sudo ip link delete $name
+done
+```
+
+⚠️ If you're working in a contributor loop and you modify the rootfs after some firecracker IPs have already been allocated, it can potentially wreck the host networking and you'll notice
+the agents suddenly unable to communicate. If this happens, just purge the IPs and the `veth` devices to start over fresh.
+
 ## Configuration
 The `nex-node` service needs to know the size and shape of the firecracker machines to dispense. As a result, it needs a JSON file that describes the cookie cutter from which VMs are stamped. Here's a sample `machineconfig.json` file:
 
@@ -43,7 +56,7 @@ The `nex-node` service needs to know the size and shape of the firecracker machi
 This file tells `nex-node` where to find the kernel and rootfs for the firecracker VMs, as well as the CNI configuration. Finally, if you supply a non-empty value for `requester_public_keys`, that will serve as an allow-list for public **Xkeys** that can be used to submit requests. XKeys are basically [nkeys](https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro/nkey_auth) that can be used for encryption. Note that the `network_name` field must match _exactly_ the `{network_name}.conflist` file in `/etc/cni/conf.d`.
 
 ## Reference
-Here's a look at the `fcnet.conflist` file that we use as a default. This gives each firecracker VM access to whatever the host can access, and allows the host to make inbound requests. Regardless of your CNI configuration, the `nex-node` process _**must**_ be able to make inbound HTTP/2 requests into the VM.
+Here's a look at the `fcnet.conflist` file that we use as a default. This gives each firecracker VM access to whatever the host can access, and allows the host to make inbound requests. Regardless of your CNI configuration, the agent process _must_ be able to communicate with the host node via the internal NATS server (defaults to running in port `9222`).
 
 ```json
 {
@@ -71,21 +84,21 @@ If you want to add additional constraints and rules to the `fcnet` definition, c
 You can monitor events coming out of the node and workloads running within the node by subscribing on the following subject pattern:
 
 ```
-$NEX.events.{event_type}
+$NEX.events.{namespace}.{event_type}
 ```
 
-The payload of these events is a **CloudEvents** envelope containing an inner JSON object for the `data` field.
+The payload of these events is a **CloudEvent** envelope containing an inner JSON object for the `data` field.
 
 ## Observing Logs
 You can subscribe to log emissions without console access by using the following subject pattern:
 
 ```
-$NEX.logs.{host}.{workload}.{vmId}
+$NEX.logs.{namespace}.{host}.{workload}.{vmId}
 ```
 
 This gives you the flexibility of monitoring everything from a given host, workload, or vmID. For example, if you want to see
 an aggregate of all logs emitted by the `bankservice` workload throughout an entire system, you could just subscribe to:
 
 ```
-$NEX.logs.*.bankservice.*
+$NEX.logs.*.*.bankservice.*
 ```

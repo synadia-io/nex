@@ -6,23 +6,19 @@ import (
 	"strings"
 	"time"
 
+	agentapi "github.com/ConnectEverything/nex/agent-api"
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
 
-func (m *MachineManager) PublishCloudEvent(eventType string, namespace string, event cloudevents.Event) {
-	event.SetType(eventType) // force this to always be consistent
+func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.Event) {
 
-	raw, err := event.MarshalJSON()
-	if err != nil {
-		panic(err)
-	}
+	raw, _ := event.MarshalJSON()
 
-	// TODO: in the future, consider using a queue so we can buffer events when
-	// disconnected
-	m.nc.Publish(fmt.Sprintf("%s.%s.%s", eventSubjectPrefix, namespace, eventType), raw)
+	// $NEX.events.{namespace}.{event_type}
+	m.nc.Publish(fmt.Sprintf("%s.%s.%s", EventSubjectPrefix, namespace, event.Type()), raw)
 	m.nc.Flush()
 }
 
@@ -43,10 +39,11 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		cloudevent.SetSource(m.PublicKey())
 		cloudevent.SetID(uuid.NewString())
 		cloudevent.SetTime(time.Now().UTC())
+		cloudevent.SetType(agentapi.WorkloadStoppedEventType)
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 		cloudevent.SetData(workloadStopped)
 
-		m.PublishCloudEvent("workload_stopped", vm.namespace, cloudevent)
+		m.PublishCloudEvent(vm.namespace, cloudevent)
 
 		emitLog := emittedLog{
 			Text:      "Workload stopped",
@@ -55,7 +52,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		}
 		logBytes, _ := json.Marshal(emitLog)
 
-		subject := fmt.Sprintf("%s.%s.%s.%s.%s", logSubjectPrefix, vm.namespace, m.PublicKey(), workloadName, vm.vmmID)
+		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.PublicKey(), workloadName, vm.vmmID)
 		m.nc.Publish(subject, logBytes)
 		m.nc.Flush()
 	}
@@ -75,12 +72,13 @@ func (m *MachineManager) PublishNodeStarted() {
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(nodeStart)
 
-	m.PublishCloudEvent(controlapi.NodeStartedEventType, "system", cloudevent)
+	m.PublishCloudEvent("system", cloudevent)
 }
 
 func (m *MachineManager) PublishNodeStopped() {
 	cloudevent := cloudevents.NewEvent()
 
+	m.log.Info("Publishing node stopped")
 	evt := controlapi.NodeStoppedEvent{
 		Id:       m.PublicKey(),
 		Graceful: true,
@@ -92,7 +90,7 @@ func (m *MachineManager) PublishNodeStopped() {
 	cloudevent.SetType(controlapi.NodeStoppedEventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	cloudevent.SetData(evt)
-	m.PublishCloudEvent(controlapi.NodeStoppedEventType, "system", cloudevent)
+	m.PublishCloudEvent("system", cloudevent)
 }
 
 type emittedLog struct {

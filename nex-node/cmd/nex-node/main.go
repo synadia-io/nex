@@ -99,13 +99,15 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 	log.Infof("Loaded node configuration from '%s'", opts.NodeConfigFile)
 
 	manager := nexnode.NewMachineManager(ctx, cancel, nc, config, log)
-	setupSignalHandlers(log, manager)
 	err = manager.Start()
 	if err != nil {
-		panic(err)
+		log.WithError(err).Error("Failed to start machine manager")
+		os.Exit(1)
 	}
 
-	api := nexnode.NewApiListener(nc, log, manager, make(map[string]string))
+	setupSignalHandlers(log, manager)
+
+	api := nexnode.NewApiListener(log, manager, make(map[string]string))
 	api.Start()
 }
 
@@ -130,10 +132,10 @@ func clearMyApiSockets() {
 
 func setupSignalHandlers(log *logrus.Logger, manager *nexnode.MachineManager) {
 	go func() {
-		// Clear some default handlers installed by the firecracker SDK:
-		signal.Reset(os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+		// both firecracker and the embedded NATS server register signal handlers... wipe those so ours are the ones being used
+		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
 		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 
 		for {
 			switch s := <-c; {
@@ -143,7 +145,7 @@ func setupSignalHandlers(log *logrus.Logger, manager *nexnode.MachineManager) {
 				clearMyApiSockets()
 				os.Exit(0)
 			case s == syscall.SIGQUIT:
-				log.Infof("Caught signal: %s, forcing shutdown", s.String())
+				log.Infof("Caught quit signal: %s, still trying graceful shutdown", s.String())
 				manager.Stop()
 				clearMyApiSockets()
 				os.Exit(0)

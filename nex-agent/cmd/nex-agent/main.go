@@ -1,31 +1,40 @@
 package main
 
 import (
-	"log"
-	"net"
+	"context"
+	"fmt"
 	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 	nexagent "github.com/ConnectEverything/nex/nex-agent"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
+	"github.com/nats-io/nats.go"
 )
 
 func main() {
-	s := grpc.NewServer()
-	agentapi.RegisterNexAgentServer(s, nexagent.NewApiServer())
-	reflection.Register(s)
+	ctx := context.Background()
+	time.Sleep(1 * time.Second) // give host time to post metadata
+	metadata, err := nexagent.GetMachineMetadata()
 
-	lis, err := net.Listen("tcp", ":8081")
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		// If we're using the defaults (e.g. in dev loop) this will at least be able to report
+		// the metadata failure
+		metadata = &agentapi.MachineMetadata{
+			VmId:            "42",
+			NodeNatsAddress: "192.168.172.1",
+			NodePort:        9222,
+			Message:         fmt.Sprintf("%s", err),
+		}
 	}
-	go func() {
-		time.Sleep(2 * time.Second)
-		nexagent.PublishAgentStarted()
-	}()
 
-	s.Serve(lis)
+	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", metadata.NodeNatsAddress, metadata.NodePort))
+	if err != nil {
+		panic(err)
+	}
+	nodeClient, err := nexagent.NewNodeClient(nc, metadata)
+	if err != nil {
+		panic(err)
+	}
+	nodeClient.Start()
 
-	// Can't publish agent stopped here since `s` is not running
+	<-ctx.Done()
 }

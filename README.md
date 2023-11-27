@@ -6,7 +6,7 @@ Turn your NATS infrastructure into a distributed workload deployment and executi
 * [control-api](./control-api/) - The API for communicating with and remotely controlling NEX nodes
 * [nex-cli](./nex-cli) - CLI for communicating with NEX nodes
 * [fc-image](./fc-image/) - Tools for building the rootfs (ext4) file system for use in firecracker VMs
-* [agent-api](./agent-api/) - Protobuf API specification for protocol used between `nex-node` and `nex-agent` across the firecracker boundary. Also contains a client for communicating with an agent. This is an internal API unlikely to be of interest to users.
+* [agent-api](./agent-api/) - Data types and other API data for protocol used between `nex-node` and `nex-agent` across the firecracker boundary. This is an internal API unlikely to be of interest to anyone other than contributors.
 
 Follow these steps to get up and running:
 
@@ -38,6 +38,8 @@ For other languages, check the language documentation or community.
 Once your static executable is ready to run, you can use the [CLI](./nex-cli/) or the [Control API](./control-api/) to launch it. The system will validate that the binary is statically linked and reject it otherwise.
 
 ## Architecture
-The following diagram provides a (rough) view of the various components of the system. Here, `nex-node` processes all attach to a NATS system. Each `nex-node` process is responsible for spinning up multiple firecracker VMs. Within each firecracker VM is a `nex-agent` process, and spawned by each `nex-agent` process is a _single_, untrusted workload (executable). This untrusted workload, if it has a NATS connection, is using completely separate credentials and URLs than the control interface for `nex-node`s.
+The following diagram provides a (rough) view of the various components of the system. Here, `nex-node` processes all attach to a NATS system. Each `nex-node` process is responsible for spinning up multiple firecracker VMs. Within each firecracker VM is a `nex-agent` process, and spawned by each `nex-agent` process is a _single_, untrusted workload (executable). 
+
+In production, if an untrusted workload has a NATS connection, it should not use the same URL+credentials that the node servers are using. Remember that credentials and URLs are all passed to workloads through encrypted environment variables.
 
 ![NEX architecture](./nex-arch.png)

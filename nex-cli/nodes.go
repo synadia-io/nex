@@ -9,6 +9,7 @@ import (
 	"github.com/choria-io/fisk"
 )
 
+// Uses a control API client to request a node list from a NATS environment
 func ListNodes(ctx *fisk.ParseContext) error {
 
 	nc, err := generateConnectionFromOpts()
@@ -27,6 +28,7 @@ func ListNodes(ctx *fisk.ParseContext) error {
 
 }
 
+// Uses a control API client to retrieve info on a single node
 func NodeInfo(ctx *fisk.ParseContext) error {
 
 	nc, err := generateConnectionFromOpts()

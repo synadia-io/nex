@@ -87,7 +87,7 @@ func WatchLogs(ctx *fisk.ParseContext) error {
 		// FIX: 👀 in this text upsets the formatter. Emoji usage is priority
 		Info("Starting log watcher")
 
-	// $NEX.LOGS.{namespace}.{node}.{workload name}.{vm}
+	// $NEX.logs.{namespace}.{node}.{workload name}.{vm}
 	subscribeSubject := fmt.Sprintf("%s.logs.%s.%s.%s.%s", controlapi.APIPrefix, namespaceFilter, nodeFilter, workloadNameFilter, vmFilter)
 	_, err = nc.Subscribe(subscribeSubject, handleLogEntry(log))
 	if err != nil {

@@ -1,13 +1,12 @@
 package nexnode
 
 import (
-	"debug/elf"
-	"errors"
-	"fmt"
+	"io"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 
+	agentapi "github.com/ConnectEverything/nex/agent-api"
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
@@ -27,61 +26,79 @@ func NewPayloadCache(nc *nats.Conn, log *logrus.Logger, dir string) *payloadCach
 	}
 }
 
-func (c *payloadCache) GetPayload(request *controlapi.RunRequest) (*os.File, error) {
-	// TODO - check for locally cached version
-
+func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
-	c.log.WithField("bucket", bucket).WithField("key", key).Info("Attempting object store download")
+	m.log.WithField("bucket", bucket).WithField("key", key).WithField("url", m.nc.Opts.Url).Info("Attempting object store download")
 	opts := []nats.JSOpt{}
 	if len(strings.TrimSpace(request.JsDomain)) != 0 {
 		opts = append(opts, nats.APIPrefix(request.JsDomain))
 	}
-	js, err := c.nc.JetStream(opts...)
+	js, err := m.nc.JetStream(opts...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	store, err := js.ObjectStore(bucket)
 	if err != nil {
-		c.log.WithError(err).WithField("bucket", bucket).Error("Failed to bind to specified object store")
-		return nil, err
+		m.log.WithError(err).WithField("bucket", bucket).Error("Failed to bind to source object store")
+		return err
 	}
-
-	filename := fmt.Sprintf("%s.%s.bin", bucket, key)
-	fname := filepath.Join(c.rootDir, filename)
 	_, err = store.GetInfo(key)
 	if err != nil {
-		c.log.WithError(err).WithField("key", key).Error("Failed to locate workload binary")
-		return nil, err
+		m.log.WithError(err).WithField("key", key).WithField("bucket", bucket).Error("Failed to locate workload binary in source object store")
+		return err
 	}
-	// TODO: examine objInfo.Digest to get file hash to compare against locally hashed file
-	err = store.GetFile(key, fname)
-	if err != nil {
-		return nil, err
-	}
-	c.log.WithField("filename", fname).WithField("bucket", bucket).WithField("key", key).Info("Downloaded workload bytes from bucket")
 
-	elfFile, err := elf.Open(fname)
+	// NOTE: it's not the best use of time to write the file to disk and then read it back again in order to
+	// hand it to the cache.. but the elf verification library only works on a filename and doesn't take
+	// a reader or a slice
+
+	filename := path.Join(os.TempDir(), "sus")
+	err = store.GetFile(key, filename)
 	if err != nil {
-		c.log.WithError(err).Error("Failed to verify downloaded file is a static-linked elf binary")
+		m.log.WithError(err).WithField("key", key).Error("Failed to download bytes from source object store")
+		return err
 	}
-	defer elfFile.Close()
-	err = verifyStatic(elfFile)
+
+	// TODO: as we support more workload types, validate those accordingly. For now, the node only
+	// supports 64-bit statically linked binaries
+	err = controlapi.ValidateNativeBinary(filename)
 	if err != nil {
-		c.log.WithError(err).Error("❌ Invalid ELF binary")
-		return nil, err
+		m.log.WithError(err).Error("❌ Invalid ELF binary")
+		return err
 	} else {
-		c.log.WithField("key", key).Info("✅ Verified static-linked ELF binary")
+		m.log.WithField("key", key).WithField("name", request.DecodedClaims.Subject).Info("✅ Verified static-linked ELF binary")
 	}
 
-	return os.Open(fname)
-}
-
-func verifyStatic(elf *elf.File) error {
-	for _, prog := range elf.Progs {
-		if prog.ProgHeader.Type == 3 { // PT_INTERP
-			return errors.New("elf binary contains at least one dynamically linked dependency")
-		}
+	f, err := os.Open(filename)
+	if err != nil {
+		return err
 	}
+	workload, err := io.ReadAll(f)
+	if err != nil {
+		m.log.WithError(err).Error("Couldn't read the file we just wrote")
+		return err
+	}
+	os.Remove(filename)
+
+	jsInternal, err := m.ncInternal.JetStream()
+	if err != nil {
+		m.log.WithError(err).Error("Failed to acquire JetStream context for internal object store.")
+		panic(err)
+	}
+	cache, err := jsInternal.ObjectStore(agentapi.WorkloadCacheBucket)
+	if err != nil {
+		m.log.WithError(err).Error("Failed to get object store reference for internal cache.")
+		panic(err)
+	}
+
+	_, err = cache.PutBytes(request.DecodedClaims.Subject, workload)
+	if err != nil {
+		m.log.WithError(err).Error("Failed to write workload to internal cache.")
+		panic(err)
+	}
+
+	m.log.WithField("name", request.DecodedClaims.Subject).Info("Successfully stored workload in internal object store")
+
 	return nil
 }

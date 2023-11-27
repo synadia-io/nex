@@ -2,17 +2,16 @@ package nexagent
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
 
-func RunWorkload(name string, totalBytes int32, tempFile *os.File, runtimeEnvironment map[string]string) error {
+func RunWorkload(vmId string, name string, totalBytes int32, tempFileName string, runtimeEnvironment map[string]string) error {
 	// This has to be backgrounded because the workload could be a long-running process/service
 	go func() {
-		cmd := exec.Command(tempFile.Name())
+		cmd := exec.Command(tempFileName)
 		cmd.Stdout = &logEmitter{stderr: false, name: name}
 		cmd.Stderr = &logEmitter{stderr: true, name: name}
 
@@ -27,10 +26,12 @@ func RunWorkload(name string, totalBytes int32, tempFile *os.File, runtimeEnviro
 		if err != nil {
 			msg := fmt.Sprintf("Failed to start workload: %s", err)
 			LogError(msg)
-			PublishWorkloadStopped(name, true, msg)
+			PublishWorkloadStopped(vmId, name, true, msg)
 			return
 		}
-		PublishWorkloadStarted(name, totalBytes)
+		PublishWorkloadStarted(vmId, name, totalBytes)
+
+		// if cmd.Wait has unblocked, it means the workload has stopped
 		err = cmd.Wait()
 		msg := ""
 		if err != nil {
@@ -38,13 +39,16 @@ func RunWorkload(name string, totalBytes int32, tempFile *os.File, runtimeEnviro
 		} else {
 			msg = "OK"
 		}
-		PublishWorkloadStopped(name, err != nil, msg)
+		PublishWorkloadStopped(vmId, name, err != nil, msg)
+
 	}()
 
 	return nil
 
 }
 
+// This implements the writer interface that allows us to capture a workload's
+// stdout and stderr so that we can then publish those logs to the host node
 type logEmitter struct {
 	stderr bool
 	name   string
@@ -53,9 +57,9 @@ type logEmitter struct {
 func (l *logEmitter) Write(bytes []byte) (int, error) {
 	var lvl agentapi.LogLevel
 	if l.stderr {
-		lvl = agentapi.LogLevel_LEVEL_ERROR
+		lvl = agentapi.LogLevelError
 	} else {
-		lvl = agentapi.LogLevel_LEVEL_DEBUG
+		lvl = agentapi.LogLevelInfo
 	}
 	entry := &agentapi.LogEntry{
 		Source: l.name,

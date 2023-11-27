@@ -37,7 +37,6 @@ func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace s
 // another issuer's workload
 func (api *apiClient) StopWorkload(stopRequest *StopRequest) (*StopResponse, error) {
 	subject := fmt.Sprintf("%s.STOP.%s.%s", APIPrefix, api.namespace, stopRequest.TargetNode)
-	fmt.Println(subject)
 	bytes, err := api.performRequest(subject, stopRequest)
 	if err != nil {
 		return nil, err

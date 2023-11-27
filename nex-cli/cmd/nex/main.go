@@ -51,6 +51,12 @@ func main() {
 	run.Flag("description", "Description of the workload").StringVar(&cli.RunOpts.Description)
 	run.Action(cli.RunWorkload)
 
+	yeet := ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
+	yeet.Arg("file", "File to run").Required().ExistingFileVar(&cli.DevRunOpts.Filename)
+	yeet.Arg("env", "Environment variables to pass to workload").StringMapVar(&cli.RunOpts.Env)
+	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&cli.DevRunOpts.AutoStop)
+	yeet.Action(cli.RunDevWorkload)
+
 	stop := ncli.Command("stop", "Stop a running workload")
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&cli.StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&cli.StopOpts.WorkloadId)

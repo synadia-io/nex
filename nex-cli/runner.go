@@ -92,13 +92,13 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 		return err
 	}
 
-	renderRunResponse(resp)
+	renderRunResponse(RunOpts.TargetNode, resp)
 	return nil
 }
 
-func renderRunResponse(resp *controlapi.RunResponse) {
+func renderRunResponse(targetNode string, resp *controlapi.RunResponse) {
 	if resp.Started {
-		fmt.Printf("🚀 Workload '%s' accepted. You can now refer to this workload with ID: %s\n", resp.Name, resp.MachineId)
+		fmt.Printf("🚀 Workload '%s' accepted. You can now refer to this workload with ID: %s on node %s", resp.Name, resp.MachineId, targetNode)
 	} else {
 		fmt.Println("⛔ Workload rejected")
 	}
