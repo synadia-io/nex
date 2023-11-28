@@ -73,11 +73,10 @@ func main() {
 	switch cmd {
 	case "up":
 		cmdUp(opts, ctx, cancel, log)
+		<-ctx.Done()
 	case "preflight":
 		cmdPreflight(opts, ctx, cancel, log)
 	}
-
-	<-ctx.Done()
 }
 
 func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
@@ -112,6 +111,13 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 }
 
 func cmdPreflight(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
+	config, err := nexnode.LoadNodeConfiguration(opts.NodeConfigFile)
+	if err != nil {
+		fmt.Printf("Failed to load configuration file: %s\n", err)
+		os.Exit(1)
+	}
+
+	nexnode.CheckPreRequisites(config)
 }
 
 // TODO : look into also pre-removing /var/lib/cni/networks/fcnet/ during startup sequence
