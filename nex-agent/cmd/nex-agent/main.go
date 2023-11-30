@@ -20,7 +20,7 @@ func main() {
 		// the metadata failure
 		metadata = &agentapi.MachineMetadata{
 			VmId:            "42",
-			NodeNatsAddress: "192.168.172.1",
+			NodeNatsAddress: "192.168.127.1",
 			NodePort:        9222,
 			Message:         fmt.Sprintf("%s", err),
 		}
