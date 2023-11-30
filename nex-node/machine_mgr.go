@@ -89,7 +89,8 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName strin
 	req := agentapi.WorkRequest{
 		WorkloadName: workloadName,
 		Hash:         "",
-		TotalBytes:   0,
+		TotalBytes:   0, // TODO: make real
+		WorkloadType: request.WorkloadType,
 		Environment:  request.WorkloadEnvironment,
 	}
 	bytes, _ := json.Marshal(req)
@@ -97,7 +98,11 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName strin
 	subject := fmt.Sprintf("agentint.%s.workdispatch", vm.vmmID)
 	resp, err := m.ncInternal.Request(subject, bytes, 1*time.Second)
 	if err != nil {
-		return err
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			return errors.New("timed out waiting for acknowledgement of work dispatch")
+		} else {
+			return fmt.Errorf("failed to submit request for work: %s", err)
+		}
 	}
 	var workResponse agentapi.WorkResponse
 	err = json.Unmarshal(resp.Data, &workResponse)
@@ -105,7 +110,7 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName strin
 		return err
 	}
 	if !workResponse.Accepted {
-		return fmt.Errorf("workload not accepted by agent: %s", workResponse.Message)
+		return fmt.Errorf("workload rejected by agent: %s", workResponse.Message)
 	}
 
 	vm.workloadStarted = time.Now().UTC()

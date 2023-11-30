@@ -12,6 +12,7 @@ type WorkRequest struct {
 	Hash         string            `json:"hash"`
 	TotalBytes   int               `json:"total_bytes"`
 	Environment  map[string]string `json:"environment"`
+	WorkloadType string            `json:"workload_type,omitempty"`
 }
 
 type WorkResponse struct {

@@ -1,14 +1,2 @@
 # Agent API
 This is the API used for communication between the agent (process running inside the firecracker VM) and the host (`nex-node`). This API contains operations to subscribe to logs and events, as well as health query and, of course, a function to start and run a workload.
-
-Most of this package is generated from protobufs, but there is also a client that can be used to communicate with `nex-agent`s.
-
-# Why gRPC?
-It's worth pointing out that end user developers will never see or interact with this protocol. It's _only_ to be used as internal comms between a node host and the agent inside firecracker. The only people exposed to the use of gRPC here would be contributors.
-
-There are a number of requirements that drove the gRPC decision. 
-
-* **Workload delivery** - We need to send a workload into a running firecracker instance. It's already running at the time of workload assignment because we're keeping it warm. We can either send over network, or we can do it through block device mount. For the latter, we'd have to fill an empty file, format it as `ext4`, mount it, write the workload binary to it, unmount it, and then submit the drive to the machine. Since firecracker machines can't add drives while running, using the drive mount option means we can't keep microVMs warm. Firecracker cannot mount shared directories (unless we start doing hybrid shenanigans with docker).
-* **Security & Multi-tenancy** - Having the agent be a service hosting an endpoint on its privately-assigned firecracker VM allows us to do multi-tenancy without the need for complex NATS account and credential management. If the node were to either embed or start a NATS server specifically for allowing communication with agents, we would need to manage accounts and user credentials for each firecracker VM/workload and that adds more potential failure paths than I'm comfortable with, not to mention the complexity burden on developers. We could also do it with specific users, but one slipup could expose private data to the wrong tenant.
-* **Size** - We need the individual VMs to be as small as humanly possible. We could start a NATS server inside each VM and use it instead of gRPC to communicate with the agent inside. However, if we do this, we're inurring (at least) a **20MB** RAM penalty _per firecracker VM_. This won't scale (**4GB** of RAM per **255** workloads).
-* **Isolation** - The agent and node host need to be able to communicate with each other and continue operation during network partition events. If the agent and node both use a "remote" NATS server as their means for communication, not only would they be incurring the at-least-1-hop latency penalty, but neither would be able to talk to each other when disconnected from the remote server/cluster.

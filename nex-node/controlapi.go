@@ -191,7 +191,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 
 		if err != nil {
 			api.log.WithError(err).Error("Failed to start workload in VM")
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to submit workload to agent process: %s", err))
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to start workload: %s", err))
 			return
 		}
 		api.log.WithField("workload", workloadName).WithField("vmid", runningVm.vmmID).Info("Work accepted")

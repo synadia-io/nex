@@ -21,6 +21,7 @@ var (
 
 const (
 	AdvertiseSubject = "agentint.advertise"
+	MyWorkloadType   = "elf"
 )
 
 type NodeClient struct {
@@ -83,6 +84,12 @@ func handleWorkDispatched(node *NodeClient) func(m *nats.Msg) {
 			msg := fmt.Sprintf("Failed to unmarshal work request: %s", err)
 			LogError(msg)
 			workAck(m, false, msg)
+			return
+		}
+		if request.WorkloadType != MyWorkloadType {
+			// silently do nothing, allowing other potential agents that do
+			// handle that workload to respond
+			LogDebug(fmt.Sprintf("Ignoring request to start workload of type '%s'", request.WorkloadType))
 			return
 		}
 

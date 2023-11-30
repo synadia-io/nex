@@ -14,12 +14,12 @@ type AgentStartedEvent struct {
 }
 
 type WorkloadStartedEvent struct {
-	Name       string `json:"name"`
+	Name       string `json:"workload_name"`
 	TotalBytes int    `json:"total_bytes"`
 }
 
 type WorkloadStoppedEvent struct {
-	Name    string `json:"name"`
+	Name    string `json:"workload_name"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }

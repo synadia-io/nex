@@ -40,11 +40,12 @@ func WatchEvents(ctx *fisk.ParseContext) error {
 	systemSub := fmt.Sprintf("%s.events.system.*", controlapi.APIPrefix) // capture events that come from nodes themselves, e.g. system namespace
 	_, err = nc.Subscribe(subscribeSubject, handleEventEntry(log))
 	if err != nil {
+		log.WithField("namespace_filter", namespaceFilter).WithError(err).Error("Failed to subscribe to namespace events")
 		return err
 	}
 	_, err = nc.Subscribe(systemSub, handleEventEntry(log))
 	if err != nil {
-		return err
+		log.Warn("Failed to subscribe to system namespace. Node events will be unavailable")
 	}
 
 	nctx := context.Background()
@@ -118,6 +119,8 @@ func handleEventEntry(log *logrus.Logger) func(m *nats.Msg) {
 
 		// TODO: There's likely something we can do to simplify/automate this with reflection or maybe codegen
 		entry := log.WithField("namespace", namespace).WithField("event_type", eventType).WithFields(event.Extensions())
+
+		// Extract meaningful fields from well-known events
 		switch eventType {
 		case controlapi.AgentStartedEventType:
 			evt := &controlapi.AgentStartedEvent{}
@@ -184,6 +187,9 @@ func handleLogEntry(log *logrus.Logger) func(m *nats.Msg) {
 		if err != nil {
 			log.WithError(err).Error("Log entry deserialization failure")
 			return
+		}
+		if logEntry.Level == 0 {
+			logEntry.Level = logrus.DebugLevel
 		}
 
 		log.WithField("namespace", namespace).
