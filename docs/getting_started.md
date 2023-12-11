@@ -4,7 +4,15 @@ Nex is a suite of tools for deploying applications and services into a NATS envi
 ## Installation
 The first thing you'll want to do is install the `nex-node` and `nex-cli` binaries and compile the `nex-agent` binary (required to create a Root FS, discussed shortly).
 
-At the moment since Nex is still in its infancy, we don't have an automated release or installation process. This means that you'll want to clone this repository, go to the root directory, and run `task build`. If you don't have (or want to) task installed, you can always read the [Taskfile.yml](../Taskfile.yml) file and manually run each of the build commands. We will have an installation process available soon. We will also have official release images for the root filesystem, letting you skip the next step.
+At the moment since Nex is still in its infancy, we don't have an automated release or installation process. This means that you'll want to clone this repository, go to the root directory, and run `task build`. If you don't have (or want to) task installed, you can always read the [Taskfile.yml](../Taskfile.yml) file and manually run each of the build commands, e.g.
+
+```
+go build -tags netgo -ldflags '-extldflags "-static"'
+```
+
+Consult the appropriate documentation if you're building workloads in another language like Rust, C, or Zig that have excellent static linking support.
+
+We will have an installation process available soon. We will also have official release images for the root filesystem, letting you skip the next step.
 
 ### Building a Root File System
 Every firecracker virtual machine is a melding of a Linux kernel binary and a root file system. In our case, the root file system contains an [agent](../nex-agent/) configured to start automatically during boot time. To make sure this agent is in the root file system, follow the instructions in the [fc-image](../fc-image/) directory to create a `rootfs.ext4` file. 
@@ -114,3 +122,6 @@ $ nex run --xkey=./keys/publisher.xk \
 This will attempt to run the workload stored in object store `MYFILES` under the key `echoservice` on the nex node `Nxxxxxxxxxxxxxxxx`.
 
 If you're using the echo service from our examples, then when you run `nats micro ls` you'll actually see the instance of the service running inside a nex node. If you issue another run command (not `devrun`), you'll quickly see a second instance of that service running.
+
+### Observing Workloads
+You can monitor a stream of logs and events for running workloads. These events and logs are published on `$NEX.events.*` and `$NEX.logs.>` respectively. However, there's a more user-friendly way to monitor this using `nex logs` or `nex events`.
