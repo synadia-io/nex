@@ -2,9 +2,11 @@ package nexagent
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
@@ -34,12 +36,31 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-metadata-token", token)
 
+	remainingAttempts := 3
 	client := &http.Client{}
+	for remainingAttempts > 0 {
+		metadata, err := performMatadataQuery(url, req, client)
+		if err != nil {
+			remainingAttempts -= 1
+			time.Sleep(1 * time.Second)
+			continue
+		} else {
+			return metadata, nil
+		}
+	}
+
+	return nil, errors.New("failed to obtain metadata after multiple attempts")
+}
+
+func performMatadataQuery(url string, req *http.Request, client *http.Client) (*agentapi.MachineMetadata, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, errors.New("metadata not found")
+	}
 	bodyBytes, err := io.ReadAll(resp.Body)
 
 	if err != nil {
@@ -51,7 +72,6 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	if err != nil {
 		return nil, fmt.Errorf("deserialization failure: %s: body: '%s'", err, string(bodyBytes))
 	}
-
 	return &metadata, nil
 }
 
