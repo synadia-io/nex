@@ -10,5 +10,3 @@ Turn your NATS infrastructure into a distributed workload deployment and executi
 other than contributors.
 
 To get up and running, follow the [Getting Started](./docs/getting_started.md) guide.
-
-![NEX architecture](./nex-arch.png)
