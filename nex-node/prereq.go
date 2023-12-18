@@ -57,6 +57,18 @@ func CheckPreRequisites(config *NodeConfiguration) {
 	} else {
 		fmt.Printf("✅ Located the firecracker executable in path (%s)\n", cyan(firecrackerBinary))
 	}
+
+	if _, err := os.Stat(config.KernelPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("⛔ Could not access the virtual machine kernel (%s)\n", red(config.KernelPath))
+	} else {
+		fmt.Printf("✅ Able to access the virtual machine kernel (%s)\n", cyan(config.KernelPath))
+	}
+
+	if _, err := os.Stat(config.RootFsPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("⛔ Could not access the virtual machine root fs image (%s)\n", red(config.KernelPath))
+	} else {
+		fmt.Printf("✅ Able to access the virtual machine root fs image (%s)\n", cyan(config.KernelPath))
+	}
 }
 
 func writeCniConf(fileName string, networkName string) error {
