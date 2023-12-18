@@ -37,7 +37,9 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	req.Header.Set("X-metadata-token", token)
 
 	remainingAttempts := 3
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 1 * time.Second,
+	}
 	for remainingAttempts > 0 {
 		metadata, err := performMatadataQuery(url, req, client)
 		if err != nil {
@@ -85,7 +87,9 @@ func acquireToken() (string, error) {
 
 	req.Header.Set("X-metadata-token-ttl-seconds", "60")
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 1 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
