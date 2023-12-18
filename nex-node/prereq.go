@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/fatih/color"
 
@@ -58,16 +59,16 @@ func CheckPreRequisites(config *NodeConfiguration) {
 		fmt.Printf("✅ Located the firecracker executable in path (%s)\n", cyan(firecrackerBinary))
 	}
 
-	if _, err := os.Stat(config.KernelPath); errors.Is(err, os.ErrNotExist) {
+	if kInfo, err := os.Stat(config.KernelPath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("⛔ Could not access the virtual machine kernel (%s)\n", red(config.KernelPath))
 	} else {
-		fmt.Printf("✅ Able to access the virtual machine kernel (%s)\n", cyan(config.KernelPath))
+		fmt.Printf("✅ Able to access the virtual machine kernel (%s) Last Modified %s\n", cyan(config.KernelPath), cyan(kInfo.ModTime().Local().Format(time.RFC3339)))
 	}
 
-	if _, err := os.Stat(config.RootFsPath); errors.Is(err, os.ErrNotExist) {
+	if rfsInfo, err := os.Stat(config.RootFsPath); errors.Is(err, os.ErrNotExist) {
 		fmt.Printf("⛔ Could not access the virtual machine root fs image (%s)\n", red(config.RootFsPath))
 	} else {
-		fmt.Printf("✅ Able to access the virtual machine root fs image (%s)\n", cyan(config.RootFsPath))
+		fmt.Printf("✅ Able to access the virtual machine root fs image (%s) Last Modified %s\n", cyan(config.RootFsPath), cyan(rfsInfo.ModTime().Local().Format(time.RFC3339)))
 	}
 }
 
