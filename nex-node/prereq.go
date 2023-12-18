@@ -65,9 +65,9 @@ func CheckPreRequisites(config *NodeConfiguration) {
 	}
 
 	if _, err := os.Stat(config.RootFsPath); errors.Is(err, os.ErrNotExist) {
-		fmt.Printf("⛔ Could not access the virtual machine root fs image (%s)\n", red(config.KernelPath))
+		fmt.Printf("⛔ Could not access the virtual machine root fs image (%s)\n", red(config.RootFsPath))
 	} else {
-		fmt.Printf("✅ Able to access the virtual machine root fs image (%s)\n", cyan(config.KernelPath))
+		fmt.Printf("✅ Able to access the virtual machine root fs image (%s)\n", cyan(config.RootFsPath))
 	}
 }
 
