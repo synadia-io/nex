@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path"
+	"strconv"
 	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
@@ -198,165 +200,22 @@ func (m *MachineManager) fillPool() {
 
 			m.log.WithField("ip", vm.ip).WithField("vmid", vm.vmmID).Info("Adding new VM to warm pool")
 
-			// Don't wait forever, if the VM is not available after 5s, move on
-			//ctx, cancel := context.WithTimeout(m.rootContext, 5*time.Second)
-			//defer cancel()
+			// TODO: kill the vm if we haven't received the advert message from it within n (4?) seconds. 4 because
+			// there are 3 1-second backoffs in the agent for trying to read mmds. Maybe 4500 mils
 
-			// err = vm.agentClient.WaitForAgentToBoot(ctx)
-			// if err != nil {
-			// 	m.log.WithError(err).Info("VM did not respond with healthy in timeout. Aborting.")
-			// 	vm.vmmCancel()
-			// 	break
-			// }
-
-			// logs, events, err := vm.Subscribe()
-			// if err != nil {
-			// 	m.log.WithError(err).Error("Failed to get channels from client for gRPC subscriptions")
-			// 	return
-			// }
-
-			// go dispatchLogs(vm, m.kp, m.nc, logs, m.log)
-			// go dispatchEvents(m, vm, m.kp, m.nc, events, m.log)
-
-			// // Add the new microVM to the pool.
-			// // If the pool is full, this line will block until a slot is available.
+			// If the pool is full, this line will block until a slot is available.
 			m.warmVms <- vm
-			// // This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
+			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
 			m.allVms[vm.vmmID] = vm
 		}
 	}
 }
 
-/*
-func dispatchLogs(vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, logs <-chan *agentapi.LogEntry, log *logrus.Logger) {
-	pk, _ := kp.PublicKey()
-	for {
-		entry := <-logs
-		workloadName := vm.workloadSpecification.DecodedClaims.Subject
-		lvl := getLogrusLevel(entry)
-
-		if len(strings.TrimSpace(workloadName)) != 0 {
-			emitLog := emittedLog{
-				Text:      entry.Text,
-				Level:     lvl,
-				MachineId: vm.vmmID,
-			}
-			logBytes, _ := json.Marshal(emitLog)
-			// $NEX.LOGS.{namespace}.{host}.{workload}.{vm}
-			subject := fmt.Sprintf("%s.%s.%s.%s.%s", logSubjectPrefix, vm.namespace, pk, workloadName, vm.vmmID)
-			err := nc.Publish(subject, logBytes)
-			if err != nil {
-				log.WithField("vmid", vm.vmmID).WithField("ip", vm.ip).WithField("subject", subject).Warn("Failed to publish log on logs subject")
-			}
-		}
-
-		log.WithField("namespace", vm.namespace).WithField("vmid", vm.vmmID).WithField("ip", vm.ip).Log(lvl, entry.Text)
-
-	}
-}
-
-func dispatchEvents(m *MachineManager, vm *runningFirecracker, kp nkeys.KeyPair, nc *nats.Conn, events <-chan *agentapi.AgentEvent, log *logrus.Logger) {
-	pk, _ := kp.PublicKey()
-	for {
-		event := <-events
-		eventType := getEventType(event)
-		m.PublishCloudEvent(eventType, vm.namespace, agentEventToCloudEvent(vm, pk, event, eventType))
-		log.WithField("vmid", vm.vmmID).
-			WithField("event_type", eventType).
-			WithField("ip", vm.ip).
-			WithField("namespace", vm.namespace).
-			Debug("Received event from agent")
-		if eventType == "agent_stopped" || eventType == "workload_stopped" {
-			delete(m.allVms, vm.vmmID)
-			vm.shutDown()
-		}
-	}
-}
-
-func getEventType(event *agentapi.AgentEvent) string {
-	var eventType string
-	switch event.Data.(type) {
-	case *agentapi.AgentEvent_AgentStarted:
-		eventType = "agent_started"
-	case *agentapi.AgentEvent_AgentStopped:
-		eventType = "agent_stopped"
-	case *agentapi.AgentEvent_WorkloadStarted:
-		eventType = "workload_started"
-	case *agentapi.AgentEvent_WorkloadStopped:
-		eventType = "workload_stopped"
-	default:
-		eventType = "unknown"
-	}
-	return eventType
-}
-
-func getLogrusLevel(entry *agentapi.LogEntry) logrus.Level {
-	switch entry.Level {
-	case agentapi.LogLevel_LEVEL_INFO:
-		return logrus.InfoLevel
-	case agentapi.LogLevel_LEVEL_DEBUG:
-		return logrus.DebugLevel
-	case agentapi.LogLevel_LEVEL_PANIC:
-		return logrus.PanicLevel
-	case agentapi.LogLevel_LEVEL_FATAL:
-		return logrus.FatalLevel
-	case agentapi.LogLevel_LEVEL_WARN:
-		return logrus.WarnLevel
-	case agentapi.LogLevel_LEVEL_TRACE:
-		return logrus.TraceLevel
-	default:
-		return logrus.DebugLevel
-	}
-}
-
-func agentEventToCloudEvent(vm *runningFirecracker, pk string, event *agentapi.AgentEvent, eventType string) cloudevents.Event {
-	cloudevent := cloudevents.NewEvent()
-
-	cloudevent.SetSource(fmt.Sprintf("%s-%s", pk, vm.vmmID))
-	cloudevent.SetID(uuid.NewString())
-	cloudevent.SetTime(time.Now().UTC())
-	cloudevent.SetType(eventType)
-	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-
-	// ACL so we don't bleed inner details of control mechanisms onto public event streams
-
-	var data interface{}
-	switch typ := event.Data.(type) {
-	case *agentapi.AgentEvent_AgentStarted:
-		data = controlapi.AgentStartedEvent{
-			AgentVersion: typ.AgentStarted.AgentVersion,
-		}
-	case *agentapi.AgentEvent_AgentStopped:
-		data = controlapi.AgentStoppedEvent{
-			Message: typ.AgentStopped.Message,
-			Code:    int(typ.AgentStopped.Code),
-		}
-	case *agentapi.AgentEvent_WorkloadStarted:
-		data = controlapi.WorkloadStartedEvent{
-			Name:       typ.WorkloadStarted.Name,
-			TotalBytes: int(typ.WorkloadStarted.TotalBytes),
-		}
-	case *agentapi.AgentEvent_WorkloadStopped:
-		data = controlapi.WorkloadStoppedEvent{
-			Name:    typ.WorkloadStopped.Name,
-			Code:    int(typ.WorkloadStopped.Code),
-			Message: typ.WorkloadStopped.Message,
-		}
-	default:
-		data = struct{}{}
-	}
-
-	cloudevent.SetData(data)
-
-	return cloudevent
-}
-*/
-
 func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error) {
 
 	natsServer, err := server.NewServer(&server.Options{
 		Host:      "0.0.0.0",
-		Port:      m.config.InternalNodePort,
+		Port:      -1,
 		JetStream: true,
 		NoLog:     true,
 		StoreDir:  path.Join(os.TempDir(), "pnats"),
@@ -367,7 +226,16 @@ func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error)
 	natsServer.Start()
 	time.Sleep(50 * time.Millisecond) // TODO: unsure if we need to give the server time to start
 
-	nc, err := nats.Connect(fmt.Sprintf("nats://0.0.0.0:%d", m.config.InternalNodePort))
+	clientUrl, err := url.Parse(natsServer.ClientURL())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse internal NATS client URL: %s", err)
+	}
+	p, err := strconv.Atoi(clientUrl.Port())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse internal NATS client URL: %s", err)
+	}
+	m.config.InternalNodePort = p
+	nc, err := nats.Connect(natsServer.ClientURL())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to internal nats: %s", err)
 	}
