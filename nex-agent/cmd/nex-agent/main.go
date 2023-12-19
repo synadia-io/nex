@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/agent-api"
 	nexagent "github.com/ConnectEverything/nex/nex-agent"
 	"github.com/nats-io/nats.go"
 )
@@ -16,23 +15,16 @@ func main() {
 	metadata, err := nexagent.GetMachineMetadata()
 
 	if err != nil {
-		// If we're using the defaults (e.g. in dev loop) this will at least be able to report
-		// the metadata failure
-		metadata = &agentapi.MachineMetadata{
-			VmId:            "42",
-			NodeNatsAddress: "192.168.127.1",
-			NodePort:        9222,
-			Message:         fmt.Sprintf("%s", err),
-		}
+		nexagent.HaltVM(err)
 	}
 
 	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", metadata.NodeNatsAddress, metadata.NodePort))
 	if err != nil {
-		panic(err)
+		nexagent.HaltVM(err)
 	}
 	nodeClient, err := nexagent.NewNodeClient(nc, metadata)
 	if err != nil {
-		panic(err)
+		nexagent.HaltVM(err)
 	}
 	nodeClient.Start()
 
