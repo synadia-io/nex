@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 
 	_ "embed"
@@ -56,6 +57,18 @@ func CheckPreRequisites(config *NodeConfiguration) {
 		fmt.Println("⛔ Could not locate the 'firecracker' binary in path")
 	} else {
 		fmt.Printf("✅ Located the firecracker executable in path (%s)\n", cyan(firecrackerBinary))
+	}
+
+	if kInfo, err := os.Stat(config.KernelPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("⛔ Could not access the virtual machine kernel (%s)\n", red(config.KernelPath))
+	} else {
+		fmt.Printf("✅ Able to access the virtual machine kernel (%s) Last Modified %s\n", cyan(config.KernelPath), cyan(humanize.Time(kInfo.ModTime().Local())))
+	}
+
+	if rfsInfo, err := os.Stat(config.RootFsPath); errors.Is(err, os.ErrNotExist) {
+		fmt.Printf("⛔ Could not access the virtual machine root fs image (%s)\n", red(config.RootFsPath))
+	} else {
+		fmt.Printf("✅ Able to access the virtual machine root fs image (%s) Last Modified %s\n", cyan(config.RootFsPath), cyan(humanize.Time(rfsInfo.ModTime().Local())))
 	}
 }
 

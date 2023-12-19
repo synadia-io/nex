@@ -6,11 +6,10 @@ require (
 	github.com/cdfmlr/ellipsis v0.0.1
 	github.com/choria-io/fisk v0.6.1
 	github.com/cloudevents/sdk-go v1.2.0
+	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0
-	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.4.0
-	github.com/imroc/req v0.3.2
 	github.com/jedib0t/go-pretty/v6 v6.4.9
 	github.com/nats-io/jsm.go v0.1.1-0.20231031093634-09b45b142881
 	github.com/nats-io/jwt/v2 v2.5.3
@@ -21,8 +20,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.5.0
 	github.com/sirupsen/logrus v1.9.3
-	google.golang.org/grpc v1.59.0
-	google.golang.org/protobuf v1.31.0
 )
 
 require (
@@ -32,7 +29,6 @@ require (
 	github.com/containerd/fifo v1.0.0 // indirect
 	github.com/containernetworking/cni v1.0.1 // indirect
 	github.com/containernetworking/plugins v1.0.1 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-openapi/analysis v0.21.2 // indirect
 	github.com/go-openapi/errors v0.20.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
@@ -74,6 +70,5 @@ require (
 	golang.org/x/term v0.14.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.4.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
