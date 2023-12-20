@@ -109,7 +109,11 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 	setupSignalHandlers(log, manager)
 
 	api := nexnode.NewApiListener(log, manager, make(map[string]string))
-	api.Start()
+	err = api.Start()
+	if err != nil {
+		log.WithError(err).Error("Failed to start API listener")
+		os.Exit(1)
+	}
 }
 
 func cmdPreflight(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
@@ -149,12 +153,18 @@ func setupSignalHandlers(log *logrus.Logger, manager *nexnode.MachineManager) {
 			switch s := <-c; {
 			case s == syscall.SIGTERM || s == os.Interrupt:
 				log.Infof("Caught signal: %s, requesting clean shutdown", s.String())
-				manager.Stop()
+				err := manager.Stop()
+				if err != nil {
+					log.WithError(err).Warn("Machine manager failed to stop")
+				}
 				clearMyApiSockets()
 				os.Exit(0)
 			case s == syscall.SIGQUIT:
 				log.Infof("Caught quit signal: %s, still trying graceful shutdown", s.String())
-				manager.Stop()
+				err := manager.Stop()
+				if err != nil {
+					log.WithError(err).Warn("Machine manager failed to stop")
+				}
 				clearMyApiSockets()
 				os.Exit(0)
 			}

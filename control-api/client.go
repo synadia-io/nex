@@ -113,7 +113,10 @@ func (api *apiClient) ListNodes() ([]PingResponse, error) {
 	}
 	msg := nats.NewMsg(fmt.Sprintf("%s.PING", APIPrefix))
 	msg.Reply = sub.Subject
-	api.nc.PublishMsg(msg)
+	err = api.nc.PublishMsg(msg)
+	if err != nil {
+		return nil, err
+	}
 
 	<-ctx.Done()
 	return responses, nil

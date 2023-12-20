@@ -40,8 +40,11 @@ func (vm *runningFirecracker) shutDown() {
 		WithField("ip", vm.ip).
 		Info("Machine stopping")
 
-	vm.machine.StopVMM()
-	err := os.Remove(vm.machine.Cfg.SocketPath)
+	err := vm.machine.StopVMM()
+	if err != nil {
+		log.WithError(err).Error("Failed to stop firecracker VM")
+	}
+	err = os.Remove(vm.machine.Cfg.SocketPath)
 	if err != nil {
 		if !errors.Is(err, fs.ErrExist) {
 			log.WithError(err).Warn("Failed to delete firecracker socket")
@@ -65,7 +68,15 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 	vmmID := xid.New().String()
 
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
-	copy(config.RootFsPath, *fcCfg.Drives[0].PathOnHost)
+	if err != nil {
+		log.WithError(err).Error("Failed to generate firecracker configuration")
+		return nil, err
+	}
+	err = copy(config.RootFsPath, *fcCfg.Drives[0].PathOnHost)
+	if err != nil {
+		log.WithError(err).Error("Failed to copy rootfs to temp location")
+		return nil, err
+	}
 
 	if err != nil {
 		log.Errorf("Error: %s", err)

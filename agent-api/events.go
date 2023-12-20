@@ -37,7 +37,7 @@ func NewAgentEvent(sourceId string, eventType string, event interface{}) cloudev
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(eventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-	cloudevent.SetData(event)
+	_ = cloudevent.SetData(event)
 
 	return cloudevent
 }

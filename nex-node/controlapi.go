@@ -63,13 +63,28 @@ func (api *ApiListener) PublicKey() string {
 
 func (api *ApiListener) Start() error {
 
-	api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
-	api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
+	_, err := api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
+	if err != nil {
+		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to ping subject: %s", err)
+	}
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
+	if err != nil {
+		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to node-specific ping subject: %s", err)
+	}
 
 	// Namespaced subscriptions, the * below is for the namespace
-	api.mgr.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, handleInfo(api))
-	api.mgr.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
-	api.mgr.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, handleInfo(api))
+	if err != nil {
+		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to info subject: %s", err)
+	}
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
+	if err != nil {
+		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to run subject: %s", err)
+	}
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
+	if err != nil {
+		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to stop subject: %s", err)
+	}
 
 	api.log.WithField("id", api.nodeId).WithField("version", VERSION).Info("NATS execution engine awaiting commands")
 	return nil
@@ -130,7 +145,7 @@ func handleStop(api *ApiListener) func(m *nats.Msg) {
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal run response")
 		} else {
-			m.Respond(raw)
+			_ = m.Respond(raw)
 		}
 
 	}
@@ -206,7 +221,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal run response")
 		} else {
-			m.Respond(raw)
+			_ = m.Respond(raw)
 		}
 	}
 }
@@ -225,7 +240,7 @@ func handlePing(api *ApiListener) func(m *nats.Msg) {
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal ping response")
 		} else {
-			m.Respond(raw)
+			_ = m.Respond(raw)
 		}
 	}
 
@@ -254,7 +269,7 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal ping response")
 		} else {
-			m.Respond(raw)
+			_ = m.Respond(raw)
 		}
 	}
 
@@ -318,7 +333,7 @@ func myUptime(d time.Duration) string {
 func respondFail(responseType string, m *nats.Msg, reason string) {
 	env := controlapi.NewEnvelope(responseType, []byte{}, &reason)
 	jenv, _ := json.Marshal(env)
-	m.Respond(jenv)
+	_ = m.Respond(jenv)
 }
 
 func extractNamespace(subject string) (string, error) {
