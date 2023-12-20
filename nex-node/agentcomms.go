@@ -70,7 +70,11 @@ func handleAgentEvent(mgr *MachineManager) func(m *nats.Msg) {
 		}
 		mgr.log.WithField("vmid", vmId).WithField("type", evt.Type()).Info("Received agent event")
 
-		mgr.PublishCloudEvent(vm.namespace, evt)
+		err = mgr.PublishCloudEvent(vm.namespace, evt)
+		if err != nil {
+			mgr.log.WithError(err).Error("Failed to publish cloudevent")
+			return
+		}
 
 		if evt.Type() == agentapi.WorkloadStoppedEventType {
 			vm.shutDown()
@@ -84,6 +88,7 @@ func handleAdvertise(mgr *MachineManager) func(m *nats.Msg) {
 		var advert agentapi.AdvertiseMessage
 		err := json.Unmarshal(m.Data, &advert)
 		if err != nil {
+			mgr.log.WithField("vmid", advert.MachineId).WithField("message", advert.Message).Error("Failed to handle agent advert")
 			return
 		}
 

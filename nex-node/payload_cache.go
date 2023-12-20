@@ -49,25 +49,11 @@ func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 		return err
 	}
 
-	// NOTE: it's not the best use of time to write the file to disk and then read it back again in order to
-	// hand it to the cache.. but the elf verification library only works on a filename and doesn't take
-	// a reader or a slice
-
-	filename := path.Join(os.TempDir(), "sus")
+	filename := path.Join(os.TempDir(), "sus") // lol... sus.
 	err = store.GetFile(key, filename)
 	if err != nil {
 		m.log.WithError(err).WithField("key", key).Error("Failed to download bytes from source object store")
 		return err
-	}
-
-	// TODO: as we support more workload types, validate those accordingly. For now, the node only
-	// supports 64-bit statically linked binaries
-	err = controlapi.ValidateNativeBinary(filename)
-	if err != nil {
-		m.log.WithError(err).Error("❌ Invalid ELF binary")
-		return err
-	} else {
-		m.log.WithField("key", key).WithField("name", request.DecodedClaims.Subject).Info("✅ Verified static-linked ELF binary")
 	}
 
 	f, err := os.Open(filename)
