@@ -1,3 +1,5 @@
+![go build status](https://github.com/ConnectEverything/nex/actions/workflows/go.yml/badge.svg)
+
 # NATS Execution Engine
 Turn your NATS infrastructure into a distributed workload deployment and execution engine.
 
