@@ -11,16 +11,16 @@ import (
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
 
-// https://github.com/firecracker-microvm/firecracker/blob/main/docs/mmds/mmds-user-guide.md#version-2
+// MmdsAddress is the address used by the agent to query firecracker MMDS
+// (see https://github.com/firecracker-microvm/firecracker/blob/main/docs/mmds/mmds-user-guide.md#version-2)
+const MmdsAddress = "169.254.169.254"
 
-const (
-	MmdsAddress = "169.254.169.254"
-)
-
-// Attempts to retrieve metadata from firecracker's MMDS. Version of 2 this service requires the acuisition of
-// a token and the use of that token for all requests. Note that metadata is PUT into a running machine AFTER
-// it starts. So if we have things that auto start (like this agent), then we need to ensure we avoid the race
-// condition of reading metadata before it exists.
+// GetMachineMetadata attempts to retrieve metadata from firecracker's MMDS.
+// Version of 2 this service requires the acuisition of a token and the use
+// of that token for all requests. Note that metadata is PUT into a running
+// machine AFTER it starts. So if we have things that auto start (like this
+// agent), then we need to ensure we avoid the race condition of reading
+// metadata before it exists.
 func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	token, err := acquireToken()
 	if err != nil {

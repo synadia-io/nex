@@ -13,8 +13,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.Event) {
+// FIXME-- move this to types repo-- audit other places where it is redeclared (nex-cli)
+type emittedLog struct {
+	Text      string       `json:"text"`
+	Level     logrus.Level `json:"level"`
+	MachineId string       `json:"machine_id"`
+}
 
+// PublishCloudEvent writes the given $NEX event to an arbitrary namespace
+func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.Event) error {
 	raw, _ := event.MarshalJSON()
 
 	// $NEX.events.{namespace}.{event_type}
@@ -22,10 +29,12 @@ func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.E
 	if err != nil {
 		m.log.WithError(err).Error("Failed to publish cloud event")
 	}
-	m.nc.Flush()
+
+	return m.nc.Flush()
 }
 
-func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
+// PublishMachineStopped writes a workload stopped event for the provided firecracker VM
+func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) error {
 	workloadName := strings.TrimSpace(vm.workloadSpecification.DecodedClaims.Subject)
 	if len(workloadName) > 0 {
 		workloadStopped := struct {
@@ -46,7 +55,10 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 		_ = cloudevent.SetData(workloadStopped)
 
-		m.PublishCloudEvent(vm.namespace, cloudevent)
+		err := m.PublishCloudEvent(vm.namespace, cloudevent)
+		if err != nil {
+			return err
+		}
 
 		emitLog := emittedLog{
 			Text:      "Workload stopped",
@@ -56,15 +68,19 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		logBytes, _ := json.Marshal(emitLog)
 
 		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.PublicKey(), workloadName, vm.vmmID)
-		err := m.nc.Publish(subject, logBytes)
+		err = m.nc.Publish(subject, logBytes)
 		if err != nil {
 			m.log.WithError(err).Error("Failed to publish machine stopped event")
 		}
-		m.nc.Flush()
+
+		return m.nc.Flush()
 	}
+
+	return nil
 }
 
-func (m *MachineManager) PublishNodeStarted() {
+// PublishNodeStarted emits a node_started event
+func (m *MachineManager) PublishNodeStarted() error {
 	nodeStart := controlapi.NodeStartedEvent{
 		Version: VERSION,
 		Id:      m.PublicKey(),
@@ -78,10 +94,11 @@ func (m *MachineManager) PublishNodeStarted() {
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(nodeStart)
 
-	m.PublishCloudEvent("system", cloudevent)
+	return m.PublishCloudEvent("system", cloudevent)
 }
 
-func (m *MachineManager) PublishNodeStopped() {
+// PublishNodeStopped emits a node_stopped event
+func (m *MachineManager) PublishNodeStopped() error {
 	cloudevent := cloudevents.NewEvent()
 
 	m.log.Info("Publishing node stopped")
@@ -96,11 +113,6 @@ func (m *MachineManager) PublishNodeStopped() {
 	cloudevent.SetType(controlapi.NodeStoppedEventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(evt)
-	m.PublishCloudEvent("system", cloudevent)
-}
 
-type emittedLog struct {
-	Text      string       `json:"text"`
-	Level     logrus.Level `json:"level"`
-	MachineId string       `json:"machine_id"`
+	return m.PublishCloudEvent("system", cloudevent)
 }

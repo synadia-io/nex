@@ -3,30 +3,36 @@ package main
 import (
 	"context"
 	"fmt"
-	"time"
+	"os"
+	"syscall"
 
 	nexagent "github.com/ConnectEverything/nex/nex-agent"
-	"github.com/nats-io/nats.go"
 )
 
 func main() {
 	ctx := context.Background()
-	time.Sleep(1 * time.Second) // give host time to post metadata
-	metadata, err := nexagent.GetMachineMetadata()
 
+	agent, err := nexagent.InitAgent()
 	if err != nil {
-		nexagent.HaltVM(err)
+		haltVM(err)
 	}
 
-	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", metadata.NodeNatsAddress, metadata.NodePort))
-	if err != nil {
-		nexagent.HaltVM(err)
+	if agent != nil {
+		err = agent.Start()
+		if err != nil {
+			haltVM(err)
+		}
 	}
-	nodeClient, err := nexagent.NewNodeClient(nc, metadata)
-	if err != nil {
-		nexagent.HaltVM(err)
-	}
-	nodeClient.Start()
 
 	<-ctx.Done()
+}
+
+// haltVM stops the firecracker VM
+func haltVM(err error) {
+	// On the off chance the agent's log is captured from the vm
+	fmt.Fprintf(os.Stderr, "Terminating Firecracker VM due to fatal error: %s\n", err)
+	err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to reboot: %s", err)
+	}
 }

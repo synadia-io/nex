@@ -1,11 +1,22 @@
 package agentapi
 
-import "time"
-
-const (
-	// Internal bucket for sharing files between host and agent. This is not a public bucket
-	WorkloadCacheBucket = "NEXCACHE"
+import (
+	"io"
+	"time"
 )
+
+// WorkloadCacheBucket is an internal, non-public bucket for sharing files between host and agent
+const WorkloadCacheBucket = "NEXCACHE"
+
+// ExecutionProviderParams parameters for initializing a specific execution provider
+type ExecutionProviderParams struct {
+	WorkRequest
+
+	Stderr      io.Writer `json:"-"`
+	Stdout      io.Writer `json:"-"`
+	TmpFilename string    `json:"-"`
+	VmID        string    `json:"-"`
+}
 
 type WorkRequest struct {
 	WorkloadName string            `json:"workload_name"`
@@ -13,6 +24,10 @@ type WorkRequest struct {
 	TotalBytes   int               `json:"total_bytes"`
 	Environment  map[string]string `json:"environment"`
 	WorkloadType string            `json:"workload_type,omitempty"`
+
+	Stderr      io.Writer `json:"-"`
+	Stdout      io.Writer `json:"-"`
+	TmpFilename string    `json:"-"`
 }
 
 type WorkResponse struct {

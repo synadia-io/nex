@@ -6,21 +6,21 @@ import (
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
 
-func LogError(msg string) {
-	submitLog(msg, agentapi.LogLevelError)
+func (a *Agent) LogError(msg string) {
+	a.submitLog(msg, agentapi.LogLevelError)
 }
 
-func LogDebug(msg string) {
-	submitLog(msg, agentapi.LogLevelDebug)
+func (a *Agent) LogDebug(msg string) {
+	a.submitLog(msg, agentapi.LogLevelDebug)
 }
 
-func LogInfo(msg string) {
-	submitLog(msg, agentapi.LogLevelInfo)
+func (a *Agent) LogInfo(msg string) {
+	a.submitLog(msg, agentapi.LogLevelInfo)
 }
 
-func submitLog(msg string, lvl agentapi.LogLevel) {
+func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
 	select {
-	case agentLogs <- &agentapi.LogEntry{
+	case a.agentLogs <- &agentapi.LogEntry{
 		Source: "nex-agent",
 		Level:  lvl,
 		Text:   msg,
@@ -29,9 +29,9 @@ func submitLog(msg string, lvl agentapi.LogLevel) {
 	}
 }
 
-func PublishWorkloadStarted(vmId string, workloadName string, totalBytes int32) {
+func (a *Agent) PublishWorkloadStarted(vmID string, workloadName string, totalBytes int32) {
 	select {
-	case agentLogs <- &agentapi.LogEntry{
+	case a.agentLogs <- &agentapi.LogEntry{
 		Source: "nex-agent",
 		Level:  agentapi.LogLevelInfo,
 		Text:   fmt.Sprintf("Workload %s started", workloadName),
@@ -40,15 +40,16 @@ func PublishWorkloadStarted(vmId string, workloadName string, totalBytes int32) 
 		// noop
 	}
 
-	evt := agentapi.NewAgentEvent(vmId, agentapi.WorkloadStartedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName})
+	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStartedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName})
 	select {
-	case eventLogs <- evt: // noop
+	case a.eventLogs <- &evt: // noop
 	default:
 		// noop
 	}
 }
 
-func PublishWorkloadStopped(vmId string, workloadName string, err bool, message string) {
+// PublishWorkloadStopped publishes a workload stopped message
+func (a *Agent) PublishWorkloadStopped(vmId string, workloadName string, err bool, message string) {
 	level := agentapi.LogLevelInfo
 	code := 0
 	if err {
@@ -56,7 +57,7 @@ func PublishWorkloadStopped(vmId string, workloadName string, err bool, message 
 		code = -1
 	}
 	select {
-	case agentLogs <- &agentapi.LogEntry{
+	case a.agentLogs <- &agentapi.LogEntry{
 		Source: "nex-agent",
 		Level:  agentapi.LogLevel(level),
 		Text:   fmt.Sprintf("Workload %s stopped", workloadName),
@@ -66,7 +67,7 @@ func PublishWorkloadStopped(vmId string, workloadName string, err bool, message 
 
 	evt := agentapi.NewAgentEvent(vmId, agentapi.WorkloadStoppedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
 	select {
-	case eventLogs <- evt: // noop
+	case a.eventLogs <- &evt: // noop
 	default:
 		// noop
 	}
