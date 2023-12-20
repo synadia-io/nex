@@ -12,7 +12,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	agent, err := nexagent.InitAgent()
+	agent, err := nexagent.NewAgent()
 	if err != nil {
 		haltVM(err)
 	}

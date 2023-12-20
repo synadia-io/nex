@@ -34,8 +34,8 @@ type ExecutionProvider interface {
 	Validate() error
 }
 
-// ExecutionProviderFactory initializes and returns an execution provider for a given work request
-func ExecutionProviderFactory(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
+// NewExecutionProvider initializes and returns an execution provider for a given work request
+func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
 	if params.WorkloadType == "" { // FIXME-- should req.WorkloadType be a *string for better readability? e.g., json.Unmarshal will set req.Type == "" even if it is not provided.
 		return nil, errors.New("execution provider factory requires a workload type parameter")
 	}

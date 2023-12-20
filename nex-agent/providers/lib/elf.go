@@ -7,6 +7,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
@@ -19,7 +20,9 @@ type ELF struct {
 	totalBytes  int32
 	vmID        string
 
-	// started chan int
+	fail chan bool
+	run  chan bool
+	exit chan int
 
 	stderr io.Writer
 	stdout io.Writer
@@ -33,38 +36,38 @@ func (e *ELF) Execute() error {
 		cmd.Stdout = e.stdout
 		cmd.Stderr = e.stderr
 
-		envVars := make([]string, len(e.environment))
+		cmd.Env = make([]string, len(e.environment))
 		for k, v := range e.environment {
 			item := fmt.Sprintf("%s=%s", strings.ToUpper(k), v)
-			envVars = append(envVars, item)
+			cmd.Env = append(cmd.Env, item)
 		}
-		cmd.Env = envVars
 
-		err := cmd.Start()
-
+		err := cmd.Start() // this doesn't actually have to be in the goroutine, and we could just return the error...
 		if err != nil {
-			// FIXME
-			// msg := fmt.Sprintf("Failed to start workload: %s", err)
-			// //e.agent.LogError(msg)
-			// //e.agent.PublishWorkloadStopped(e.vmID, e.name, true, msg)
-			// return
+			e.fail <- true
+			return
 		}
 
-		//e.agent.PublishWorkloadStarted(e.vmID, e.name, e.totalBytes)
+		go func() {
+			for {
+				if cmd.Process != nil {
+					e.run <- true
+					return
+				}
 
-		// if cmd.Wait has unblocked, it means the workload has stopped
-		err = cmd.Wait()
+				// TODO-- implement a timeout after which we dispatch e.fail
 
-		// FIXME
-		// var msg string
-		// if err != nil {
-		// 	msg = fmt.Sprintf("Workload stopped unexpectedly: %s", err)
-		// } else {
-		// 	msg = "OK"
-		// }
+				time.Sleep(time.Millisecond * agentapi.DefaultRunloopSleepTimeoutMillis)
+			}
+		}()
 
-		//e.agent.PublishWorkloadStopped(e.vmID, e.name, err != nil, msg)
-
+		if err = cmd.Wait(); err != nil { // blocking until exit
+			if exitError, ok := err.(*exec.ExitError); ok {
+				e.exit <- exitError.ExitCode() // this is here for now for review but can likely be simplified to one line: `e.exit <- cmd.ProcessState.ExitCode()``
+			}
+		} else {
+			e.exit <- cmd.ProcessState.ExitCode()
+		}
 	}()
 
 	return nil
@@ -82,11 +85,15 @@ func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) *ELF 
 		environment: params.Environment,
 		name:        params.WorkloadName,
 		tmpFilename: params.TmpFilename,
-		totalBytes:  int32(params.TotalBytes),
+		totalBytes:  params.TotalBytes,
 		vmID:        params.VmID,
 
 		stderr: params.Stderr,
 		stdout: params.Stdout,
+
+		fail: params.Fail,
+		run:  params.Run,
+		exit: params.Exit,
 	}
 }
 

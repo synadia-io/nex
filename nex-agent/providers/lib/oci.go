@@ -1,17 +1,21 @@
 package lib
 
-import agentapi "github.com/ConnectEverything/nex/agent-api"
+import (
+	"errors"
+
+	agentapi "github.com/ConnectEverything/nex/agent-api"
+)
 
 // OCI execution provider implementation
 type OCI struct {
 }
 
 func (o *OCI) Execute() error {
-	return nil
+	return errors.New("oci execution provider not yet implemented")
 }
 
 func (o *OCI) Validate() error {
-	return nil
+	return errors.New("oci execution provider not yet implemented")
 }
 
 // InitNexExecutionProviderOCI convenience method to initialize an OCI execution provider

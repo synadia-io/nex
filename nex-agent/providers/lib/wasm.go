@@ -1,17 +1,21 @@
 package lib
 
-import agentapi "github.com/ConnectEverything/nex/agent-api"
+import (
+	"errors"
+
+	agentapi "github.com/ConnectEverything/nex/agent-api"
+)
 
 // Wasm execution provider implementation
 type Wasm struct {
 }
 
 func (e *Wasm) Execute() error {
-	return nil
+	return errors.New("wasm execution provider not yet implemented")
 }
 
 func (e *Wasm) Validate() error {
-	return nil
+	return errors.New("wasm execution provider not yet implemented")
 }
 
 // InitNexExecutionProviderWasm convenience method to initialize a Wasm execution provider
