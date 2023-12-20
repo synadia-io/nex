@@ -29,9 +29,9 @@ type Agent struct {
 	started     time.Time
 }
 
-// InitAgent initializes a new agent to facilitate communications with
+// NewAgent initializes a new agent to facilitate communications with
 // the host node and dispatch workloads
-func InitAgent() (*Agent, error) {
+func NewAgent() (*Agent, error) {
 	metadata, err := GetMachineMetadata()
 	if err != nil {
 		return nil, err
@@ -120,19 +120,13 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 		return
 	}
 
-	tmpFile, err := a.cacheExecutableArtifact(&request)
+	params, err := a.newExecutionProviderParams(&request)
 	if err != nil {
 		a.workAck(m, false, err.Error())
 		return
 	}
 
-	provider, err := providers.ExecutionProviderFactory(&agentapi.ExecutionProviderParams{
-		WorkRequest: request,
-		Stderr:      &logEmitter{stderr: true, name: request.WorkloadName, logs: a.agentLogs},
-		Stdout:      &logEmitter{stderr: false, name: request.WorkloadName, logs: a.agentLogs},
-		TmpFilename: *tmpFile,
-		VmID:        a.md.VmId,
-	})
+	provider, err := providers.NewExecutionProvider(params)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
 		a.LogError(msg)
@@ -175,6 +169,51 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.WorkRequest) (*string, err
 	}
 
 	return &tempFile, nil
+}
+
+// newExecutionProviderParams initializes new execution provider params
+// for the given work request and starts a goroutine listening
+func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest) (*agentapi.ExecutionProviderParams, error) {
+	tmpFile, err := a.cacheExecutableArtifact(req)
+	if err != nil {
+		return nil, err
+	}
+
+	params := &agentapi.ExecutionProviderParams{
+		WorkRequest: *req,
+		Stderr:      &logEmitter{stderr: true, name: req.WorkloadName, logs: a.agentLogs},
+		Stdout:      &logEmitter{stderr: false, name: req.WorkloadName, logs: a.agentLogs},
+		TmpFilename: *tmpFile,
+		VmID:        a.md.VmId,
+
+		Fail: make(chan bool),
+		Run:  make(chan bool),
+		Exit: make(chan int),
+	}
+
+	go func() {
+		for {
+			select {
+			case <-params.Fail:
+				msg := fmt.Sprintf("Failed to start workload: %s", err)
+				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, true, -1)
+				return
+
+			case <-params.Run:
+				a.PublishWorkloadStarted(params.VmID, params.WorkloadName, params.TotalBytes)
+
+			case exit := <-params.Exit:
+				msg := fmt.Sprintf("Exited workload with status: %d", exit)
+				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, exit != 0, exit)
+			default:
+				// fmt.Println("no-op")
+			}
+
+			time.Sleep(agentapi.DefaultRunloopSleepTimeoutMillis)
+		}
+	}()
+
+	return params, nil
 }
 
 // workAck ACKs the provided NATS message by responding with the

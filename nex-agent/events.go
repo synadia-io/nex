@@ -6,6 +6,8 @@ import (
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
 
+const NexEventSourceNexAgent = "nex-agent"
+
 func (a *Agent) LogError(msg string) {
 	a.submitLog(msg, agentapi.LogLevelError)
 }
@@ -21,7 +23,7 @@ func (a *Agent) LogInfo(msg string) {
 func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
 	select {
 	case a.agentLogs <- &agentapi.LogEntry{
-		Source: "nex-agent",
+		Source: NexEventSourceNexAgent,
 		Level:  lvl,
 		Text:   msg,
 	}: // noop
@@ -29,10 +31,11 @@ func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
 	}
 }
 
-func (a *Agent) PublishWorkloadStarted(vmID string, workloadName string, totalBytes int32) {
+// FIXME-- revisit error handling
+func (a *Agent) PublishWorkloadStarted(vmID, workloadName string, totalBytes int32) {
 	select {
 	case a.agentLogs <- &agentapi.LogEntry{
-		Source: "nex-agent",
+		Source: NexEventSourceNexAgent,
 		Level:  agentapi.LogLevelInfo,
 		Text:   fmt.Sprintf("Workload %s started", workloadName),
 	}: // noop
@@ -48,24 +51,30 @@ func (a *Agent) PublishWorkloadStarted(vmID string, workloadName string, totalBy
 	}
 }
 
-// PublishWorkloadStopped publishes a workload stopped message
-func (a *Agent) PublishWorkloadStopped(vmId string, workloadName string, err bool, message string) {
+// PublishWorkloadExited publishes a workload failed or stopped message
+// FIXME-- revisit error handling
+func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bool, code int) {
 	level := agentapi.LogLevelInfo
-	code := 0
 	if err {
 		level = agentapi.LogLevelError
-		code = -1
 	}
+
+	// FIXME-- this hack is here to get things working... refactor me
+	txt := fmt.Sprintf("Workload %s stopped", workloadName)
+	if code == -1 {
+		txt = fmt.Sprintf("Workload %s failed to start", workloadName)
+	}
+
 	select {
 	case a.agentLogs <- &agentapi.LogEntry{
-		Source: "nex-agent",
+		Source: NexEventSourceNexAgent,
 		Level:  agentapi.LogLevel(level),
-		Text:   fmt.Sprintf("Workload %s stopped", workloadName),
+		Text:   txt,
 	}: // noop
 	default: // noop
 	}
 
-	evt := agentapi.NewAgentEvent(vmId, agentapi.WorkloadStoppedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
+	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStoppedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
 	select {
 	case a.eventLogs <- &evt: // noop
 	default:

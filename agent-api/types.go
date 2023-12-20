@@ -8,20 +8,33 @@ import (
 // WorkloadCacheBucket is an internal, non-public bucket for sharing files between host and agent
 const WorkloadCacheBucket = "NEXCACHE"
 
+// DefaultRunloopSleepTimeoutMillis default number of milliseconds to sleep during execution runloops
+const DefaultRunloopSleepTimeoutMillis = 25
+
 // ExecutionProviderParams parameters for initializing a specific execution provider
 type ExecutionProviderParams struct {
 	WorkRequest
 
-	Stderr      io.Writer `json:"-"`
-	Stdout      io.Writer `json:"-"`
-	TmpFilename string    `json:"-"`
-	VmID        string    `json:"-"`
+	// Fail channel receives bool upon command failing to start
+	Fail chan bool `json:"-"`
+
+	// Run channel receives bool upon command successfully starting
+	Run chan bool `json:"-"`
+
+	// Exit channel receives int exit code upon command exit
+	Exit chan int `json:"-"`
+
+	Stderr io.Writer `json:"-"`
+	Stdout io.Writer `json:"-"`
+
+	TmpFilename string `json:"-"`
+	VmID        string `json:"-"`
 }
 
 type WorkRequest struct {
 	WorkloadName string            `json:"workload_name"`
 	Hash         string            `json:"hash"`
-	TotalBytes   int               `json:"total_bytes"`
+	TotalBytes   int32             `json:"total_bytes"`
 	Environment  map[string]string `json:"environment"`
 	WorkloadType string            `json:"workload_type,omitempty"`
 
