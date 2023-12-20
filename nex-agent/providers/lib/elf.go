@@ -73,12 +73,7 @@ func (e *ELF) Execute() error {
 // Validate the underlying artifact to be a 64-bit linux native ELF
 // binary that is statically-linked
 func (e *ELF) Validate() error {
-	err := validateNativeBinary(e.tmpFilename)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return validateNativeBinary(e.tmpFilename)
 }
 
 // InitNexExecutionProviderELF convenience method to initialize an ELF execution provider
