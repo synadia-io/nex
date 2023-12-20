@@ -11,7 +11,3 @@ func newColumns(heading string, a ...any) *columns.Writer {
 
 	return w
 }
-
-func f(v any) string {
-	return columns.F(v)
-}

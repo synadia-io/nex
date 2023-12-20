@@ -43,7 +43,7 @@ func handleAgentLog(mgr *MachineManager) func(m *nats.Msg) {
 			return
 		}
 
-		mgr.nc.Publish(logPublishSubject(vm.namespace, mgr.PublicKey(), vm.workloadSpecification.DecodedClaims.Subject, vmId), bytes)
+		_ = mgr.nc.Publish(logPublishSubject(vm.namespace, mgr.PublicKey(), vm.workloadSpecification.DecodedClaims.Subject, vmId), bytes)
 
 	}
 }

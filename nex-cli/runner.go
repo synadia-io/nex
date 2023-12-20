@@ -27,6 +27,10 @@ func StopWorkload(ctx *fisk.ParseContext) error {
 		return err
 	}
 	stopRequest, err := controlapi.NewStopRequest(StopOpts.WorkloadId, StopOpts.WorkloadName, StopOpts.TargetNode, issuerKp)
+	if err != nil {
+		fmt.Printf("⛔ Failed to create workload request: %s\n", err)
+		return err
+	}
 	resp, err := nodeClient.StopWorkload(stopRequest)
 	if err != nil {
 		fmt.Printf("⛔ Workload stop request failed: %s\n", err)

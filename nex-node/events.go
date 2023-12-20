@@ -18,7 +18,10 @@ func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.E
 	raw, _ := event.MarshalJSON()
 
 	// $NEX.events.{namespace}.{event_type}
-	m.nc.Publish(fmt.Sprintf("%s.%s.%s", EventSubjectPrefix, namespace, event.Type()), raw)
+	err := m.nc.Publish(fmt.Sprintf("%s.%s.%s", EventSubjectPrefix, namespace, event.Type()), raw)
+	if err != nil {
+		m.log.WithError(err).Error("Failed to publish cloud event")
+	}
 	m.nc.Flush()
 }
 
@@ -41,7 +44,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		cloudevent.SetTime(time.Now().UTC())
 		cloudevent.SetType(agentapi.WorkloadStoppedEventType)
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-		cloudevent.SetData(workloadStopped)
+		_ = cloudevent.SetData(workloadStopped)
 
 		m.PublishCloudEvent(vm.namespace, cloudevent)
 
@@ -53,7 +56,10 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) {
 		logBytes, _ := json.Marshal(emitLog)
 
 		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.PublicKey(), workloadName, vm.vmmID)
-		m.nc.Publish(subject, logBytes)
+		err := m.nc.Publish(subject, logBytes)
+		if err != nil {
+			m.log.WithError(err).Error("Failed to publish machine stopped event")
+		}
 		m.nc.Flush()
 	}
 }
@@ -70,7 +76,7 @@ func (m *MachineManager) PublishNodeStarted() {
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(controlapi.NodeStartedEventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-	cloudevent.SetData(nodeStart)
+	_ = cloudevent.SetData(nodeStart)
 
 	m.PublishCloudEvent("system", cloudevent)
 }
@@ -89,7 +95,7 @@ func (m *MachineManager) PublishNodeStopped() {
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(controlapi.NodeStoppedEventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-	cloudevent.SetData(evt)
+	_ = cloudevent.SetData(evt)
 	m.PublishCloudEvent("system", cloudevent)
 }
 

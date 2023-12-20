@@ -54,7 +54,12 @@ func (node *NodeClient) Start() {
 	node.Advertise()
 
 	subject := fmt.Sprintf("agentint.%s.workdispatch", node.md.VmId)
-	node.nc.Subscribe(subject, handleWorkDispatched(node))
+	_, err := node.nc.Subscribe(subject, handleWorkDispatched(node))
+	if err != nil {
+		LogError(fmt.Sprintf("Failed to subscribe to work dispatch: %s", err))
+		// if the agent can't subscribe to work dispatch, the agent/VM is useless
+		HaltVM(err)
+	}
 
 	go dispatchEvents(node)
 	go dispatchLogs(node)
@@ -68,7 +73,10 @@ func (node *NodeClient) Advertise() {
 		Message:   node.md.Message,
 	}
 	raw, _ := json.Marshal(msg)
-	node.nc.Publish(AdvertiseSubject, raw)
+	err := node.nc.Publish(AdvertiseSubject, raw)
+	if err != nil {
+		LogError(fmt.Sprintf("Failed to publish agent advertisement: %s", err))
+	}
 	node.nc.Flush()
 
 	LogInfo("Agent is up")
@@ -122,7 +130,10 @@ func workAck(m *nats.Msg, accepted bool, msg string) {
 	}
 	bytes, err := json.Marshal(&ack)
 	if err == nil {
-		m.Respond(bytes)
+		err = m.Respond(bytes)
+		if err != nil {
+			LogError(fmt.Sprintf("Failed to acknowledge work dispatch: %s", err))
+		}
 	}
 }
 

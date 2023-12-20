@@ -28,7 +28,10 @@ func TestStopValidation(t *testing.T) {
 		TargetPublicXKey(recipientPk),
 	)
 
-	request.Validate(recipientKey) // need this to produce the `DecodedClaims` field
+	_, err := request.Validate(recipientKey) // need this to produce the `DecodedClaims` field
+	if err != nil {
+		t.Fatalf("Failed to validate request that should've passed: %s", err)
+	}
 
 	originalClaims := request.DecodedClaims
 	fmt.Printf("%+v", originalClaims)
@@ -36,7 +39,7 @@ func TestStopValidation(t *testing.T) {
 
 	stopRequest, _ := NewStopRequest("1234", "testworkload", "Nx", issuerAccount)
 
-	err := stopRequest.Validate(&originalClaims)
+	err = stopRequest.Validate(&originalClaims)
 	if err != nil {
 		t.Fatalf("Expected no errors during positive path validation, got %s", err)
 	}

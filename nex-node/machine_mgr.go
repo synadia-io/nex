@@ -140,7 +140,7 @@ func (m *MachineManager) Stop() error {
 	}
 	time.Sleep(100 * time.Millisecond)
 
-	m.nc.Drain()
+	_ = m.nc.Drain()
 
 	return nil
 }

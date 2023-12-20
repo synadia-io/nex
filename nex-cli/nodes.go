@@ -7,6 +7,7 @@ import (
 
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/choria-io/fisk"
+	"github.com/nats-io/natscli/columns"
 )
 
 // Uses a control API client to request a node list from a NATS environment
@@ -46,10 +47,13 @@ func NodeInfo(ctx *fisk.ParseContext) error {
 	return nil
 }
 
+func render(cols *columns.Writer) {
+	_ = cols.Frender(os.Stdout)
+}
 func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 	cols := newColumns("NEX Node Information")
 
-	defer cols.Frender(os.Stdout)
+	defer render(cols)
 	cols.AddRow("Node", id)
 	cols.AddRowf("Xkey", info.PublicXKey)
 	cols.AddRow("Version", info.Version)
@@ -86,7 +90,6 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 		}
 		cols.Indent(0)
 	}
-
 }
 
 func renderNodeList(nodes []controlapi.PingResponse) {

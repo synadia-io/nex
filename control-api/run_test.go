@@ -27,12 +27,15 @@ func TestEncryption(t *testing.T) {
 		TargetPublicXKey(recipientPk),
 	)
 
-	request.DecryptRequestEnvironment(recipientKey)
+	err := request.DecryptRequestEnvironment(recipientKey)
+	if err != nil {
+		t.Fatalf("Did not decrypt request environment: %s", err)
+	}
 	if request.WorkloadEnvironment["TOP_SECRET_LUGGAGE"] != "12345" {
 		t.Fatalf("Expected a good luggage password, found %s", request.WorkloadEnvironment["TOP_SECRET_LUGGAGE"])
 	}
 
-	_, err := request.Validate(recipientKey)
+	_, err = request.Validate(recipientKey)
 	if err != nil {
 		t.Fatalf("Expected no error, but got one: %s", err)
 	}
