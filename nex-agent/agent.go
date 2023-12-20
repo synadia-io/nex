@@ -120,7 +120,13 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 		return
 	}
 
-	params, err := a.newExecutionProviderParams(&request)
+	tmpFile, err := a.cacheExecutableArtifact(&request)
+	if err != nil {
+		a.workAck(m, false, err.Error())
+		return
+	}
+
+	params, err := a.newExecutionProviderParams(&request, *tmpFile)
 	if err != nil {
 		a.workAck(m, false, err.Error())
 		return
@@ -173,17 +179,12 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.WorkRequest) (*string, err
 
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
-func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest) (*agentapi.ExecutionProviderParams, error) {
-	tmpFile, err := a.cacheExecutableArtifact(req)
-	if err != nil {
-		return nil, err
-	}
-
+func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
 	params := &agentapi.ExecutionProviderParams{
 		WorkRequest: *req,
 		Stderr:      &logEmitter{stderr: true, name: req.WorkloadName, logs: a.agentLogs},
 		Stdout:      &logEmitter{stderr: false, name: req.WorkloadName, logs: a.agentLogs},
-		TmpFilename: *tmpFile,
+		TmpFilename: tmpFile,
 		VmID:        a.md.VmId,
 
 		Fail: make(chan bool),
@@ -195,7 +196,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest) (*agentapi
 		for {
 			select {
 			case <-params.Fail:
-				msg := fmt.Sprintf("Failed to start workload: %s", err)
+				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", params.WorkloadName, params.VmID)
 				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, true, -1)
 				return
 
@@ -203,10 +204,10 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest) (*agentapi
 				a.PublishWorkloadStarted(params.VmID, params.WorkloadName, params.TotalBytes)
 
 			case exit := <-params.Exit:
-				msg := fmt.Sprintf("Exited workload with status: %d", exit)
+				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", params.WorkloadName, params.VmID, exit)
 				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, exit != 0, exit)
 			default:
-				// fmt.Println("no-op")
+				// no-op
 			}
 
 			time.Sleep(agentapi.DefaultRunloopSleepTimeoutMillis)
