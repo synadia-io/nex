@@ -142,7 +142,10 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 
 	err = provider.Validate()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to validate workload: %s", err))
+		msg := fmt.Sprintf("Failed to validate workload: %s", err)
+		a.LogError(msg)
+		_ = a.workAck(m, false, msg)
+		return
 	}
 
 	_ = a.workAck(m, true, "Workload accepted")
