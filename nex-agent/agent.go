@@ -218,7 +218,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 				// no-op
 			}
 
-			time.Sleep(time.Millisecond * sleepMillis)
+			time.Sleep(time.Millisecond * time.Duration(sleepMillis))
 		}
 	}()
 
