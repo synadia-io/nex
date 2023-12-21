@@ -26,9 +26,6 @@ type ExecutionProvider interface {
 	// Execute is the equivalent to a language-specific main() entrypoint
 	Execute() error
 
-	// TODO-- add a method to cleanup after execution terminates
-	// Clean() error
-
 	// Validate the executable artifact, e.g., specific characteristics of a
 	// statically-linked binary or raw source code, depending on provider implementation
 	Validate() error
