@@ -130,10 +130,10 @@ func (m *MachineManager) Stop() error {
 
 	m.rootCancel() // stops the pool from refilling
 	for _, vm := range m.allVms {
-		m.PublishMachineStopped(vm)
+		_ = m.PublishMachineStopped(vm)
 		vm.shutDown()
 	}
-	m.PublishNodeStopped()
+	_ = m.PublishNodeStopped()
 	// Now empty the leftovers in the pool
 	for vm := range m.warmVms {
 		vm.shutDown()
@@ -151,7 +151,7 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	if !exists {
 		return errors.New("no such workload")
 	}
-	m.PublishMachineStopped(vm)
+	_ = m.PublishMachineStopped(vm)
 	vm.shutDown()
 	delete(m.allVms, vmId)
 	return nil
