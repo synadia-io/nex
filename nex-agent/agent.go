@@ -116,19 +116,19 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 	if err != nil {
 		msg := fmt.Sprintf("Failed to unmarshal work request: %s", err)
 		a.LogError(msg)
-		a.workAck(m, false, msg)
+		_ = a.workAck(m, false, msg)
 		return
 	}
 
 	tmpFile, err := a.cacheExecutableArtifact(&request)
 	if err != nil {
-		a.workAck(m, false, err.Error())
+		_ = a.workAck(m, false, err.Error())
 		return
 	}
 
 	params, err := a.newExecutionProviderParams(&request, *tmpFile)
 	if err != nil {
-		a.workAck(m, false, err.Error())
+		_ = a.workAck(m, false, err.Error())
 		return
 	}
 
@@ -136,7 +136,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 	if err != nil {
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
 		a.LogError(msg)
-		a.workAck(m, false, msg)
+		_ = a.workAck(m, false, msg)
 		return
 	}
 
@@ -145,7 +145,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 		a.LogError(fmt.Sprintf("Failed to validate workload: %s", err))
 	}
 
-	a.workAck(m, true, "Workload accepted")
+	_ = a.workAck(m, true, "Workload accepted")
 
 	err = provider.Execute()
 	if err != nil {
