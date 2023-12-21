@@ -79,7 +79,7 @@ func (m *MachineManager) Start() error {
 		return err
 	}
 	go m.fillPool()
-	m.PublishNodeStarted()
+	_ = m.PublishNodeStarted()
 
 	return nil
 }
