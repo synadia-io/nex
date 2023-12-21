@@ -15,6 +15,7 @@ import (
 )
 
 const NexAgentSubjectAdvertise = "agentint.advertise"
+const workloadExecutionSleepTimeoutMillis = 1000
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
 // and the nex node by way of a configured internal NATS server. Agent instances provide
@@ -196,6 +197,8 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 	}
 
 	go func() {
+		sleepMillis := agentapi.DefaultRunloopSleepTimeoutMillis
+
 		for {
 			select {
 			case <-params.Fail:
@@ -205,15 +208,17 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 
 			case <-params.Run:
 				a.PublishWorkloadStarted(params.VmID, params.WorkloadName, params.TotalBytes)
+				sleepMillis = workloadExecutionSleepTimeoutMillis
 
 			case exit := <-params.Exit:
 				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", params.WorkloadName, params.VmID, exit)
 				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, exit != 0, exit)
+				return
 			default:
 				// no-op
 			}
 
-			time.Sleep(agentapi.DefaultRunloopSleepTimeoutMillis)
+			time.Sleep(time.Millisecond * sleepMillis)
 		}
 	}()
 
