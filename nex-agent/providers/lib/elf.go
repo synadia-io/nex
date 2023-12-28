@@ -30,24 +30,23 @@ type ELF struct {
 
 // Execute the ELF binary
 func (e *ELF) Execute() error {
-	// This has to be backgrounded because the workload could be a long-running process/service
+	cmd := exec.Command(e.tmpFilename)
+	cmd.Stdout = e.stdout
+	cmd.Stderr = e.stderr
+
+	cmd.Env = make([]string, len(e.environment))
+	for k, v := range e.environment {
+		item := fmt.Sprintf("%s=%s", strings.ToUpper(k), v)
+		cmd.Env = append(cmd.Env, item)
+	}
+
+	err := cmd.Start()
+	if err != nil {
+		e.fail <- true
+		return err
+	}
+
 	go func() {
-		cmd := exec.Command(e.tmpFilename)
-		cmd.Stdout = e.stdout
-		cmd.Stderr = e.stderr
-
-		cmd.Env = make([]string, len(e.environment))
-		for k, v := range e.environment {
-			item := fmt.Sprintf("%s=%s", strings.ToUpper(k), v)
-			cmd.Env = append(cmd.Env, item)
-		}
-
-		err := cmd.Start() // this doesn't actually have to be in the goroutine, and we could just return the error...
-		if err != nil {
-			e.fail <- true
-			return
-		}
-
 		go func() {
 			for {
 				if cmd.Process != nil {
@@ -61,6 +60,7 @@ func (e *ELF) Execute() error {
 			}
 		}()
 
+		// This has to be backgrounded because the workload could be a long-running process/service
 		if err = cmd.Wait(); err != nil { // blocking until exit
 			if exitError, ok := err.(*exec.ExitError); ok {
 				e.exit <- exitError.ExitCode() // this is here for now for review but can likely be simplified to one line: `e.exit <- cmd.ProcessState.ExitCode()``
@@ -79,7 +79,7 @@ func (e *ELF) Validate() error {
 	return validateNativeBinary(e.tmpFilename)
 }
 
-// InitNexExecutionProviderELF convenience method to initialize an ELF execution provider
+// convenience method to initialize an ELF execution provider
 func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) *ELF {
 	return &ELF{
 		environment: params.Environment,
@@ -114,7 +114,7 @@ func validateNativeBinary(path string) error {
 	return nil
 }
 
-// verifyStatic returns an error if the provided elf binary contains any dynamically-linked dependencies
+// Returns an error if the provided elf binary contains any dynamically-linked dependencies
 func verifyStatic(elf *elf.File) error {
 	for _, prog := range elf.Progs {
 		if prog.ProgHeader.Type == 3 { // PT_INTERP
