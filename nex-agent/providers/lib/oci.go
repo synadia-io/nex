@@ -19,7 +19,7 @@ func (o *OCI) Validate() error {
 }
 
 // InitNexExecutionProviderOCI convenience method to initialize an OCI execution provider
-func InitNexExecutionProviderOCI(req *agentapi.ExecutionProviderParams) *OCI {
+func InitNexExecutionProviderOCI(params *agentapi.ExecutionProviderParams) *OCI {
 	// TODO-- impl...
 	return nil
 }
