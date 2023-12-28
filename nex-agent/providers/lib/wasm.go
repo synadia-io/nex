@@ -19,7 +19,7 @@ func (e *Wasm) Validate() error {
 }
 
 // InitNexExecutionProviderWasm convenience method to initialize a Wasm execution provider
-func InitNexExecutionProviderWasm(req *agentapi.ExecutionProviderParams) *Wasm {
+func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) *Wasm {
 	// TODO-- impl...
 	return nil
 }
