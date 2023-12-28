@@ -1,0 +1,16 @@
+{
+  "name": "hello-nex",
+  "version": "1.0.0",
+  "description": "nex example executable javascript project",
+  "author": "Synadia Communications, Inc.",
+  "license": "MIT",
+  "type": "module",
+  "source": "src/index.js",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild ./src/index.js --bundle --outfile=./dist/index.js"
+  },
+  "devDependencies": {
+    "esbuild": "0.19.10"
+  }
+}
