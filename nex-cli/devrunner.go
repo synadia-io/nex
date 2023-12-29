@@ -14,6 +14,7 @@ import (
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -46,7 +47,8 @@ func RunDevWorkload(ctx *fisk.ParseContext) error {
 	}
 	// developer mode can have a smaller discovery timeout, since we're assuming there's a NEX
 	// node "nearby"
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, "default")
+	log := logrus.New()
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, "default", log)
 
 	candidates, err := nodeClient.ListNodes()
 	if err != nil {

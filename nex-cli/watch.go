@@ -1,17 +1,14 @@
 package nexcli
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/cdfmlr/ellipsis"
 	"github.com/choria-io/fisk"
-	cloudevents "github.com/cloudevents/sdk-go"
-	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,22 +33,16 @@ func WatchEvents(ctx *fisk.ParseContext) error {
 		// FIX: 👀 in the info string upsets the formatter
 		Info("Starting event watcher")
 
-	subscribeSubject := fmt.Sprintf("%s.events.%s.*", controlapi.APIPrefix, namespaceFilter)
-	systemSub := fmt.Sprintf("%s.events.system.*", controlapi.APIPrefix) // capture events that come from nodes themselves, e.g. system namespace
-	_, err = nc.Subscribe(subscribeSubject, handleEventEntry(log))
+	apiClient := controlapi.NewApiClient(nc, 1*time.Second, log)
+	eventChannel, err := apiClient.MonitorEvents(namespaceFilter, "*", 0)
 	if err != nil {
-		log.WithField("namespace_filter", namespaceFilter).WithError(err).Error("Failed to subscribe to namespace events")
 		return err
 	}
-	_, err = nc.Subscribe(systemSub, handleEventEntry(log))
-	if err != nil {
-		log.Warn("Failed to subscribe to system namespace. Node events will be unavailable")
+
+	for {
+		event := <-eventChannel
+		handleEventEntry(log, event)
 	}
-
-	nctx := context.Background()
-	<-nctx.Done()
-
-	return nil
 }
 
 func WatchLogs(ctx *fisk.ParseContext) error {
@@ -61,19 +52,19 @@ func WatchLogs(ctx *fisk.ParseContext) error {
 	}
 
 	nodeFilter := "*"
-	if len(strings.TrimSpace(WatchOpts.NodeId)) == 0 {
+	if len(strings.TrimSpace(WatchOpts.NodeId)) != 0 {
 		nodeFilter = WatchOpts.NodeId
 	}
 	namespaceFilter := "*"
-	if len(strings.TrimSpace(Opts.Namespace)) == 0 {
+	if len(strings.TrimSpace(Opts.Namespace)) != 0 {
 		namespaceFilter = "default"
 	}
 	workloadNameFilter := "*"
-	if len(strings.TrimSpace(WatchOpts.WorkloadName)) == 0 {
+	if len(strings.TrimSpace(WatchOpts.WorkloadName)) != 0 {
 		workloadNameFilter = WatchOpts.WorkloadName
 	}
 	vmFilter := "*"
-	if len(strings.TrimSpace(WatchOpts.WorkloadId)) == 0 {
+	if len(strings.TrimSpace(WatchOpts.WorkloadId)) != 0 {
 		vmFilter = WatchOpts.WorkloadId
 	}
 
@@ -88,122 +79,82 @@ func WatchLogs(ctx *fisk.ParseContext) error {
 		// FIX: 👀 in this text upsets the formatter. Emoji usage is priority
 		Info("Starting log watcher")
 
-	// $NEX.logs.{namespace}.{node}.{workload name}.{vm}
-	subscribeSubject := fmt.Sprintf("%s.logs.%s.%s.%s.%s", controlapi.APIPrefix, namespaceFilter, nodeFilter, workloadNameFilter, vmFilter)
-	_, err = nc.Subscribe(subscribeSubject, handleLogEntry(log))
+	apiClient := controlapi.NewApiClient(nc, 1*time.Second, log)
+	ch, err := apiClient.MonitorLogs(namespaceFilter, nodeFilter, workloadNameFilter, vmFilter, 0)
 	if err != nil {
 		return err
 	}
-
-	nctx := context.Background()
-	<-nctx.Done()
-
-	return nil
-}
-
-func handleEventEntry(log *logrus.Logger) func(m *nats.Msg) {
-	return func(m *nats.Msg) {
-		tokens := strings.Split(m.Subject, ".")
-		if len(tokens) != 4 {
-			return
-		}
-
-		namespace := tokens[2]
-		eventType := tokens[3]
-
-		event := cloudevents.NewEvent()
-		err := json.Unmarshal(m.Data, &event)
-		if err != nil {
-			return
-		}
-
-		// TODO: There's likely something we can do to simplify/automate this with reflection or maybe codegen
-		entry := log.WithField("namespace", namespace).WithField("event_type", eventType).WithFields(event.Extensions())
-
-		// Extract meaningful fields from well-known events
-		switch eventType {
-		case controlapi.AgentStartedEventType:
-			evt := &controlapi.AgentStartedEvent{}
-			if err := event.DataAs(evt); err != nil {
-				entry = entry.WithError(err)
-			} else {
-				entry = entry.WithField("agent_version", evt.AgentVersion)
-			}
-		case controlapi.AgentStoppedEventType:
-			evt := &controlapi.AgentStoppedEvent{}
-			if err := event.DataAs(evt); err != nil {
-				entry = entry.WithError(err)
-			} else {
-				entry = entry.WithField("message", evt.Message).WithField("code", evt.Code)
-			}
-		case controlapi.WorkloadStartedEventType:
-			evt := &controlapi.WorkloadStartedEvent{}
-			if err := event.DataAs(evt); err != nil {
-				entry = entry.WithError(err)
-			} else {
-				entry = entry.WithField("workload_name", evt.Name)
-			}
-		case controlapi.WorkloadStoppedEventType:
-			evt := &controlapi.WorkloadStoppedEvent{}
-			if err := event.DataAs(evt); err != nil {
-				entry = entry.WithError(err)
-			} else {
-				entry = entry.WithField("message", evt.Message).WithField("code", evt.Code).WithField("workload_name", evt.Name)
-			}
-		case controlapi.NodeStartedEventType:
-			evt := &controlapi.NodeStartedEvent{}
-			if err := event.DataAs(evt); err != nil {
-				entry = entry.WithError(err)
-			} else {
-				entry = entry.WithField("node_id", ellipsis.Centering(evt.Id, 25)).WithField("version", evt.Version)
-			}
-		case controlapi.NodeStoppedEventType:
-			evt := &controlapi.NodeStoppedEvent{}
-			if err := event.DataAs(evt); err != nil {
-				entry = entry.WithError(err)
-			} else {
-				entry = entry.WithField("node_id", ellipsis.Centering(evt.Id, 25)).WithField("graceful", evt.Graceful)
-			}
-		}
-
-		entry.Info("Received")
+	for {
+		logEntry := <-ch
+		handleLogEntry(log, logEntry)
 	}
 }
 
-func handleLogEntry(log *logrus.Logger) func(m *nats.Msg) {
-	return func(m *nats.Msg) {
-		tokens := strings.Split(m.Subject, ".")
-		if len(tokens) != 6 {
-			return
-		}
-		namespace := tokens[2]
-		// missed opportunity to call this method "MiddleOut"
-		node := ellipsis.Centering(tokens[3], 25)
-		workload := tokens[4]
-		vm := tokens[5]
+func handleEventEntry(log *logrus.Logger, emittedEvent controlapi.EmittedEvent) {
 
-		var logEntry emittedLog
-		err := json.Unmarshal(m.Data, &logEntry)
-		if err != nil {
-			log.WithError(err).Error("Log entry deserialization failure")
-			return
-		}
-		if logEntry.Level == 0 {
-			logEntry.Level = logrus.DebugLevel
-		}
+	event := emittedEvent.Event
+	// TODO: There's likely something we can do to simplify/automate this with reflection or maybe codegen
+	entry := log.WithField("namespace", emittedEvent.Namespace).WithField("event_type", emittedEvent.EventType).WithFields(event.Extensions())
 
-		log.WithField("namespace", namespace).
-			WithField("node", node).
-			WithField("workload", workload).
-			WithField("vmid", vm).
-			Log(log.Level, logEntry.Text)
+	// Extract meaningful fields from well-known events
+	switch emittedEvent.EventType {
+	case controlapi.AgentStartedEventType:
+		evt := &controlapi.AgentStartedEvent{}
+		if err := event.DataAs(evt); err != nil {
+			entry = entry.WithError(err)
+		} else {
+			entry = entry.WithField("agent_version", evt.AgentVersion)
+		}
+	case controlapi.AgentStoppedEventType:
+		evt := &controlapi.AgentStoppedEvent{}
+		if err := event.DataAs(evt); err != nil {
+			entry = entry.WithError(err)
+		} else {
+			entry = entry.WithField("message", evt.Message).WithField("code", evt.Code)
+		}
+	case controlapi.WorkloadStartedEventType:
+		evt := &controlapi.WorkloadStartedEvent{}
+		if err := event.DataAs(evt); err != nil {
+			entry = entry.WithError(err)
+		} else {
+			entry = entry.WithField("workload_name", evt.Name)
+		}
+	case controlapi.WorkloadStoppedEventType:
+		evt := &controlapi.WorkloadStoppedEvent{}
+		if err := event.DataAs(evt); err != nil {
+			entry = entry.WithError(err)
+		} else {
+			entry = entry.WithField("message", evt.Message).WithField("code", evt.Code).WithField("workload_name", evt.Name)
+		}
+	case controlapi.NodeStartedEventType:
+		evt := &controlapi.NodeStartedEvent{}
+		if err := event.DataAs(evt); err != nil {
+			entry = entry.WithError(err)
+		} else {
+			entry = entry.WithField("node_id", ellipsis.Centering(evt.Id, 25)).WithField("version", evt.Version)
+		}
+	case controlapi.NodeStoppedEventType:
+		evt := &controlapi.NodeStoppedEvent{}
+		if err := event.DataAs(evt); err != nil {
+			entry = entry.WithError(err)
+		} else {
+			entry = entry.WithField("node_id", ellipsis.Centering(evt.Id, 25)).WithField("graceful", evt.Graceful)
+		}
 	}
+
+	entry.Info("Received")
 }
 
-type emittedLog struct {
-	Text      string       `json:"text"`
-	Level     logrus.Level `json:"level"`
-	MachineId string       `json:"machine_id"`
+func handleLogEntry(log *logrus.Logger, entry controlapi.EmittedLog) {
+	if entry.Level == 0 {
+		entry.Level = logrus.DebugLevel
+	}
+
+	log.WithField("namespace", entry.Namespace).
+		WithField("node", entry.NodeId).
+		WithField("workload", entry.Workload).
+		WithField("vmid", entry.Workload).
+		Log(log.Level, entry.Text)
 }
 
 func buildWatcherLog() *logrus.Logger {

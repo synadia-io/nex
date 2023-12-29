@@ -8,6 +8,7 @@ import (
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/natscli/columns"
+	"github.com/sirupsen/logrus"
 )
 
 // Uses a control API client to request a node list from a NATS environment
@@ -17,7 +18,8 @@ func ListNodes(ctx *fisk.ParseContext) error {
 	if err != nil {
 		return err
 	}
-	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout)
+	log := logrus.New()
+	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout, log)
 
 	nodes, err := nodeClient.ListNodes()
 	if err != nil {
@@ -36,7 +38,8 @@ func NodeInfo(ctx *fisk.ParseContext) error {
 	if err != nil {
 		return err
 	}
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace)
+	log := logrus.New()
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
 	id := ctx.SelectedCommand.Model().Args[0].Value.String()
 	nodeInfo, err := nodeClient.NodeInfo(id)
 	if err != nil {

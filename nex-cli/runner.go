@@ -7,6 +7,7 @@ import (
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/nkeys"
+	"github.com/sirupsen/logrus"
 )
 
 // Issues a request to stop a running workload
@@ -15,7 +16,8 @@ func StopWorkload(ctx *fisk.ParseContext) error {
 	if err != nil {
 		return err
 	}
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace)
+	log := logrus.New()
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
 
 	issuerSeed, err := os.ReadFile(StopOpts.ClaimsIssuerFile)
 	if err != nil {
@@ -47,7 +49,8 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 	if err != nil {
 		return err
 	}
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace)
+	log := logrus.New()
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
 
 	// Get node info so we can get public xkey from the target for env encryption
 	nodeInfo, err := nodeClient.NodeInfo(RunOpts.TargetNode)
