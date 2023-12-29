@@ -1,5 +1,10 @@
 package controlapi
 
+import (
+	cloudevents "github.com/cloudevents/sdk-go"
+	"github.com/sirupsen/logrus"
+)
+
 const (
 	APIPrefix = "$NEX"
 )
@@ -63,6 +68,28 @@ type Envelope struct {
 	PayloadType string      `json:"type"`
 	Data        interface{} `json:"data,omitempty"`
 	Error       interface{} `json:"error,omitempty"`
+}
+
+// Wrapper for what goes across the wire
+type EmittedLog struct {
+	Namespace string
+	NodeId    string
+	Workload  string
+	rawLog
+}
+
+type rawLog struct {
+	Text      string       `json:"text"`
+	Level     logrus.Level `json:"level"`
+	MachineId string       `json:"machine_id"`
+}
+
+// Note this a wrapper to add context to a cloud event, and is not
+// intended to be sent on the wire as-is
+type EmittedEvent struct {
+	cloudevents.Event
+	Namespace string
+	EventType string
 }
 
 func NewEnvelope(dataType string, data interface{}, err *string) Envelope {
