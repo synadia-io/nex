@@ -28,13 +28,13 @@ func TestEventMonitor(t *testing.T) {
 	evt.SetType("workload_started")
 	evt.SetID("1")
 	evt.SetSource("testing")
-	evt.SetData(testStruct{
+	_ = evt.SetData(testStruct{
 		Bob:   "1",
 		Alice: "2",
 	})
 
 	bytes, _ := json.Marshal(evt)
-	nc.Publish("$NEX.events.default.workload_started", bytes)
+	_ = nc.Publish("$NEX.events.default.workload_started", bytes)
 
 	actualEvent := <-ch
 	if actualEvent.EventType != "workload_started" {
@@ -64,7 +64,7 @@ func TestLogMonitor(t *testing.T) {
 	rawLog := rawLog{Text: "hey from test", Level: logrus.DebugLevel, MachineId: "vm1234"}
 	bytes, _ := json.Marshal(rawLog)
 
-	nc.Publish("$NEX.logs.default.Nxxxx.echoservice.vm1234", bytes)
+	_ = nc.Publish("$NEX.logs.default.Nxxxx.echoservice.vm1234", bytes)
 	actualEntry := <-ch
 	if actualEntry.Namespace != "default" {
 		t.Fatalf("namespace in log should be default, found %s", actualEntry.Namespace)
