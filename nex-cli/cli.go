@@ -7,11 +7,16 @@ import (
 
 var (
 	Opts       = &Options{}
+	GuiOpts    = &UiOptions{}
 	RunOpts    = &RunOptions{Env: make(map[string]string)}
 	DevRunOpts = &DevRunOptions{}
 	StopOpts   = &StopOptions{}
 	WatchOpts  = &WatchOptions{}
 )
+
+type UiOptions struct {
+	Port int
+}
 
 type DevRunOptions struct {
 	Filename string

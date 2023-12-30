@@ -72,9 +72,10 @@ type Envelope struct {
 
 // Wrapper for what goes across the wire
 type EmittedLog struct {
-	Namespace string
-	NodeId    string
-	Workload  string
+	Namespace string `json:"namespace"`
+	NodeId    string `json:"node_id"`
+	Workload  string `json:"workload_id"`
+	Timestamp string `json:"timestamp"`
 	rawLog
 }
 
@@ -84,12 +85,11 @@ type rawLog struct {
 	MachineId string       `json:"machine_id"`
 }
 
-// Note this a wrapper to add context to a cloud event, and is not
-// intended to be sent on the wire as-is
+// Note this a wrapper to add context to a cloud event
 type EmittedEvent struct {
 	cloudevents.Event
-	Namespace string
-	EventType string
+	Namespace string `json:"namespace"`
+	EventType string `json:"event_type"`
 }
 
 func NewEnvelope(dataType string, data interface{}, err *string) Envelope {

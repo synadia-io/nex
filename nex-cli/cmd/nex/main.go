@@ -74,5 +74,9 @@ func main() {
 	evts := ncli.Command("events", "Live monitor events from nex nodes")
 	evts.Action(cli.WatchEvents)
 
+	ui := ncli.Command("ui", "Starts a web server for interacting with Nex")
+	ui.Flag("port", "Port on which to run the UI").Default("8080").IntVar(&cli.GuiOpts.Port)
+	ui.Action(cli.RunUI)
+
 	ncli.MustParseWithUsage(os.Args[1:])
 }

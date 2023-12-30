@@ -25,7 +25,7 @@ func ListNodes(ctx *fisk.ParseContext) error {
 	if err != nil {
 		return err
 	}
-	// TODO
+
 	renderNodeList(nodes)
 	return nil
 
