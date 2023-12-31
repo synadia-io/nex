@@ -54,7 +54,14 @@ func (c *Client) readPump() {
 	}()
 	c.conn.SetReadLimit(maxMessageSize)
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.conn.SetPongHandler(func(string) error {
+		err := c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		if err != nil {
+			logrus.StandardLogger().WithError(err).Error("Failed to set socket read deadline")
+			return err
+		}
+		return nil
+	})
 	for {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
@@ -88,7 +95,7 @@ func (c *Client) writePump() {
 				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			c.conn.WriteMessage(websocket.BinaryMessage, message)
+			_ = c.conn.WriteMessage(websocket.BinaryMessage, message)
 		case <-ticker.C:
 			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
