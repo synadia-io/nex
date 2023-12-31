@@ -6,7 +6,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# because we're embedding the dist into the go binary, we actually
+# need it
+# TODO - should we exclude it and regenerate it via CI?
+#dist
 dist-ssr
 *.local
 
