@@ -36,7 +36,10 @@ func ServeUI(port int) {
 	go hub.run()
 
 	observer, _ := newObserver(hub, nc, log)
-	observer.run()
+	err = observer.run()
+	if err != nil {
+		log.WithError(err).Fatal("Failed to run observer")
+	}
 
 	http.Handle("/", http.FileServer(http.FS(dist)))
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
