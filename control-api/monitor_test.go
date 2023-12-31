@@ -2,83 +2,124 @@ package controlapi
 
 import (
 	"encoding/json"
-	"testing"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-func TestEventMonitor(t *testing.T) {
-	nc, _ := nats.Connect(nats.DefaultURL)
-	log := logrus.New()
-	apiClient := NewApiClient(nc, time.Second, log)
-	ch, err := apiClient.MonitorEvents("*", "*", 0)
-	if err != nil {
-		t.Fatalf("Failed to create log monitor: %s", err)
-	}
+var _ = Describe("event monitor", func() {
+	var nc *nats.Conn
+	var log *logrus.Logger
+	var client *apiClient
+	var ch chan EmittedEvent
+	var subject EmittedEvent
 
 	type testStruct struct {
 		Bob   string `json:"bob"`
 		Alice string `json:"alice"`
 	}
 
-	evt := cloudevents.NewEvent()
-	evt.SetType("workload_started")
-	evt.SetID("1")
-	evt.SetSource("testing")
-	_ = evt.SetData(testStruct{
-		Bob:   "1",
-		Alice: "2",
+	BeforeEach(func() {
+		var err error
+
+		nc, err = nats.Connect(nats.DefaultURL)
+		Expect(err).ToNot(BeNil())
+
+		log = logrus.New()
+		client = NewApiClient(nc, time.Second, log)
+		ch, err = client.MonitorEvents("*", "*", 0)
+		Expect(err).ToNot(BeNil())
+
+		evt := cloudevents.NewEvent()
+		evt.SetType("workload_started")
+		evt.SetID("1")
+		evt.SetSource("testing")
+		_ = evt.SetData(testStruct{
+			Bob:   "1",
+			Alice: "2",
+		})
+
+		bytes, _ := json.Marshal(evt)
+		_ = nc.Publish("$NEX.events.default.workload_started", bytes)
+
+		subject = <-ch
 	})
 
-	bytes, _ := json.Marshal(evt)
-	_ = nc.Publish("$NEX.events.default.workload_started", bytes)
+	It("maintains namespace", func(ctx SpecContext) {
+		Expect(subject.Namespace).To(Equal("default"))
+	})
 
-	actualEvent := <-ch
-	if actualEvent.EventType != "workload_started" {
-		t.Fatal("Event wrapper didn't maintain event type")
-	}
-	if actualEvent.Namespace != "default" {
-		t.Fatal("Event wrapper didn't maintain namespace")
-	}
-	var ts testStruct
-	err = actualEvent.DataAs(&ts)
-	if err != nil {
-		t.Fatalf("Event wrapper lost fidelity of event data: %s", err)
-	}
-	if ts.Alice != "2" || ts.Bob != "1" {
-		t.Fatalf("Lost data in event round trip!: %+v", ts)
-	}
-}
+	It("maintains event type", func(ctx SpecContext) {
+		Expect(subject.EventType).To(Equal("workload_started"))
+	})
 
-func TestLogMonitor(t *testing.T) {
-	nc, _ := nats.Connect(nats.DefaultURL)
-	log := logrus.New()
-	apiClient := NewApiClient(nc, time.Second, log)
-	ch, err := apiClient.MonitorLogs("*", "*", "*", "*", 0)
-	if err != nil {
-		t.Fatalf("Failed to create log monitor: %s", err)
-	}
-	rawLog := rawLog{Text: "hey from test", Level: logrus.DebugLevel, MachineId: "vm1234"}
-	bytes, _ := json.Marshal(rawLog)
+	Describe("DataAs", func() {
+		var _subject testStruct
 
-	_ = nc.Publish("$NEX.logs.default.Nxxxx.echoservice.vm1234", bytes)
-	actualEntry := <-ch
-	if actualEntry.Namespace != "default" {
-		t.Fatalf("namespace in log should be default, found %s", actualEntry.Namespace)
-	}
-	if actualEntry.NodeId != "Nxxxx" {
-		t.Fatalf("node ID failed to propogate, should be Nxxx found %s", actualEntry.NodeId)
-	}
-	if actualEntry.Workload != "echoservice" {
-		t.Fatalf("workload failed to propogate, should be echoservice, found %s", actualEntry.Workload)
-	}
-	if actualEntry.MachineId != "vm1234" {
-		t.Fatalf("did not get the right machine ID. expected vm1234, found %s", actualEntry.MachineId)
-	}
-	if actualEntry.rawLog != rawLog {
-		t.Fatalf("Failed to wrap the raw on the wire log: %+v", actualEntry)
-	}
-}
+		BeforeEach(func() {
+			err := subject.DataAs(&_subject)
+			Expect(err).To(BeNil()) // Event wrapper lost fidelity of event data
+		})
+
+		It("maintains fidelity of `Alice`", func(ctx SpecContext) {
+			Expect(_subject.Alice).To(Equal("2"))
+		})
+
+		It("maintains fidelity of `Bob`", func(ctx SpecContext) {
+			Expect(_subject.Bob).To(Equal("1"))
+		})
+	})
+})
+
+var _ = Describe("log monitor", func() {
+	var nc *nats.Conn
+	var log *logrus.Logger
+	var client *apiClient
+	var ch chan EmittedLog
+	var subject EmittedLog
+
+	var raw rawLog // FIXME...
+
+	BeforeEach(func() {
+		var err error
+
+		nc, err = nats.Connect(nats.DefaultURL)
+		Expect(err).ToNot(BeNil())
+
+		log = logrus.New()
+		client = NewApiClient(nc, time.Second, log)
+		ch, err = client.MonitorLogs("*", "*", "*", "*", 0)
+		Expect(err).ToNot(BeNil())
+
+		raw = rawLog{Text: "hey from test", Level: logrus.DebugLevel, MachineId: "vm1234"}
+		bytes, _ := json.Marshal(raw)
+
+		_ = nc.Publish("$NEX.logs.default.Nxxxx.echoservice.vm1234", bytes)
+		subject = <-ch
+	})
+
+	It("sets the default namespace", func(ctx SpecContext) {
+		Expect(subject.Namespace).To(Equal("default"))
+	})
+
+	It("includes the node id", func(ctx SpecContext) {
+		Expect(subject.NodeId).To(Equal("Nxxxx"))
+	})
+
+	It("includes the workload", func(ctx SpecContext) {
+		Expect(subject.Workload).To(Equal("echoservice"))
+	})
+
+	It("includes the machine id", func(ctx SpecContext) {
+		Expect(subject.MachineId).To(Equal("vm1234"))
+	})
+
+	It("wraps the raw on the wire log", func(ctx SpecContext) {
+		Expect(subject.rawLog).To(Equal(raw))
+	})
+})
