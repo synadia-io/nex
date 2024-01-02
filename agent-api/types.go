@@ -27,8 +27,9 @@ type ExecutionProviderParams struct {
 	Stderr io.Writer `json:"-"`
 	Stdout io.Writer `json:"-"`
 
-	TmpFilename string `json:"-"`
-	VmID        string `json:"-"`
+	TmpFilename     string           `json:"-"`
+	VmID            string           `json:"-"`
+	MachineMetadata *MachineMetadata `json:"-"`
 }
 
 type WorkRequest struct {

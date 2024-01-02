@@ -86,7 +86,7 @@ func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) *ELF 
 		name:        params.WorkloadName,
 		tmpFilename: params.TmpFilename,
 		totalBytes:  params.TotalBytes,
-		vmID:        params.VmID,
+		vmID:        params.MachineMetadata.VmId,
 
 		stderr: params.Stderr,
 		stdout: params.Stdout,

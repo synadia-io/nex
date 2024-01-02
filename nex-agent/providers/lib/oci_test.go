@@ -7,13 +7,8 @@ import (
 )
 
 func TestCommandGeneration(t *testing.T) {
+
 	o := &OCI{
-		md: &agentapi.MachineMetadata{
-			VmId:            "vm1234567",
-			NodeNatsAddress: "192.168.127.1",
-			NodePort:        0,
-			Message:         "ahoy there",
-		},
 		params: &agentapi.ExecutionProviderParams{
 			WorkRequest: agentapi.WorkRequest{
 				WorkloadName: "echoservice",
@@ -35,6 +30,12 @@ func TestCommandGeneration(t *testing.T) {
 			Stdout:      nil,
 			TmpFilename: "",
 			VmID:        "vm1234567",
+			MachineMetadata: &agentapi.MachineMetadata{
+				VmId:            "vm1234567",
+				NodeNatsAddress: "192.168.127.1",
+				NodePort:        0,
+				Message:         "ahoy there",
+			},
 		},
 	}
 	cmd := o.generateDockerCommand()

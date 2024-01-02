@@ -133,7 +133,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 		return
 	}
 
-	provider, err := providers.NewExecutionProvider(params, a.md)
+	provider, err := providers.NewExecutionProvider(params)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
 		a.LogError(msg)
@@ -189,11 +189,11 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 		Stderr:      &logEmitter{stderr: true, name: req.WorkloadName, logs: a.agentLogs},
 		Stdout:      &logEmitter{stderr: false, name: req.WorkloadName, logs: a.agentLogs},
 		TmpFilename: tmpFile,
-		VmID:        a.md.VmId,
 
-		Fail: make(chan bool),
-		Run:  make(chan bool),
-		Exit: make(chan int),
+		Fail:            make(chan bool),
+		Run:             make(chan bool),
+		Exit:            make(chan int),
+		MachineMetadata: a.md,
 	}
 
 	go func() {
@@ -202,7 +202,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 		for {
 			select {
 			case <-params.Fail:
-				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", params.WorkloadName, params.VmID)
+				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", params.WorkloadName, params.MachineMetadata.VmId)
 				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, true, -1)
 				return
 
@@ -211,7 +211,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 				sleepMillis = workloadExecutionSleepTimeoutMillis
 
 			case exit := <-params.Exit:
-				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", params.WorkloadName, params.VmID, exit)
+				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", params.WorkloadName, params.MachineMetadata.VmId, exit)
 				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, exit != 0, exit)
 				return
 			default:

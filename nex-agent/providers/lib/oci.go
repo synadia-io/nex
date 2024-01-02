@@ -20,7 +20,6 @@ import (
 
 // OCI execution provider implementation
 type OCI struct {
-	md     *agentapi.MachineMetadata
 	params *agentapi.ExecutionProviderParams
 }
 
@@ -77,8 +76,8 @@ func (o *OCI) generateDockerCommand() *exec.Cmd {
 		env_params = append(env_params, "-e")
 		env_params = append(env_params, fmt.Sprintf("%s=%s", strings.ToUpper(k), v))
 	}
-	// TODO: convert 5000 into metadata-supplied value
-	env_params = append(env_params, fmt.Sprintf("%s:5000/%s", o.md.NodeNatsAddress, o.md.VmId))
+	// TODO: convert 5000 into metadata-supplied value.
+	env_params = append(env_params, fmt.Sprintf("%s:5000/%s", o.params.MachineMetadata.NodeNatsAddress, o.params.MachineMetadata.VmId))
 
 	cmd := exec.Command("docker", env_params...)
 	cmd.Stdout = o.params.Stdout
@@ -88,7 +87,7 @@ func (o *OCI) generateDockerCommand() *exec.Cmd {
 }
 
 // InitNexExecutionProviderOCI convenience method to initialize an OCI execution provider
-func InitNexExecutionProviderOCI(params *agentapi.ExecutionProviderParams, md *agentapi.MachineMetadata) *OCI {
+func InitNexExecutionProviderOCI(params *agentapi.ExecutionProviderParams) *OCI {
 
-	return &OCI{params: params, md: md}
+	return &OCI{params: params}
 }
