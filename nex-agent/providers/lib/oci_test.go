@@ -2,6 +2,7 @@ package lib
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
@@ -43,8 +44,9 @@ func TestCommandGeneration(t *testing.T) {
 	}
 	cmd := o.generateDockerCommand()
 	s := cmd.String()
+	s2 := strings.Join(strings.Fields(strings.TrimSpace(s)), " ")
 	// cmd generator adds a bunch of whitespace
-	if s != "/usr/bin/docker          run --rm --network host -e VAR1=val1 -e VAR2=val2 private.registry.io/test" {
+	if s2 != "/usr/bin/docker run --rm --network host -e VAR1=val1 -e VAR2=val2 private.registry.io/test" {
 		t.Fatalf("Expected a proper docker command, got '%s'", s)
 	}
 }
