@@ -23,12 +23,12 @@ type ApiListener struct {
 	nodeId string
 	start  time.Time
 	xk     nkeys.KeyPair
-	tags   map[string]string
+	config *NodeConfiguration
 }
 
-func NewApiListener(log *logrus.Logger, mgr *MachineManager, tags map[string]string) *ApiListener {
+func NewApiListener(log *logrus.Logger, mgr *MachineManager, config *NodeConfiguration) *ApiListener {
 	pub, _ := mgr.kp.PublicKey()
-	efftags := tags
+	efftags := config.Tags
 	efftags[controlapi.TagOS] = runtime.GOOS
 	efftags[controlapi.TagArch] = runtime.GOARCH
 	efftags[controlapi.TagCPUs] = strconv.FormatInt(int64(runtime.NumCPU()), 10)
@@ -52,7 +52,7 @@ func NewApiListener(log *logrus.Logger, mgr *MachineManager, tags map[string]str
 		nodeId: pub,
 		xk:     kp,
 		start:  time.Now().UTC(),
-		tags:   tags,
+		config: config,
 	}
 }
 
@@ -167,6 +167,12 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			return
 		}
 
+		if !slices.Contains(api.config.WorkloadTypes, request.WorkloadType) {
+			api.log.WithField("workload_type", request.WorkloadType).Error("This node does not support the given workload type")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", request.WorkloadType))
+			return
+		}
+
 		decodedClaims, err := request.Validate(api.xk)
 		if err != nil {
 			api.log.WithError(err).Error("Invalid run request")
@@ -234,7 +240,7 @@ func handlePing(api *ApiListener) func(m *nats.Msg) {
 			Version:         VERSION,
 			Uptime:          myUptime(now.Sub(api.start)),
 			RunningMachines: len(api.mgr.allVms),
-			Tags:            api.tags,
+			Tags:            api.config.Tags,
 		}, nil)
 		raw, err := json.Marshal(res)
 		if err != nil {
@@ -258,12 +264,13 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 		now := time.Now().UTC()
 		stats, _ := ReadMemoryStats()
 		res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
-			Version:    VERSION,
-			PublicXKey: pubX,
-			Uptime:     myUptime(now.Sub(api.start)),
-			Tags:       api.tags,
-			Machines:   summarizeMachines(&api.mgr.allVms, namespace),
-			Memory:     stats,
+			Version:                VERSION,
+			PublicXKey:             pubX,
+			Uptime:                 myUptime(now.Sub(api.start)),
+			Tags:                   api.config.Tags,
+			SupportedWorkloadTypes: api.config.WorkloadTypes,
+			Machines:               summarizeMachines(&api.mgr.allVms, namespace),
+			Memory:                 stats,
 		}, nil)
 		raw, err := json.Marshal(res)
 		if err != nil {

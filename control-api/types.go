@@ -30,8 +30,8 @@ type PingResponse struct {
 	NodeId          string            `json:"node_id"`
 	Version         string            `json:"version"`
 	Uptime          string            `json:"uptime"`
-	RunningMachines int               `json:"running_machines"`
 	Tags            map[string]string `json:"tags,omitempty"`
+	RunningMachines int               `json:"running_machines"`
 }
 
 type MemoryStat struct {
@@ -41,12 +41,13 @@ type MemoryStat struct {
 }
 
 type InfoResponse struct {
-	Version    string            `json:"version"`
-	Uptime     string            `json:"uptime"`
-	PublicXKey string            `json:"public_xkey"`
-	Tags       map[string]string `json:"tags,omitempty"`
-	Memory     *MemoryStat       `json:"memory,omitempty"`
-	Machines   []MachineSummary  `json:"machines"`
+	Version                string            `json:"version"`
+	Uptime                 string            `json:"uptime"`
+	PublicXKey             string            `json:"public_xkey"`
+	Tags                   map[string]string `json:"tags,omitempty"`
+	Memory                 *MemoryStat       `json:"memory,omitempty"`
+	Machines               []MachineSummary  `json:"machines"`
+	SupportedWorkloadTypes []string          `json:"supported_workload_types,omitempty"`
 }
 
 type MachineSummary struct {

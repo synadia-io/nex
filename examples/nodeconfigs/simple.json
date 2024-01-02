@@ -9,5 +9,8 @@
     "machine_template": {
         "vcpu_count": 1,
         "memsize_mib": 256
+    },
+    "tags": {
+        "simple": "true"
     }
 }
