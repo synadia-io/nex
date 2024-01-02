@@ -26,6 +26,7 @@ func NewPayloadCache(nc *nats.Conn, log *logrus.Logger, dir string) *payloadCach
 	}
 }
 
+// TODO: switch on workload type
 func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")

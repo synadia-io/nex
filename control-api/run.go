@@ -12,6 +12,13 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
+const (
+	WorkloadTypeElf  = "elf"
+	WorkloadTypeV8   = "v8"
+	WorkloadTypeOCI  = "oci"
+	WorkloadTypeWasm = "wasm"
+)
+
 type RunRequest struct {
 	Description  string  `json:"description,omitempty"`
 	WorkloadType string  `json:"type"`

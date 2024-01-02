@@ -133,7 +133,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 		return
 	}
 
-	provider, err := providers.NewExecutionProvider(params)
+	provider, err := providers.NewExecutionProvider(params, a.md)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
 		a.LogError(msg)
