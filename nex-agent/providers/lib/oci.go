@@ -3,9 +3,9 @@ package lib
 /*
  * Docker execution
  * Assumptions:
- * - the nex-node host will have started a private, in-memory OCI registry server on port n (default 5000)
- * - the nex-node host will have added a repo for the vm ID, resulting in an OCI URL of
- *       192.168.127.1:5000/{vmId}
+ * - nex-node is not responsible for running an OCI registry
+ * - it is the operator's responsibility to ensure that the firecracker VM has access to the registry
+ * - the full path to the OCI image is contained in the request's Location property
  * - this executor just issues the docker run command, setting host networking to true (the host is the firecracker VM)
  */
 
@@ -76,8 +76,8 @@ func (o *OCI) generateDockerCommand() *exec.Cmd {
 		env_params = append(env_params, "-e")
 		env_params = append(env_params, fmt.Sprintf("%s=%s", strings.ToUpper(k), v))
 	}
-	// TODO: convert 5000 into metadata-supplied value.
-	env_params = append(env_params, fmt.Sprintf("%s:5000/%s", o.params.MachineMetadata.NodeNatsAddress, o.params.MachineMetadata.VmId))
+
+	env_params = append(env_params, o.params.Location.String())
 
 	cmd := exec.Command("docker", env_params...)
 	cmd.Stdout = o.params.Stdout

@@ -2,6 +2,7 @@ package agentapi
 
 import (
 	"io"
+	"net/url"
 	"time"
 )
 
@@ -38,6 +39,7 @@ type WorkRequest struct {
 	TotalBytes   int32             `json:"total_bytes"`
 	Environment  map[string]string `json:"environment"`
 	WorkloadType string            `json:"workload_type,omitempty"`
+	Location     url.URL           `json:"location,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`

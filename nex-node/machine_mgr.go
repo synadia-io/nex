@@ -94,6 +94,7 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName strin
 		TotalBytes:   0, // TODO: make real
 		WorkloadType: request.WorkloadType,
 		Environment:  request.WorkloadEnvironment,
+		Location:     request.Location,
 	}
 	bytes, _ := json.Marshal(req)
 

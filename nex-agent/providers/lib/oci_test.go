@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"net/url"
 	"testing"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
@@ -8,6 +9,7 @@ import (
 
 func TestCommandGeneration(t *testing.T) {
 
+	url, _ := url.Parse("private.registry.io/test")
 	o := &OCI{
 		params: &agentapi.ExecutionProviderParams{
 			WorkRequest: agentapi.WorkRequest{
@@ -22,6 +24,7 @@ func TestCommandGeneration(t *testing.T) {
 				Stderr:       nil,
 				Stdout:       nil,
 				TmpFilename:  "",
+				Location:     *url,
 			},
 			Fail:        make(chan bool),
 			Run:         make(chan bool),
@@ -41,7 +44,7 @@ func TestCommandGeneration(t *testing.T) {
 	cmd := o.generateDockerCommand()
 	s := cmd.String()
 	// cmd generator adds a bunch of whitespace
-	if s != "/usr/bin/docker          run --rm --network host -e VAR1=val1 -e VAR2=val2 192.168.127.1:5000/vm1234567" {
+	if s != "/usr/bin/docker          run --rm --network host -e VAR1=val1 -e VAR2=val2 private.registry.io/test" {
 		t.Fatalf("Expected a proper docker command, got '%s'", s)
 	}
 }
