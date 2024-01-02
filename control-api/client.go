@@ -19,7 +19,7 @@ import (
 // $NEX.RUN.{namespace}.{node}
 // $NEX.STOP.{namespace}.{node}
 
-type apiClient struct {
+type Client struct {
 	nc        *nats.Conn
 	timeout   time.Duration
 	namespace string
@@ -28,20 +28,20 @@ type apiClient struct {
 
 // Creates a new client to communicate with a group of NEX nodes, using the
 // namespace of 'default' for applicable requests
-func NewApiClient(nc *nats.Conn, timeout time.Duration, log *logrus.Logger) *apiClient {
+func NewApiClient(nc *nats.Conn, timeout time.Duration, log *logrus.Logger) *Client {
 	return NewApiClientWithNamespace(nc, timeout, "default", log)
 }
 
 // Creates a new client to communicate with a group of NEX nodes all within a given namespace. Note that
 // this namespace is used for requests where it is mandatory
-func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace string, log *logrus.Logger) *apiClient {
-	return &apiClient{nc: nc, timeout: timeout, namespace: namespace, log: log}
+func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace string, log *logrus.Logger) *Client {
+	return &Client{nc: nc, timeout: timeout, namespace: namespace, log: log}
 }
 
 // Attempts to stop a running workload. This can fail for a wide variety of reasons, the most common
 // is likely to be security validation that prevents one issuer from issuing a stop request for
 // another issuer's workload
-func (api *apiClient) StopWorkload(stopRequest *StopRequest) (*StopResponse, error) {
+func (api *Client) StopWorkload(stopRequest *StopRequest) (*StopResponse, error) {
 	subject := fmt.Sprintf("%s.STOP.%s.%s", APIPrefix, api.namespace, stopRequest.TargetNode)
 	bytes, err := api.performRequest(subject, stopRequest)
 	if err != nil {
@@ -59,7 +59,7 @@ func (api *apiClient) StopWorkload(stopRequest *StopRequest) (*StopResponse, err
 
 // Attempts to start a workload. The workload URI, at the moment, must always point to a NATS object store
 // bucket in the form of `nats://{bucket}/{key}`
-func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
+func (api *Client) StartWorkload(request *RunRequest) (*RunResponse, error) {
 	subject := fmt.Sprintf("%s.RUN.%s.%s", APIPrefix, api.namespace, request.TargetNode)
 	bytes, err := api.performRequest(subject, request)
 	if err != nil {
@@ -75,7 +75,7 @@ func (api *apiClient) StartWorkload(request *RunRequest) (*RunResponse, error) {
 }
 
 // Requests information for a given node within the client's namespace
-func (api *apiClient) NodeInfo(nodeId string) (*InfoResponse, error) {
+func (api *Client) NodeInfo(nodeId string) (*InfoResponse, error) {
 	subject := fmt.Sprintf("%s.INFO.%s.%s", APIPrefix, api.namespace, nodeId)
 	bytes, err := api.performRequest(subject, nil)
 	if err != nil {
@@ -92,7 +92,7 @@ func (api *apiClient) NodeInfo(nodeId string) (*InfoResponse, error) {
 
 // Attempts to list all nodes. Note that this operation returns all visible nodes regardless of
 // namespace
-func (api *apiClient) ListNodes() ([]PingResponse, error) {
+func (api *Client) ListNodes() ([]PingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
 
@@ -130,14 +130,14 @@ func (api *apiClient) ListNodes() ([]PingResponse, error) {
 
 // A convenience function that subscribes to all available logs and uses
 // an unbuffered, blocking channel
-func (api *apiClient) MonitorAllLogs() (chan EmittedLog, error) {
+func (api *Client) MonitorAllLogs() (chan EmittedLog, error) {
 	return api.MonitorLogs("*", "*", "*", "*", 0)
 }
 
 // Creates a NATS subscription to the appropriate log subject. If you do not want to limit
 // the monitor by any of the filters, supply a '*', not an empty string. Bufferlength refers
 // to the size of the channel buffer, where 0 is unbuffered (aka blocking)
-func (api *apiClient) MonitorLogs(
+func (api *Client) MonitorLogs(
 	namespaceFilter string,
 	nodeFilter string,
 	workloadFilter string,
@@ -161,14 +161,14 @@ func (api *apiClient) MonitorLogs(
 
 // A convenience function that monitors all available events without filter, and
 // uses an unbuffered (blocking) channel for the results
-func (api *apiClient) MonitorAllEvents() (chan EmittedEvent, error) {
+func (api *Client) MonitorAllEvents() (chan EmittedEvent, error) {
 	return api.MonitorEvents("*", "*", 0)
 }
 
 // Creates a NATS subscription to the appropriate event subject. If you don't want to limit
 // the monitor to a specific namespace or event type, then supply '*' for both values, not
 // an empty string. Buffer length is the size of the channel buffer, where 0 is unbuffered (blocking)
-func (api *apiClient) MonitorEvents(
+func (api *Client) MonitorEvents(
 	namespaceFilter string,
 	eventTypeFilter string,
 	bufferLength int) (chan EmittedEvent, error) {
@@ -195,7 +195,7 @@ func (api *apiClient) MonitorEvents(
 	return eventChannel, nil
 }
 
-func handleEventEntry(api *apiClient, ch chan EmittedEvent) func(m *nats.Msg) {
+func handleEventEntry(api *Client, ch chan EmittedEvent) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
 		tokens := strings.Split(m.Subject, ".")
 		if len(tokens) != 4 {
@@ -219,7 +219,7 @@ func handleEventEntry(api *apiClient, ch chan EmittedEvent) func(m *nats.Msg) {
 	}
 }
 
-func handleLogEntry(api *apiClient, ch chan EmittedLog) func(m *nats.Msg) {
+func handleLogEntry(api *Client, ch chan EmittedLog) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
 		/*
 			$NEX.logs.{namespace}.{node}.{workload}.{vm}
@@ -242,6 +242,7 @@ func handleLogEntry(api *apiClient, ch chan EmittedLog) func(m *nats.Msg) {
 			Namespace: tokens[2],
 			NodeId:    tokens[3],
 			Workload:  tokens[4],
+			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			rawLog:    logEntry,
 		}
 	}
@@ -250,7 +251,7 @@ func handleLogEntry(api *apiClient, ch chan EmittedLog) func(m *nats.Msg) {
 
 // Helper that submits data, gets a standard envelope back, and returns the inner data
 // payload as JSON
-func (api *apiClient) performRequest(subject string, raw interface{}) ([]byte, error) {
+func (api *Client) performRequest(subject string, raw interface{}) ([]byte, error) {
 	var bytes []byte
 	var err error
 	if raw == nil {

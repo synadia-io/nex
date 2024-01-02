@@ -15,7 +15,7 @@ import (
 var _ = Describe("event monitor", func() {
 	var nc *nats.Conn
 	var log *logrus.Logger
-	var client *apiClient
+	var client *Client
 	var ch chan EmittedEvent
 	var subject EmittedEvent
 
@@ -79,7 +79,7 @@ var _ = Describe("event monitor", func() {
 var _ = Describe("log monitor", func() {
 	var nc *nats.Conn
 	var log *logrus.Logger
-	var client *apiClient
+	var client *Client
 	var ch chan EmittedLog
 	var subject EmittedLog
 
