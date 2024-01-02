@@ -17,4 +17,4 @@ docker run -i --rm \
 
 umount /tmp/my-rootfs
 
-# rootfs available under `rootfs.ext4`
+# rootfs available under `rootfs-docker.ext4`
