@@ -77,7 +77,7 @@ func (m *MachineManager) Start() error {
 	if err != nil {
 		return err
 	}
-	_, err = m.ncInternal.Subscribe("agentint.advertise", handleAdvertise(m))
+	_, err = m.ncInternal.Subscribe("agentint.handshake", handleHandshake(m))
 	if err != nil {
 		return err
 	}

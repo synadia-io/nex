@@ -15,7 +15,7 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const NexAgentSubjectAdvertise = "agentint.advertise"
+const NexAgentSubjectAdvertise = "agentint.handshake"
 const workloadExecutionSleepTimeoutMillis = 1000
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
@@ -94,7 +94,7 @@ func (a *Agent) Start() error {
 // Publish an initial message to the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) Advertise() error {
-	msg := agentapi.AdvertiseMessage{
+	msg := agentapi.HandshakeRequest{
 		MachineId: a.md.VmId,
 		StartTime: a.started,
 		Message:   a.md.Message,

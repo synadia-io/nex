@@ -48,7 +48,7 @@ type WorkResponse struct {
 	Message  string `json:"message"`
 }
 
-type AdvertiseMessage struct {
+type HandshakeRequest struct {
 	MachineId string    `json:"machine_id"`
 	StartTime time.Time `json:"start_time"`
 	Message   string    `json:"message,omitempty"`
