@@ -36,6 +36,8 @@ type MachineManager struct {
 	log         *logrus.Logger
 	allVms      map[string]*runningFirecracker
 	warmVms     chan *runningFirecracker
+
+	handshakes map[string]string
 }
 
 func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.Conn, config *NodeConfiguration, log *logrus.Logger) *MachineManager {
@@ -48,6 +50,7 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 		nc:          nc,
 		log:         log,
 		kp:          server,
+		handshakes:  make(map[string]string),
 		allVms:      make(map[string]*runningFirecracker),
 		warmVms:     make(chan *runningFirecracker, config.MachinePoolSize-1),
 	}
@@ -74,7 +77,7 @@ func (m *MachineManager) Start() error {
 	if err != nil {
 		return err
 	}
-	_, err = m.ncInternal.Subscribe("agentint.advertise", handleAdvertise(m))
+	_, err = m.ncInternal.Subscribe("agentint.handshake", handleHandshake(m))
 	if err != nil {
 		return err
 	}
@@ -197,11 +200,9 @@ func (m *MachineManager) fillPool() {
 				// if we can't create a vm, there's no point in this app staying up
 				panic(err)
 			}
+			go m.awaitHandshake(vm.vmmID)
 
 			m.log.WithField("ip", vm.ip).WithField("vmid", vm.vmmID).Info("Adding new VM to warm pool")
-
-			// TODO: kill the vm if we haven't received the advert message from it within n (4?) seconds. 4 because
-			// there are 3 1-second backoffs in the agent for trying to read mmds. Maybe 4500 mils
 
 			// If the pool is full, this line will block until a slot is available.
 			m.warmVms <- vm
@@ -209,6 +210,17 @@ func (m *MachineManager) fillPool() {
 			m.allVms[vm.vmmID] = vm
 		}
 	}
+}
+
+func (m *MachineManager) awaitHandshake(vmid string) {
+	time.Sleep(time.Millisecond * 4000) // TODO: should this be a configurable delay?
+
+	_, ok := m.handshakes[vmid]
+	if !ok {
+		m.log.WithField("vmid", vmid).Error("Did not receive NATS handshake from agent within timeout. Exiting unstable node")
+		os.Exit(1)
+	}
+
 }
 
 func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error) {

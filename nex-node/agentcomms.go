@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 	cloudevents "github.com/cloudevents/sdk-go"
@@ -82,17 +83,25 @@ func handleAgentEvent(mgr *MachineManager) func(m *nats.Msg) {
 	}
 }
 
-// Right now all we do is log this. In the future we might want to use this (or the lack thereof) as a health indicator
-func handleAdvertise(mgr *MachineManager) func(m *nats.Msg) {
+// This handshake uses the request pattern to force a full round trip to ensure connectivity is working properly as
+// fire-and-forget publishes from inside the firecracker VM could potentially be lost
+func handleHandshake(mgr *MachineManager) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
-		var advert agentapi.AdvertiseMessage
-		err := json.Unmarshal(m.Data, &advert)
+		var shake agentapi.HandshakeRequest
+		err := json.Unmarshal(m.Data, &shake)
 		if err != nil {
-			mgr.log.WithField("vmid", advert.MachineId).WithField("message", advert.Message).Error("Failed to handle agent advert")
+			mgr.log.WithField("vmid", shake.MachineId).WithField("message", shake.Message).Error("Failed to handle agent handshake")
 			return
 		}
 
-		mgr.log.WithField("vmid", advert.MachineId).WithField("message", advert.Message).Info("Received agent advert")
+		now := time.Now().UTC()
+		mgr.handshakes[shake.MachineId] = now.Format(time.RFC3339)
+
+		mgr.log.WithField("vmid", shake.MachineId).WithField("message", shake.Message).Info("Received agent handshake")
+		err = m.Respond([]byte("OK"))
+		if err != nil {
+			mgr.log.WithError(err).Error("Failed to reply to agent handshake")
+		}
 	}
 }
 

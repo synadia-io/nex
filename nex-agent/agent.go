@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"time"
@@ -14,7 +15,7 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const NexAgentSubjectAdvertise = "agentint.advertise"
+const NexAgentSubjectAdvertise = "agentint.handshake"
 const workloadExecutionSleepTimeoutMillis = 1000
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
@@ -35,21 +36,25 @@ type Agent struct {
 func NewAgent() (*Agent, error) {
 	metadata, err := GetMachineMetadata()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get mmds data: %s", err)
 		return nil, err
 	}
 
 	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", metadata.NodeNatsAddress, metadata.NodePort))
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
 		return nil, err
 	}
 
 	js, err := nc.JetStream()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get JetStream context from shared NATS: %s", err)
 		return nil, err
 	}
 
 	bucket, err := js.ObjectStore(agentapi.WorkloadCacheBucket)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get reference to shared object store: %s", err)
 		return nil, err
 	}
 
@@ -64,9 +69,11 @@ func NewAgent() (*Agent, error) {
 }
 
 // Start the agent
+// NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() error {
 	err := a.Advertise()
 	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
 		return err
 	}
 
@@ -77,6 +84,7 @@ func (a *Agent) Start() error {
 		return err
 	}
 
+	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
 	go a.dispatchLogs()
 
@@ -84,23 +92,18 @@ func (a *Agent) Start() error {
 }
 
 // Publish an initial message to the host indicating the agent is "all the way" up
+// NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) Advertise() error {
-	msg := agentapi.AdvertiseMessage{
+	msg := agentapi.HandshakeRequest{
 		MachineId: a.md.VmId,
 		StartTime: a.started,
 		Message:   a.md.Message,
 	}
 	raw, _ := json.Marshal(msg)
 
-	err := a.nc.Publish(NexAgentSubjectAdvertise, raw)
+	_, err := a.nc.Request(NexAgentSubjectAdvertise, raw, 100*time.Millisecond)
 	if err != nil {
-		a.LogError("Agent failed to publish initial advertise message")
-		return err
-	}
-
-	err = a.nc.FlushTimeout(5 * time.Second)
-	if err != nil {
-		a.LogError("Agent failed to publish initial advertise message")
+		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
 		return err
 	}
 
@@ -245,4 +248,27 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	}
 
 	return nil
+}
+
+func (a *Agent) startDiagnosticEndpoint() {
+	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
+	http.HandleFunc("/healthz", handleHealthz(a))
+	_ = http.ListenAndServe(":9999", nil)
+}
+
+// At the moment this is really not much more than an HTTP ping to verify that the host
+// can talk to the agent. As agent functionality progresses, we'll likely add more to
+// this
+func handleHealthz(a *Agent) func(w http.ResponseWriter, req *http.Request) {
+	return func(w http.ResponseWriter, _req *http.Request) {
+
+		res := struct {
+			Started string `json:"started"`
+		}{
+			Started: a.started.Format(time.RFC3339),
+		}
+		bytes, _ := json.Marshal(res)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bytes)
+	}
 }
