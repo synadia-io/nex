@@ -76,6 +76,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 			VcpuCount:  1,
 			MemSizeMib: 256,
 		},
+		Tags:          make(map[string]string),
 		RateLimiters:  nil,
 		WorkloadTypes: defaultWorkloadTypes,
 		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the inside of the firecracker VM--. This is not necessarily the address
@@ -98,6 +99,9 @@ func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if config.Tags == nil {
+		config.Tags = make(map[string]string)
 	}
 	return &config, nil
 }
