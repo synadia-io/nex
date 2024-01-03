@@ -141,8 +141,11 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 		return nil, fmt.Errorf("failed to set machine metadata: %s", err)
 	}
 
+	gw := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.Gateway
 	ip := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.IPAddr.IP
-	log.WithField("ip", ip).Info("Machine started")
+	hosttap := m.Cfg.NetworkInterfaces[0].StaticConfiguration.HostDevName
+	mask := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.IPAddr.Mask
+	log.WithField("ip", ip).WithField("gateway", gw).WithField("netmask", mask).WithField("hosttap", hosttap).Info("Machine started")
 
 	return &runningFirecracker{
 		vmmCtx:         vmmCtx,
