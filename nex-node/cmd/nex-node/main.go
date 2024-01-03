@@ -108,7 +108,7 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 
 	setupSignalHandlers(log, manager)
 
-	api := nexnode.NewApiListener(log, manager, make(map[string]string))
+	api := nexnode.NewApiListener(log, manager, config)
 	err = api.Start()
 	if err != nil {
 		log.WithError(err).Error("Failed to start API listener")
