@@ -1,7 +1,9 @@
 package nexagent
 
 import (
+	"errors"
 	"fmt"
+	"os"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
@@ -9,15 +11,19 @@ import (
 const NexEventSourceNexAgent = "nex-agent"
 
 func (a *Agent) LogError(msg string) {
+	a.lastError = errors.New(msg)
 	a.submitLog(msg, agentapi.LogLevelError)
+	fmt.Fprintln(os.Stderr, msg)
 }
 
 func (a *Agent) LogDebug(msg string) {
 	a.submitLog(msg, agentapi.LogLevelDebug)
+	fmt.Fprintln(os.Stdout, msg)
 }
 
 func (a *Agent) LogInfo(msg string) {
 	a.submitLog(msg, agentapi.LogLevelInfo)
+	fmt.Fprintln(os.Stdout, msg)
 }
 
 func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {

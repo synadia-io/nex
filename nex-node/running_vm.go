@@ -32,6 +32,7 @@ type runningFirecracker struct {
 	machineStarted        time.Time
 	workloadSpecification controlapi.RunRequest
 	namespace             string
+	advertReceived        bool
 }
 
 func (vm *runningFirecracker) shutDown() {

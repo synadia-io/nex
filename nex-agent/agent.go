@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
 	"time"
@@ -23,6 +24,8 @@ const workloadExecutionSleepTimeoutMillis = 1000
 type Agent struct {
 	agentLogs chan *agentapi.LogEntry
 	eventLogs chan *cloudevents.Event
+	connected bool
+	lastError error
 
 	cacheBucket nats.ObjectStore
 	md          *agentapi.MachineMetadata
@@ -67,6 +70,7 @@ func NewAgent() (*Agent, error) {
 func (a *Agent) Start() error {
 	err := a.Advertise()
 	if err != nil {
+		a.lastError = err
 		return err
 	}
 
@@ -76,6 +80,10 @@ func (a *Agent) Start() error {
 		a.LogError(fmt.Sprintf("Failed to subscribe to work dispatch: %s", err))
 		return err
 	}
+
+	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
+	http.HandleFunc("/healthz", handleHealthz(a))
+	go http.ListenAndServe(":9999", nil)
 
 	go a.dispatchEvents()
 	go a.dispatchLogs()
@@ -92,19 +100,14 @@ func (a *Agent) Advertise() error {
 	}
 	raw, _ := json.Marshal(msg)
 
-	err := a.nc.Publish(NexAgentSubjectAdvertise, raw)
+	_, err := a.nc.Request(NexAgentSubjectAdvertise, raw, 100*time.Millisecond)
 	if err != nil {
-		a.LogError("Agent failed to publish initial advertise message")
-		return err
-	}
-
-	err = a.nc.FlushTimeout(5 * time.Second)
-	if err != nil {
-		a.LogError("Agent failed to publish initial advertise message")
+		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
 		return err
 	}
 
 	a.LogInfo("Agent is up")
+	a.connected = true
 	return nil
 }
 
@@ -203,6 +206,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 			select {
 			case <-params.Fail:
 				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", params.WorkloadName, params.VmID)
+				a.lastError = errors.New(msg)
 				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, true, -1)
 				return
 
@@ -245,4 +249,30 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	}
 
 	return nil
+}
+
+func handleHealthz(a *Agent) func(w http.ResponseWriter, req *http.Request) {
+	return func(w http.ResponseWriter, _req *http.Request) {
+
+		res := struct {
+			Connected bool    `json:"connected"`
+			Started   string  `json:"started"`
+			LastError *string `json:"last_error,omitempty"`
+		}{
+			Connected: a.connected,
+			Started:   a.started.Format(time.RFC3339),
+			LastError: a.getLastError(),
+		}
+		bytes, _ := json.Marshal(res)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(bytes)
+	}
+}
+
+func (a *Agent) getLastError() *string {
+	if a.lastError == nil {
+		return nil
+	}
+	s := a.lastError.Error()
+	return &s
 }

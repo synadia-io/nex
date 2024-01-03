@@ -93,6 +93,7 @@ func handleAdvertise(mgr *MachineManager) func(m *nats.Msg) {
 		}
 
 		mgr.log.WithField("vmid", advert.MachineId).WithField("message", advert.Message).Info("Received agent advert")
+		_ = m.Respond([]byte("OK"))
 	}
 }
 
