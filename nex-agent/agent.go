@@ -81,10 +81,7 @@ func (a *Agent) Start() error {
 		return err
 	}
 
-	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
-	http.HandleFunc("/healthz", handleHealthz(a))
-	go http.ListenAndServe(":9999", nil)
-
+	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
 	go a.dispatchLogs()
 
@@ -249,6 +246,12 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	}
 
 	return nil
+}
+
+func (a *Agent) startDiagnosticEndpoint() {
+	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
+	http.HandleFunc("/healthz", handleHealthz(a))
+	_ = http.ListenAndServe(":9999", nil)
 }
 
 func handleHealthz(a *Agent) func(w http.ResponseWriter, req *http.Request) {
