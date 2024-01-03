@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 	cloudevents "github.com/cloudevents/sdk-go"
@@ -91,6 +92,9 @@ func handleAdvertise(mgr *MachineManager) func(m *nats.Msg) {
 			mgr.log.WithField("vmid", advert.MachineId).WithField("message", advert.Message).Error("Failed to handle agent advert")
 			return
 		}
+
+		now := time.Now().UTC()
+		mgr.handshakes[advert.MachineId] = now.Format(time.RFC3339)
 
 		mgr.log.WithField("vmid", advert.MachineId).WithField("message", advert.Message).Info("Received agent advert")
 		_ = m.Respond([]byte("OK"))
