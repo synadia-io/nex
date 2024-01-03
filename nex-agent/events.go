@@ -1,7 +1,6 @@
 package nexagent
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -11,7 +10,6 @@ import (
 const NexEventSourceNexAgent = "nex-agent"
 
 func (a *Agent) LogError(msg string) {
-	a.lastError = errors.New(msg)
 	a.submitLog(msg, agentapi.LogLevelError)
 	fmt.Fprintln(os.Stderr, msg)
 }

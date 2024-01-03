@@ -24,8 +24,6 @@ const workloadExecutionSleepTimeoutMillis = 1000
 type Agent struct {
 	agentLogs chan *agentapi.LogEntry
 	eventLogs chan *cloudevents.Event
-	connected bool
-	lastError error
 
 	cacheBucket nats.ObjectStore
 	md          *agentapi.MachineMetadata
@@ -38,21 +36,25 @@ type Agent struct {
 func NewAgent() (*Agent, error) {
 	metadata, err := GetMachineMetadata()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get mmds data: %s", err)
 		return nil, err
 	}
 
 	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", metadata.NodeNatsAddress, metadata.NodePort))
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
 		return nil, err
 	}
 
 	js, err := nc.JetStream()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get JetStream context from shared NATS: %s", err)
 		return nil, err
 	}
 
 	bucket, err := js.ObjectStore(agentapi.WorkloadCacheBucket)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get reference to shared object store: %s", err)
 		return nil, err
 	}
 
@@ -67,10 +69,11 @@ func NewAgent() (*Agent, error) {
 }
 
 // Start the agent
+// NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() error {
 	err := a.Advertise()
 	if err != nil {
-		a.lastError = err
+		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
 		return err
 	}
 
@@ -89,6 +92,7 @@ func (a *Agent) Start() error {
 }
 
 // Publish an initial message to the host indicating the agent is "all the way" up
+// NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) Advertise() error {
 	msg := agentapi.AdvertiseMessage{
 		MachineId: a.md.VmId,
@@ -104,7 +108,6 @@ func (a *Agent) Advertise() error {
 	}
 
 	a.LogInfo("Agent is up")
-	a.connected = true
 	return nil
 }
 
@@ -203,7 +206,6 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 			select {
 			case <-params.Fail:
 				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", params.WorkloadName, params.VmID)
-				a.lastError = errors.New(msg)
 				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, true, -1)
 				return
 
@@ -254,28 +256,19 @@ func (a *Agent) startDiagnosticEndpoint() {
 	_ = http.ListenAndServe(":9999", nil)
 }
 
+// At the moment this is really not much more than an HTTP ping to verify that the host
+// can talk to the agent. As agent functionality progresses, we'll likely add more to
+// this
 func handleHealthz(a *Agent) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, _req *http.Request) {
 
 		res := struct {
-			Connected bool    `json:"connected"`
-			Started   string  `json:"started"`
-			LastError *string `json:"last_error,omitempty"`
+			Started string `json:"started"`
 		}{
-			Connected: a.connected,
-			Started:   a.started.Format(time.RFC3339),
-			LastError: a.getLastError(),
+			Started: a.started.Format(time.RFC3339),
 		}
 		bytes, _ := json.Marshal(res)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(bytes)
 	}
-}
-
-func (a *Agent) getLastError() *string {
-	if a.lastError == nil {
-		return nil
-	}
-	s := a.lastError.Error()
-	return &s
 }
