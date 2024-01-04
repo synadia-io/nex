@@ -33,15 +33,15 @@ type ExecutionProvider interface {
 
 // NewExecutionProvider initializes and returns an execution provider for a given work request
 func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
-	if params.WorkloadType == "" { // FIXME-- should req.WorkloadType be a *string for better readability? e.g., json.Unmarshal will set req.Type == "" even if it is not provided.
+	if params.WorkloadType == nil {
 		return nil, errors.New("execution provider factory requires a workload type parameter")
 	}
 
-	switch params.WorkloadType {
+	switch *params.WorkloadType {
 	case NexExecutionProviderELF:
-		return lib.InitNexExecutionProviderELF(params), nil
+		return lib.InitNexExecutionProviderELF(params)
 	case NexExecutionProviderV8:
-		return lib.InitNexExecutionProviderV8(params), nil
+		return lib.InitNexExecutionProviderV8(params)
 	case NexExecutionProviderOCI:
 		// TODO-- return lib.InitNexExecutionProviderOCI(params), nil
 		return nil, errors.New("oci execution provider not yet implemented")

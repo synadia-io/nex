@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -109,12 +110,24 @@ func (v *V8) Validate() error {
 }
 
 // convenience method to initialize a V8 execution provider
-func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) *V8 {
+func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, error) {
+	if params.WorkloadName == nil {
+		return nil, errors.New("V8 execution provider requires a workload name parameter")
+	}
+
+	if params.TmpFilename == nil {
+		return nil, errors.New("V8 execution provider requires a temporary filename parameter")
+	}
+
+	if params.TotalBytes == nil {
+		return nil, errors.New("V8 execution provider requires a VM id parameter")
+	}
+
 	return &V8{
 		environment: params.Environment,
-		name:        params.WorkloadName,
-		tmpFilename: params.TmpFilename,
-		totalBytes:  params.TotalBytes,
+		name:        *params.WorkloadName,
+		tmpFilename: *params.TmpFilename,
+		totalBytes:  *params.TotalBytes,
 		vmID:        params.VmID,
 
 		// stderr: params.Stderr,
@@ -125,5 +138,5 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) *V8 {
 		exit: params.Exit,
 
 		ctx: v8.NewContext(),
-	}
+	}, nil
 }

@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	EventSubjectPrefix = "$NEX.events"
-	LogSubjectPrefix   = "$NEX.logs"
+	EventSubjectPrefix      = "$NEX.events"
+	LogSubjectPrefix        = "$NEX.logs"
+	WorkloadCacheBucketName = "NEXCACHE"
 )
 
 // The machine manager is responsible for the pool of warm firecracker VMs. This includes starting new
@@ -40,9 +41,15 @@ type MachineManager struct {
 	handshakes map[string]string
 }
 
-func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.Conn, config *NodeConfiguration, log *logrus.Logger) *MachineManager {
+func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.Conn, config *NodeConfiguration, log *logrus.Logger) (*MachineManager, error) {
+	// Validate the node config
+	if !config.Validate() {
+		return nil, fmt.Errorf("failed to create new machine manager; invalid node config; %v", config.Errors)
+	}
+
 	// Create a new User KeyPair
 	server, _ := nkeys.CreateServer()
+
 	return &MachineManager{
 		rootContext: ctx,
 		rootCancel:  cancel,
@@ -53,7 +60,7 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 		handshakes:  make(map[string]string),
 		allVms:      make(map[string]*runningFirecracker),
 		warmVms:     make(chan *runningFirecracker, config.MachinePoolSize-1),
-	}
+	}, nil
 }
 
 // Starts the machine manager. Publishes a node started event and starts the goroutine responsible for
@@ -87,15 +94,13 @@ func (m *MachineManager) Start() error {
 	return nil
 }
 
-func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName string, namespace string, request controlapi.RunRequest) error {
-
+func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, namespace string, request controlapi.RunRequest) error {
 	// TODO: make the bytes and hash/digest available to the agent
-
 	req := agentapi.WorkRequest{
-		WorkloadName: workloadName,
-		Hash:         "",
-		TotalBytes:   0, // TODO: make real
-		WorkloadType: request.WorkloadType,
+		WorkloadName: &workloadName,
+		Hash:         agentapi.StringOrNil(""), // FIXME
+		TotalBytes:   nil,                      // TODO: make real
+		WorkloadType: &request.WorkloadType,    // FIXME-- audit all types for string -> *string, and validate...
 		Environment:  request.WorkloadEnvironment,
 	}
 	bytes, _ := json.Marshal(req)
@@ -115,7 +120,7 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName strin
 		return err
 	}
 	if !workResponse.Accepted {
-		return fmt.Errorf("workload rejected by agent: %s", workResponse.Message)
+		return fmt.Errorf("workload rejected by agent: %s", *workResponse.Message)
 	}
 
 	vm.workloadStarted = time.Now().UTC()
@@ -247,7 +252,7 @@ func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse internal NATS client URL: %s", err)
 	}
-	m.config.InternalNodePort = p
+	m.config.InternalNodePort = &p
 	nc, err := nats.Connect(natsServer.ClientURL())
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to connect to internal nats: %s", err)
@@ -259,7 +264,7 @@ func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error)
 	}
 
 	_, err = jsCtx.CreateObjectStore(&nats.ObjectStoreConfig{
-		Bucket:      "NEXCACHE",
+		Bucket:      WorkloadCacheBucketName,
 		Description: "Object store cache for nex-node workloads",
 		Storage:     nats.MemoryStorage,
 	})
