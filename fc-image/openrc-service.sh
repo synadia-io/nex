@@ -10,5 +10,5 @@ output_log="/home/nex/nex.log"
 error_log="/home/nex/err.log"
 
 depend() {
-	after net
+	after net.eth0
 }
