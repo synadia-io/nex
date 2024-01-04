@@ -2,7 +2,9 @@ package nexnode
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -14,8 +16,9 @@ var (
 // Node configuration is used to configure the node process as well as the virtual machines it
 // produces
 type NodeConfiguration struct {
-	KernelPath       string            `json:"kernel_path"`
-	RootFsPath       string            `json:"rootfs_path"`
+	KernelFile       string            `json:"kernel_file"`
+	RootFsFile       string            `json:"rootfs_file"`
+	DefaultDir       string            `json:"default_resource_dir"`
 	MachinePoolSize  int               `json:"machine_pool_size"`
 	CNI              CNIDefinition     `json:"cni"`
 	MachineTemplate  MachineTemplate   `json:"machine_template"`
@@ -25,6 +28,8 @@ type NodeConfiguration struct {
 	InternalNodePort int               `json:"internal_node_port"`
 	WorkloadTypes    []string          `json:"workload_types,omitempty"`
 	Tags             map[string]string `json:"tags,omitempty"`
+	ForensicMode     bool              `json:"-"`
+	ForceDepInstall  bool              `json:"-"`
 }
 
 // A set of rate limiters. These fields are identical to those in firecracker rate limiter configuration
@@ -65,8 +70,6 @@ type TokenBucket struct {
 
 func DefaultNodeConfiguration() NodeConfiguration {
 	return NodeConfiguration{
-		KernelPath:      "vmlinux-5.10",
-		RootFsPath:      "rootfs.ext4",
 		MachinePoolSize: 1,
 		CNI: CNIDefinition{
 			NetworkName:   "fcnet",
@@ -100,6 +103,18 @@ func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if config.KernelFile == "" && config.DefaultDir != "" {
+		config.KernelFile = filepath.Join(config.DefaultDir, "vmlinux")
+	} else if config.KernelFile == "" && config.DefaultDir == "" {
+		return nil, errors.New("invalid kernel file setting")
+	}
+	if config.RootFsFile == "" && config.DefaultDir != "" {
+		config.RootFsFile = filepath.Join(config.DefaultDir, "rootfs.ext4")
+	} else if config.KernelFile == "" && config.DefaultDir == "" {
+		return nil, errors.New("invalid rootfs file setting")
+	}
+
 	if config.Tags == nil {
 		config.Tags = make(map[string]string)
 	}
@@ -131,4 +146,8 @@ type CliOptions struct {
 	TlsFirst bool
 	// Path to the file containing virtual machine management settings and node-wide settings
 	NodeConfigFile string
+	// When enabled, the nex node will not clean up logs or rootfs files
+	ForensicMode bool
+	// When enabled, preflight will automatically install or reinstall dependencies
+	ForceDependencyInstall bool
 }

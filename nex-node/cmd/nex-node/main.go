@@ -67,8 +67,11 @@ func main() {
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("5s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&opts.Timeout)
 	ncli.Flag("config", "Path to the node configuration file").Required().ExistingFileVar(&opts.NodeConfigFile)
 
-	ncli.Command("up", "Starts the node execution engine")
-	ncli.Command("preflight", "Examines the environment to verify pre-requisites")
+	up := ncli.Command("up", "Starts the node execution engine")
+	up.Flag("forensic", "Enable forensic mode which will not delete any temporary files used by the app").Default("false").Envar("NEX_FORENSIC").BoolVar(&opts.ForensicMode)
+
+	preflight := ncli.Command("preflight", "Examines the environment to verify pre-requisites")
+	preflight.Flag("force", "Automatically reinstall all dependencies, including missing ones, without prompt").Default("false").BoolVar(&opts.ForceDependencyInstall)
 
 	cmd := ncli.MustParseWithUsage(os.Args[1:])
 	opts.ConnectionName = "nex-node " + nexnode.VERSION
@@ -82,7 +85,6 @@ func main() {
 }
 
 func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
-
 	nc, err := generateConnectionFromOpts(opts)
 	if err != nil {
 		log.WithError(err).Error("Failed to connect to NATS")
@@ -123,7 +125,15 @@ func cmdPreflight(opts *nexnode.CliOptions, ctx context.Context, cancel context.
 		os.Exit(1)
 	}
 
-	nexnode.CheckPreRequisites(config)
+	if opts.ForceDependencyInstall {
+		config.ForceDepInstall = true
+	}
+
+	err = nexnode.CheckPreRequisites(config)
+	if err != nil {
+		fmt.Printf("Preflight checks failed:  %s\n", err)
+		os.Exit(1)
+	}
 }
 
 // TODO : look into also pre-removing /var/lib/cni/networks/fcnet/ during startup sequence
