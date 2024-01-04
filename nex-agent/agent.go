@@ -38,7 +38,7 @@ type Agent struct {
 func NewAgent() (*Agent, error) {
 	metadata, err := GetMachineMetadata()
 	if err != nil {
-		log.Printf("failed to get mmds data: %s\n", err)
+		log.WithError(err).Error("failed to get mmds data")
 		return nil, err
 	}
 
