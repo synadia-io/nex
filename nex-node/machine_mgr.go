@@ -134,12 +134,12 @@ func (m *MachineManager) Stop() error {
 	m.rootCancel() // stops the pool from refilling
 	for _, vm := range m.allVms {
 		_ = m.PublishMachineStopped(vm)
-		vm.shutDown()
+		vm.shutDown(m.config.ForensicMode)
 	}
 	_ = m.PublishNodeStopped()
 	// Now empty the leftovers in the pool
 	for vm := range m.warmVms {
-		vm.shutDown()
+		vm.shutDown(m.config.ForensicMode)
 	}
 	time.Sleep(100 * time.Millisecond)
 
@@ -155,7 +155,7 @@ func (m *MachineManager) StopMachine(vmId string) error {
 		return errors.New("no such workload")
 	}
 	_ = m.PublishMachineStopped(vm)
-	vm.shutDown()
+	vm.shutDown(m.config.ForensicMode)
 	delete(m.allVms, vmId)
 	return nil
 }

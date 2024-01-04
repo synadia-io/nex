@@ -25,6 +25,7 @@ type NodeConfiguration struct {
 	InternalNodePort int               `json:"internal_node_port"`
 	WorkloadTypes    []string          `json:"workload_types,omitempty"`
 	Tags             map[string]string `json:"tags,omitempty"`
+	ForensicMode     bool              `json:"-"`
 }
 
 // A set of rate limiters. These fields are identical to those in firecracker rate limiter configuration
@@ -131,4 +132,6 @@ type CliOptions struct {
 	TlsFirst bool
 	// Path to the file containing virtual machine management settings and node-wide settings
 	NodeConfigFile string
+	// When enabled, the nex node will not clean up logs or rootfs files
+	ForensicMode bool
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	log "github.com/sirupsen/logrus"
+
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
 
@@ -11,17 +13,17 @@ const NexEventSourceNexAgent = "nex-agent"
 
 func (a *Agent) LogError(msg string) {
 	a.submitLog(msg, agentapi.LogLevelError)
-	fmt.Fprintln(os.Stderr, msg)
+	log.Error(msg)
 }
 
 func (a *Agent) LogDebug(msg string) {
 	a.submitLog(msg, agentapi.LogLevelDebug)
-	fmt.Fprintln(os.Stdout, msg)
+	log.Debug(msg)
 }
 
 func (a *Agent) LogInfo(msg string) {
 	a.submitLog(msg, agentapi.LogLevelInfo)
-	fmt.Fprintln(os.Stdout, msg)
+	log.Info(msg)
 }
 
 func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
@@ -37,6 +39,7 @@ func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
 
 // FIXME-- revisit error handling
 func (a *Agent) PublishWorkloadStarted(vmID, workloadName string, totalBytes int32) {
+	fmt.Fprintf(os.Stdout, "Workload %s started", workloadName)
 	select {
 	case a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,
@@ -68,6 +71,8 @@ func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bo
 	if code == -1 {
 		txt = fmt.Sprintf("Workload %s failed to start", workloadName)
 	}
+
+	log.Info(txt)
 
 	select {
 	case a.agentLogs <- &agentapi.LogEntry{

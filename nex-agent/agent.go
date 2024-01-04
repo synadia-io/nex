@@ -9,6 +9,8 @@ import (
 	"path"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	agentapi "github.com/ConnectEverything/nex/agent-api"
 	"github.com/ConnectEverything/nex/nex-agent/providers"
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
@@ -36,27 +38,28 @@ type Agent struct {
 func NewAgent() (*Agent, error) {
 	metadata, err := GetMachineMetadata()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get mmds data: %s", err)
+		log.Printf("failed to get mmds data: %s\n", err)
 		return nil, err
 	}
 
 	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", metadata.NodeNatsAddress, metadata.NodePort))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
+		log.WithError(err).Error("Failed to connect to shared NATS")
 		return nil, err
 	}
 
 	js, err := nc.JetStream()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get JetStream context from shared NATS: %s", err)
+		log.WithError(err).Error("failed to get JetStream context from shared NATS")
 		return nil, err
 	}
 
 	bucket, err := js.ObjectStore(agentapi.WorkloadCacheBucket)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get reference to shared object store: %s", err)
+		log.WithError(err).Error("failed to get reference to shared object store")
 		return nil, err
 	}
+	log.WithField("vmid", metadata.VmId).Info("Successfully created agent instance")
 
 	return &Agent{
 		agentLogs:   make(chan *agentapi.LogEntry),
@@ -73,16 +76,17 @@ func NewAgent() (*Agent, error) {
 func (a *Agent) Start() error {
 	err := a.Advertise()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
+		a.LogError(fmt.Sprintf("Failed to handshake with node: %s\n", err))
 		return err
 	}
 
 	subject := fmt.Sprintf("agentint.%s.workdispatch", a.md.VmId)
 	_, err = a.nc.Subscribe(subject, a.handleWorkDispatched)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to work dispatch: %s", err))
+		a.LogError(fmt.Sprintf("Failed to subscribe to work dispatch: %s\n", err))
 		return err
 	}
+	log.Info("Succesfully started agent")
 
 	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
@@ -103,7 +107,7 @@ func (a *Agent) Advertise() error {
 
 	_, err := a.nc.Request(NexAgentSubjectAdvertise, raw, 100*time.Millisecond)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
+		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s\n", err))
 		return err
 	}
 
@@ -118,7 +122,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 	var request agentapi.WorkRequest
 	err := json.Unmarshal(m.Data, &request)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to unmarshal work request: %s", err)
+		msg := fmt.Sprintf("Failed to unmarshal work request: %s\n", err)
 		a.LogError(msg)
 		_ = a.workAck(m, false, msg)
 		return
@@ -138,7 +142,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 
 	provider, err := providers.NewExecutionProvider(params)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
+		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s\n", err)
 		a.LogError(msg)
 		_ = a.workAck(m, false, msg)
 		return
@@ -146,17 +150,18 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 
 	err = provider.Validate()
 	if err != nil {
-		msg := fmt.Sprintf("Failed to validate workload: %s", err)
+		msg := fmt.Sprintf("Failed to validate workload: %s\n", err)
 		a.LogError(msg)
 		_ = a.workAck(m, false, msg)
 		return
 	}
 
 	_ = a.workAck(m, true, "Workload accepted")
+	fmt.Fprintf(os.Stdout, "Workload '%s' of type '%s' accepted\n", request.WorkloadName, request.WorkloadType)
 
 	err = provider.Execute()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to execute workload: %s", err))
+		a.LogError(fmt.Sprintf("Failed to execute workload: %s\n", err))
 	}
 }
 

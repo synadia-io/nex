@@ -25,6 +25,6 @@ rc-update add agent boot
 for d in bin etc lib root sbin usr; do tar c "/$d" | tar x -C /my-rootfs; done
 for dir in dev proc run sys var tmp; do mkdir /my-rootfs/${dir}; done
 
-chmod 1777 /my-rootfs/tmp
 mkdir -p /my-rootfs/home/nex/
+chmod 1777 /my-rootfs/tmp
 chown 1000:1000 /my-rootfs/home/nex/

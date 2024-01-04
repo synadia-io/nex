@@ -67,7 +67,9 @@ func main() {
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("5s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&opts.Timeout)
 	ncli.Flag("config", "Path to the node configuration file").Required().ExistingFileVar(&opts.NodeConfigFile)
 
-	ncli.Command("up", "Starts the node execution engine")
+	up := ncli.Command("up", "Starts the node execution engine")
+	up.Flag("forensic", "Enable forensic mode which will not delete any temporary files used by the app").Default("false").Envar("NEX_FORENSIC").BoolVar(&opts.ForensicMode)
+
 	ncli.Command("preflight", "Examines the environment to verify pre-requisites")
 
 	cmd := ncli.MustParseWithUsage(os.Args[1:])
@@ -82,7 +84,6 @@ func main() {
 }
 
 func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
-
 	nc, err := generateConnectionFromOpts(opts)
 	if err != nil {
 		log.WithError(err).Error("Failed to connect to NATS")
@@ -96,8 +97,11 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 		log.WithError(err).WithField("file", opts.NodeConfigFile).Error("Failed to load node configuration file")
 		os.Exit(1)
 	}
-
 	log.Infof("Loaded node configuration from '%s'", opts.NodeConfigFile)
+	if opts.ForensicMode {
+		log.Warn("Forensic mode enabled. Rootfs and other data may not be cleaned up after execution")
+		config.ForensicMode = true
+	}
 
 	manager := nexnode.NewMachineManager(ctx, cancel, nc, config, log)
 	err = manager.Start()
@@ -130,6 +134,7 @@ func cmdPreflight(opts *nexnode.CliOptions, ctx context.Context, cancel context.
 // to ensure we get the full IP range
 
 // Remove firecracker VM sockets created by this pid
+// These files are removed regardless of forensic mode because there's no app data in them
 func clearMyApiSockets() {
 	dir, err := os.ReadDir(os.TempDir())
 	if err != nil {

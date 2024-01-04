@@ -6,12 +6,13 @@ import (
 )
 
 var (
-	Opts       = &Options{}
-	GuiOpts    = &UiOptions{}
-	RunOpts    = &RunOptions{Env: make(map[string]string)}
-	DevRunOpts = &DevRunOptions{}
-	StopOpts   = &StopOptions{}
-	WatchOpts  = &WatchOptions{}
+	Opts        = &Options{}
+	GuiOpts     = &UiOptions{}
+	RunOpts     = &RunOptions{Env: make(map[string]string)}
+	DevRunOpts  = &DevRunOptions{}
+	StopOpts    = &StopOptions{}
+	WatchOpts   = &WatchOptions{}
+	ExtractOpts = &ExtractOptions{}
 )
 
 type UiOptions struct {
@@ -22,6 +23,10 @@ type DevRunOptions struct {
 	Filename string
 	// Stop a workload with the same name on a target
 	AutoStop bool
+}
+
+type ExtractOptions struct {
+	Filename string
 }
 
 // Options configure the CLI

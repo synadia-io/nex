@@ -34,31 +34,35 @@ type runningFirecracker struct {
 	namespace             string
 }
 
-func (vm *runningFirecracker) shutDown() {
+func (vm *runningFirecracker) shutDown(forensic bool) {
+
+	rootFs := getRootFsPath(vm.vmmID)
 
 	log.WithField("vmid", vm.vmmID).
 		WithField("ip", vm.ip).
+		WithField("rootfs", rootFs).
 		Info("Machine stopping")
 
 	err := vm.machine.StopVMM()
 	if err != nil {
 		log.WithError(err).Error("Failed to stop firecracker VM")
 	}
-	err = os.Remove(vm.machine.Cfg.SocketPath)
-	if err != nil {
-		if !errors.Is(err, fs.ErrExist) {
-			log.WithError(err).Warn("Failed to delete firecracker socket")
+	if !forensic {
+		err = os.Remove(vm.machine.Cfg.SocketPath)
+		if err != nil {
+			if !errors.Is(err, fs.ErrExist) {
+				log.WithError(err).Warn("Failed to delete firecracker socket")
+			}
 		}
-	}
 
-	// NOTE: we're not deleting the firecracker machine logs ... they're in a tempfs so they'll eventually
-	// go away but we might want them kept around for troubleshooting
+		// NOTE: we're not deleting the firecracker machine logs ... they're in a tempfs so they'll eventually
+		// go away but we might want them kept around for troubleshooting
 
-	rootFs := getRootFsPath(vm.vmmID)
-	err = os.Remove(rootFs)
-	if err != nil {
-		if !errors.Is(err, fs.ErrExist) {
-			log.WithError(err).Warn("Failed to delete firecracker rootfs")
+		err = os.Remove(rootFs)
+		if err != nil {
+			if !errors.Is(err, fs.ErrExist) {
+				log.WithError(err).Warn("Failed to delete firecracker rootfs")
+			}
 		}
 	}
 }

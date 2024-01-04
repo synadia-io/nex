@@ -78,7 +78,7 @@ func handleAgentEvent(mgr *MachineManager) func(m *nats.Msg) {
 		}
 
 		if evt.Type() == agentapi.WorkloadStoppedEventType {
-			vm.shutDown()
+			vm.shutDown(mgr.config.ForensicMode)
 		}
 	}
 }

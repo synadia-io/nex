@@ -78,5 +78,9 @@ func main() {
 	ui.Flag("port", "Port on which to run the UI").Default("8080").IntVar(&cli.GuiOpts.Port)
 	ui.Action(cli.RunUI)
 
+	extract := ncli.Command("extract", "Extracts the log and error files from a rootfs")
+	extract.Arg("file", "Rootfs (ext4) device to examine").Required().ExistingFileVar(&cli.ExtractOpts.Filename)
+	extract.Action(cli.RunExtract)
+
 	ncli.MustParseWithUsage(os.Args[1:])
 }
