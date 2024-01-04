@@ -218,6 +218,7 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 	_, ok := m.handshakes[vmid]
 	if !ok {
 		m.log.WithField("vmid", vmid).Error("Did not receive NATS handshake from agent within timeout. Exiting unstable node")
+		_ = m.Stop()
 		os.Exit(1)
 	}
 
