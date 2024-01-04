@@ -72,7 +72,7 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 		log.WithError(err).Error("Failed to generate firecracker configuration")
 		return nil, err
 	}
-	err = copy(config.RootFsPath, *fcCfg.Drives[0].PathOnHost)
+	err = copy(*config.RootFsPath, *fcCfg.Drives[0].PathOnHost)
 	if err != nil {
 		log.WithError(err).Error("Failed to copy rootfs to temp location")
 		return nil, err
@@ -124,17 +124,19 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 		vmmCancel()
 		return nil, fmt.Errorf("failed creating machine: %s", err)
 	}
+
 	md := agentapi.MachineMetadata{
-		VmId:            vmmID,
+		VmId:            &vmmID,
 		NodeNatsAddress: config.InternalNodeHost,
 		NodePort:        config.InternalNodePort,
-		Message:         "Host-supplied metadata",
+		Message:         agentapi.StringOrNil("Host-supplied metadata"),
 	}
 
 	if err := m.Start(vmmCtx); err != nil {
 		vmmCancel()
 		return nil, fmt.Errorf("failed to start machine: %v", err)
 	}
+
 	err = m.SetMetadata(vmmCtx, md)
 	if err != nil {
 		vmmCancel()
@@ -172,7 +174,7 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 
 	return firecracker.Config{
 		SocketPath:      socket,
-		KernelImagePath: config.KernelPath,
+		KernelImagePath: *config.KernelPath,
 		LogPath:         fmt.Sprintf("%s.log", socket),
 		Drives: []models.Drive{{
 			DriveID:      firecracker.String("1"),
@@ -197,15 +199,15 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 			AllowMMDS: true,
 			// Use CNI to get dynamic IP
 			CNIConfiguration: &firecracker.CNIConfiguration{
-				NetworkName: config.CNI.NetworkName,
-				IfName:      config.CNI.InterfaceName,
+				NetworkName: *config.CNI.NetworkName,
+				IfName:      *config.CNI.InterfaceName,
 			},
 			//OutRateLimiter: firecracker.NewRateLimiter(..., ...),
 			//InRateLimiter: firecracker.NewRateLimiter(..., ...),
 		}},
 		MachineCfg: models.MachineConfiguration{
-			VcpuCount:  firecracker.Int64(int64(config.MachineTemplate.VcpuCount)),
-			MemSizeMib: firecracker.Int64(int64(config.MachineTemplate.MemSizeMib)),
+			VcpuCount:  firecracker.Int64(int64(*config.MachineTemplate.VcpuCount)),
+			MemSizeMib: firecracker.Int64(int64(*config.MachineTemplate.MemSizeMib)),
 		},
 		MmdsVersion: firecracker.MMDSv2,
 	}, nil

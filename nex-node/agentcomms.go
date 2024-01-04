@@ -95,7 +95,7 @@ func handleHandshake(mgr *MachineManager) func(m *nats.Msg) {
 		}
 
 		now := time.Now().UTC()
-		mgr.handshakes[shake.MachineId] = now.Format(time.RFC3339)
+		mgr.handshakes[*shake.MachineId] = now.Format(time.RFC3339)
 
 		mgr.log.WithField("vmid", shake.MachineId).WithField("message", shake.Message).Info("Received agent handshake")
 		err = m.Respond([]byte("OK"))

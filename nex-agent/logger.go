@@ -44,7 +44,7 @@ func (a *Agent) dispatchEvents() {
 			continue
 		}
 
-		subject := fmt.Sprintf("agentint.%s.events.%s", a.md.VmId, entry.Type())
+		subject := fmt.Sprintf("agentint.%s.events.%s", *a.md.VmId, entry.Type())
 		err = a.nc.Publish(subject, bytes)
 		if err != nil {
 			continue
@@ -64,7 +64,7 @@ func (a *Agent) dispatchLogs() {
 			continue
 		}
 
-		subject := fmt.Sprintf("agentint.%s.logs", a.md.VmId)
+		subject := fmt.Sprintf("agentint.%s.logs", *a.md.VmId)
 		err = a.nc.Publish(subject, bytes)
 		if err != nil {
 			continue
