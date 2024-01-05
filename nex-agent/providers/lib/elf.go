@@ -90,7 +90,8 @@ func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) (*ELF
 	}
 
 	if params.TotalBytes == nil {
-		return nil, errors.New("ELF execution provider requires a VM id parameter")
+		totalBytes := int32(0) // FIXME
+		params.TotalBytes = &totalBytes
 	}
 
 	return &ELF{

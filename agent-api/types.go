@@ -53,13 +53,15 @@ func (w *WorkRequest) Validate() bool {
 		w.Errors = append(w.Errors, errors.New("workload name is required"))
 	}
 
-	if w.Hash == nil {
-		w.Errors = append(w.Errors, errors.New("hash is required"))
-	}
+	// FIXME-- this should be provided in the request
+	// if w.Hash == nil {
+	// 	w.Errors = append(w.Errors, errors.New("hash is required"))
+	// }
 
-	if w.TotalBytes == nil {
-		w.Errors = append(w.Errors, errors.New("total bytes is required"))
-	}
+	// FIXME-- this should be provided in the request
+	// if w.TotalBytes == nil {
+	// 	w.Errors = append(w.Errors, errors.New("total bytes is required"))
+	// }
 
 	if w.WorkloadType == nil {
 		w.Errors = append(w.Errors, errors.New("workload type is required"))
