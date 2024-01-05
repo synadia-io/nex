@@ -156,10 +156,7 @@ func uploadWorkload(nc *nats.Conn, filename string) (string, string, error) {
 func readOrGenerateIssuer() (nkeys.KeyPair, error) {
 	filename := path.Join(nexDir, "issuer.nk")
 	bytes, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	if len(bytes) == 0 {
+	if errors.Is(err, fs.ErrNotExist) {
 		return writeNewIssuer()
 	} else {
 		fmt.Printf("Reusing existing issuer account key: %s\n", filename)
