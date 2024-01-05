@@ -73,7 +73,7 @@ func RunDevWorkload(ctx *fisk.ParseContext) error {
 	}
 
 	targetPublicXkey := info.PublicXKey
-	workloadUrl, workloadName, err := uploadWorkload(nc, DevRunOpts.Filename)
+	workloadUrl, workloadName, workloadType, err := uploadWorkload(nc, DevRunOpts.Filename)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,9 @@ func RunDevWorkload(ctx *fisk.ParseContext) error {
 		controlapi.SenderXKey(publisherXKey),
 		controlapi.TargetNode(target.NodeId),
 		controlapi.TargetPublicXKey(targetPublicXkey),
+		controlapi.TriggerSubjects(nil),
 		controlapi.WorkloadName(workloadName),
+		controlapi.WorkloadType(workloadType),
 		controlapi.Checksum("abc12345TODOmakethisreal"),
 		controlapi.WorkloadDescription("Workload published in devmode"),
 	)
@@ -122,7 +124,7 @@ func RunDevWorkload(ctx *fisk.ParseContext) error {
 	return nil
 }
 
-func uploadWorkload(nc *nats.Conn, filename string) (string, string, error) {
+func uploadWorkload(nc *nats.Conn, filename string) (string, string, string, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
@@ -135,22 +137,22 @@ func uploadWorkload(nc *nats.Conn, filename string) (string, string, error) {
 			Description: "Ad hoc object storage for NEX CLI developer mode uploads",
 		})
 		if err != nil {
-			return "", "", err
+			return "", "", "", err
 		}
 	}
 	bytes, err := os.ReadFile(filename)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	key := filepath.Base(filename)
 	key = strings.ReplaceAll(key, ".", "_")
 
 	_, err = bucket.PutBytes(key, bytes)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return fmt.Sprintf("nats://%s/%s", objectStoreName, key), key, nil
+	return fmt.Sprintf("nats://%s/%s", objectStoreName, key), key, "elf", nil
 }
 
 func readOrGenerateIssuer() (nkeys.KeyPair, error) {

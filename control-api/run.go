@@ -13,17 +13,22 @@ import (
 )
 
 type RunRequest struct {
-	Description  string  `json:"description,omitempty"`
-	WorkloadType string  `json:"type"`
-	Location     url.URL `json:"location"`
+	Description  *string  `json:"description,omitempty"`
+	WorkloadType *string  `json:"type"`
+	Location     *url.URL `json:"location"`
+
 	// Contains claims for the workload: name, hash
-	WorkloadJwt string `json:"workload_jwt"`
+	WorkloadJwt *string `json:"workload_jwt"`
+
 	// A base64-encoded byte array that contains an encrypted json-serialized map[string]string.
-	Environment     string `json:"environment"`
-	SenderPublicKey string `json:"sender_public_key"`
-	TargetNode      string `json:"target_node"`
+	Environment *string `json:"environment"`
+
 	// If the payload indicates an object store bucket & key, JS domain can be supplied
-	JsDomain string `json:"jsdomain,omitempty"`
+	JsDomain *string `json:"jsdomain,omitempty"`
+
+	SenderPublicKey *string  `json:"sender_public_key"`
+	TargetNode      *string  `json:"target_node"`
+	TriggerSubjects []string `json:"trigger_subjects,omitempty"`
 
 	WorkloadEnvironment map[string]string `json:"-"`
 	DecodedClaims       jwt.GenericClaims `json:"-"`
@@ -40,27 +45,31 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	for _, o := range opts {
 		reqOpts = o(reqOpts)
 	}
+
 	// TODO: ensure that all the required fields are here
 
 	workloadJwt, err := CreateWorkloadJwt(reqOpts.hash, reqOpts.workloadName, reqOpts.claimsIssuer)
 	if err != nil {
 		return nil, err
 	}
+
 	encryptedEnv, err := EncryptRequestEnvironment(reqOpts.senderXkey, reqOpts.targetPublicXKey, reqOpts.env)
 	if err != nil {
 		return nil, err
 	}
+
 	senderPublic, _ := reqOpts.senderXkey.PublicKey()
 
 	req := &RunRequest{
-		Description:     reqOpts.workloadDescription,
-		WorkloadType:    "elf",
-		Location:        reqOpts.location,
-		WorkloadJwt:     workloadJwt,
-		Environment:     encryptedEnv,
-		SenderPublicKey: senderPublic,
-		TargetNode:      reqOpts.targetNode,
-		JsDomain:        reqOpts.jsDomain,
+		Description:     &reqOpts.workloadDescription,
+		WorkloadType:    &reqOpts.workloadType,
+		Location:        &reqOpts.location,
+		WorkloadJwt:     &workloadJwt,
+		Environment:     &encryptedEnv,
+		SenderPublicKey: &senderPublic,
+		TargetNode:      &reqOpts.targetNode,
+		TriggerSubjects: reqOpts.triggerSubjects,
+		JsDomain:        &reqOpts.jsDomain,
 	}
 
 	return req, nil
@@ -69,11 +78,11 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 // This will validate a request's workload JWT, decrypt the request environment. It will not
 // perform a comparison of the hash found in the claims with a recipient's expected hash
 func (request *RunRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims, error) {
-
-	claims, err := jwt.DecodeGeneric(request.WorkloadJwt)
+	claims, err := jwt.DecodeGeneric(*request.WorkloadJwt)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode workload JWT: %s", err)
 	}
+
 	request.DecodedClaims = *claims
 	if !validWorkloadName.MatchString(claims.Subject) {
 		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements of all lowercase letters", claims.Subject)
@@ -91,7 +100,6 @@ func (request *RunRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims, er
 	}
 
 	return claims, nil
-
 }
 
 func CreateWorkloadJwt(hash string, name string, issuer nkeys.KeyPair) (string, error) {
@@ -107,23 +115,25 @@ func EncryptRequestEnvironment(senderXKey nkeys.KeyPair, recipientPublicKey stri
 	encEnv, _ := senderXKey.Seal(jsonEnv, recipientPublicKey)
 	hexenv := base64.StdEncoding.EncodeToString(encEnv)
 	return hexenv, nil
-
 }
 
 func (request *RunRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair) error {
-	data, err := base64.StdEncoding.DecodeString(request.Environment)
+	data, err := base64.StdEncoding.DecodeString(*request.Environment)
 	if err != nil {
 		return err
 	}
-	unencrypted, err := recipientXKey.Open(data, request.SenderPublicKey)
+
+	unencrypted, err := recipientXKey.Open(data, *request.SenderPublicKey)
 	if err != nil {
 		return err
 	}
+
 	var cleanEnv map[string]string
 	err = json.Unmarshal(unencrypted, &cleanEnv)
 	if err != nil {
 		return err
 	}
+
 	// "I can't believe I can do this" - Every Rust developer ever.
 	request.WorkloadEnvironment = cleanEnv
 	return nil
@@ -131,6 +141,7 @@ func (request *RunRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair
 
 type requestOptions struct {
 	workloadName        string
+	workloadType        string
 	workloadDescription string
 	location            url.URL
 	env                 map[string]string
@@ -140,6 +151,7 @@ type requestOptions struct {
 	jsDomain            string
 	hash                string
 	targetNode          string
+	triggerSubjects     []string
 }
 
 type RequestOption func(o requestOptions) requestOptions
@@ -152,10 +164,26 @@ func WorkloadName(name string) RequestOption {
 	}
 }
 
-// Sets the target execution engine node (a public key of type "server") for this requet
+// Type of the workload, e.g., one of "elf", "v8", "oci", "wasm" for this request
+func WorkloadType(workloadType string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.workloadType = workloadType
+		return o
+	}
+}
+
+// Sets the target execution engine node (a public key of type "server") for this request
 func TargetNode(publicKey string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.targetNode = publicKey
+		return o
+	}
+}
+
+// Sets the trigger subjects to register for this request
+func TriggerSubjects(triggerSubjects []string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.triggerSubjects = triggerSubjects
 		return o
 	}
 }

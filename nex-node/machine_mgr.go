@@ -22,6 +22,7 @@ import (
 const (
 	EventSubjectPrefix      = "$NEX.events"
 	LogSubjectPrefix        = "$NEX.logs"
+	TriggerSubjectPrefix    = "$NEX.triggers"
 	WorkloadCacheBucketName = "NEXCACHE"
 
 	defaultHandshakeTimeoutMillis = 5000
@@ -119,9 +120,9 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 	// TODO: make the bytes and hash/digest available to the agent
 	req := agentapi.WorkRequest{
 		WorkloadName: &workloadName,
-		Hash:         nil,                   // FIXME
-		TotalBytes:   nil,                   // FIXME
-		WorkloadType: &request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
+		Hash:         nil,                  // FIXME
+		TotalBytes:   nil,                  // FIXME
+		WorkloadType: request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
 		Environment:  request.WorkloadEnvironment,
 	}
 	bytes, _ := json.Marshal(req)
