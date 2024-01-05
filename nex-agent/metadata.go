@@ -15,7 +15,7 @@ import (
 // (see https://github.com/firecracker-microvm/firecracker/blob/main/docs/mmds/mmds-user-guide.md#version-2)
 const MmdsAddress = "169.254.169.254"
 
-const metadataPollingIntervalMillis = 50
+const metadataClientTimeoutMillis = 50
 const metadataPollingTimeoutMillis = 5000
 
 // GetMachineMetadata attempts to retrieve metadata from firecracker's MMDS.
@@ -31,7 +31,6 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	}
 
 	url := fmt.Sprintf("http://%s/", MmdsAddress)
-
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -40,7 +39,7 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	req.Header.Set("X-metadata-token", token)
 
 	client := &http.Client{
-		Timeout: metadataPollingIntervalMillis * time.Millisecond,
+		Timeout: metadataClientTimeoutMillis * time.Millisecond,
 	}
 
 	timeoutAt := time.Now().UTC().Add(metadataPollingTimeoutMillis * time.Millisecond)
@@ -58,7 +57,7 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 		return metadata, nil
 	}
 
-	return nil, errors.New("failed to obtain metadata after multiple attempts")
+	return nil, fmt.Errorf("failed to obtain metadata after %dms", metadataPollingTimeoutMillis)
 }
 
 func performMatadataQuery(url string, req *http.Request, client *http.Client) (*agentapi.MachineMetadata, error) {
@@ -67,11 +66,12 @@ func performMatadataQuery(url string, req *http.Request, client *http.Client) (*
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != 200 {
 		return nil, errors.New("metadata not found")
 	}
-	bodyBytes, err := io.ReadAll(resp.Body)
 
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -81,12 +81,12 @@ func performMatadataQuery(url string, req *http.Request, client *http.Client) (*
 	if err != nil {
 		return nil, fmt.Errorf("deserialization failure: %s: body: '%s'", err, string(bodyBytes))
 	}
+
 	return &metadata, nil
 }
 
 func acquireToken() (string, error) {
 	url := fmt.Sprintf("http://%s/latest/api/token", MmdsAddress)
-
 	req, err := http.NewRequest(http.MethodPut, url, nil)
 	if err != nil {
 		return "", err
@@ -97,10 +97,12 @@ func acquireToken() (string, error) {
 	client := &http.Client{
 		Timeout: 1 * time.Second,
 	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
+
 	defer resp.Body.Close()
 	bodyBytes, err := io.ReadAll(resp.Body)
 
