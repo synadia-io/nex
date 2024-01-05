@@ -15,6 +15,9 @@ import (
 // (see https://github.com/firecracker-microvm/firecracker/blob/main/docs/mmds/mmds-user-guide.md#version-2)
 const MmdsAddress = "169.254.169.254"
 
+const metadataPollingIntervalMillis = 50
+const metadataPollingTimeoutMillis = 5000
+
 // GetMachineMetadata attempts to retrieve metadata from firecracker's MMDS.
 // Version of 2 this service requires the acuisition of a token and the use
 // of that token for all requests. Note that metadata is PUT into a running
@@ -36,19 +39,23 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-metadata-token", token)
 
-	remainingAttempts := 3
 	client := &http.Client{
-		Timeout: 1 * time.Second,
+		Timeout: metadataPollingIntervalMillis * time.Millisecond,
 	}
-	for remainingAttempts > 0 {
+
+	timeoutAt := time.Now().UTC().Add(metadataPollingTimeoutMillis * time.Millisecond)
+
+	for {
 		metadata, err := performMatadataQuery(url, req, client)
 		if err != nil {
-			remainingAttempts -= 1
-			time.Sleep(1 * time.Second)
+			if time.Now().UTC().After(timeoutAt) {
+				break
+			}
+
 			continue
-		} else {
-			return metadata, nil
 		}
+
+		return metadata, nil
 	}
 
 	return nil, errors.New("failed to obtain metadata after multiple attempts")

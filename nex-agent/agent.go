@@ -40,7 +40,11 @@ func NewAgent() (*Agent, error) {
 		return nil, err
 	}
 
-	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsAddress, metadata.NodePort))
+	if !metadata.Validate() {
+		return nil, fmt.Errorf("invalid metadata retrieved from mmds; %v", metadata.Errors)
+	}
+
+	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsAddress, *metadata.NodePort))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
 		return nil, err
