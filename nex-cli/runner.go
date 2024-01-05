@@ -86,6 +86,8 @@ func RunWorkload(ctx *fisk.ParseContext) error {
 		controlapi.TargetNode(RunOpts.TargetNode),
 		controlapi.TargetPublicXKey(targetPublicXkey),
 		controlapi.WorkloadName(RunOpts.Name),
+		controlapi.WorkloadType(RunOpts.WorkloadType),
+		controlapi.TriggerSubjects(RunOpts.TriggerSubjects),
 		controlapi.Checksum("abc12345TODOmakethisreal"),
 		controlapi.WorkloadDescription(RunOpts.Description),
 	)

@@ -168,9 +168,15 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			return
 		}
 
-		if !slices.Contains(api.config.WorkloadTypes, request.WorkloadType) {
-			api.log.WithField("workload_type", request.WorkloadType).Error("This node does not support the given workload type")
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", request.WorkloadType))
+		if !slices.Contains(api.config.WorkloadTypes, *request.WorkloadType) {
+			api.log.WithField("workload_type", *request.WorkloadType).Error("This node does not support the given workload type")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", *request.WorkloadType))
+			return
+		}
+
+		if len(request.TriggerSubjects) > 0 && !strings.EqualFold(*request.WorkloadType, "v8") { // FIXME -- workload type comparison
+			api.log.WithField("trigger_subjects", *request.WorkloadType).Error("Workload type does not support trigger subject registration")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", *request.WorkloadType))
 			return
 		}
 
@@ -208,6 +214,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			WithField("vmid", runningVm.vmmID).
 			WithField("namespace", namespace).
 			WithField("workload", workloadName).
+			WithField("type", *request.WorkloadType).
 			Info("Submitting workload to VM")
 
 		err = api.mgr.DispatchWork(runningVm, workloadName, namespace, request)
@@ -291,15 +298,25 @@ func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []
 	now := time.Now().UTC()
 	for _, v := range *vms {
 		if v.namespace == namespace {
+			var desc string
+			if v.workloadSpecification.Description != nil {
+				desc = *v.workloadSpecification.Description // FIXME-- audit controlapi.WorkloadSummary
+			}
+
+			var workloadType string
+			if v.workloadSpecification.WorkloadType != nil {
+				workloadType = *v.workloadSpecification.WorkloadType
+			}
+
 			machine := controlapi.MachineSummary{
 				Id:      v.vmmID,
 				Healthy: true, // TODO cache last health status
 				Uptime:  myUptime(now.Sub(v.machineStarted)),
 				Workload: controlapi.WorkloadSummary{
 					Name:         v.workloadSpecification.DecodedClaims.Subject,
-					Description:  v.workloadSpecification.Description,
+					Description:  desc,
 					Runtime:      myUptime(now.Sub(v.workloadStarted)),
-					WorkloadType: v.workloadSpecification.WorkloadType,
+					WorkloadType: workloadType,
 					//Hash:         v.workloadSpecification.DecodedClaims.Data["hash"].(string),
 				},
 			}
