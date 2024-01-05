@@ -23,6 +23,9 @@ const (
 	EventSubjectPrefix      = "$NEX.events"
 	LogSubjectPrefix        = "$NEX.logs"
 	WorkloadCacheBucketName = "NEXCACHE"
+
+	defaultHandshakeTimeoutMillis = 5000
+	defaultNatsStoreDir           = "pnats"
 )
 
 // The machine manager is responsible for the pool of warm firecracker VMs. This includes starting new
@@ -38,7 +41,11 @@ type MachineManager struct {
 	allVms      map[string]*runningFirecracker
 	warmVms     chan *runningFirecracker
 
-	handshakes map[string]string
+	handshakes       map[string]string
+	handshakeTimeout time.Duration // TODO: make configurable...
+
+	natsStoreDir string
+	publicKey    string
 }
 
 func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.Conn, config *NodeConfiguration, log *logrus.Logger) (*MachineManager, error) {
@@ -47,19 +54,30 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 		return nil, fmt.Errorf("failed to create new machine manager; invalid node config; %v", config.Errors)
 	}
 
-	// Create a new User KeyPair
-	server, _ := nkeys.CreateServer()
+	// Create a new keypair
+	server, err := nkeys.CreateServer()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new machine manager; failed to generate keypair; %s", err)
+	}
+
+	pubkey, err := server.PublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new machine manager; failed to encode public key; %s", err)
+	}
 
 	return &MachineManager{
-		rootContext: ctx,
-		rootCancel:  cancel,
-		config:      config,
-		nc:          nc,
-		log:         log,
-		kp:          server,
-		handshakes:  make(map[string]string),
-		allVms:      make(map[string]*runningFirecracker),
-		warmVms:     make(chan *runningFirecracker, config.MachinePoolSize-1),
+		rootContext:      ctx,
+		rootCancel:       cancel,
+		config:           config,
+		nc:               nc,
+		log:              log,
+		kp:               server,
+		publicKey:        pubkey,
+		handshakes:       make(map[string]string),
+		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
+		natsStoreDir:     defaultNatsStoreDir,
+		allVms:           make(map[string]*runningFirecracker),
+		warmVms:          make(chan *runningFirecracker, config.MachinePoolSize-1),
 	}, nil
 }
 
@@ -80,14 +98,17 @@ func (m *MachineManager) Start() error {
 	if err != nil {
 		return err
 	}
+
 	_, err = m.ncInternal.Subscribe("agentint.*.events.*", handleAgentEvent(m))
 	if err != nil {
 		return err
 	}
+
 	_, err = m.ncInternal.Subscribe("agentint.handshake", handleHandshake(m))
 	if err != nil {
 		return err
 	}
+
 	go m.fillPool()
 	_ = m.PublishNodeStarted()
 
@@ -98,9 +119,9 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 	// TODO: make the bytes and hash/digest available to the agent
 	req := agentapi.WorkRequest{
 		WorkloadName: &workloadName,
-		Hash:         agentapi.StringOrNil(""), // FIXME
-		TotalBytes:   nil,                      // TODO: make real
-		WorkloadType: &request.WorkloadType,    // FIXME-- audit all types for string -> *string, and validate...
+		Hash:         nil,                   // FIXME
+		TotalBytes:   nil,                   // FIXME
+		WorkloadType: &request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
 		Environment:  request.WorkloadEnvironment,
 	}
 	bytes, _ := json.Marshal(req)
@@ -114,11 +135,13 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 			return fmt.Errorf("failed to submit request for work: %s", err)
 		}
 	}
+
 	var workResponse agentapi.WorkResponse
 	err = json.Unmarshal(resp.Data, &workResponse)
 	if err != nil {
 		return err
 	}
+
 	if !workResponse.Accepted {
 		return fmt.Errorf("workload rejected by agent: %s", *workResponse.Message)
 	}
@@ -141,7 +164,9 @@ func (m *MachineManager) Stop() error {
 		_ = m.PublishMachineStopped(vm)
 		vm.shutDown()
 	}
+
 	_ = m.PublishNodeStopped()
+
 	// Now empty the leftovers in the pool
 	for vm := range m.warmVms {
 		vm.shutDown()
@@ -159,20 +184,12 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	if !exists {
 		return errors.New("no such workload")
 	}
+
 	_ = m.PublishMachineStopped(vm)
 	vm.shutDown()
 	delete(m.allVms, vmId)
-	return nil
-}
 
-// Retrieves the machine manager's public key, which comes from a key pair of type server (Nxxx)
-func (m *MachineManager) PublicKey() string {
-	pk, err := m.kp.PublicKey()
-	if err != nil {
-		return "???"
-	} else {
-		return pk
-	}
+	return nil
 }
 
 // Looks up a virtual machine by workload/vm ID. Returns nil if machine doesn't exist
@@ -205,12 +222,13 @@ func (m *MachineManager) fillPool() {
 				// if we can't create a vm, there's no point in this app staying up
 				panic(err)
 			}
-			go m.awaitHandshake(vm.vmmID)
 
+			go m.awaitHandshake(vm.vmmID)
 			m.log.WithField("ip", vm.ip).WithField("vmid", vm.vmmID).Info("Adding new VM to warm pool")
 
 			// If the pool is full, this line will block until a slot is available.
 			m.warmVms <- vm
+
 			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
 			m.allVms[vm.vmmID] = vm
 		}
@@ -218,7 +236,7 @@ func (m *MachineManager) fillPool() {
 }
 
 func (m *MachineManager) awaitHandshake(vmid string) {
-	time.Sleep(time.Millisecond * 4000) // TODO: should this be a configurable delay?
+	time.Sleep(m.handshakeTimeout)
 
 	_, ok := m.handshakes[vmid]
 	if !ok {
@@ -230,13 +248,12 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 }
 
 func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error) {
-
 	natsServer, err := server.NewServer(&server.Options{
 		Host:      "0.0.0.0",
 		Port:      -1,
 		JetStream: true,
 		NoLog:     true,
-		StoreDir:  path.Join(os.TempDir(), "pnats"),
+		StoreDir:  path.Join(os.TempDir(), m.natsStoreDir),
 	})
 	if err != nil {
 		return nil, nil, err

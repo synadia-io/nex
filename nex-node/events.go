@@ -25,7 +25,8 @@ func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.E
 	raw, _ := event.MarshalJSON()
 
 	// $NEX.events.{namespace}.{event_type}
-	err := m.nc.Publish(fmt.Sprintf("%s.%s.%s", EventSubjectPrefix, namespace, event.Type()), raw)
+	subject := fmt.Sprintf("%s.%s.%s", EventSubjectPrefix, namespace, event.Type())
+	err := m.nc.Publish(subject, raw)
 	if err != nil {
 		m.log.WithError(err).Error("Failed to publish cloud event")
 	}
@@ -48,7 +49,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) error {
 		}
 
 		cloudevent := cloudevents.NewEvent()
-		cloudevent.SetSource(m.PublicKey())
+		cloudevent.SetSource(m.publicKey)
 		cloudevent.SetID(uuid.NewString())
 		cloudevent.SetTime(time.Now().UTC())
 		cloudevent.SetType(agentapi.WorkloadStoppedEventType)
@@ -67,7 +68,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) error {
 		}
 		logBytes, _ := json.Marshal(emitLog)
 
-		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.PublicKey(), workloadName, vm.vmmID)
+		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, workloadName, vm.vmmID)
 		err = m.nc.Publish(subject, logBytes)
 		if err != nil {
 			m.log.WithError(err).Error("Failed to publish machine stopped event")
@@ -83,11 +84,11 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) error {
 func (m *MachineManager) PublishNodeStarted() error {
 	nodeStart := controlapi.NodeStartedEvent{
 		Version: VERSION,
-		Id:      m.PublicKey(),
+		Id:      m.publicKey,
 	}
 
 	cloudevent := cloudevents.NewEvent()
-	cloudevent.SetSource(m.PublicKey())
+	cloudevent.SetSource(m.publicKey)
 	cloudevent.SetID(uuid.NewString())
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(controlapi.NodeStartedEventType)
@@ -99,20 +100,19 @@ func (m *MachineManager) PublishNodeStarted() error {
 
 // PublishNodeStopped emits a node_stopped event
 func (m *MachineManager) PublishNodeStopped() error {
-	cloudevent := cloudevents.NewEvent()
-
-	m.log.Info("Publishing node stopped")
 	evt := controlapi.NodeStoppedEvent{
-		Id:       m.PublicKey(),
+		Id:       m.publicKey,
 		Graceful: true,
 	}
 
-	cloudevent.SetSource(m.PublicKey())
+	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetSource(m.publicKey)
 	cloudevent.SetID(uuid.NewString())
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(controlapi.NodeStoppedEventType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(evt)
 
+	m.log.Info("Publishing node stopped")
 	return m.PublishCloudEvent("system", cloudevent)
 }
