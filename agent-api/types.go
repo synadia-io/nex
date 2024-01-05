@@ -84,6 +84,26 @@ type MachineMetadata struct {
 	NodeNatsAddress *string `json:"node_address"`
 	NodePort        *int    `json:"node_port"`
 	Message         *string `json:"message"`
+
+	Errors []error `json:"errors,omitempty"`
+}
+
+func (m *MachineMetadata) Validate() bool {
+	m.Errors = make([]error, 0)
+
+	if m.VmId == nil {
+		m.Errors = append(m.Errors, errors.New("vm id is required"))
+	}
+
+	if m.NodeNatsAddress == nil {
+		m.Errors = append(m.Errors, errors.New("node NATS address is required"))
+	}
+
+	if m.NodePort == nil {
+		m.Errors = append(m.Errors, errors.New("node port is required"))
+	}
+
+	return len(m.Errors) == 0
 }
 
 type LogEntry struct {
