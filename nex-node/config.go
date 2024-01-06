@@ -27,7 +27,6 @@ var (
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
-
 	KernelFile       string            `json:"kernel_file"`
 	RootFsFile       string            `json:"rootfs_file"`
 	DefaultDir       string            `json:"default_resource_dir"`
@@ -39,7 +38,6 @@ type NodeConfiguration struct {
 	MachineTemplate  MachineTemplate   `json:"machine_template"`
 	RateLimiters     *Limiters         `json:"rate_limiters,omitempty"`
 	RootFsPath       *string           `json:"rootfs_path"`
-	Tags             map[string]string `json:"tags,omitempty"`
 	ValidIssuers     []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes    []string          `json:"workload_types,omitempty"`
 	Tags             map[string]string `json:"tags,omitempty"`
