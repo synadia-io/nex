@@ -1,0 +1,1 @@
+cargo wasi run -- test.trigger < test.txt 
