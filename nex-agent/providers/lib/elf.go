@@ -80,12 +80,25 @@ func (e *ELF) Validate() error {
 }
 
 // convenience method to initialize an ELF execution provider
-func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) *ELF {
+func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) (*ELF, error) {
+	if params.WorkloadName == nil {
+		return nil, errors.New("ELF execution provider requires a workload name parameter")
+	}
+
+	if params.TmpFilename == nil {
+		return nil, errors.New("ELF execution provider requires a temporary filename parameter")
+	}
+
+	if params.TotalBytes == nil {
+		totalBytes := int32(0) // FIXME
+		params.TotalBytes = &totalBytes
+	}
+
 	return &ELF{
 		environment: params.Environment,
-		name:        params.WorkloadName,
-		tmpFilename: params.TmpFilename,
-		totalBytes:  params.TotalBytes,
+		name:        *params.WorkloadName,
+		tmpFilename: *params.TmpFilename,
+		totalBytes:  *params.TotalBytes,
 		vmID:        params.VmID,
 
 		stderr: params.Stderr,
@@ -94,7 +107,7 @@ func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) *ELF 
 		fail: params.Fail,
 		run:  params.Run,
 		exit: params.Exit,
-	}
+	}, nil
 }
 
 // Validates that the indicated file is a 64-bit linux native elf binary that is statically linked.

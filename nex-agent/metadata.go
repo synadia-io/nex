@@ -15,6 +15,9 @@ import (
 // (see https://github.com/firecracker-microvm/firecracker/blob/main/docs/mmds/mmds-user-guide.md#version-2)
 const MmdsAddress = "169.254.169.254"
 
+const metadataClientTimeoutMillis = 50
+const metadataPollingTimeoutMillis = 5000
+
 // GetMachineMetadata attempts to retrieve metadata from firecracker's MMDS.
 // Version of 2 this service requires the acuisition of a token and the use
 // of that token for all requests. Note that metadata is PUT into a running
@@ -28,7 +31,6 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	}
 
 	url := fmt.Sprintf("http://%s/", MmdsAddress)
-
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -36,22 +38,26 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-metadata-token", token)
 
-	remainingAttempts := 3
 	client := &http.Client{
-		Timeout: 1 * time.Second,
-	}
-	for remainingAttempts > 0 {
-		metadata, err := performMatadataQuery(url, req, client)
-		if err != nil {
-			remainingAttempts -= 1
-			time.Sleep(1 * time.Second)
-			continue
-		} else {
-			return metadata, nil
-		}
+		Timeout: metadataClientTimeoutMillis * time.Millisecond,
 	}
 
-	return nil, errors.New("failed to obtain metadata after multiple attempts")
+	timeoutAt := time.Now().UTC().Add(metadataPollingTimeoutMillis * time.Millisecond)
+
+	for {
+		metadata, err := performMatadataQuery(url, req, client)
+		if err != nil {
+			if time.Now().UTC().After(timeoutAt) {
+				break
+			}
+
+			continue
+		}
+
+		return metadata, nil
+	}
+
+	return nil, fmt.Errorf("failed to obtain metadata after %dms", metadataPollingTimeoutMillis)
 }
 
 func performMatadataQuery(url string, req *http.Request, client *http.Client) (*agentapi.MachineMetadata, error) {
@@ -60,11 +66,12 @@ func performMatadataQuery(url string, req *http.Request, client *http.Client) (*
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != 200 {
 		return nil, errors.New("metadata not found")
 	}
-	bodyBytes, err := io.ReadAll(resp.Body)
 
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +81,12 @@ func performMatadataQuery(url string, req *http.Request, client *http.Client) (*
 	if err != nil {
 		return nil, fmt.Errorf("deserialization failure: %s: body: '%s'", err, string(bodyBytes))
 	}
+
 	return &metadata, nil
 }
 
 func acquireToken() (string, error) {
 	url := fmt.Sprintf("http://%s/latest/api/token", MmdsAddress)
-
 	req, err := http.NewRequest(http.MethodPut, url, nil)
 	if err != nil {
 		return "", err
@@ -90,10 +97,12 @@ func acquireToken() (string, error) {
 	client := &http.Client{
 		Timeout: 1 * time.Second,
 	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
+
 	defer resp.Body.Close()
 	bodyBytes, err := io.ReadAll(resp.Body)
 

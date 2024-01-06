@@ -40,7 +40,11 @@ func NewAgent() (*Agent, error) {
 		return nil, err
 	}
 
-	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", metadata.NodeNatsAddress, metadata.NodePort))
+	if !metadata.Validate() {
+		return nil, fmt.Errorf("invalid metadata retrieved from mmds; %v", metadata.Errors)
+	}
+
+	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsAddress, *metadata.NodePort))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
 		return nil, err
@@ -77,7 +81,7 @@ func (a *Agent) Start() error {
 		return err
 	}
 
-	subject := fmt.Sprintf("agentint.%s.workdispatch", a.md.VmId)
+	subject := fmt.Sprintf("agentint.%s.workdispatch", *a.md.VmId)
 	_, err = a.nc.Subscribe(subject, a.handleWorkDispatched)
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to subscribe to work dispatch: %s", err))
@@ -124,6 +128,11 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 		return
 	}
 
+	if !request.Validate() {
+		_ = a.workAck(m, false, fmt.Sprintf("%v", request.Errors)) // FIXME-- this message can be formatted prettier
+		return
+	}
+
 	tmpFile, err := a.cacheExecutableArtifact(&request)
 	if err != nil {
 		_ = a.workAck(m, false, err.Error())
@@ -167,7 +176,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 func (a *Agent) cacheExecutableArtifact(req *agentapi.WorkRequest) (*string, error) {
 	tempFile := path.Join(os.TempDir(), "workload") // FIXME-- randomly generate a filename
 
-	err := a.cacheBucket.GetFile(req.WorkloadName, tempFile)
+	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to write workload artifact to temp dir: %s", err)
 		a.LogError(msg)
@@ -187,12 +196,20 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.WorkRequest) (*string, err
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
 func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
+	if a.md.VmId == nil {
+		return nil, errors.New("vm id is required to initialize execution provider params")
+	}
+
+	if req.WorkloadName == nil {
+		return nil, errors.New("workload name is required to initialize execution provider params")
+	}
+
 	params := &agentapi.ExecutionProviderParams{
 		WorkRequest: *req,
-		Stderr:      &logEmitter{stderr: true, name: req.WorkloadName, logs: a.agentLogs},
-		Stdout:      &logEmitter{stderr: false, name: req.WorkloadName, logs: a.agentLogs},
-		TmpFilename: tmpFile,
-		VmID:        a.md.VmId,
+		Stderr:      &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
+		Stdout:      &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
+		TmpFilename: &tmpFile,
+		VmID:        *a.md.VmId,
 
 		Fail: make(chan bool),
 		Run:  make(chan bool),
@@ -205,17 +222,17 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 		for {
 			select {
 			case <-params.Fail:
-				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", params.WorkloadName, params.VmID)
-				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, true, -1)
+				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", *params.WorkloadName, params.VmID)
+				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, true, -1)
 				return
 
 			case <-params.Run:
-				a.PublishWorkloadStarted(params.VmID, params.WorkloadName, params.TotalBytes)
+				a.PublishWorkloadStarted(params.VmID, *params.WorkloadName, params.TotalBytes)
 				sleepMillis = workloadExecutionSleepTimeoutMillis
 
 			case exit := <-params.Exit:
-				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", params.WorkloadName, params.VmID, exit)
-				a.PublishWorkloadExited(params.VmID, params.WorkloadName, msg, exit != 0, exit)
+				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", *params.WorkloadName, params.VmID, exit)
+				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, exit != 0, exit)
 				return
 			default:
 				// no-op
@@ -233,7 +250,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	ack := agentapi.WorkResponse{
 		Accepted: accepted,
-		Message:  msg,
+		Message:  agentapi.StringOrNil(msg),
 	}
 
 	bytes, err := json.Marshal(&ack)

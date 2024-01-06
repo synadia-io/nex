@@ -18,6 +18,7 @@ func TestStopValidation(t *testing.T) {
 
 	request, _ := NewRunRequest(
 		WorkloadName("testworkload"),
+		WorkloadType("elf"),
 		WorkloadDescription("testy mctesto"),
 		Checksum("hashbrowns"),
 		EnvironmentValue("NATS_URL", "nats://127.0.0.1:4222"),

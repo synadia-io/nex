@@ -6,26 +6,41 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	agentapi "github.com/ConnectEverything/nex/agent-api"
 )
+
+const defaultCNINetworkName = "fcnet"
+const defaultCNIInterfaceName = "veth0"
+const defaultInternalNodeHost = "192.168.127.1"
+const defaultInternalNodePort = 9222
+const defaultKernelPath = "vmlinux-5.10"
+const defaultNodeMemSizeMib = 256
+const defaultNodeVcpuCount = 1
+const defaultRootFsPath = "rootfs.ext4"
 
 var (
 	// docker/OCI needs to be explicitly enabled in node configuration
 	defaultWorkloadTypes = []string{"elf", "v8", "wasm"}
 )
 
-// Node configuration is used to configure the node process as well as the virtual machines it
-// produces
+// Node configuration is used to configure the node process as well
+// as the virtual machines it produces
 type NodeConfiguration struct {
+
 	KernelFile       string            `json:"kernel_file"`
 	RootFsFile       string            `json:"rootfs_file"`
 	DefaultDir       string            `json:"default_resource_dir"`
-	MachinePoolSize  int               `json:"machine_pool_size"`
 	CNI              CNIDefinition     `json:"cni"`
+	InternalNodeHost *string           `json:"internal_node_host,omitempty"`
+	InternalNodePort *int              `json:"internal_node_port"`
+	KernelPath       *string           `json:"kernel_path"`
+	MachinePoolSize  int               `json:"machine_pool_size"`
 	MachineTemplate  MachineTemplate   `json:"machine_template"`
 	RateLimiters     *Limiters         `json:"rate_limiters,omitempty"`
+	RootFsPath       *string           `json:"rootfs_path"`
+	Tags             map[string]string `json:"tags,omitempty"`
 	ValidIssuers     []string          `json:"valid_issuers,omitempty"`
-	InternalNodeHost string            `json:"internal_node_host,omitempty"`
-	InternalNodePort int               `json:"internal_node_port"`
 	WorkloadTypes    []string          `json:"workload_types,omitempty"`
 	Tags             map[string]string `json:"tags,omitempty"`
 	ForensicMode     bool              `json:"-"`
@@ -41,14 +56,14 @@ type Limiters struct {
 // Defines a reference to the CNI network name, which is defined and configured in a {network}.conflist file, as per
 // CNI convention
 type CNIDefinition struct {
-	NetworkName   string `json:"network_name"`
-	InterfaceName string `json:"interface_name"`
+	NetworkName   *string `json:"network_name"`
+	InterfaceName *string `json:"interface_name"`
 }
 
 // Defines the CPU and memory usage of a machine to be configured when it is added to the pool
 type MachineTemplate struct {
-	VcpuCount  int `json:"vcpu_count"`
-	MemSizeMib int `json:"memsize_mib"`
+	VcpuCount  *int `json:"vcpu_count"`
+	MemSizeMib *int `json:"memsize_mib"`
 }
 
 type TokenBucket struct {
@@ -69,23 +84,29 @@ type TokenBucket struct {
 }
 
 func DefaultNodeConfiguration() NodeConfiguration {
+	defaultNodePort := defaultInternalNodePort
+	defaultVcpuCount := defaultNodeVcpuCount
+	defaultMemSizeMib := defaultNodeMemSizeMib
+
 	return NodeConfiguration{
-		MachinePoolSize: 1,
 		CNI: CNIDefinition{
-			NetworkName:   "fcnet",
-			InterfaceName: "veth0",
+			NetworkName:   agentapi.StringOrNil(defaultCNINetworkName),
+			InterfaceName: agentapi.StringOrNil(defaultCNIInterfaceName),
 		},
+		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the inside of the firecracker VM--. This is not necessarily the address
+		// on which the internal NATS server is actually listening on inside the node.
+		InternalNodeHost: agentapi.StringOrNil(defaultInternalNodeHost),
+		InternalNodePort: &defaultNodePort,
+		KernelPath:       agentapi.StringOrNil(defaultKernelPath),
+		MachinePoolSize:  1,
 		MachineTemplate: MachineTemplate{
-			VcpuCount:  1,
-			MemSizeMib: 256,
+			VcpuCount:  &defaultVcpuCount,
+			MemSizeMib: &defaultMemSizeMib,
 		},
 		Tags:          make(map[string]string),
 		RateLimiters:  nil,
+		RootFsPath:    agentapi.StringOrNil(defaultRootFsPath),
 		WorkloadTypes: defaultWorkloadTypes,
-		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the inside of the firecracker VM--. This is not necessarily the address
-		// on which the internal NATS server is actually listening on inside the node.
-		InternalNodeHost: "192.168.127.1",
-		InternalNodePort: 9222,
 	}
 }
 

@@ -59,11 +59,13 @@ type RunOptions struct {
 	TargetNode        string
 	WorkloadUrl       *url.URL
 	Name              string
+	WorkloadType      string
 	Description       string
 	PublisherXkeyFile string
 	ClaimsIssuerFile  string
 	Env               map[string]string
 	DevMode           bool
+	TriggerSubjects   []string
 }
 
 type StopOptions struct {

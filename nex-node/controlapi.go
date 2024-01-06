@@ -27,7 +27,6 @@ type ApiListener struct {
 }
 
 func NewApiListener(log *logrus.Logger, mgr *MachineManager, config *NodeConfiguration) *ApiListener {
-	pub, _ := mgr.kp.PublicKey()
 	efftags := config.Tags
 	efftags[controlapi.TagOS] = runtime.GOOS
 	efftags[controlapi.TagArch] = runtime.GOARCH
@@ -49,7 +48,7 @@ func NewApiListener(log *logrus.Logger, mgr *MachineManager, config *NodeConfigu
 	return &ApiListener{
 		mgr:    mgr,
 		log:    log,
-		nodeId: pub,
+		nodeId: mgr.publicKey,
 		xk:     kp,
 		start:  time.Now().UTC(),
 		config: config,
@@ -57,16 +56,15 @@ func NewApiListener(log *logrus.Logger, mgr *MachineManager, config *NodeConfigu
 }
 
 func (api *ApiListener) PublicKey() string {
-	pub, _ := api.mgr.kp.PublicKey()
-	return pub
+	return api.mgr.publicKey
 }
 
 func (api *ApiListener) Start() error {
-
 	_, err := api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
 	if err != nil {
 		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to ping subject: %s", err)
 	}
+
 	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
 	if err != nil {
 		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to node-specific ping subject: %s", err)
@@ -77,10 +75,12 @@ func (api *ApiListener) Start() error {
 	if err != nil {
 		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to info subject: %s", err)
 	}
+
 	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
 	if err != nil {
 		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to run subject: %s", err)
 	}
+
 	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
 	if err != nil {
 		api.log.WithField("id", api.nodeId).Errorf("Failed to subscribe to stop subject: %s", err)
@@ -98,6 +98,7 @@ func handleStop(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.StopResponseType, m, "Invalid subject for workload stop")
 			return
 		}
+
 		var request controlapi.StopRequest
 		err = json.Unmarshal(m.Data, &request)
 		if err != nil {
@@ -147,7 +148,6 @@ func handleStop(api *ApiListener) func(m *nats.Msg) {
 		} else {
 			_ = m.Respond(raw)
 		}
-
 	}
 }
 
@@ -159,6 +159,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, "Invalid subject for workload run")
 			return
 		}
+
 		var request controlapi.RunRequest
 		err = json.Unmarshal(m.Data, &request)
 		if err != nil {
@@ -167,9 +168,15 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			return
 		}
 
-		if !slices.Contains(api.config.WorkloadTypes, request.WorkloadType) {
-			api.log.WithField("workload_type", request.WorkloadType).Error("This node does not support the given workload type")
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", request.WorkloadType))
+		if !slices.Contains(api.config.WorkloadTypes, *request.WorkloadType) {
+			api.log.WithField("workload_type", *request.WorkloadType).Error("This node does not support the given workload type")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", *request.WorkloadType))
+			return
+		}
+
+		if len(request.TriggerSubjects) > 0 && !strings.EqualFold(*request.WorkloadType, "v8") { // FIXME -- workload type comparison
+			api.log.WithField("trigger_subjects", *request.WorkloadType).Error("Workload type does not support trigger subject registration")
+			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", *request.WorkloadType))
 			return
 		}
 
@@ -179,6 +186,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid run request: %s", err))
 			return
 		}
+
 		request.DecodedClaims = *decodedClaims
 		if !validateIssuer(request.DecodedClaims.Issuer, api.mgr.config.ValidIssuers) {
 			err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
@@ -206,6 +214,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			WithField("vmid", runningVm.vmmID).
 			WithField("namespace", namespace).
 			WithField("workload", workloadName).
+			WithField("type", *request.WorkloadType).
 			Info("Submitting workload to VM")
 
 		err = api.mgr.DispatchWork(runningVm, workloadName, namespace, request)
@@ -223,6 +232,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			Issuer:    runningVm.workloadSpecification.DecodedClaims.Issuer,
 			MachineId: runningVm.vmmID,
 		}, nil)
+
 		raw, err := json.Marshal(res)
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal run response")
@@ -242,6 +252,7 @@ func handlePing(api *ApiListener) func(m *nats.Msg) {
 			RunningMachines: len(api.mgr.allVms),
 			Tags:            api.config.Tags,
 		}, nil)
+
 		raw, err := json.Marshal(res)
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal ping response")
@@ -249,7 +260,6 @@ func handlePing(api *ApiListener) func(m *nats.Msg) {
 			_ = m.Respond(raw)
 		}
 	}
-
 }
 
 func handleInfo(api *ApiListener) func(m *nats.Msg) {
@@ -260,6 +270,7 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.InfoResponseType, m, "Failed to extract namespace for info request")
 			return
 		}
+
 		pubX, _ := api.xk.PublicKey()
 		now := time.Now().UTC()
 		stats, _ := ReadMemoryStats()
@@ -272,6 +283,7 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 			Machines:               summarizeMachines(&api.mgr.allVms, namespace),
 			Memory:                 stats,
 		}, nil)
+
 		raw, err := json.Marshal(res)
 		if err != nil {
 			api.log.WithError(err).Error("Failed to marshal ping response")
@@ -279,7 +291,6 @@ func handleInfo(api *ApiListener) func(m *nats.Msg) {
 			_ = m.Respond(raw)
 		}
 	}
-
 }
 
 func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []controlapi.MachineSummary {
@@ -287,15 +298,25 @@ func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []
 	now := time.Now().UTC()
 	for _, v := range *vms {
 		if v.namespace == namespace {
+			var desc string
+			if v.workloadSpecification.Description != nil {
+				desc = *v.workloadSpecification.Description // FIXME-- audit controlapi.WorkloadSummary
+			}
+
+			var workloadType string
+			if v.workloadSpecification.WorkloadType != nil {
+				workloadType = *v.workloadSpecification.WorkloadType
+			}
+
 			machine := controlapi.MachineSummary{
 				Id:      v.vmmID,
 				Healthy: true, // TODO cache last health status
 				Uptime:  myUptime(now.Sub(v.machineStarted)),
 				Workload: controlapi.WorkloadSummary{
 					Name:         v.workloadSpecification.DecodedClaims.Subject,
-					Description:  v.workloadSpecification.Description,
+					Description:  desc,
 					Runtime:      myUptime(now.Sub(v.workloadStarted)),
-					WorkloadType: v.workloadSpecification.WorkloadType,
+					WorkloadType: workloadType,
 					//Hash:         v.workloadSpecification.DecodedClaims.Data["hash"].(string),
 				},
 			}

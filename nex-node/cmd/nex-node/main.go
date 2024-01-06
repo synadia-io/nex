@@ -101,7 +101,12 @@ func cmdUp(opts *nexnode.CliOptions, ctx context.Context, cancel context.CancelF
 
 	log.Infof("Loaded node configuration from '%s'", opts.NodeConfigFile)
 
-	manager := nexnode.NewMachineManager(ctx, cancel, nc, config, log)
+	manager, err := nexnode.NewMachineManager(ctx, cancel, nc, config, log)
+	if err != nil {
+		log.WithError(err).Error("Failed to initialize machine manager")
+		os.Exit(1)
+	}
+
 	err = manager.Start()
 	if err != nil {
 		log.WithError(err).Error("Failed to start machine manager")

@@ -1,6 +1,7 @@
 package agentapi
 
 import (
+	"errors"
 	"io"
 	"time"
 )
@@ -27,38 +28,84 @@ type ExecutionProviderParams struct {
 	Stderr io.Writer `json:"-"`
 	Stdout io.Writer `json:"-"`
 
-	TmpFilename string `json:"-"`
-	VmID        string `json:"-"`
+	TmpFilename *string `json:"-"`
+	VmID        string  `json:"-"`
 }
 
 type WorkRequest struct {
-	WorkloadName string            `json:"workload_name"`
-	Hash         string            `json:"hash"`
-	TotalBytes   int32             `json:"total_bytes"`
 	Environment  map[string]string `json:"environment"`
-	WorkloadType string            `json:"workload_type,omitempty"`
+	Hash         *string           `json:"hash,omitempty"`
+	TotalBytes   *int32            `json:"total_bytes,omitempty"`
+	WorkloadName *string           `json:"workload_name,omitempty"`
+	WorkloadType *string           `json:"workload_type,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`
-	TmpFilename string    `json:"-"`
+	TmpFilename *string   `json:"-"`
+
+	Errors []error `json:"errors,omitempty"`
+}
+
+func (w *WorkRequest) Validate() bool {
+	w.Errors = make([]error, 0)
+
+	if w.WorkloadName == nil {
+		w.Errors = append(w.Errors, errors.New("workload name is required"))
+	}
+
+	// FIXME-- this should be provided in the request
+	// if w.Hash == nil {
+	// 	w.Errors = append(w.Errors, errors.New("hash is required"))
+	// }
+
+	// FIXME-- this should be provided in the request
+	// if w.TotalBytes == nil {
+	// 	w.Errors = append(w.Errors, errors.New("total bytes is required"))
+	// }
+
+	if w.WorkloadType == nil {
+		w.Errors = append(w.Errors, errors.New("workload type is required"))
+	}
+
+	return len(w.Errors) == 0
 }
 
 type WorkResponse struct {
-	Accepted bool   `json:"accepted"`
-	Message  string `json:"message"`
+	Accepted bool    `json:"accepted"`
+	Message  *string `json:"message"`
 }
 
 type HandshakeRequest struct {
-	MachineId string    `json:"machine_id"`
+	MachineId *string   `json:"machine_id"`
 	StartTime time.Time `json:"start_time"`
-	Message   string    `json:"message,omitempty"`
+	Message   *string   `json:"message,omitempty"`
 }
 
 type MachineMetadata struct {
-	VmId            string `json:"vmid"`
-	NodeNatsAddress string `json:"node_address"`
-	NodePort        int    `json:"node_port"`
-	Message         string `json:"message"`
+	VmId            *string `json:"vmid"`
+	NodeNatsAddress *string `json:"node_address"`
+	NodePort        *int    `json:"node_port"`
+	Message         *string `json:"message"`
+
+	Errors []error `json:"errors,omitempty"`
+}
+
+func (m *MachineMetadata) Validate() bool {
+	m.Errors = make([]error, 0)
+
+	if m.VmId == nil {
+		m.Errors = append(m.Errors, errors.New("vm id is required"))
+	}
+
+	if m.NodeNatsAddress == nil {
+		m.Errors = append(m.Errors, errors.New("node NATS address is required"))
+	}
+
+	if m.NodePort == nil {
+		m.Errors = append(m.Errors, errors.New("node port is required"))
+	}
+
+	return len(m.Errors) == 0
 }
 
 type LogEntry struct {

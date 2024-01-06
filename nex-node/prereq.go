@@ -197,6 +197,7 @@ func downloadKernel(r *requirement, _ *NodeConfiguration) error {
 		}
 
 		respBin, err := http.Get(VM_LINUX_KERNEL_URL)
+
 		if err != nil {
 			return err
 		}
@@ -254,6 +255,7 @@ func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
 				return err
 			}
 		}
+
 	}
 	return nil
 }

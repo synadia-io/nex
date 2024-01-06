@@ -43,12 +43,13 @@ func main() {
 	run := ncli.Command("run", "Run a workload on a target node")
 	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&cli.RunOpts.WorkloadUrl)
 	run.Arg("id", "Public key of the target node to run the workload").Required().StringVar(&cli.RunOpts.TargetNode)
-
 	run.Flag("xkey", "Path to publisher's Xkey required to encrypt environment").Required().ExistingFileVar(&cli.RunOpts.PublisherXkeyFile)
 	run.Flag("issuer", "Path to a seed key to sign the workload JWT as the issuer").Required().ExistingFileVar(&cli.RunOpts.ClaimsIssuerFile)
 	run.Arg("env", "Environment variables to pass to workload").StringMapVar(&cli.RunOpts.Env)
 	run.Flag("name", "Name of the workload. Must be alphabetic (lowercase)").Required().StringVar(&cli.RunOpts.Name)
+	run.Arg("type", "Type of workload, e.g., \"elf\", \"v8\", \"oci\", \"wasm\"").Required().Default("elf").StringVar(&cli.RunOpts.WorkloadType)
 	run.Flag("description", "Description of the workload").StringVar(&cli.RunOpts.Description)
+	run.Arg("trigger_subjects", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&cli.RunOpts.TriggerSubjects)
 	run.Action(cli.RunWorkload)
 
 	yeet := ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
