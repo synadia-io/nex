@@ -28,8 +28,8 @@ type ELF struct {
 	stdout io.Writer
 }
 
-// Execute the ELF binary
-func (e *ELF) Execute() error {
+// Deploy the ELF binary
+func (e *ELF) Deploy() error {
 	cmd := exec.Command(e.tmpFilename)
 	cmd.Stdout = e.stdout
 	cmd.Stderr = e.stderr
@@ -71,6 +71,10 @@ func (e *ELF) Execute() error {
 	}()
 
 	return nil
+}
+
+func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
+	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
 }
 
 // Validate the underlying artifact to be a 64-bit linux native ELF

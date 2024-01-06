@@ -17,8 +17,12 @@ type Wasm struct {
 	wasmFile []byte
 }
 
-func (e *Wasm) Execute() error {
+func (e *Wasm) Deploy() error {
 	return errors.New("wasm execution provider not yet implemented")
+}
+
+func (e *Wasm) Execute(subject string, payload []byte) ([]byte, error) {
+	return nil, errors.New("wasm execution provider does not support trigger execution... yet ;)")
 }
 
 func (e *Wasm) Validate() error {

@@ -20,11 +20,14 @@ const NexExecutionProviderOCI = "oci"
 const NexExecutionProviderWasm = "wasm"
 
 // ExecutionProvider implementations provide support for a specific
-// execution environment "persona" -- e.g., statically-linked ELF
+// execution environment pattern -- e.g., statically-linked ELF
 // binaries, serverless JavaScript functions, OCI images, Wasm, etc.
 type ExecutionProvider interface {
-	// Execute is the equivalent to a language-specific main() entrypoint
-	Execute() error
+	// Deploy a service (e.g., "elf" and "oci" types) or executable function (e.g., "v8" and "wasm" types)
+	Deploy() error
+
+	// Execute a deployed function, if supported by the execution provider implementation (e.g., "v8" and "wasm" types)
+	Execute(subject string, payload []byte) ([]byte, error)
 
 	// Validate the executable artifact, e.g., specific characteristics of a
 	// statically-linked binary or raw source code, depending on provider implementation

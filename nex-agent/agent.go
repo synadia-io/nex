@@ -163,7 +163,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 
 	_ = a.workAck(m, true, "Workload accepted")
 
-	err = provider.Execute()
+	err = provider.Deploy()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to execute workload: %s", err))
 	}
@@ -214,6 +214,9 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 		Fail: make(chan bool),
 		Run:  make(chan bool),
 		Exit: make(chan int),
+
+		NATSConn:        a.nc,
+		TriggerSubjects: req.TriggerSubjects,
 	}
 
 	go func() {
