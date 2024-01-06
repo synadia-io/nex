@@ -116,14 +116,16 @@ func (m *MachineManager) Start() error {
 	return nil
 }
 
+// TODO-- refactor Dispatch -> Deploy; RunRequest -> DeployRequest
 func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, namespace string, request controlapi.RunRequest) error {
 	// TODO: make the bytes and hash/digest available to the agent
 	req := agentapi.WorkRequest{
-		WorkloadName: &workloadName,
-		Hash:         nil,                  // FIXME
-		TotalBytes:   nil,                  // FIXME
-		WorkloadType: request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
-		Environment:  request.WorkloadEnvironment,
+		WorkloadName:    &workloadName,
+		Hash:            nil, // FIXME
+		TotalBytes:      nil, // FIXME
+		TriggerSubjects: request.TriggerSubjects,
+		WorkloadType:    request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
+		Environment:     request.WorkloadEnvironment,
 	}
 	bytes, _ := json.Marshal(req)
 
@@ -145,6 +147,51 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 
 	if !workResponse.Accepted {
 		return fmt.Errorf("workload rejected by agent: %s", *workResponse.Message)
+	} else if request.SupportsTriggerSubjects() {
+		for _, tsub := range request.TriggerSubjects {
+			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
+				_tsub := fmt.Sprintf("agentint.%s.trigger", msg.Data)
+				resp, err := m.ncInternal.Request(_tsub, msg.Data, time.Millisecond*10000) // FIXME-- make timeout configurable
+				if err != nil {
+					m.log.WithField("vmid", vm.vmmID).
+						WithField("trigger_subject", tsub).
+						WithField("workload_type", *request.WorkloadType).
+						WithError(err).
+						Error("Failed to request agent execution via internal trigger subject")
+				} else if resp != nil {
+					m.log.WithField("vmid", vm.vmmID).
+						WithField("trigger_subject", tsub).
+						WithField("workload_type", *request.WorkloadType).
+						WithField("payload_size", len(resp.Data)).
+						Debug("Received response from execution via trigger subject")
+
+					err = msg.Respond(msg.Data)
+					if err != nil {
+						m.log.WithField("vmid", vm.vmmID).
+							WithField("trigger_subject", tsub).
+							WithField("workload_type", *request.WorkloadType).
+							WithError(err).
+							Error("Failed to respond to trigger subject subscription request for deployed workload")
+					}
+				}
+			})
+			if err != nil {
+				m.log.WithField("vmid", vm.vmmID).
+					WithField("trigger_subject", tsub).
+					WithField("workload_type", *request.WorkloadType).
+					WithError(err).
+					Error("Failed to create trigger subject subscription for deployed workload")
+				// TODO-- rollback the otherwise accepted deployment and return the error below...
+				// return err
+			}
+
+			m.log.WithField("vmid", vm.vmmID).
+				WithField("trigger_subject", tsub).
+				WithField("workload_type", *request.WorkloadType).
+				Info("Created trigger subject subscription for deployed workload")
+		}
+
+		return nil
 	}
 
 	vm.workloadStarted = time.Now().UTC()

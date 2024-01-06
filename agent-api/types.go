@@ -4,6 +4,8 @@ import (
 	"errors"
 	"io"
 	"time"
+
+	"github.com/nats-io/nats.go"
 )
 
 // WorkloadCacheBucket is an internal, non-public bucket for sharing files between host and agent
@@ -15,6 +17,7 @@ const DefaultRunloopSleepTimeoutMillis = 25
 // ExecutionProviderParams parameters for initializing a specific execution provider
 type ExecutionProviderParams struct {
 	WorkRequest
+	TriggerSubjects []string `json:"trigger_subjects"`
 
 	// Fail channel receives bool upon command failing to start
 	Fail chan bool `json:"-"`
@@ -30,14 +33,19 @@ type ExecutionProviderParams struct {
 
 	TmpFilename *string `json:"-"`
 	VmID        string  `json:"-"`
+
+	// NATS connection which be injected into the execution provider
+	NATSConn *nats.Conn `json:"-"`
 }
 
+// FIXME? WorkRequest -> DeployRequest?
 type WorkRequest struct {
-	Environment  map[string]string `json:"environment"`
-	Hash         *string           `json:"hash,omitempty"`
-	TotalBytes   *int32            `json:"total_bytes,omitempty"`
-	WorkloadName *string           `json:"workload_name,omitempty"`
-	WorkloadType *string           `json:"workload_type,omitempty"`
+	Environment     map[string]string `json:"environment"`
+	Hash            *string           `json:"hash,omitempty"`
+	TotalBytes      *int32            `json:"total_bytes,omitempty"`
+	TriggerSubjects []string          `json:"trigger_subjects"`
+	WorkloadName    *string           `json:"workload_name,omitempty"`
+	WorkloadType    *string           `json:"workload_type,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`

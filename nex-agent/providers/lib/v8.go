@@ -7,6 +7,7 @@ import (
 	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
+	"github.com/nats-io/nats.go"
 	v8 "rogchap.com/v8go"
 )
 
@@ -27,14 +28,43 @@ type V8 struct {
 	// stderr io.Writer
 	// stdout io.Writer
 
+	nc *nats.Conn // agent NATS connection
+
 	ctx *v8.Context
 	ubs *v8.UnboundScript
 }
 
-// Execute expects a `Validate` to have succeeded and `ubs` to be non-nil
-func (v *V8) Execute() error {
+// Deploy expects a `Validate` to have succeeded and `ubs` to be non-nil
+func (v *V8) Deploy() error {
 	if v.ubs == nil {
 		return fmt.Errorf("invalid state for execution; no compiled code available for vm: %s", v.name)
+	}
+
+	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
+	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
+		val, err := v.Execute(subject, msg.Data)
+		if err != nil {
+			// TODO-- propagate this error to agent logs
+			return
+		}
+
+		if len(val) > 0 {
+			_ = msg.Respond(val)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to trigger: %s", err)
+	}
+
+	return nil
+}
+
+// Trigger execution of the deployed function; expects a `Validate` to have succeeded and `ubs` to be non-nil.
+// The executed function can optionally return a value, in which case it will be deemed a reply and returned
+// to the caller. In the case of a nil or empty value returned by the function, no reply will be sent.
+func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
+	if v.ubs == nil {
+		return nil, fmt.Errorf("invalid state for execution; no compiled code available for vm: %s", v.name)
 	}
 
 	// TODO-- implement the following
@@ -46,32 +76,38 @@ func (v *V8) Execute() error {
 
 	var err error
 
-	// vals := make(chan *v8.Value, 1)
+	vals := make(chan *v8.Value, 1)
 	errs := make(chan error, 1)
 
 	go func() {
-		_, err = v.ubs.Run(v.ctx)
-
+		val, err := v.ubs.Run(v.ctx)
 		if err != nil {
 			errs <- err
+			return
 		}
+
+		vals <- val
 	}()
 
 	select {
-	// case <-vals:
-	// we don't care about any returned values... executed scripts should return nothing...
-	case <-errs:
-		// javascript error
+	case val := <-vals:
+		retval, err := val.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		return retval, nil
+	case err := <-errs:
+		return nil, err
 	case <-time.After(time.Millisecond * agentapi.DefaultRunloopSleepTimeoutMillis):
 		if err != nil {
 			// TODO-- check for v8.JSError as this type has Message, Location and StackTrace we can log...
-			return fmt.Errorf("failed to invoke default export: %s", err)
+			return nil, fmt.Errorf("failed to invoke default export: %s", err)
 		}
 
 		v.run <- true
 	}
 
-	return nil
+	return nil, nil
 }
 
 // Validate has the side effect of compiling the executable javascript source
@@ -137,6 +173,7 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 		run:  params.Run,
 		exit: params.Exit,
 
+		nc:  params.NATSConn,
 		ctx: v8.NewContext(),
 	}, nil
 }
