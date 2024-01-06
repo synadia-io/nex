@@ -95,7 +95,6 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		// on which the internal NATS server is actually listening on inside the node.
 		InternalNodeHost: agentapi.StringOrNil(defaultInternalNodeHost),
 		InternalNodePort: &defaultNodePort,
-		KernelPath:       agentapi.StringOrNil(defaultKernelPath),
 		MachinePoolSize:  1,
 		MachineTemplate: MachineTemplate{
 			VcpuCount:  &defaultVcpuCount,
@@ -103,7 +102,6 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		},
 		Tags:          make(map[string]string),
 		RateLimiters:  nil,
-		RootFsPath:    agentapi.StringOrNil(defaultRootFsPath),
 		WorkloadTypes: defaultWorkloadTypes,
 	}
 }
