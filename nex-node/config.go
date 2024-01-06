@@ -43,6 +43,16 @@ type NodeConfiguration struct {
 	Tags             map[string]string `json:"tags,omitempty"`
 	ForensicMode     bool              `json:"-"`
 	ForceDepInstall  bool              `json:"-"`
+
+	Errors []error `json:"errors,omitempty"`
+}
+
+func (c *NodeConfiguration) Validate() bool {
+	c.Errors = make([]error, 0)
+
+	// TODO-- add validation
+
+	return len(c.Errors) == 0
 }
 
 // A set of rate limiters. These fields are identical to those in firecracker rate limiter configuration
