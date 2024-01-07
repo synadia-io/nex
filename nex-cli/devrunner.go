@@ -149,7 +149,7 @@ func uploadWorkload(nc *nats.Conn, filename string) (string, string, string, err
 		return "", "", "", err
 	}
 	key := filepath.Base(filename)
-	key = strings.ReplaceAll(key, ".", "_")
+	key = strings.ReplaceAll(key, ".", "")
 
 	_, err = bucket.PutBytes(key, bytes)
 	if err != nil {

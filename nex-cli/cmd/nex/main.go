@@ -47,14 +47,15 @@ func main() {
 	run.Flag("issuer", "Path to a seed key to sign the workload JWT as the issuer").Required().ExistingFileVar(&cli.RunOpts.ClaimsIssuerFile)
 	run.Arg("env", "Environment variables to pass to workload").StringMapVar(&cli.RunOpts.Env)
 	run.Flag("name", "Name of the workload. Must be alphabetic (lowercase)").Required().StringVar(&cli.RunOpts.Name)
-	run.Arg("type", "Type of workload, e.g., \"elf\", \"v8\", \"oci\", \"wasm\"").Required().Default("elf").StringVar(&cli.RunOpts.WorkloadType)
+	run.Flag("type", "Type of workload, e.g., \"elf\", \"v8\", \"oci\", \"wasm\"").StringVar(&cli.RunOpts.WorkloadType)
 	run.Flag("description", "Description of the workload").StringVar(&cli.RunOpts.Description)
-	run.Arg("trigger_subjects", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&cli.RunOpts.TriggerSubjects)
+	run.Flag("trigger_subjects", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&cli.RunOpts.TriggerSubjects)
 	run.Action(cli.RunWorkload)
 
 	yeet := ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
 	yeet.Arg("file", "File to run").Required().ExistingFileVar(&cli.DevRunOpts.Filename)
 	yeet.Arg("env", "Environment variables to pass to workload").StringMapVar(&cli.RunOpts.Env)
+	yeet.Flag("trigger_subjects", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&cli.RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&cli.DevRunOpts.AutoStop)
 	yeet.Action(cli.RunDevWorkload)
 
