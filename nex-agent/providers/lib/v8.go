@@ -92,13 +92,19 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 			return
 		}
 
-		arg, err := v8.NewValue(v.ctx.Isolate(), payload)
+		argv1, err := v8.NewValue(v.ctx.Isolate(), subject)
 		if err != nil {
 			errs <- err
 			return
 		}
 
-		val, err = fn.Call(v.ctx.Global(), arg)
+		argv2, err := v8.NewValue(v.ctx.Isolate(), payload)
+		if err != nil {
+			errs <- err
+			return
+		}
+
+		val, err = fn.Call(v.ctx.Global(), argv1, argv2)
 		if err != nil {
 			errs <- err
 			return
