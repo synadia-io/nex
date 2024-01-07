@@ -86,6 +86,24 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 			return
 		}
 
+		fn, err := val.AsFunction()
+		if err != nil {
+			errs <- err
+			return
+		}
+
+		arg, err := v8.NewValue(v.ctx.Isolate(), payload)
+		if err != nil {
+			errs <- err
+			return
+		}
+
+		val, err = fn.Call(v.ctx.Global(), arg)
+		if err != nil {
+			errs <- err
+			return
+		}
+
 		vals <- val
 	}()
 
