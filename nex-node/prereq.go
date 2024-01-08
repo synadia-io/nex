@@ -88,7 +88,7 @@ func CheckPreRequisites(config *NodeConfiguration) error {
 			//cniConfig := fmt.Sprintf("/etc/cni/conf.d/%s.conflist", config.CNI.NetworkName)
 			directory: "/etc/cni/conf.d",
 			files: []fileSpec{
-				{name: config.CNI.NetworkName + ".conflist", description: "CNI Configuration"},
+				{name: *config.CNI.NetworkName + ".conflist", description: "CNI Configuration"},
 			},
 			descriptor: "CNI configuration requirements",
 			satisfied:  false,
