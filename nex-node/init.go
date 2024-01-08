@@ -133,7 +133,13 @@ func CmdPreflight(opts *nexcli.Options, nodeopts *nexcli.NodeOptions, ctx contex
 		os.Exit(1)
 	}
 
-	CheckPreRequisites(config)
+	config.ForceDepInstall = nodeopts.ForceDepInstall
+
+	err = CheckPreRequisites(config)
+	if err != nil {
+		fmt.Printf("Preflight checks failed:  %s\n", err)
+		os.Exit(1)
+	}
 }
 
 // TODO : look into also pre-removing /var/lib/cni/networks/fcnet/ during startup sequence
