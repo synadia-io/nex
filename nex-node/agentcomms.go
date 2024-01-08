@@ -89,14 +89,14 @@ func handleHandshake(mgr *MachineManager) func(m *nats.Msg) {
 		var shake agentapi.HandshakeRequest
 		err := json.Unmarshal(m.Data, &shake)
 		if err != nil {
-			mgr.log.WithField("vmid", shake.MachineId).WithField("message", shake.Message).Error("Failed to handle agent handshake")
+			mgr.log.WithField("vmid", *shake.MachineId).WithField("message", *shake.Message).Error("Failed to handle agent handshake")
 			return
 		}
 
 		now := time.Now().UTC()
 		mgr.handshakes[*shake.MachineId] = now.Format(time.RFC3339)
 
-		mgr.log.WithField("vmid", shake.MachineId).WithField("message", shake.Message).Info("Received agent handshake")
+		mgr.log.WithField("vmid", *shake.MachineId).WithField("message", *shake.Message).Info("Received agent handshake")
 		err = m.Respond([]byte("OK"))
 		if err != nil {
 			mgr.log.WithError(err).Error("Failed to reply to agent handshake")
