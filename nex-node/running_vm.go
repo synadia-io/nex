@@ -128,10 +128,10 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 	}
 
 	md := agentapi.MachineMetadata{
-		VmId:            &vmmID,
-		NodeNatsAddress: config.InternalNodeHost,
-		NodePort:        config.InternalNodePort,
-		Message:         agentapi.StringOrNil("Host-supplied metadata"),
+		VmId:         &vmmID,
+		NodeNatsHost: config.InternalNodeHost,
+		NodeNatsPort: config.InternalNodePort,
+		Message:      agentapi.StringOrNil("Host-supplied metadata"),
 	}
 
 	if err := m.Start(vmmCtx); err != nil {
@@ -149,7 +149,15 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 	ip := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.IPAddr.IP
 	hosttap := m.Cfg.NetworkInterfaces[0].StaticConfiguration.HostDevName
 	mask := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.IPAddr.Mask
-	log.WithField("ip", ip).WithField("gateway", gw).WithField("netmask", mask).WithField("hosttap", hosttap).Info("Machine started")
+
+	log.WithField("vmid", vmmID).
+		WithField("ip", ip).
+		WithField("gateway", gw).
+		WithField("netmask", mask).
+		WithField("hosttap", hosttap).
+		WithField("nats_host", *md.NodeNatsHost).
+		WithField("nats_port", *md.NodeNatsPort).
+		Info("Machine started")
 
 	return &runningFirecracker{
 		vmmCtx:         vmmCtx,

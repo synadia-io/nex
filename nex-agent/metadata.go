@@ -45,7 +45,7 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	timeoutAt := time.Now().UTC().Add(metadataPollingTimeoutMillis * time.Millisecond)
 
 	for {
-		metadata, err := performMatadataQuery(url, req, client)
+		metadata, err := performMetadataQuery(url, req, client)
 		if err != nil {
 			if time.Now().UTC().After(timeoutAt) {
 				break
@@ -60,7 +60,7 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	return nil, fmt.Errorf("failed to obtain metadata after %dms", metadataPollingTimeoutMillis)
 }
 
-func performMatadataQuery(url string, req *http.Request, client *http.Client) (*agentapi.MachineMetadata, error) {
+func performMetadataQuery(url string, req *http.Request, client *http.Client) (*agentapi.MachineMetadata, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
