@@ -186,7 +186,7 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 		environment: params.Environment,
 		name:        *params.WorkloadName,
 		tmpFilename: *params.TmpFilename,
-		totalBytes:  *params.TotalBytes,
+		totalBytes:  0, // FIXME
 		vmID:        params.VmID,
 
 		// stderr: params.Stderr,
