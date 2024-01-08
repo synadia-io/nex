@@ -72,7 +72,9 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 		log.WithError(err).Error("Failed to generate firecracker configuration")
 		return nil, err
 	}
-	err = copy(*config.RootFsPath, *fcCfg.Drives[0].PathOnHost)
+
+	err = copy(config.RootFsFile, *fcCfg.Drives[0].PathOnHost)
+
 	if err != nil {
 		log.WithError(err).Error("Failed to copy rootfs to temp location")
 		return nil, err
@@ -174,7 +176,7 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 
 	return firecracker.Config{
 		SocketPath:      socket,
-		KernelImagePath: *config.KernelPath,
+		KernelImagePath: config.KernelFile,
 		LogPath:         fmt.Sprintf("%s.log", socket),
 		Drives: []models.Drive{{
 			DriveID:      firecracker.String("1"),

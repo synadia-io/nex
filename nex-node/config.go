@@ -2,7 +2,9 @@ package nexnode
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
@@ -12,10 +14,8 @@ const defaultCNINetworkName = "fcnet"
 const defaultCNIInterfaceName = "veth0"
 const defaultInternalNodeHost = "192.168.127.1"
 const defaultInternalNodePort = 9222
-const defaultKernelPath = "vmlinux-5.10"
 const defaultNodeMemSizeMib = 256
 const defaultNodeVcpuCount = 1
-const defaultRootFsPath = "rootfs.ext4"
 
 var (
 	// docker/OCI needs to be explicitly enabled in node configuration
@@ -25,6 +25,9 @@ var (
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
+	KernelFile       string            `json:"kernel_file"`
+	RootFsFile       string            `json:"rootfs_file"`
+	DefaultDir       string            `json:"default_resource_dir"`
 	CNI              CNIDefinition     `json:"cni"`
 	InternalNodeHost *string           `json:"internal_node_host,omitempty"`
 	InternalNodePort *int              `json:"internal_node_port"`
@@ -33,9 +36,11 @@ type NodeConfiguration struct {
 	MachineTemplate  MachineTemplate   `json:"machine_template"`
 	RateLimiters     *Limiters         `json:"rate_limiters,omitempty"`
 	RootFsPath       *string           `json:"rootfs_path"`
-	Tags             map[string]string `json:"tags,omitempty"`
 	ValidIssuers     []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes    []string          `json:"workload_types,omitempty"`
+	Tags             map[string]string `json:"tags,omitempty"`
+	ForensicMode     bool              `json:"-"`
+	ForceDepInstall  bool              `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }
@@ -98,7 +103,6 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		// on which the internal NATS server is actually listening on inside the node.
 		InternalNodeHost: agentapi.StringOrNil(defaultInternalNodeHost),
 		InternalNodePort: &defaultNodePort,
-		KernelPath:       agentapi.StringOrNil(defaultKernelPath),
 		MachinePoolSize:  1,
 		MachineTemplate: MachineTemplate{
 			VcpuCount:  &defaultVcpuCount,
@@ -106,7 +110,6 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		},
 		Tags:          make(map[string]string),
 		RateLimiters:  nil,
-		RootFsPath:    agentapi.StringOrNil(defaultRootFsPath),
 		WorkloadTypes: defaultWorkloadTypes,
 	}
 }
@@ -125,6 +128,18 @@ func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if config.KernelFile == "" && config.DefaultDir != "" {
+		config.KernelFile = filepath.Join(config.DefaultDir, "vmlinux")
+	} else if config.KernelFile == "" && config.DefaultDir == "" {
+		return nil, errors.New("invalid kernel file setting")
+	}
+	if config.RootFsFile == "" && config.DefaultDir != "" {
+		config.RootFsFile = filepath.Join(config.DefaultDir, "rootfs.ext4")
+	} else if config.KernelFile == "" && config.DefaultDir == "" {
+		return nil, errors.New("invalid rootfs file setting")
+	}
+
 	if config.Tags == nil {
 		config.Tags = make(map[string]string)
 	}
@@ -156,4 +171,8 @@ type CliOptions struct {
 	TlsFirst bool
 	// Path to the file containing virtual machine management settings and node-wide settings
 	NodeConfigFile string
+	// When enabled, the nex node will not clean up logs or rootfs files
+	ForensicMode bool
+	// When enabled, preflight will automatically install or reinstall dependencies
+	ForceDependencyInstall bool
 }
