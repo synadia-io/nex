@@ -179,9 +179,9 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 		return nil, errors.New("V8 execution provider requires a temporary filename parameter")
 	}
 
-	if params.TotalBytes == nil {
-		return nil, errors.New("V8 execution provider requires a VM id parameter")
-	}
+	// if params.TotalBytes == nil {
+	// 	return nil, errors.New("V8 execution provider requires a total bytes parameter")
+	// }
 
 	return &V8{
 		environment: params.Environment,
