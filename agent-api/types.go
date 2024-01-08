@@ -107,10 +107,10 @@ type HandshakeRequest struct {
 }
 
 type MachineMetadata struct {
-	VmId            *string `json:"vmid"`
-	NodeNatsAddress *string `json:"node_address"`
-	NodePort        *int    `json:"node_port"`
-	Message         *string `json:"message"`
+	VmId         *string `json:"vmid"`
+	NodeNatsHost *string `json:"node_nats_host"`
+	NodeNatsPort *int    `json:"node_nats_port"`
+	Message      *string `json:"message"`
 
 	Errors []error `json:"errors,omitempty"`
 }
@@ -122,12 +122,12 @@ func (m *MachineMetadata) Validate() bool {
 		m.Errors = append(m.Errors, errors.New("vm id is required"))
 	}
 
-	if m.NodeNatsAddress == nil {
-		m.Errors = append(m.Errors, errors.New("node NATS address is required"))
+	if m.NodeNatsHost == nil {
+		m.Errors = append(m.Errors, errors.New("node NATS host is required"))
 	}
 
-	if m.NodePort == nil {
-		m.Errors = append(m.Errors, errors.New("node port is required"))
+	if m.NodeNatsPort == nil {
+		m.Errors = append(m.Errors, errors.New("node NATS port is required"))
 	}
 
 	return len(m.Errors) == 0
