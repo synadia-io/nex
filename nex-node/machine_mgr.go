@@ -154,7 +154,7 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 	} else if request.SupportsTriggerSubjects() {
 		for _, tsub := range request.TriggerSubjects {
 			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
-				_tsub := fmt.Sprintf("agentint.%s.trigger", msg.Data)
+				_tsub := fmt.Sprintf("agentint.%s.trigger", vm.vmmID)
 				resp, err := m.ncInternal.Request(_tsub, msg.Data, time.Millisecond*10000) // FIXME-- make timeout configurable
 				if err != nil {
 					m.log.WithField("vmid", vm.vmmID).
