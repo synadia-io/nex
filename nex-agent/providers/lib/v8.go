@@ -56,6 +56,7 @@ func (v *V8) Deploy() error {
 		return fmt.Errorf("failed to subscribe to trigger: %s", err)
 	}
 
+	v.run <- true
 	return nil
 }
 
@@ -127,8 +128,6 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 			// TODO-- check for v8.JSError as this type has Message, Location and StackTrace we can log...
 			return nil, fmt.Errorf("failed to invoke default export: %s", err)
 		}
-
-		v.run <- true
 	}
 
 	return nil, nil
