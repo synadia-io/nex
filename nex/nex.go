@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ConnectEverything/nex/nex-cli/models"
+	"github.com/ConnectEverything/nex/nex/models"
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
 )

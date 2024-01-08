@@ -13,7 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	nexcli "github.com/ConnectEverything/nex/nex-cli/models"
+	nexcli "github.com/ConnectEverything/nex/nex/models"
 )
 
 func CmdUp(opts *nexcli.Options, nodeopts *nexcli.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
