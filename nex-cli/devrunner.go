@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	agentapi "github.com/ConnectEverything/nex/agent-api"
 	controlapi "github.com/ConnectEverything/nex/control-api"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/nats.go"
@@ -22,8 +23,11 @@ var (
 )
 
 const (
-	defaultFileMode = os.FileMode(int(0770)) // owner and group r/w/x
-	objectStoreName = "NEXCLIFILES"
+	defaultFileMode     = os.FileMode(int(0770)) // owner and group r/w/x
+	defaultWorkloadType = agentapi.NexExecutionProviderELF
+	fileExtensionJS     = "js"
+	fileExtensionWasm   = "wasm"
+	objectStoreName     = "NEXCLIFILES"
 )
 
 func init() {
@@ -105,7 +109,7 @@ func RunDevWorkload(ctx *fisk.ParseContext) error {
 		controlapi.SenderXKey(publisherXKey),
 		controlapi.TargetNode(target.NodeId),
 		controlapi.TargetPublicXKey(targetPublicXkey),
-		controlapi.TriggerSubjects(nil),
+		controlapi.TriggerSubjects(RunOpts.TriggerSubjects),
 		controlapi.WorkloadName(workloadName),
 		controlapi.WorkloadType(workloadType),
 		controlapi.Checksum("abc12345TODOmakethisreal"),
@@ -145,14 +149,24 @@ func uploadWorkload(nc *nats.Conn, filename string) (string, string, string, err
 		return "", "", "", err
 	}
 	key := filepath.Base(filename)
-	key = strings.ReplaceAll(key, ".", "_")
+	key = strings.ReplaceAll(key, ".", "")
 
 	_, err = bucket.PutBytes(key, bytes)
 	if err != nil {
 		return "", "", "", err
 	}
 
-	return fmt.Sprintf("nats://%s/%s", objectStoreName, key), key, "elf", nil
+	var workloadType string
+	switch strings.Replace(filepath.Ext(DevRunOpts.Filename), ".", "", 1) {
+	case fileExtensionJS:
+		workloadType = agentapi.NexExecutionProviderV8
+	case fileExtensionWasm:
+		workloadType = agentapi.NexExecutionProviderWasm
+	default:
+		workloadType = defaultWorkloadType
+	}
+
+	return fmt.Sprintf("nats://%s/%s", objectStoreName, key), key, workloadType, nil
 }
 
 func readOrGenerateIssuer() (nkeys.KeyPair, error) {

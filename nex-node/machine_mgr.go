@@ -22,7 +22,6 @@ import (
 const (
 	EventSubjectPrefix      = "$NEX.events"
 	LogSubjectPrefix        = "$NEX.logs"
-	TriggerSubjectPrefix    = "$NEX.triggers"
 	WorkloadCacheBucketName = "NEXCACHE"
 
 	defaultHandshakeTimeoutMillis = 5000

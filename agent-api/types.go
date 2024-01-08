@@ -3,10 +3,23 @@ package agentapi
 import (
 	"errors"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
 )
+
+// NexExecutionProviderELF Executable Linkable Format execution provider
+const NexExecutionProviderELF = "elf"
+
+// NexExecutionProviderV8 V8 execution provider
+const NexExecutionProviderV8 = "v8"
+
+// NexExecutionProviderOCI OCI execution provider
+const NexExecutionProviderOCI = "oci"
+
+// NexExecutionProviderWasm Wasm execution provider
+const NexExecutionProviderWasm = "wasm"
 
 // WorkloadCacheBucket is an internal, non-public bucket for sharing files between host and agent
 const WorkloadCacheBucket = "NEXCACHE"
@@ -73,6 +86,10 @@ func (w *WorkRequest) Validate() bool {
 
 	if w.WorkloadType == nil {
 		w.Errors = append(w.Errors, errors.New("workload type is required"))
+	} else if (strings.EqualFold(*w.WorkloadType, NexExecutionProviderV8) ||
+		strings.EqualFold(*w.WorkloadType, NexExecutionProviderWasm)) &&
+		len(w.TriggerSubjects) == 0 {
+		w.Errors = append(w.Errors, errors.New("at least one trigger subject is required for this workload type"))
 	}
 
 	return len(w.Errors) == 0
