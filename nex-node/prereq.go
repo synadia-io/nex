@@ -57,11 +57,6 @@ type fileSpec struct {
 	satisfied   bool
 }
 
-func initNotImplented(_ *requirement, _ *NodeConfiguration) error {
-	fmt.Println("init not implented")
-	return nil
-}
-
 func CheckPreRequisites(config *NodeConfiguration) error {
 	required := &requirements{
 		{

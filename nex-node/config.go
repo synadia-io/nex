@@ -14,10 +14,8 @@ const defaultCNINetworkName = "fcnet"
 const defaultCNIInterfaceName = "veth0"
 const defaultInternalNodeHost = "192.168.127.1"
 const defaultInternalNodePort = 9222
-const defaultKernelPath = "vmlinux-5.10"
 const defaultNodeMemSizeMib = 256
 const defaultNodeVcpuCount = 1
-const defaultRootFsPath = "rootfs.ext4"
 
 var (
 	// docker/OCI needs to be explicitly enabled in node configuration
