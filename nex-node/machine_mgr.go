@@ -169,7 +169,7 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 						WithField("payload_size", len(resp.Data)).
 						Debug("Received response from execution via trigger subject")
 
-					err = msg.Respond(msg.Data)
+					err = msg.Respond(resp.Data)
 					if err != nil {
 						m.log.WithField("vmid", vm.vmmID).
 							WithField("trigger_subject", tsub).
