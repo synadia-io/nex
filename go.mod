@@ -6,7 +6,6 @@ require (
 	github.com/cdfmlr/ellipsis v0.0.1
 	github.com/choria-io/fisk v0.6.1
 	github.com/cloudevents/sdk-go v1.2.0
-	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0
 	github.com/google/uuid v1.4.0
@@ -23,6 +22,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.5.0
 	github.com/sirupsen/logrus v1.9.3
+	github.com/tetratelabs/wazero v1.6.0
 	rogchap.com/v8go v0.9.0
 )
 
@@ -33,6 +33,7 @@ require (
 	github.com/containerd/fifo v1.0.0 // indirect
 	github.com/containernetworking/cni v1.0.1 // indirect
 	github.com/containernetworking/plugins v1.0.1 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-openapi/analysis v0.21.2 // indirect
 	github.com/go-openapi/errors v0.20.2 // indirect
@@ -64,7 +65,6 @@ require (
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	github.com/tetratelabs/wazero v1.6.0 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	go.mongodb.org/mongo-driver v1.8.3 // indirect
