@@ -80,5 +80,13 @@ func main() {
 	ui.Flag("port", "Port on which to run the UI").Default("8080").IntVar(&cli.GuiOpts.Port)
 	ui.Action(cli.RunUI)
 
+	node := ncli.Command("node", "Subcommand for configuring and starting nex-node")
+	node_up := node.Command("up", "Starts a nex-node")
+	node_up.Flag("config", "configuration file for nex-node").Default("./config.json").StringVar(&cli.NodeOpts.Config)
+	node_preflight := node.Command("preflight", "Checks system for nex-node requirements and installs missing")
+	node_preflight.Flag("force", "installs missing dependencies without prompt").Default("false").BoolVar(&cli.NodeOpts.ForceDepInstall)
+	node_up.Action(cli.RunNodeUp)
+	node_preflight.Action(cli.RunNodePreflight)
+
 	ncli.MustParseWithUsage(os.Args[1:])
 }
