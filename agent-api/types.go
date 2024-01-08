@@ -9,19 +9,22 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-// NexExecutionProviderELF Executable Linkable Format execution provider
+// Agent handshake subject
+const NexAgentSubjectHandshake = "agentint.handshake"
+
+// Executable Linkable Format execution provider
 const NexExecutionProviderELF = "elf"
 
-// NexExecutionProviderV8 V8 execution provider
+// V8 execution provider
 const NexExecutionProviderV8 = "v8"
 
-// NexExecutionProviderOCI OCI execution provider
+// OCI execution provider
 const NexExecutionProviderOCI = "oci"
 
-// NexExecutionProviderWasm Wasm execution provider
+// Wasm execution provider
 const NexExecutionProviderWasm = "wasm"
 
-// WorkloadCacheBucket is an internal, non-public bucket for sharing files between host and agent
+// Name of the internal, non-public bucket for sharing files between host and agent
 const WorkloadCacheBucket = "NEXCACHE"
 
 // DefaultRunloopSleepTimeoutMillis default number of milliseconds to sleep during execution runloops

@@ -15,7 +15,7 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const NexAgentSubjectAdvertise = "agentint.handshake"
+const defaultAgentHandshakeTimeoutMillis = 250
 const workloadExecutionSleepTimeoutMillis = 1000
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
@@ -75,7 +75,7 @@ func NewAgent() (*Agent, error) {
 // Start the agent
 // NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() error {
-	err := a.Advertise()
+	err := a.RequestHandshake()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
 		return err
@@ -95,9 +95,9 @@ func (a *Agent) Start() error {
 	return nil
 }
 
-// Publish an initial message to the host indicating the agent is "all the way" up
+// Request a handshake with the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
-func (a *Agent) Advertise() error {
+func (a *Agent) RequestHandshake() error {
 	msg := agentapi.HandshakeRequest{
 		MachineId: a.md.VmId,
 		StartTime: a.started,
@@ -105,7 +105,7 @@ func (a *Agent) Advertise() error {
 	}
 	raw, _ := json.Marshal(msg)
 
-	_, err := a.nc.Request(NexAgentSubjectAdvertise, raw, 100*time.Millisecond)
+	_, err := a.nc.Request(agentapi.NexAgentSubjectHandshake, raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
 		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
 		return err
