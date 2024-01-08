@@ -128,6 +128,11 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 	}
 	bytes, _ := json.Marshal(req)
 
+	status := m.ncInternal.Status()
+	m.log.WithField("vmid", vm.vmmID).
+		WithField("status", status.String()).
+		Debug("NATS internal connection status")
+
 	subject := fmt.Sprintf("agentint.%s.workdispatch", vm.vmmID)
 	resp, err := m.ncInternal.Request(subject, bytes, 1*time.Second)
 	if err != nil {
@@ -283,15 +288,19 @@ func (m *MachineManager) fillPool() {
 }
 
 func (m *MachineManager) awaitHandshake(vmid string) {
-	time.Sleep(m.handshakeTimeout)
+	timeoutAt := time.Now().UTC().Add(m.handshakeTimeout)
 
-	_, ok := m.handshakes[vmid]
-	if !ok {
-		m.log.WithField("vmid", vmid).Error("Did not receive NATS handshake from agent within timeout. Exiting unstable node")
-		_ = m.Stop()
-		os.Exit(1)
+	handshakeOk := false
+	for !handshakeOk {
+		if time.Now().UTC().After(timeoutAt) {
+			m.log.WithField("vmid", vmid).Error("Did not receive NATS handshake from agent within timeout. Exiting unstable node")
+			_ = m.Stop()
+			os.Exit(1) // FIXME
+		}
+
+		_, handshakeOk = m.handshakes[vmid]
+		time.Sleep(time.Millisecond * agentapi.DefaultRunloopSleepTimeoutMillis)
 	}
-
 }
 
 func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error) {
