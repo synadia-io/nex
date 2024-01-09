@@ -13,10 +13,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	nexcli "github.com/ConnectEverything/nex/nex/models"
+	nexmodels "github.com/ConnectEverything/nex/internal/models"
 )
 
-func CmdUp(opts *nexcli.Options, nodeopts *nexcli.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
+func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
 	nc, err := generateConnectionFromOpts(opts)
 	if err != nil {
 		log.WithError(err).Error("Failed to connect to NATS")
@@ -55,7 +55,7 @@ func CmdUp(opts *nexcli.Options, nodeopts *nexcli.NodeOptions, ctx context.Conte
 	}
 }
 
-func generateConnectionFromOpts(opts *nexcli.Options) (*nats.Conn, error) {
+func generateConnectionFromOpts(opts *nexmodels.Options) (*nats.Conn, error) {
 	if len(strings.TrimSpace(opts.Servers)) == 0 {
 		opts.Servers = nats.DefaultURL
 	}
@@ -126,7 +126,7 @@ func setupSignalHandlers(log *logrus.Logger, manager *MachineManager) {
 	}()
 }
 
-func CmdPreflight(opts *nexcli.Options, nodeopts *nexcli.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
+func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
 	config, err := LoadNodeConfiguration(nodeopts.Config)
 	if err != nil {
 		fmt.Printf("Failed to load configuration file: %s\n", err)
