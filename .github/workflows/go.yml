@@ -42,14 +42,14 @@ jobs:
       working-directory: ./nex-agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
     - name: Build nex-cli
-      working-directory: ./nex-cli
+      working-directory: ./nex
       run: go build -tags netgo -ldflags '-extldflags "-static"'
 
     - name: Test nex-agent
       working-directory: ./nex-agent
       run: go test -v ./...
     - name: Test nex-cli
-      working-directory: ./nex-cli
+      working-directory: ./nex
       run: go test -v ./...
     - name: Test control-api
       working-directory: ./control-api
