@@ -14,7 +14,7 @@ other than contributors.
 
 ## Quickstart
 
-`GOPRIVATE=github.com/ConnectEverything/nex go install github.com/ConnectEverything/nex/nex-cli@main`
+`GOPRIVATE=github.com/ConnectEverything/nex go install github.com/ConnectEverything/nex/nex@main`
 
 The `nex node preflight` command is here to help you bootstrap your system.  
 
