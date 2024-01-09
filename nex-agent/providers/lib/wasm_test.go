@@ -10,7 +10,7 @@ func TestWasmExecution(t *testing.T) {
 	file := "../../../examples/wasm/echofunction/echofunction.wasm"
 	typ := "wasm"
 	params := &agentapi.ExecutionProviderParams{
-		WorkRequest: agentapi.WorkRequest{
+		DeployRequest: agentapi.DeployRequest{
 			Environment:  map[string]string{},
 			Hash:         new(string),
 			TotalBytes:   new(int32),
@@ -29,7 +29,7 @@ func TestWasmExecution(t *testing.T) {
 		TmpFilename: &file,
 		VmID:        "bob",
 	}
-	params.WorkRequest.WorkloadType = &typ
+	params.DeployRequest.WorkloadType = &typ
 	wasm, err := InitNexExecutionProviderWasm(params)
 	if err != nil {
 		t.Fatalf("Failed to instantiate wasm provider: %s", err)
