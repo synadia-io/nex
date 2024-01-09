@@ -49,7 +49,7 @@ jobs:
       working-directory: ./nex-agent
       run: go test -v ./...
     - name: Test nex-cli
-      working-directory: ./nex-cli
+      working-directory: ./nex
       run: go test -v ./...
     - name: Test control-api
       working-directory: ./control-api
