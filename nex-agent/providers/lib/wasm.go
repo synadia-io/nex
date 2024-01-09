@@ -12,21 +12,43 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+// TODO: support environment variables
+
 // Wasm execution provider implementation
 type Wasm struct {
-	wasmFile []byte
+	wasmFile      []byte
+	env           map[string]string
+	runtime       wazero.Runtime
+	runtimeConfig wazero.ModuleConfig
+	inBuf         *stdInBuf
+	outBuf        *stdOutBuf
 }
 
 func (e *Wasm) Deploy() error {
-	return errors.New("wasm execution provider not yet implemented")
+	ctx := context.Background()
+	r := wazero.NewRuntime(ctx)
+	e.runtime = r
+
+	config := wazero.NewModuleConfig().
+		WithStdin(e.inBuf).
+		WithStdout(e.outBuf).
+		WithStderr(os.Stderr)
+
+	for key, val := range e.env {
+		config = config.WithEnv(key, val)
+	}
+
+	e.runtimeConfig = config
+
+	return nil
 }
 
 func (e *Wasm) Execute(subject string, payload []byte) ([]byte, error) {
-	return nil, errors.New("wasm execution provider does not support trigger execution... yet ;)")
+	return e.runTrigger(subject, payload)
 }
 
 func (e *Wasm) Validate() error {
-	return errors.New("wasm execution provider not yet implemented")
+	return nil
 }
 
 // InitNexExecutionProviderWasm convenience method to initialize a Wasm execution provider
@@ -52,27 +74,23 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 
 	return &Wasm{
 		wasmFile: bytes,
+		env:      params.Environment,
+		outBuf:   newStdOutBuf(),
+		inBuf:    newStdInBuf(),
 	}, nil
 }
 
 // if the return slice is missing or empty, that counts as a "no reply"
-func (e *Wasm) RunTrigger(subject string, payload []byte) ([]byte, error) {
+func (e *Wasm) runTrigger(subject string, payload []byte) ([]byte, error) {
 
 	ctx := context.Background()
 
-	r := wazero.NewRuntime(ctx)
-	defer r.Close(ctx) // This closes everything this Runtime created.
-
-	outBuf := newStdOutBuf()
-	inBuf := newStdInBuf(payload)
-	config := wazero.NewModuleConfig().
-		WithStdin(inBuf).
-		WithStdout(outBuf).
-		WithStderr(os.Stderr)
+	e.outBuf.Reset()
+	e.inBuf.Reset(payload)
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wasi_snapshot_preview1.MustInstantiate(ctx, r)
-	_, err := r.InstantiateWithConfig(ctx, e.wasmFile, config.WithArgs("nexfunction", subject))
+	wasi_snapshot_preview1.MustInstantiate(ctx, e.runtime)
+	_, err := e.runtime.InstantiateWithConfig(ctx, e.wasmFile, e.runtimeConfig.WithArgs("nexfunction", subject))
 	if err != nil {
 		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
 			// TODO: log error
@@ -82,13 +100,17 @@ func (e *Wasm) RunTrigger(subject string, payload []byte) ([]byte, error) {
 			return nil, errors.New("failed to execute WASI function")
 		}
 	} else {
-		return outBuf.buf, err
+		return e.outBuf.buf, err
 	}
 	return nil, errors.New("unknown")
 }
 
 type stdOutBuf struct {
 	buf []byte
+}
+
+func (o *stdOutBuf) Reset() {
+	o.buf = o.buf[:0]
 }
 
 func newStdOutBuf() *stdOutBuf {
@@ -108,9 +130,14 @@ type stdInBuf struct {
 	readIndex int64
 }
 
-func newStdInBuf(input []byte) *stdInBuf {
+func (i *stdInBuf) Reset(input []byte) {
+	i.readIndex = 0
+	i.data = input
+}
+
+func newStdInBuf() *stdInBuf {
 	return &stdInBuf{
-		data: input,
+		data: nil,
 	}
 }
 
