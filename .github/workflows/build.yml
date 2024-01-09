@@ -1,6 +1,6 @@
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Go
+name: Test | Build
 
 on:
   push:
@@ -9,51 +9,68 @@ on:
     branches: [ "main" ]
 
 jobs:
-
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Go
+    - 
+      uses: actions/checkout@v4
+    - 
+      name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
 
-    - name: Install ginkgo
+    - 
+      name: Install ginkgo
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo
 
-    - name: Install lint deps
+    - 
+      name: Install lint deps
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
         go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
 
-    - name: Run Lint
+    - 
+      name: Run Lint
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
         golangci-lint run
-
-    - name: Build nex-node
-      working-directory: ./nex-node/cmd/nex-node
-      run: go build -tags netgo -ldflags '-extldflags "-static"'
-    - name: Build nex-agent
-      working-directory: ./nex-agent/cmd/nex-agent
-      run: go build -tags netgo -ldflags '-extldflags "-static"'
-    - name: Build nex-cli
-      working-directory: ./nex
-      run: go build -tags netgo -ldflags '-extldflags "-static"'
-
-    - name: Test nex-agent
+    
+    - 
+      name: Test nex-agent
       working-directory: ./nex-agent
       run: go test -v ./...
-    - name: Test nex-cli
+    - 
+      name: Test nex-cli
       working-directory: ./nex
       run: go test -v ./...
-    - name: Test control-api
+    - 
+      name: Test control-api
       working-directory: ./control-api
       run: ginkgo
-    - name: Test nex-node
+    - 
+      name: Test nex-node
       working-directory: ./nex-node
       run: go test -v ./...
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - 
+      uses: actions/checkout@v4
+    - 
+      name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    - 
+      name: Build nex-agent
+      working-directory: ./nex-agent/cmd/nex-agent
+      run: go build -tags netgo -ldflags '-extldflags "-static"'
+    - 
+      name: Build nex-cli
+      working-directory: ./nex
+      run: go build .
+

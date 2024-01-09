@@ -10,6 +10,10 @@ import (
 )
 
 var (
+	VERSION   = "development"
+	COMMIT    = ""
+	BUILDDATE = ""
+
 	Opts       = &models.Options{}
 	GuiOpts    = &models.UiOptions{}
 	RunOpts    = &models.RunOptions{Env: make(map[string]string)}
@@ -26,7 +30,7 @@ func main() {
 	ncli := fisk.New("nex", help)
 	ncli.Author("Synadia Communications")
 	ncli.UsageWriter(os.Stdout)
-	ncli.Version(VERSION)
+	ncli.Version(fmt.Sprintf("v%s [%s] | Built-on: %s", VERSION, COMMIT, BUILDDATE))
 	ncli.HelpFlag.Short('h')
 	ncli.WithCheats().CheatCommand.Hidden()
 
