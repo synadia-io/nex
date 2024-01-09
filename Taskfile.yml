@@ -24,7 +24,7 @@ tasks:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
   nex-cli:
-    dir: nex-cli/cmd/nex
+    dir: nex-cli
     sources:
       - "*.go"
     cmds:

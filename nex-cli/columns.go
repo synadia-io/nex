@@ -1,4 +1,4 @@
-package nexcli
+package main
 
 import (
 	"github.com/nats-io/natscli/columns"

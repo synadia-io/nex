@@ -12,4 +12,42 @@ Turn your NATS infrastructure into a distributed workload deployment and executi
 other than contributors.
 
 
-To get up and running, follow the [Getting Started](./docs/getting_started.md) guide.
+## Quickstart
+
+`GOPRIVATE=github.com/ConnectEverything/nex go install github.com/ConnectEverything/nex/nex-cli@main`
+
+The `nex node preflight` command is here to help you bootstrap your system.  
+
+First, we need to create a few directories it is expecting 
+```
+mkdir -p /opt/cni/bin
+mkdir -p /etc/cni/conf.d
+mkdir -p /tmp/wd
+```
+You will also need to make sure that `/usr/local/bin` is in your path
+
+Once those things are confirmed, use this configuration file
+
+```json
+{
+    "default_resource_dir":"/tmp/wd",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "tags": {
+        "simple": "true"
+    }
+}
+```
+
+along with the below command 
+
+`sudo nex node preflight --config /tmp/wd`
+
+There is a `--force` flag if you do not want to be prompted to install the missing dependencies

@@ -1,4 +1,4 @@
-package nexcli
+package main
 
 import (
 	nexui "github.com/ConnectEverything/nex/nex-ui"

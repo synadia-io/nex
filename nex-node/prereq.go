@@ -22,8 +22,8 @@ const (
 	VM_LINUX_KERNEL_URL    string = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/x86_64/vmlinux-5.10.186"
 	VM_LINUX_KERNEL_SHA256 string = "d48d320e320a8cf970184e79e66a833b044a049a4c2c645b9a1abefdb2fe7b31"
 
-	CNI_PLUGINS_TARBALL_URL    string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm-v1.3.0.tgz"
-	CNI_PLUGINS_TARBALL_SHA256 string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm-v1.3.0.tgz.sha256"
+	CNI_PLUGINS_TARBALL_URL    string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz"
+	CNI_PLUGINS_TARBALL_SHA256 string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz.sha256"
 	// TODO: once awslabs fixes their release action, this URL needs to be changed
 	TC_REDIRECT_CNI_PLUGIN_URL    string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64"
 	TC_REDIRECT_CNI_PLUGIN_SHA256 string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64.sha256"
