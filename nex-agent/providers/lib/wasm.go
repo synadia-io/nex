@@ -110,7 +110,7 @@ type stdOutBuf struct {
 }
 
 func (o *stdOutBuf) Reset() {
-	o.buf = make([]byte, 0, 1024)
+	o.buf = o.buf[:0]
 }
 
 func newStdOutBuf() *stdOutBuf {
