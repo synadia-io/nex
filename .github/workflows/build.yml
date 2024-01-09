@@ -9,7 +9,7 @@ on:
     branches: [ "main" ]
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
     - 
@@ -19,13 +19,6 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
-
-    - 
-      name: Install ginkgo
-      shell: bash --noprofile --norc -x -eo pipefail {0}
-      run: |
-        go install github.com/onsi/ginkgo/v2/ginkgo
-
     - 
       name: Install lint deps
       shell: bash --noprofile --norc -x -eo pipefail {0}
@@ -37,7 +30,22 @@ jobs:
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
         golangci-lint run
-    
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - 
+      uses: actions/checkout@v4
+    - 
+      name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    - 
+      name: Install ginkgo
+      shell: bash --noprofile --norc -x -eo pipefail {0}
+      run: |
+        go install github.com/onsi/ginkgo/v2/ginkgo
     - 
       name: Test nex-agent
       working-directory: ./nex-agent
