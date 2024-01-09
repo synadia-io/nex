@@ -73,20 +73,6 @@ type WatchOptions struct {
 	LogLevel     string
 }
 
-const (
-	defaultCNINetworkName   = "fcnet"
-	defaultCNIInterfaceName = "veth0"
-	defaultInternalNodeHost = "192.168.127.1"
-	defaultInternalNodePort = 9222
-	defaultNodeMemSizeMib   = 256
-	defaultNodeVcpuCount    = 1
-)
-
-var (
-	// docker/OCI needs to be explicitly enabled in node configuration
-	defaultWorkloadTypes = []string{"elf", "v8", "wasm"}
-)
-
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeOptions struct {
