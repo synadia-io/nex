@@ -29,8 +29,6 @@ func (e *Wasm) Deploy() error {
 	r := wazero.NewRuntime(ctx)
 	e.runtime = r
 
-	e.outBuf = newStdOutBuf()
-	e.inBuf = newStdInBuf()
 	config := wazero.NewModuleConfig().
 		WithStdin(e.inBuf).
 		WithStdout(e.outBuf).
@@ -77,6 +75,8 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 	return &Wasm{
 		wasmFile: bytes,
 		env:      params.Environment,
+		outBuf:   newStdOutBuf(),
+		inBuf:    newStdInBuf(),
 	}, nil
 }
 
