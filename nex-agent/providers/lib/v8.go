@@ -99,7 +99,7 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 			return
 		}
 
-		argv2, err := v8.NewValue(v.ctx.Isolate(), payload)
+		argv2, err := v8.NewValue(v.ctx.Isolate(), string(payload))
 		if err != nil {
 			errs <- err
 			return
