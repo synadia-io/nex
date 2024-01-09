@@ -32,7 +32,7 @@ const DefaultRunloopSleepTimeoutMillis = 25
 
 // ExecutionProviderParams parameters for initializing a specific execution provider
 type ExecutionProviderParams struct {
-	WorkRequest
+	DeployRequest
 	TriggerSubjects []string `json:"trigger_subjects"`
 
 	// Fail channel receives bool upon command failing to start
@@ -54,8 +54,8 @@ type ExecutionProviderParams struct {
 	NATSConn *nats.Conn `json:"-"`
 }
 
-// FIXME? WorkRequest -> DeployRequest?
-type WorkRequest struct {
+// FIXME? DeployRequest -> DeployRequest?
+type DeployRequest struct {
 	Environment     map[string]string `json:"environment"`
 	Hash            *string           `json:"hash,omitempty"`
 	TotalBytes      *int32            `json:"total_bytes,omitempty"`
@@ -70,7 +70,7 @@ type WorkRequest struct {
 	Errors []error `json:"errors,omitempty"`
 }
 
-func (w *WorkRequest) Validate() bool {
+func (w *DeployRequest) Validate() bool {
 	w.Errors = make([]error, 0)
 
 	if w.WorkloadName == nil {
@@ -98,7 +98,7 @@ func (w *WorkRequest) Validate() bool {
 	return len(w.Errors) == 0
 }
 
-type WorkResponse struct {
+type DeployResponse struct {
 	Accepted bool    `json:"accepted"`
 	Message  *string `json:"message"`
 }

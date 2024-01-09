@@ -20,7 +20,7 @@ const workloadExecutionSleepTimeoutMillis = 1000
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
 // and the nex node by way of a configured internal NATS server. Agent instances provide
-// logging and event emission facilities and execute dispatched workloads
+// logging and event emission facilities, and deployment and execution of workloads
 type Agent struct {
 	agentLogs chan *agentapi.LogEntry
 	eventLogs chan *cloudevents.Event
@@ -31,8 +31,7 @@ type Agent struct {
 	started     time.Time
 }
 
-// NewAgent initializes a new agent to facilitate communications with
-// the host node and dispatch workloads
+// Initialize a new agent to facilitate communications with the host
 func NewAgent() (*Agent, error) {
 	metadata, err := GetMachineMetadata()
 	if err != nil {
@@ -81,10 +80,10 @@ func (a *Agent) Start() error {
 		return err
 	}
 
-	subject := fmt.Sprintf("agentint.%s.workdispatch", *a.md.VmId)
-	_, err = a.nc.Subscribe(subject, a.handleWorkDispatched)
+	subject := fmt.Sprintf("agentint.%s.deploy", *a.md.VmId)
+	_, err = a.nc.Subscribe(subject, a.handleDeploy)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to work dispatch: %s", err))
+		a.LogError(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err))
 		return err
 	}
 
@@ -117,12 +116,12 @@ func (a *Agent) RequestHandshake() error {
 
 // Pull a RunRequest off the wire, get the payload from the shared
 // bucket, write it to temp, initialize the execution provider per
-// the work request, and then execute it
-func (a *Agent) handleWorkDispatched(m *nats.Msg) {
-	var request agentapi.WorkRequest
+// the request, and then validate and deploy a workload
+func (a *Agent) handleDeploy(m *nats.Msg) {
+	var request agentapi.DeployRequest
 	err := json.Unmarshal(m.Data, &request)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to unmarshal work request: %s", err)
+		msg := fmt.Sprintf("Failed to unmarshal deploy request: %s", err)
 		a.LogError(msg)
 		_ = a.workAck(m, false, msg)
 		return
@@ -165,7 +164,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 
 	err = provider.Deploy()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to execute workload: %s", err))
+		a.LogError(fmt.Sprintf("Failed to deploy workload: %s", err))
 	}
 }
 
@@ -173,7 +172,7 @@ func (a *Agent) handleWorkDispatched(m *nats.Msg) {
 // the executable workload artifact from the cache bucket, write it to a
 // temporary file and make it executable; this method returns the full
 // path to the cached artifact if successful
-func (a *Agent) cacheExecutableArtifact(req *agentapi.WorkRequest) (*string, error) {
+func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
 	tempFile := path.Join(os.TempDir(), "workload") // FIXME-- randomly generate a filename
 
 	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
@@ -195,7 +194,7 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.WorkRequest) (*string, err
 
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
-func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
+func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
 	if a.md.VmId == nil {
 		return nil, errors.New("vm id is required to initialize execution provider params")
 	}
@@ -205,11 +204,11 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 	}
 
 	params := &agentapi.ExecutionProviderParams{
-		WorkRequest: *req,
-		Stderr:      &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
-		Stdout:      &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
-		TmpFilename: &tmpFile,
-		VmID:        *a.md.VmId,
+		DeployRequest: *req,
+		Stderr:        &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
+		Stdout:        &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
+		TmpFilename:   &tmpFile,
+		VmID:          *a.md.VmId,
 
 		Fail: make(chan bool),
 		Run:  make(chan bool),
@@ -251,7 +250,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.WorkRequest, tmpFile st
 // workAck ACKs the provided NATS message by responding with the
 // accepted status of the attempted work request and associated message
 func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
-	ack := agentapi.WorkResponse{
+	ack := agentapi.DeployResponse{
 		Accepted: accepted,
 		Message:  agentapi.StringOrNil(msg),
 	}
@@ -263,7 +262,7 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 
 	err = m.Respond(bytes)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to acknowledge work dispatch: %s", err))
+		a.LogError(fmt.Sprintf("Failed to acknowledge workload deployment: %s", err))
 		return err
 	}
 

@@ -217,7 +217,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			WithField("type", *request.WorkloadType).
 			Info("Submitting workload to VM")
 
-		err = api.mgr.DispatchWork(runningVm, workloadName, namespace, request)
+		err = api.mgr.DeployWorkload(runningVm, workloadName, namespace, request)
 
 		if err != nil {
 			api.log.WithError(err).Error("Failed to start workload in VM")

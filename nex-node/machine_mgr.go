@@ -115,10 +115,9 @@ func (m *MachineManager) Start() error {
 	return nil
 }
 
-// TODO-- refactor Dispatch -> Deploy; RunRequest -> DeployRequest
-func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, namespace string, request controlapi.RunRequest) error {
+func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, namespace string, request controlapi.RunRequest) error {
 	// TODO: make the bytes and hash/digest available to the agent
-	req := agentapi.WorkRequest{
+	req := agentapi.DeployRequest{
 		WorkloadName:    &workloadName,
 		Hash:            nil, // FIXME
 		TotalBytes:      nil, // FIXME
@@ -133,24 +132,24 @@ func (m *MachineManager) DispatchWork(vm *runningFirecracker, workloadName, name
 		WithField("status", status.String()).
 		Debug("NATS internal connection status")
 
-	subject := fmt.Sprintf("agentint.%s.workdispatch", vm.vmmID)
+	subject := fmt.Sprintf("agentint.%s.deploy", vm.vmmID)
 	resp, err := m.ncInternal.Request(subject, bytes, 1*time.Second)
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
-			return errors.New("timed out waiting for acknowledgement of work dispatch")
+			return errors.New("timed out waiting for acknowledgement of workload deployment")
 		} else {
-			return fmt.Errorf("failed to submit request for work: %s", err)
+			return fmt.Errorf("failed to submit request for workload deployment: %s", err)
 		}
 	}
 
-	var workResponse agentapi.WorkResponse
-	err = json.Unmarshal(resp.Data, &workResponse)
+	var deployResponse agentapi.DeployResponse
+	err = json.Unmarshal(resp.Data, &deployResponse)
 	if err != nil {
 		return err
 	}
 
-	if !workResponse.Accepted {
-		return fmt.Errorf("workload rejected by agent: %s", *workResponse.Message)
+	if !deployResponse.Accepted {
+		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	} else if request.SupportsTriggerSubjects() {
 		for _, tsub := range request.TriggerSubjects {
 			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
