@@ -12,21 +12,23 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
+// TODO: support environment variables
+
 // Wasm execution provider implementation
 type Wasm struct {
 	wasmFile []byte
 }
 
 func (e *Wasm) Deploy() error {
-	return errors.New("wasm execution provider not yet implemented")
+	return nil
 }
 
 func (e *Wasm) Execute(subject string, payload []byte) ([]byte, error) {
-	return nil, errors.New("wasm execution provider does not support trigger execution... yet ;)")
+	return e.runTrigger(subject, payload)
 }
 
 func (e *Wasm) Validate() error {
-	return errors.New("wasm execution provider not yet implemented")
+	return nil
 }
 
 // InitNexExecutionProviderWasm convenience method to initialize a Wasm execution provider
@@ -56,7 +58,7 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 }
 
 // if the return slice is missing or empty, that counts as a "no reply"
-func (e *Wasm) RunTrigger(subject string, payload []byte) ([]byte, error) {
+func (e *Wasm) runTrigger(subject string, payload []byte) ([]byte, error) {
 
 	ctx := context.Background()
 

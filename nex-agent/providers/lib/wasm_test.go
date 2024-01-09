@@ -38,7 +38,7 @@ func TestWasmExecution(t *testing.T) {
 	input := []byte("Hello world")
 	subject := "test.trigger"
 
-	output, err := wasm.RunTrigger(subject, input)
+	output, err := wasm.runTrigger(subject, input)
 	if err != nil {
 		t.Fatalf("Failed to run trigger: %s", err)
 	}
