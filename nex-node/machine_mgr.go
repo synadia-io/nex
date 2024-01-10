@@ -193,8 +193,6 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 				WithField("workload_type", *request.WorkloadType).
 				Info("Created trigger subject subscription for deployed workload")
 		}
-
-		return nil
 	}
 
 	vm.workloadStarted = time.Now().UTC()
