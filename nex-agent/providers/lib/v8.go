@@ -42,7 +42,7 @@ func (v *V8) Deploy() error {
 
 	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
 	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
-		val, err := v.Execute(subject, msg.Data)
+		val, err := v.Execute(msg.Header.Get("x-nex-trigger-subject"), msg.Data)
 		if err != nil {
 			// TODO-- propagate this error to agent logs
 			return

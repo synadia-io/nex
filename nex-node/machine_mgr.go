@@ -153,8 +153,11 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 	} else if request.SupportsTriggerSubjects() {
 		for _, tsub := range request.TriggerSubjects {
 			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
-				_tsub := fmt.Sprintf("agentint.%s.trigger", vm.vmmID)
-				resp, err := m.ncInternal.Request(_tsub, msg.Data, time.Millisecond*10000) // FIXME-- make timeout configurable
+				intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
+				intmsg.Data = msg.Data
+				intmsg.Header.Add("x-nex-trigger-subject", msg.Subject)
+
+				resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
 				if err != nil {
 					m.log.WithField("vmid", vm.vmmID).
 						WithField("trigger_subject", tsub).

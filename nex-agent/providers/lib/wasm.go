@@ -51,7 +51,7 @@ func (e *Wasm) Deploy() error {
 
 	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
-		val, err := e.Execute(subject, msg.Data)
+		val, err := e.Execute(msg.Header.Get("x-nex-trigger-subject"), msg.Data)
 		if err != nil {
 			// TODO-- propagate this error to agent logs
 			return
@@ -66,7 +66,6 @@ func (e *Wasm) Deploy() error {
 	}
 
 	e.run <- true
-
 	return nil
 }
 
