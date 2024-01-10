@@ -49,8 +49,7 @@ func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionPr
 		// TODO-- return lib.InitNexExecutionProviderOCI(params), nil
 		return nil, errors.New("oci execution provider not yet implemented")
 	case NexExecutionProviderWasm:
-		// TODO-- return lib.InitNexExecutionProviderWasm(params), nil
-		return nil, errors.New("wasm execution provider not yet implemented")
+		return lib.InitNexExecutionProviderWasm(params)
 	default:
 		break
 	}
