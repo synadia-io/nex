@@ -1,0 +1,42 @@
+version: 1
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - 
+    id: "nex-cli"
+    main: "./nex"
+    binary: "nex"
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w --X main.VERSION={{.Version}} -X main.COMMIT={{.Commit}} -X main.BUILDDATE={{.Date}}
+      - -extldflags "-static"
+  -
+    id: "nex-agent"
+    main: "./nex-agent/cmd/nex-agent"
+    binary: "nex-agent"
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w --X main.VERSION={{.Version}} -X main.COMMIT={{.Commit}} -X main.BUILDDATE={{.Date}}
+      - -extldflags "-static"
+    tags:
+      - netgo
+
+archives:
+  - format: binary
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

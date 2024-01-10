@@ -26,3 +26,5 @@ go.work
 
 # stash things locally 
 local/
+
+dist/
