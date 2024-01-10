@@ -71,13 +71,13 @@ func main() {
 	run.Flag("name", "Name of the workload. Must be alphabetic (lowercase)").Required().StringVar(&RunOpts.Name)
 	run.Flag("type", "Type of workload, e.g., \"elf\", \"v8\", \"oci\", \"wasm\"").StringVar(&RunOpts.WorkloadType)
 	run.Flag("description", "Description of the workload").StringVar(&RunOpts.Description)
-	run.Flag("trigger_subjects", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
+	run.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	run.Action(RunWorkload)
 
 	yeet := ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
 	yeet.Arg("file", "File to run").Required().ExistingFileVar(&DevRunOpts.Filename)
 	yeet.Arg("env", "Environment variables to pass to workload").StringMapVar(&RunOpts.Env)
-	yeet.Flag("trigger_subjects", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
+	yeet.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
 	yeet.Action(RunDevWorkload)
 
