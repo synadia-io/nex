@@ -48,6 +48,6 @@ Once those things are confirmed, use this configuration file
 
 along with the below command 
 
-`sudo nex node preflight --config /tmp/wd`
+`sudo nex node preflight --config config.json`
 
 There is a `--force` flag if you do not want to be prompted to install the missing dependencies
