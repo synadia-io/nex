@@ -49,22 +49,20 @@ func (e *Wasm) Deploy() error {
 
 	e.runtimeConfig = config
 
-	if e.nc != nil { // FIXME-- this is in place to not break tests
-		subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
-		_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
-			val, err := e.Execute(subject, msg.Data)
-			if err != nil {
-				// TODO-- propagate this error to agent logs
-				return
-			}
-
-			if len(val) > 0 {
-				_ = msg.Respond(val)
-			}
-		})
+	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
+	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
+		val, err := e.Execute(subject, msg.Data)
 		if err != nil {
-			return fmt.Errorf("failed to subscribe to trigger: %s", err)
+			// TODO-- propagate this error to agent logs
+			return
 		}
+
+		if len(val) > 0 {
+			_ = msg.Respond(val)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to trigger: %s", err)
 	}
 
 	e.run <- true
