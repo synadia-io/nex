@@ -31,7 +31,8 @@ const (
 	FIRECRACKER_TARBALL_URL    string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
 	FIRECRACKER_TARBALL_SHA256 string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
 
-	ROOTFS_TAR_URL string = "https://drive.google.com/uc?export=download&id=1qYEyxwV4kDfOJIoajOUAY9RDak_9aLgy"
+	ROOTFS_TAR_URL    string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.tgz"
+	ROOTFS_TAR_SHA256 string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.tgz.sha256"
 )
 
 var (
