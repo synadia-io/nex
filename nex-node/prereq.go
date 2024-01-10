@@ -31,8 +31,8 @@ const (
 	FIRECRACKER_TARBALL_URL    string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
 	FIRECRACKER_TARBALL_SHA256 string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
 
-	ROOTFS_TAR_URL    string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.tgz"
-	ROOTFS_TAR_SHA256 string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.tgz.sha256"
+	ROOTFS_GZIP_URL    string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
+	ROOTFS_GZIP_SHA256 string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
 )
 
 var (
@@ -329,7 +329,7 @@ func downloadRootFS(r *requirement, _ *NodeConfiguration) error {
 			continue
 		}
 
-		respTar, err := http.Get(ROOTFS_TAR_URL)
+		respTar, err := http.Get(ROOTFS_GZIP_URL)
 		if err != nil {
 			return err
 		}
