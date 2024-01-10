@@ -18,13 +18,9 @@ import (
 
 // Wasm execution provider implementation
 type Wasm struct {
-	vmID          string
-	wasmFile      []byte
-	env           map[string]string
-	runtime       wazero.Runtime
-	runtimeConfig wazero.ModuleConfig
-	inBuf         *stdInBuf
-	outBuf        *stdOutBuf
+	vmID     string
+	wasmFile []byte
+	env      map[string]string
 
 	fail chan bool
 	run  chan bool
@@ -34,20 +30,6 @@ type Wasm struct {
 }
 
 func (e *Wasm) Deploy() error {
-	ctx := context.Background()
-	r := wazero.NewRuntime(ctx)
-	e.runtime = r
-
-	config := wazero.NewModuleConfig().
-		WithStdin(e.inBuf).
-		WithStdout(e.outBuf).
-		WithStderr(os.Stderr)
-
-	for key, val := range e.env {
-		config = config.WithEnv(key, val)
-	}
-
-	e.runtimeConfig = config
 
 	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
@@ -102,8 +84,6 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 		vmID:     params.VmID,
 		wasmFile: bytes,
 		env:      params.Environment,
-		outBuf:   newStdOutBuf(),
-		inBuf:    newStdInBuf(),
 
 		fail: params.Fail,
 		run:  params.Run,
@@ -118,12 +98,25 @@ func (e *Wasm) runTrigger(subject string, payload []byte) ([]byte, error) {
 
 	ctx := context.Background()
 
-	e.outBuf.Reset()
-	e.inBuf.Reset(payload)
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+	outBuf := newStdOutBuf()
+	inBuf := newStdInBuf(payload)
+
+	config := wazero.NewModuleConfig().
+		WithStdin(inBuf).
+		WithStdout(outBuf).
+		WithStderr(os.Stderr)
+
+	for key, val := range e.env {
+		config = config.WithEnv(key, val)
+	}
 
 	// Instantiate WASI, which implements system I/O such as console output.
-	wasi_snapshot_preview1.MustInstantiate(ctx, e.runtime)
-	_, err := e.runtime.InstantiateWithConfig(ctx, e.wasmFile, e.runtimeConfig.WithArgs("nexfunction", subject))
+	wasi_snapshot_preview1.MustInstantiate(ctx, r)
+
+	// TODO: look into reusing the runtime and pre-compiling the module upon deployment
+	_, err := r.InstantiateWithConfig(ctx, e.wasmFile, config.WithArgs("nexfunction", subject))
 	if err != nil {
 		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
 			// TODO: log error
@@ -133,17 +126,13 @@ func (e *Wasm) runTrigger(subject string, payload []byte) ([]byte, error) {
 			return nil, errors.New("failed to execute WASI function")
 		}
 	} else {
-		return e.outBuf.buf, err
+		return outBuf.buf, err
 	}
 	return nil, errors.New("unknown")
 }
 
 type stdOutBuf struct {
 	buf []byte
-}
-
-func (o *stdOutBuf) Reset() {
-	o.buf = o.buf[:0]
 }
 
 func newStdOutBuf() *stdOutBuf {
@@ -163,14 +152,9 @@ type stdInBuf struct {
 	readIndex int64
 }
 
-func (i *stdInBuf) Reset(input []byte) {
-	i.readIndex = 0
-	i.data = input
-}
-
-func newStdInBuf() *stdInBuf {
+func newStdInBuf(input []byte) *stdInBuf {
 	return &stdInBuf{
-		data: nil,
+		data: input,
 	}
 }
 
