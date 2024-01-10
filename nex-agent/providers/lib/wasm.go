@@ -3,10 +3,12 @@ package lib
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
 	agentapi "github.com/ConnectEverything/nex/agent-api"
+	"github.com/nats-io/nats.go"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
@@ -16,12 +18,19 @@ import (
 
 // Wasm execution provider implementation
 type Wasm struct {
+	vmID          string
 	wasmFile      []byte
 	env           map[string]string
 	runtime       wazero.Runtime
 	runtimeConfig wazero.ModuleConfig
 	inBuf         *stdInBuf
 	outBuf        *stdOutBuf
+
+	fail chan bool
+	run  chan bool
+	exit chan int
+
+	nc *nats.Conn // agent NATS connection
 }
 
 func (e *Wasm) Deploy() error {
@@ -39,6 +48,26 @@ func (e *Wasm) Deploy() error {
 	}
 
 	e.runtimeConfig = config
+
+	if e.nc != nil { // FIXME-- this is in place to not break tests
+		subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
+		_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
+			val, err := e.Execute(subject, msg.Data)
+			if err != nil {
+				// TODO-- propagate this error to agent logs
+				return
+			}
+
+			if len(val) > 0 {
+				_ = msg.Respond(val)
+			}
+		})
+		if err != nil {
+			return fmt.Errorf("failed to subscribe to trigger: %s", err)
+		}
+	}
+
+	e.run <- true
 
 	return nil
 }
@@ -73,10 +102,17 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 	}
 
 	return &Wasm{
+		vmID:     params.VmID,
 		wasmFile: bytes,
 		env:      params.Environment,
 		outBuf:   newStdOutBuf(),
 		inBuf:    newStdInBuf(),
+
+		fail: params.Fail,
+		run:  params.Run,
+		exit: params.Exit,
+
+		nc: params.NATSConn,
 	}, nil
 }
 
