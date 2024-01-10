@@ -28,6 +28,8 @@ func TestWasmExecution(t *testing.T) {
 		Stdout:      nil,
 		TmpFilename: &file,
 		VmID:        "bob",
+
+		NATSConn: nil, // FIXME
 	}
 	params.DeployRequest.WorkloadType = &typ
 	wasm, err := InitNexExecutionProviderWasm(params)

@@ -174,7 +174,9 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			return
 		}
 
-		if len(request.TriggerSubjects) > 0 && !strings.EqualFold(*request.WorkloadType, "v8") { // FIXME -- workload type comparison
+		if len(request.TriggerSubjects) > 0 &&
+			(!strings.EqualFold(*request.WorkloadType, "v8") &&
+				!strings.EqualFold(*request.WorkloadType, "wasm")) { // FIXME -- workload type comparison
 			api.log.WithField("trigger_subjects", *request.WorkloadType).Error("Workload type does not support trigger subject registration")
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", *request.WorkloadType))
 			return
