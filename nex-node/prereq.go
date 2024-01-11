@@ -39,6 +39,7 @@ var (
 	cyan    = color.New(color.FgCyan).SprintFunc()
 	red     = color.New(color.FgRed).SprintFunc()
 	magenta = color.New(color.FgMagenta).SprintFunc()
+	green   = color.New(color.FgHiGreen).SprintFunc()
 )
 
 type initFunc func(*requirement, *NodeConfiguration) error
@@ -119,7 +120,7 @@ func CheckPreRequisites(config *NodeConfiguration) error {
 				fmt.Printf("\t⛔ Missing Dependency - %s [%s]\n", red(filepath.Join(r.directory, f.name)), cyan(f.description))
 			} else {
 				f.satisfied = true
-				fmt.Printf("\t✅ Depencency Satisfied - %s [%s]\n", red(filepath.Join(r.directory, f.name)), cyan(f.description))
+				fmt.Printf("\t✅ Dependency Satisfied - %s [%s]\n", green(filepath.Join(r.directory, f.name)), cyan(f.description))
 			}
 		}
 		fmt.Println()
