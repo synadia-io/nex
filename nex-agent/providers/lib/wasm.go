@@ -14,8 +14,6 @@ import (
 	"github.com/tetratelabs/wazero/sys"
 )
 
-// TODO: support environment variables
-
 // Wasm execution provider implementation
 type Wasm struct {
 	vmID          string
@@ -23,8 +21,7 @@ type Wasm struct {
 	env           map[string]string
 	runtime       wazero.Runtime
 	runtimeConfig wazero.ModuleConfig
-	inBuf         *stdInBuf
-	outBuf        *stdOutBuf
+	module        wazero.CompiledModule
 
 	fail chan bool
 	run  chan bool
@@ -34,21 +31,6 @@ type Wasm struct {
 }
 
 func (e *Wasm) Deploy() error {
-	ctx := context.Background()
-	r := wazero.NewRuntime(ctx)
-	e.runtime = r
-
-	config := wazero.NewModuleConfig().
-		WithStdin(e.inBuf).
-		WithStdout(e.outBuf).
-		WithStderr(os.Stderr)
-
-	for key, val := range e.env {
-		config = config.WithEnv(key, val)
-	}
-
-	e.runtimeConfig = config
-
 	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
 		val, err := e.Execute(msg.Header.Get("x-nex-trigger-subject"), msg.Data)
@@ -70,10 +52,62 @@ func (e *Wasm) Deploy() error {
 }
 
 func (e *Wasm) Execute(subject string, payload []byte) ([]byte, error) {
-	return e.runTrigger(subject, payload)
+	ctx := context.Background()
+
+	out := newStdOutBuf()
+	in := newStdInBuf()
+	in.Reset(payload)
+
+	// clone runtimeConfig for each execution
+	cfg := e.runtimeConfig.
+		WithStdin(in).
+		WithStdout(out).
+		WithArgs("nexfunction", subject)
+
+	_, err := e.runtime.InstantiateModule(ctx, e.module, cfg)
+	if err != nil {
+		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
+			// TODO: log error
+			return nil, err
+		} else if !ok {
+			// TODO: log failure
+			return nil, errors.New("failed to execute WASI function")
+		}
+	} else {
+		return out.buf, err
+	}
+
+	return nil, errors.New("unknown")
 }
 
 func (e *Wasm) Validate() error {
+	ctx := context.Background()
+	e.runtime = wazero.NewRuntime(ctx)
+	e.runtimeConfig = wazero.NewModuleConfig().
+		WithStderr(os.Stderr)
+
+	for key, val := range e.env {
+		e.runtimeConfig = e.runtimeConfig.WithEnv(key, val)
+	}
+
+	var err error
+
+	// Instantiate WASI, which implements system I/O such as console output.
+	wasimod, err := wasi_snapshot_preview1.NewBuilder(e.runtime).Compile(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to compile module: %s", err)
+	}
+
+	_, err = e.runtime.InstantiateModule(ctx, wasimod, e.runtimeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to compile wasi_snapshot_preview1 module: %s", err)
+	}
+
+	e.module, err = e.runtime.CompileModule(ctx, e.wasmFile)
+	if err != nil {
+		return fmt.Errorf("failed to compile module: %s", err)
+	}
+
 	return nil
 }
 
@@ -102,8 +136,6 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 		vmID:     params.VmID,
 		wasmFile: bytes,
 		env:      params.Environment,
-		outBuf:   newStdOutBuf(),
-		inBuf:    newStdInBuf(),
 
 		fail: params.Fail,
 		run:  params.Run,
@@ -111,31 +143,6 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 
 		nc: params.NATSConn,
 	}, nil
-}
-
-// if the return slice is missing or empty, that counts as a "no reply"
-func (e *Wasm) runTrigger(subject string, payload []byte) ([]byte, error) {
-
-	ctx := context.Background()
-
-	e.outBuf.Reset()
-	e.inBuf.Reset(payload)
-
-	// Instantiate WASI, which implements system I/O such as console output.
-	wasi_snapshot_preview1.MustInstantiate(ctx, e.runtime)
-	_, err := e.runtime.InstantiateWithConfig(ctx, e.wasmFile, e.runtimeConfig.WithArgs("nexfunction", subject))
-	if err != nil {
-		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() != 0 {
-			// TODO: log error
-			return nil, err
-		} else if !ok {
-			// TODO: log failure
-			return nil, errors.New("failed to execute WASI function")
-		}
-	} else {
-		return e.outBuf.buf, err
-	}
-	return nil, errors.New("unknown")
 }
 
 type stdOutBuf struct {

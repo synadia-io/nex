@@ -39,6 +39,7 @@ func TestWasmExecution(t *testing.T) {
 		t.Fatalf("Failed to instantiate wasm provider: %s", err)
 	}
 
+	_ = wasm.Validate()
 	_ = wasm.Deploy()
 
 	input := []byte("Hello world")
