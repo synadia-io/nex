@@ -24,12 +24,18 @@ jobs:
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
         go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
-
+    - 
+      name: Build ui
+      working-directory: ./ui/web
+      run: |
+        curl -fsSL https://get.pnpm.io/install.sh | SHELL=bash sh -
+        ~/.local/share/pnpm/pnpm install
+        ~/.local/share/pnpm/pnpm build
     - 
       name: Run Lint
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
-        golangci-lint run
+        golangci-lint run --timeout 5m
 
   test:
     runs-on: ubuntu-latest
@@ -47,20 +53,27 @@ jobs:
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo
     - 
-      name: Test nex-agent
-      working-directory: ./nex-agent
+      name: Build ui
+      working-directory: ./ui/web
+      run: |
+        curl -fsSL https://get.pnpm.io/install.sh | SHELL=bash sh -
+        ~/.local/share/pnpm/pnpm install
+        ~/.local/share/pnpm/pnpm build
+    - 
+      name: Test agent
+      working-directory: ./agent
       run: go test -v ./...
     - 
-      name: Test nex-cli
+      name: Test nex cli
       working-directory: ./nex
       run: go test -v ./...
     - 
       name: Test control-api
-      working-directory: ./control-api
+      working-directory: ./internal/control-api
       run: ginkgo
     - 
-      name: Test nex-node
-      working-directory: ./nex-node
+      name: Test nex node
+      working-directory: ./internal/node
       run: go test -v ./...
 
   build:
@@ -74,11 +87,17 @@ jobs:
       with:
         go-version: '1.21'
     - 
-      name: Build nex-agent
-      working-directory: ./nex-agent/cmd/nex-agent
+      name: Build agent
+      working-directory: ./agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
     - 
-      name: Build nex-cli
+      name: Build ui
+      working-directory: ./ui/web
+      run: |
+        curl -fsSL https://get.pnpm.io/install.sh | SHELL=bash sh -
+        ~/.local/share/pnpm/pnpm install
+        ~/.local/share/pnpm/pnpm build
+    - 
+      name: Build nex cli
       working-directory: ./nex
       run: go build .
-

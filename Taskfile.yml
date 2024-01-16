@@ -9,21 +9,14 @@ vars:
   NAME: "nex"
 
 tasks:  
-  nex-agent:
-    dir: nex-agent/cmd/nex-agent
+  agent:
+    dir: agent/cmd/nex-agent
     sources:
       - "*.go"
     cmds:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
-  nex-node:
-    dir: nex-node/cmd/nex-node
-    sources:
-      - "*.go"
-    cmds:
-      - go build -tags netgo -ldflags '-extldflags "-static"'
-
-  nex-cli:
+  nex:
     dir: nex
     sources:
       - "*.go"
@@ -37,5 +30,11 @@ tasks:
     cmds:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
+  ui:
+    dir: ui/web
+    cmds:
+      - curl -fsSL https://get.pnpm.io/install.sh | sh -
+      - pnpm build
+
   build:
-    deps: [nex-agent, nex-node, nex-cli, echo-service]
+    deps: [agent, ui, nex, echo-service]

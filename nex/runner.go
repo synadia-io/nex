@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	controlapi "github.com/ConnectEverything/nex/control-api"
+	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"

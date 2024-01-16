@@ -1,7 +1,7 @@
 package main
 
 import (
-	nexui "github.com/ConnectEverything/nex/nex-ui"
+	nexui "github.com/ConnectEverything/nex/ui"
 	"github.com/choria-io/fisk"
 )
 
