@@ -24,12 +24,18 @@ jobs:
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
         go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.53.3
-
+    - 
+      name: Build ui
+      working-directory: ./ui/web
+      run: |
+        curl -fsSL https://get.pnpm.io/install.sh | SHELL=bash sh -
+        ~/.local/share/pnpm/pnpm install
+        ~/.local/share/pnpm/pnpm build
     - 
       name: Run Lint
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
-        golangci-lint run
+        golangci-lint run --timeout 5m
 
   test:
     runs-on: ubuntu-latest
