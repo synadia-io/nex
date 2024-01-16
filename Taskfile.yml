@@ -34,6 +34,7 @@ tasks:
     dir: ui/web
     cmds:
       - curl -fsSL https://get.pnpm.io/install.sh | sh -
+      - pnpm install
       - pnpm build
 
   build:
