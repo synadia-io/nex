@@ -26,5 +26,7 @@ go.work
 
 # stash things locally 
 local/
-
 dist/
+
+# nex binaries
+nex/nex
