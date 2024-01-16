@@ -47,6 +47,13 @@ jobs:
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo
     - 
+      name: Build ui
+      working-directory: ./ui/web
+      run: |
+        curl -fsSL https://get.pnpm.io/install.sh | SHELL=bash sh -
+        ~/.local/share/pnpm/pnpm install
+        ~/.local/share/pnpm/pnpm build
+    - 
       name: Test agent
       working-directory: ./agent
       run: go test -v ./...
@@ -77,6 +84,13 @@ jobs:
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
+    - 
+      name: Build ui
+      working-directory: ./ui/web
+      run: |
+        curl -fsSL https://get.pnpm.io/install.sh | SHELL=bash sh -
+        ~/.local/share/pnpm/pnpm install
+        ~/.local/share/pnpm/pnpm build
     - 
       name: Build nex cli
       working-directory: ./nex
