@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	controlapi "github.com/ConnectEverything/nex/control-api"
+	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/cdfmlr/ellipsis"
 	"github.com/choria-io/fisk"
 	"github.com/sirupsen/logrus"

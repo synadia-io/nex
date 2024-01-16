@@ -6,7 +6,7 @@ before:
 
 builds:
   - 
-    id: "nex-cli"
+    id: "nex"
     main: "./nex"
     binary: "nex"
     goos:
@@ -17,8 +17,8 @@ builds:
       - -s -w --X main.VERSION={{.Version}} -X main.COMMIT={{.Commit}} -X main.BUILDDATE={{.Date}}
       - -extldflags "-static"
   -
-    id: "nex-agent"
-    main: "./nex-agent/cmd/nex-agent"
+    id: "agent"
+    main: "./agent/cmd/nex-agent"
     binary: "nex-agent"
     goos:
       - linux

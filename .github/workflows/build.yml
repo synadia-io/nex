@@ -47,20 +47,20 @@ jobs:
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo
     - 
-      name: Test nex-agent
-      working-directory: ./nex-agent
+      name: Test agent
+      working-directory: ./agent
       run: go test -v ./...
     - 
-      name: Test nex-cli
+      name: Test nex cli
       working-directory: ./nex
       run: go test -v ./...
     - 
       name: Test control-api
-      working-directory: ./control-api
+      working-directory: ./internal/control-api
       run: ginkgo
     - 
-      name: Test nex-node
-      working-directory: ./nex-node
+      name: Test nex node
+      working-directory: ./internal/node
       run: go test -v ./...
 
   build:
@@ -74,11 +74,10 @@ jobs:
       with:
         go-version: '1.21'
     - 
-      name: Build nex-agent
-      working-directory: ./nex-agent/cmd/nex-agent
+      name: Build agent
+      working-directory: ./agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
     - 
-      name: Build nex-cli
+      name: Build nex cli
       working-directory: ./nex
       run: go build .
-

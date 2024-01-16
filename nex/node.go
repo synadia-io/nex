@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	nexnode "github.com/ConnectEverything/nex/nex-node"
+	nexnode "github.com/ConnectEverything/nex/internal/node"
 	"github.com/choria-io/fisk"
 	"github.com/sirupsen/logrus"
 )

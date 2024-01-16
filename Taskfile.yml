@@ -9,21 +9,14 @@ vars:
   NAME: "nex"
 
 tasks:  
-  nex-agent:
-    dir: nex-agent/cmd/nex-agent
+  agent:
+    dir: agent/cmd/nex-agent
     sources:
       - "*.go"
     cmds:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
-  nex-node:
-    dir: nex-node/cmd/nex-node
-    sources:
-      - "*.go"
-    cmds:
-      - go build -tags netgo -ldflags '-extldflags "-static"'
-
-  nex-cli:
+  nex:
     dir: nex
     sources:
       - "*.go"
@@ -38,4 +31,4 @@ tasks:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
   build:
-    deps: [nex-agent, nex-node, nex-cli, echo-service]
+    deps: [agent, nex, echo-service]

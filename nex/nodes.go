@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	controlapi "github.com/ConnectEverything/nex/control-api"
+	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/natscli/columns"
 	"github.com/sirupsen/logrus"
