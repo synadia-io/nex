@@ -42,7 +42,7 @@ func main() {
 		return
 	}
 
-	input, err := os.ReadFile("../nex-agent/cmd/nex-agent/nex-agent")
+	input, err := os.ReadFile("../cmd/nex-agent/nex-agent")
 	if err != nil {
 		fmt.Println(err)
 		return
