@@ -4,4 +4,4 @@ The files in this directory are what are used to generate the default `rootfs.ex
 ### To Generate File
 `sudo go run .`
 
-Should drop `rootfs.etx` in working directory
+Should drop `rootfs.ext4` in working directory
