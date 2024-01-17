@@ -3,8 +3,8 @@ The files in this directory are what are used to generate the default `rootfs.ex
 
 ### Requirements
 - docker 
--mkfs.ext4
--sudo
+- mkfs.ext4
+- sudo
 
 ### To Generate File
 
