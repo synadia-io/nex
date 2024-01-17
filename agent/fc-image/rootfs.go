@@ -28,7 +28,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	// defer os.RemoveAll(tempdir)
+	defer os.RemoveAll(tempdir)
 
 	err = os.WriteFile(filepath.Join(tempdir, "openrc-service.sh"), []byte(openrc_service), 0644)
 	if err != nil {
