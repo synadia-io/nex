@@ -126,7 +126,6 @@ func build(ctx context.Context, tempdir string, mountPoint string) error {
 		WithEnvVariable("CACHEBUSTER", time.Now().String()).
 		WithUser("root").
 		WithDirectory("/tmp/rootfs", rootfs).
-		WithMountedDirectory("/tmp/rootfs", rootfs).
 		WithMountedFile("/etc/init.d/agent", orcFile).
 		WithMountedFile("/usr/local/bin/agent", nexagent).
 		WithMountedFile("/setup-alpine.sh", bootstrapScript).
