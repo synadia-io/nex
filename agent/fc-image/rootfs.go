@@ -17,6 +17,11 @@ func main() {
 		return
 	}
 
+	if len(os.Args) < 1 {
+		fmt.Println("Please provide path the agent binary")
+		return
+	}
+
 	mkfsext4, err := exec.LookPath("mkfs.ext4")
 	if err != nil {
 		fmt.Println(err)
@@ -42,7 +47,7 @@ func main() {
 		return
 	}
 
-	input, err := os.ReadFile("../cmd/nex-agent/nex-agent")
+	input, err := os.ReadFile(os.Args[1])
 	if err != nil {
 		fmt.Println(err)
 		return
