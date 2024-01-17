@@ -6,12 +6,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
+	"time"
 
 	"dagger.io/dagger"
 )
 
 func main() {
+	if os.Getuid() != 0 {
+		fmt.Println("Please run as root")
+		return
+	}
+
 	mkfsext4, err := exec.LookPath("mkfs.ext4")
 	if err != nil {
 		fmt.Println(err)
@@ -23,9 +28,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	//defer os.RemoveAll(tempdir)
-
-	fmt.Println(tempdir)
+	// defer os.RemoveAll(tempdir)
 
 	err = os.WriteFile(filepath.Join(tempdir, "openrc-service.sh"), []byte(openrc_service), 0644)
 	if err != nil {
@@ -41,22 +44,27 @@ func main() {
 
 	input, err := os.ReadFile("../nex-agent/cmd/nex-agent/nex-agent")
 	if err != nil {
-		fmt.Println("+", err)
+		fmt.Println(err)
 		return
 	}
 
 	err = os.WriteFile(filepath.Join(tempdir, "nex-agent"), input, 0644)
 	if err != nil {
-		fmt.Println("++", err)
+		fmt.Println(err)
 		return
 	}
 
 	fs, err := os.Create(filepath.Join(tempdir, "rootfs.ext4"))
 	if err != nil {
-		fmt.Println("+++", err)
+		fmt.Println(err)
 		return
 	}
-	defer fs.Close()
+
+	err = os.Chmod(filepath.Join(tempdir, "rootfs.ext4"), 0777)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	err = fs.Truncate(1 * 1024 * 1024 * 100)
 	if err != nil {
@@ -64,10 +72,16 @@ func main() {
 		return
 	}
 
-	_, err = exec.Command(mkfsext4, filepath.Join(tempdir, "rootfs.ext4")).
-		CombinedOutput()
+	err = fs.Close()
 	if err != nil {
 		fmt.Println(err)
+		return
+	}
+
+	cmd := exec.Command(mkfsext4, filepath.Join(tempdir, "rootfs.ext4"))
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println(string(output), err)
 		return
 	}
 
@@ -77,52 +91,69 @@ func main() {
 		return
 	}
 
-	//syscall.MS_NOATIME|syscall.MS_SILENT|syscall.MS_SYNCHRONOUS|syscall.MS_DIRSYNC,
-	err = syscall.Mount(
-		filepath.Join(tempdir, "rootfs-mount"),
-		filepath.Join(tempdir, "rootfs.ext4"),
-		"ext4",
-		syscall.MS_NOATIME|syscall.MS_SILENT,
-		"journal_checksum,journal_ioprio=0,barrier=1,data=ordered,errors=remount-ro",
-	)
+	device := filepath.Join(tempdir, "rootfs.ext4")
+	mountPoint := filepath.Join(tempdir, "rootfs-mount")
+
+	cmd = exec.Command("mount", device, mountPoint)
+	output, err = cmd.Output()
 	if err != nil {
-		fmt.Println("+++++", filepath.Join(tempdir, "rootfs.ext4"), filepath.Join(tempdir, "rootfs-mount"), err)
+		fmt.Println(string(output), err)
 		return
 	}
-	defer func() {
-		err := syscall.Unmount(filepath.Join(tempdir, "rootfs-mount"), 0)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	}()
 
-	if err := build(context.Background(), tempdir); err != nil {
+	if err := build(context.Background(), tempdir, mountPoint); err != nil {
 		fmt.Println(err)
 	}
 }
 
-func build(ctx context.Context, tempdir string) error {
-	fmt.Println("asdf")
-	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr))
+func build(ctx context.Context, tempdir string, mountPoint string) error {
+	client, err := dagger.Connect(ctx,
+		dagger.WithLogOutput(os.Stderr),
+		dagger.WithWorkdir(tempdir),
+	)
 	if err != nil {
 		return err
 	}
 	defer client.Close()
 
-	fmt.Println("asdf")
-	orcFile := client.Host().File(filepath.Join(tempdir, "openrc-service.sh"))
-	nexagent := client.Host().File(filepath.Join(tempdir, "nex-agent"))
-	rootfs := client.Host().Directory(filepath.Join(tempdir, "rootfs.ext4"))
-	fmt.Println("asdf")
-	_ = client.Container().
+	orcFile := client.Host().File("openrc-service.sh")
+	bootstrapScript := client.Host().File("setup-alpine.sh")
+	nexagent := client.Host().File("nex-agent")
+	rootfs := client.Host().Directory("rootfs-mount")
+
+	c := client.Container().
 		From("alpine:latest").
+		WithEnvVariable("CACHEBUSTER", time.Now().String()).
+		WithUser("root").
+		WithDirectory("/tmp/rootfs", rootfs).
+		WithMountedDirectory("/tmp/rootfs", rootfs).
 		WithMountedFile("/etc/init.d/agent", orcFile).
 		WithMountedFile("/usr/local/bin/agent", nexagent).
-		WithMountedDirectory("/tmp/rootfs", rootfs).
-		WithExec([]string{"alpine", "sh", "<", "setup-alpine.sh"})
+		WithMountedFile("/setup-alpine.sh", bootstrapScript).
+		WithExec([]string{"sh", "/setup-alpine.sh"})
 
-	fmt.Println("asdf")
+	_, err = c.Directory("/tmp/rootfs").
+		Export(ctx, "./rootfs-mount")
+	if err != nil {
+		return err
+	}
+
+	_, err = c.Stdout(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = c.Stderr(ctx)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("umount", mountPoint)
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println(string(output), err)
+		return err
+	}
+
 	input, err := os.ReadFile(filepath.Join(tempdir, "rootfs.ext4"))
 	if err != nil {
 		return err
