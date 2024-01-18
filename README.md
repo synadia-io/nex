@@ -2,30 +2,26 @@
 ![Release](https://github.com/ConnectEverything/nex/actions/workflows/release.yml/badge.svg)
 
 # NATS Execution Engine
-Turn your NATS infrastructure into a distributed workload deployment and execution engine.
-
-* [agent](./agent) - Agent that runs inside a Firecracker VM, responsible for running untrusted workloads. Not something end users need to interact with.
-* [fc-image](./agent/fc-image/) - Tools for building the rootfs (ext4) file system for use in firecracker VMs
-* [node](./internal/node) - Service running on a NEX node. Exposes a control API, starts/stops firecracker processes, communicates with the agent inside each process.
-* [nex](./nex) - CLI for communicating with NEX nodes
-* [ui](./ui) - User interface for viewing the status of NEX nodes in a web browser
-
+Leverage and extend your investment in NATS infrastructure to deploy functions and services, turning NATS into the ultimate platform for building distributed applications.
 
 ## Quickstart
+The easiest way to get started with Nex is to check out our [Using Nex](https://docs.nats.io/using-nats/nex) section in the NATS documentation.
 
-`GOPRIVATE=github.com/ConnectEverything/nex go install github.com/ConnectEverything/nex/nex@main`
+If you're already familiar with Nex and how it works, then you can get going quickly by installing the Nex CLI:
 
-The `nex node preflight` command is here to help you bootstrap your system.  
-
-First, we need to create a few directories it is expecting 
 ```
-mkdir -p /opt/cni/bin
-mkdir -p /etc/cni/conf.d
-mkdir -p /tmp/wd
+go install github.com/ConnectEverything/nex/nex@latest
 ```
-You will also need to make sure that `/usr/local/bin` is in your path
 
-Once those things are confirmed, use this configuration file
+_**Note** that an installation method that doesn't require Go is coming soon._
+
+## Preflight Check
+
+If you haven't already, please make sure that `/usr/local/bin` is in your path. 
+
+The `nex node preflight` command is here to help you bootstrap your system and ensure that you have all of the elements you need to start and operate Nex nodes.
+
+The pre-flight check requires a configuration file so it can perform the appropriate checks. If you don't already have a configuration file, then Nex's `preflight` command will generate a new one for you in `./config.json`, as shown below:
 
 ```json
 {
@@ -45,8 +41,20 @@ Once those things are confirmed, use this configuration file
 }
 ```
 
-along with the below command 
+Run the following command to get everything set up using the above defaults:
 
-`sudo nex node preflight --config config.json`
+```
+$ nex node preflight
+```
 
-There is a `--force` flag if you do not want to be prompted to install the missing dependencies
+## Nex Components
+Nex is made up of the following components
+
+* [agent](./agent) - Agent that runs inside a Firecracker VM, responsible for running untrusted workloads. Not something end users need to interact with.
+* [fc-image](./agent/fc-image/) - Tools for building the rootfs (ext4) file system for use in firecracker VMs
+* [node](./internal/node) - Service running on a NEX node. Exposes a control API, starts/stops firecracker processes, communicates with the agent inside each process.
+* [nex](./nex) - CLI for communicating with NEX nodes
+* [ui](./ui) - User interface for viewing the status of NEX nodes in a web browser
+
+## Contributing
+For information on how to contribute to Nex, please read our [contributing](./CONTRIBUTING.md) guide.
