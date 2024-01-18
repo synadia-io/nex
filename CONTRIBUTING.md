@@ -12,7 +12,7 @@ There are there general ways you can contribute to this repo:
 
 For the first two, refer to the [GitHub Issues](https://github.com/ConnectEverything/nex/issues/new/choose) which guides you through the available options along with the needed information to collect.
 
-## Contributing changes
+## Contributing Changes
 
 _Prior to opening a pull request, it is recommended to open an issue first to ensure the maintainers can review intended changes. Exceptions to this rule include fixing non-functional source such as code comments, documentation or other supporting files._
 
@@ -32,14 +32,7 @@ A good pull request includes:
 - No more commits than necessary. Sometimes having multiple commits is useful for telling a story or isolating changes from one another, but please squash down any unnecessary commits that may just be for clean-up, comments or small changes.
 - No additional external dependencies that aren't absolutely essential. Please do everything you can to avoid pulling in additional libraries/dependencies into `go.mod` as we will be very critical of these.
 
-### Sign-off
-
-In order to accept a contribution, we will first need you to certify that the contribution is your original work and that you license the work to the project under the [Apache-2.0 license](https://github.com/nats-io/nats-server/blob/main/LICENSE).
-
-This is done by using `Signed-off-by` statements, which should appear in **both** your commit messages and your PR description.
-
-To perform a sign-off with `git`, use `git commit -s` (or `--signoff`).
-
-## Get help
+## Get Help
 
 If you have questions about the contribution process, please start a [GitHub discussion](https://github.com/ConnectEverything/nex/discussions), join the [NATS Slack](https://slack.nats.io/), or send your question to the [NATS Google Group](https://groups.google.com/forum/#!forum/natsio).
+
