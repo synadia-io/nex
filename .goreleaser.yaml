@@ -34,10 +34,19 @@ builds:
       - -extldflags "-static"
     tags:
       - netgo
+    hooks:
+      post:
+        - go run ./agent/fc-image/. {{.Path}} 
 
 archives:
-  - format: binary
+  - id: binaries
+    format: binary
     name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: rootfs
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}"
+    files:
+      - rootfs.ext4
 
 changelog:
   sort: asc
