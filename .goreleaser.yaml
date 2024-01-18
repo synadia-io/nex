@@ -16,6 +16,11 @@ builds:
     ldflags:
       - -s -w --X main.VERSION={{.Version}} -X main.COMMIT={{.Commit}} -X main.BUILDDATE={{.Date}}
       - -extldflags "-static"
+    tags:
+      - netgo
+    hooks:
+      pre:
+        - go run ./ui/web/build/main.go ./ui/web
   -
     id: "agent"
     main: "./agent/cmd/nex-agent"
