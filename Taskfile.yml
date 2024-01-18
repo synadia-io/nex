@@ -31,11 +31,9 @@ tasks:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
   ui:
-    dir: ui/web
+    dir: ui
     cmds:
-      - curl -fsSL https://get.pnpm.io/install.sh | sh -
-      - pnpm install
-      - pnpm build
+      - go run web/build/main.go ./web
 
   build:
     deps: [agent, ui, nex, echo-service]
