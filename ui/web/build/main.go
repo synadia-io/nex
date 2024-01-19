@@ -6,6 +6,10 @@ import (
 	"os"
 
 	"dagger.io/dagger"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/client"
 )
 
 func main() {
@@ -29,6 +33,7 @@ func build(ctx context.Context) error {
 		return err
 	}
 	defer client.Close()
+	defer stopDaggerEngine()
 
 	webroot := client.Host().Directory(".")
 
@@ -47,4 +52,27 @@ func build(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func stopDaggerEngine() {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return
+	}
+
+	ctx := context.Background()
+
+	containers, _ := cli.ContainerList(ctx, types.ContainerListOptions{
+		All: true,
+		Filters: filters.NewArgs([]filters.KeyValuePair{
+			{
+				Key:   "name",
+				Value: "dagger-engine",
+			},
+		}...),
+	})
+
+	for _, c := range containers {
+		_ = cli.ContainerStop(ctx, c.ID, container.StopOptions{})
+	}
 }
