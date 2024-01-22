@@ -228,7 +228,7 @@ func handleLogEntry(api *Client, ch chan EmittedLog) func(m *nats.Msg) {
 		if len(tokens) != 6 {
 			return
 		}
-		var logEntry rawLog
+		var logEntry RawLog
 		err := json.Unmarshal(m.Data, &logEntry)
 		if err != nil {
 			api.log.WithError(err).Error("Log entry deserialization failure")
@@ -243,7 +243,7 @@ func handleLogEntry(api *Client, ch chan EmittedLog) func(m *nats.Msg) {
 			NodeId:    tokens[3],
 			Workload:  tokens[4],
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			rawLog:    logEntry,
+			RawLog:    logEntry,
 		}
 	}
 

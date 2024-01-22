@@ -1,15 +1,14 @@
-package lib
+package test
 
 import (
 	"testing"
 
+	"github.com/ConnectEverything/nex/agent/providers/lib"
 	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
 )
 
 func TestWasmExecution(t *testing.T) {
-	t.Skip("TODO")
-
-	file := "../../../examples/wasm/echofunction/echofunction.wasm"
+	file := "../examples/wasm/echofunction/echofunction.wasm"
 	typ := "wasm"
 	params := &agentapi.ExecutionProviderParams{
 		DeployRequest: agentapi.DeployRequest{
@@ -34,7 +33,7 @@ func TestWasmExecution(t *testing.T) {
 		NATSConn: nil, // FIXME
 	}
 	params.DeployRequest.WorkloadType = &typ
-	wasm, err := InitNexExecutionProviderWasm(params)
+	wasm, err := lib.InitNexExecutionProviderWasm(params)
 	if err != nil {
 		t.Fatalf("Failed to instantiate wasm provider: %s", err)
 	}

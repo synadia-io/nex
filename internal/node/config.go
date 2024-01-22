@@ -22,25 +22,56 @@ var (
 	defaultWorkloadTypes = []string{"elf", "v8", "wasm"}
 )
 
+type CliOptions struct {
+	// Servers is the list of servers to connect to
+	Servers string
+	// Creds is nats credentials to authenticate with
+	Creds string
+	// TlsCert is the TLS Public Certificate
+	TlsCert string
+	// TlsKey is the TLS Private Key
+	TlsKey string
+	// TlsCA is the certificate authority to verify the connection with
+	TlsCA string
+	// Timeout is how long to wait for operations
+	Timeout time.Duration
+	// ConnectionName is the name to use for the underlying NATS connection
+	ConnectionName string
+	// Username is the username or token to connect with
+	Username string
+	// Password is the password to connect with
+	Password string
+	// Nkey is the file holding a nkey to connect with
+	Nkey string
+	// TlsFirst configures theTLSHandshakeFirst behavior in nats.go
+	TlsFirst bool
+	// Path to the file containing virtual machine management settings and node-wide settings
+	NodeConfigFile string
+	// When enabled, the nex node will not clean up logs or rootfs files
+	ForensicMode bool
+	// When enabled, preflight will automatically install or reinstall dependencies
+	ForceDependencyInstall bool
+}
+
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
-	KernelFile       string            `json:"kernel_file"`
-	RootFsFile       string            `json:"rootfs_file"`
-	DefaultDir       string            `json:"default_resource_dir"`
-	CNI              CNIDefinition     `json:"cni"`
-	InternalNodeHost *string           `json:"internal_node_host,omitempty"`
-	InternalNodePort *int              `json:"internal_node_port"`
-	KernelPath       *string           `json:"kernel_path"`
-	MachinePoolSize  int               `json:"machine_pool_size"`
-	MachineTemplate  MachineTemplate   `json:"machine_template"`
-	RateLimiters     *Limiters         `json:"rate_limiters,omitempty"`
-	RootFsPath       *string           `json:"rootfs_path"`
-	ValidIssuers     []string          `json:"valid_issuers,omitempty"`
-	WorkloadTypes    []string          `json:"workload_types,omitempty"`
-	Tags             map[string]string `json:"tags,omitempty"`
-	ForensicMode     bool              `json:"-"`
-	ForceDepInstall  bool              `json:"-"`
+	KernelFile         string            `json:"kernel_file"`
+	RootFsFile         string            `json:"rootfs_file"`
+	DefaultResourceDir string            `json:"default_resource_dir"`
+	CNI                CNIDefinition     `json:"cni"`
+	InternalNodeHost   *string           `json:"internal_node_host,omitempty"`
+	InternalNodePort   *int              `json:"internal_node_port"`
+	KernelPath         *string           `json:"kernel_path"` // FIXME
+	MachinePoolSize    int               `json:"machine_pool_size"`
+	MachineTemplate    MachineTemplate   `json:"machine_template"`
+	RateLimiters       *Limiters         `json:"rate_limiters,omitempty"`
+	RootFsPath         *string           `json:"rootfs_path"` // FIXME
+	ValidIssuers       []string          `json:"valid_issuers,omitempty"`
+	WorkloadTypes      []string          `json:"workload_types,omitempty"`
+	Tags               map[string]string `json:"tags,omitempty"`
+	ForensicMode       bool              `json:"-"`
+	ForceDepInstall    bool              `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }
@@ -48,7 +79,13 @@ type NodeConfiguration struct {
 func (c *NodeConfiguration) Validate() bool {
 	c.Errors = make([]error, 0)
 
-	// TODO-- add validation
+	if _, err := os.Stat(c.KernelFile); errors.Is(err, os.ErrNotExist) {
+		c.Errors = append(c.Errors, err)
+	}
+
+	if _, err := os.Stat(c.RootFsFile); errors.Is(err, os.ErrNotExist) {
+		c.Errors = append(c.Errors, err)
+	}
 
 	return len(c.Errors) == 0
 }
@@ -62,8 +99,8 @@ type Limiters struct {
 // Defines a reference to the CNI network name, which is defined and configured in a {network}.conflist file, as per
 // CNI convention
 type CNIDefinition struct {
-	NetworkName   *string `json:"network_name"`
 	InterfaceName *string `json:"interface_name"`
+	NetworkName   *string `json:"network_name"`
 }
 
 // Defines the CPU and memory usage of a machine to be configured when it is added to the pool
@@ -73,7 +110,6 @@ type MachineTemplate struct {
 }
 
 type TokenBucket struct {
-
 	// The initial size of a token bucket.
 	// Minimum: 0
 	OneTimeBurst *int64 `json:"one_time_burst,omitempty"`
@@ -114,65 +150,38 @@ func DefaultNodeConfiguration() NodeConfiguration {
 	}
 }
 
-// Retrieves the node configuration from the specified file
+// Reads the node configuration from the specified configuration file path
 func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
 	bytes, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
+
 	config := DefaultNodeConfiguration()
 	err = json.Unmarshal(bytes, &config)
-	if len(config.WorkloadTypes) == 0 {
-		config.WorkloadTypes = defaultWorkloadTypes
-	}
 	if err != nil {
 		return nil, err
 	}
 
-	if config.KernelFile == "" && config.DefaultDir != "" {
-		config.KernelFile = filepath.Join(config.DefaultDir, "vmlinux")
-	} else if config.KernelFile == "" && config.DefaultDir == "" {
+	if len(config.WorkloadTypes) == 0 {
+		config.WorkloadTypes = defaultWorkloadTypes
+	}
+
+	if config.KernelFile == "" && config.DefaultResourceDir != "" {
+		config.KernelFile = filepath.Join(config.DefaultResourceDir, "vmlinux")
+	} else if config.KernelFile == "" && config.DefaultResourceDir == "" {
 		return nil, errors.New("invalid kernel file setting")
 	}
-	if config.RootFsFile == "" && config.DefaultDir != "" {
-		config.RootFsFile = filepath.Join(config.DefaultDir, "rootfs.ext4")
-	} else if config.KernelFile == "" && config.DefaultDir == "" {
+
+	if config.RootFsFile == "" && config.DefaultResourceDir != "" {
+		config.RootFsFile = filepath.Join(config.DefaultResourceDir, "rootfs.ext4")
+	} else if config.KernelFile == "" && config.DefaultResourceDir == "" {
 		return nil, errors.New("invalid rootfs file setting")
 	}
 
 	if config.Tags == nil {
 		config.Tags = make(map[string]string)
 	}
-	return &config, nil
-}
 
-type CliOptions struct {
-	// Servers is the list of servers to connect to
-	Servers string
-	// Creds is nats credentials to authenticate with
-	Creds string
-	// TlsCert is the TLS Public Certificate
-	TlsCert string
-	// TlsKey is the TLS Private Key
-	TlsKey string
-	// TlsCA is the certificate authority to verify the connection with
-	TlsCA string
-	// Timeout is how long to wait for operations
-	Timeout time.Duration
-	// ConnectionName is the name to use for the underlying NATS connection
-	ConnectionName string
-	// Username is the username or token to connect with
-	Username string
-	// Password is the password to connect with
-	Password string
-	// Nkey is the file holding a nkey to connect with
-	Nkey string
-	// TlsFirst configures theTLSHandshakeFirst behavior in nats.go
-	TlsFirst bool
-	// Path to the file containing virtual machine management settings and node-wide settings
-	NodeConfigFile string
-	// When enabled, the nex node will not clean up logs or rootfs files
-	ForensicMode bool
-	// When enabled, preflight will automatically install or reinstall dependencies
-	ForceDependencyInstall bool
+	return &config, nil
 }

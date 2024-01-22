@@ -1,12 +1,15 @@
-package controlapi
+package spec
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+
+	. "github.com/ConnectEverything/nex/internal/control-api"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,13 +30,13 @@ var _ = Describe("event monitor", func() {
 	BeforeEach(func() {
 		var err error
 
-		nc, err = nats.Connect(nats.DefaultURL)
-		Expect(err).ToNot(BeNil())
+		nc, err = nats.Connect(fmt.Sprintf("nats://0.0.0.0:%d", *_fixtures.natsPort))
+		Expect(err).To(BeNil())
 
 		log = logrus.New()
 		client = NewApiClient(nc, time.Second, log)
 		ch, err = client.MonitorEvents("*", "*", 0)
-		Expect(err).ToNot(BeNil())
+		Expect(err).To(BeNil())
 
 		evt := cloudevents.NewEvent()
 		evt.SetType("workload_started")
@@ -83,20 +86,20 @@ var _ = Describe("log monitor", func() {
 	var ch chan EmittedLog
 	var subject EmittedLog
 
-	var raw rawLog // FIXME...
+	var raw RawLog // FIXME...
 
 	BeforeEach(func() {
 		var err error
 
-		nc, err = nats.Connect(nats.DefaultURL)
-		Expect(err).ToNot(BeNil())
+		nc, err = nats.Connect(fmt.Sprintf("nats://0.0.0.0:%d", *_fixtures.natsPort))
+		Expect(err).To(BeNil())
 
 		log = logrus.New()
 		client = NewApiClient(nc, time.Second, log)
 		ch, err = client.MonitorLogs("*", "*", "*", "*", 0)
-		Expect(err).ToNot(BeNil())
+		Expect(err).To(BeNil())
 
-		raw = rawLog{Text: "hey from test", Level: logrus.DebugLevel, MachineId: "vm1234"}
+		raw = RawLog{Text: "hey from test", Level: logrus.DebugLevel, MachineId: "vm1234"}
 		bytes, _ := json.Marshal(raw)
 
 		_ = nc.Publish("$NEX.logs.default.Nxxxx.echoservice.vm1234", bytes)
@@ -120,6 +123,6 @@ var _ = Describe("log monitor", func() {
 	})
 
 	It("wraps the raw on the wire log", func(ctx SpecContext) {
-		Expect(subject.rawLog).To(Equal(raw))
+		Expect(subject.RawLog).To(Equal(raw))
 	})
 })

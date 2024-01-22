@@ -10,10 +10,10 @@ import (
 
 func init() {
 	node_up := nodes.Command("up", "Starts a NEX node")
-	node_up.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.Config)
+	node_up.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
 	node_preflight := nodes.Command("preflight", "Checks system for node requirements and installs missing")
 	node_preflight.Flag("force", "installs missing dependencies without prompt").Default("false").BoolVar(&NodeOpts.ForceDepInstall)
-	node_preflight.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.Config)
+	node_preflight.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
 	node_up.Action(RunNodeUp)
 	node_preflight.Action(RunNodePreflight)
 

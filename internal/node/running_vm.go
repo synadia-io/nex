@@ -35,7 +35,6 @@ type runningFirecracker struct {
 }
 
 func (vm *runningFirecracker) shutDown() {
-
 	log.WithField("vmid", vm.vmmID).
 		WithField("ip", vm.ip).
 		Info("Machine stopping")
@@ -209,8 +208,8 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 			AllowMMDS: true,
 			// Use CNI to get dynamic IP
 			CNIConfiguration: &firecracker.CNIConfiguration{
-				NetworkName: *config.CNI.NetworkName,
 				IfName:      *config.CNI.InterfaceName,
+				NetworkName: *config.CNI.NetworkName,
 			},
 			//OutRateLimiter: firecracker.NewRateLimiter(..., ...),
 			//InRateLimiter: firecracker.NewRateLimiter(..., ...),

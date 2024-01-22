@@ -47,6 +47,9 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.21'
+    -
+      name: Symlink go
+      run: sudo ln -f -s /opt/hostedtoolcache/go/1.21.5/x64/bin/* /usr/bin/
     - 
       name: Install ginkgo
       shell: bash --noprofile --norc -x -eo pipefail {0}
@@ -60,21 +63,13 @@ jobs:
         ~/.local/share/pnpm/pnpm install
         ~/.local/share/pnpm/pnpm build
     - 
-      name: Test agent
-      working-directory: ./agent
-      run: go test -v ./...
+      name: Run spec suite
+      working-directory: .
+      run: sudo -E ~/go/bin/ginkgo run -r --randomize-all --vv -race --trace --keep-going ./spec
     - 
-      name: Test nex cli
-      working-directory: ./nex
-      run: go test -v ./...
-    - 
-      name: Test control-api
-      working-directory: ./internal/control-api
-      run: ginkgo
-    - 
-      name: Test nex node
-      working-directory: ./internal/node
-      run: go test -v ./...
+      name: Run test suite
+      working-directory: .
+      run: go test -v -race ./test
 
   build:
     runs-on: ubuntu-latest
@@ -102,7 +97,6 @@ jobs:
       working-directory: ./nex
       run: go build .
 
-  
   goreleaser:
     runs-on: ubuntu-latest
     steps:
