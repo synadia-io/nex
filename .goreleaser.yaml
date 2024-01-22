@@ -36,7 +36,7 @@ builds:
       - netgo
     hooks:
       post:
-        - go run ./agent/fc-image/. {{.Path}} 
+        - sudo go run ./agent/fc-image/. {{.Path}} 
         - ls -lah
 
 archives:
