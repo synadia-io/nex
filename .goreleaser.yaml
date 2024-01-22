@@ -54,11 +54,13 @@ archives:
   - id: binaries
     format: binary
     name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    allow_different_binary_count: true
   - id: rootfs
     format: tar.gz
     name_template: "{{ .ProjectName }}_{{ .Version }}"
     files:
       - rootfs.ext4
+    allow_different_binary_count: true
 
 changelog:
   sort: asc
