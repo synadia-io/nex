@@ -58,7 +58,7 @@ archives:
 
 release:
   extra_files:
-    - glob: ./rootfs.ext4
+    - glob: ./rootfs.ext4.gz
 
 changelog:
   sort: asc
