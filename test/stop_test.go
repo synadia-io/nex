@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/nats-io/nkeys"
+	. "github.com/synadia-io/nex/internal/control-api"
 )
 
 func TestStopValidation(t *testing.T) {

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/cdfmlr/ellipsis"
 	"github.com/choria-io/fisk"
 	"github.com/sirupsen/logrus"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 func WatchEvents(ctx *fisk.ParseContext) error {

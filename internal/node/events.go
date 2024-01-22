@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
-	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // FIXME-- move this to types repo-- audit other places where it is redeclared (nex-cli)

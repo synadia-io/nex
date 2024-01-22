@@ -1,6 +1,6 @@
 package main
 
-import nexui "github.com/ConnectEverything/nex/ui"
+import nexui "github.com/synadia-io/nex/ui"
 
 // This is a convenience binary if you just want to run the UI. The "normal"
 // way of launching the UI (unless you're testing, etc) should be to use

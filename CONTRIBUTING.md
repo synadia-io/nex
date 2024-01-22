@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing! This document contains `ConnectEverything/nex` specific contributing details. If you are a first-time contributor, please refer to the general [NATS Contributor Guide](https://nats.io/contributing/) to get a comprehensive overview of contributing to the NATS project.
+Thanks for your interest in contributing! This document contains `synadia-io/nex` specific contributing details. If you are a first-time contributor, please refer to the general [NATS Contributor Guide](https://nats.io/contributing/) to get a comprehensive overview of contributing to the NATS project.
 
 ## Getting started
 
@@ -10,7 +10,7 @@ There are there general ways you can contribute to this repo:
 - Reporting a bug or regression
 - Contributing changes to the source code
 
-For the first two, refer to the [GitHub Issues](https://github.com/ConnectEverything/nex/issues/new/choose) which guides you through the available options along with the needed information to collect.
+For the first two, refer to the [GitHub Issues](https://github.com/synadia-io/nex/issues/new/choose) which guides you through the available options along with the needed information to collect.
 
 ## Contributing Changes
 
@@ -34,5 +34,5 @@ A good pull request includes:
 
 ## Get Help
 
-If you have questions about the contribution process, please start a [GitHub discussion](https://github.com/ConnectEverything/nex/discussions), join the [NATS Slack](https://slack.nats.io/), or send your question to the [NATS Google Group](https://groups.google.com/forum/#!forum/natsio).
+If you have questions about the contribution process, please start a [GitHub discussion](https://github.com/synadia-io/nex/discussions), join the [NATS Slack](https://slack.nats.io/), or send your question to the [NATS Google Group](https://groups.google.com/forum/#!forum/natsio).
 

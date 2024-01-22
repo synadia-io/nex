@@ -3,7 +3,7 @@ package lib
 import (
 	"errors"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 // OCI execution provider implementation

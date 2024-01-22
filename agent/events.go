@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 const NexEventSourceNexAgent = "nex-agent"

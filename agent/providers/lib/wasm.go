@@ -7,8 +7,8 @@ import (
 	"io"
 	"os"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
 	"github.com/nats-io/nats.go"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"

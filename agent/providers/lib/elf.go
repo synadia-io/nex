@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 // ELF execution provider implementation

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 // logEmitter implements the writer interface that allows us to capture a workload's

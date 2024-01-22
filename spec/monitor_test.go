@@ -9,7 +9,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
 
-	. "github.com/ConnectEverything/nex/internal/control-api"
+	. "github.com/synadia-io/nex/internal/control-api"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

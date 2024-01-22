@@ -3,8 +3,8 @@ package providers
 import (
 	"errors"
 
-	"github.com/ConnectEverything/nex/agent/providers/lib"
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
+	"github.com/synadia-io/nex/agent/providers/lib"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 // NexExecutionProviderELF Executable Linkable Format execution provider

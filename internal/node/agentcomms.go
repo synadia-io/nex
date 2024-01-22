@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 // Called when the node server gets a log entry via internal NATS. Used to
