@@ -25,6 +25,6 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean
+          args: release --verbose --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GHA_RELEASE }}
