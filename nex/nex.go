@@ -14,6 +14,9 @@ var (
 	COMMIT    = ""
 	BUILDDATE = ""
 
+	ncli  = fisk.New("nex", "")
+	nodes = ncli.Command("node", "Interact with execution engine nodes")
+
 	Opts       = &models.Options{}
 	GuiOpts    = &models.UiOptions{}
 	RunOpts    = &models.RunOptions{Env: make(map[string]string)}
@@ -25,9 +28,8 @@ var (
 
 func main() {
 	blue := color.New(color.FgBlue).SprintFunc()
-	help := fmt.Sprintf("%s\nNATS Execution Engine CLI Version %s\n", blue(Banner), VERSION)
+	ncli.Help = fmt.Sprintf("%s\nNATS Execution Engine CLI Version %s\n", blue(Banner), VERSION)
 
-	ncli := fisk.New("nex", help)
 	ncli.Author("Synadia Communications")
 	ncli.UsageWriter(os.Stdout)
 	ncli.Version(fmt.Sprintf("v%s [%s] | Built-on: %s", VERSION, COMMIT, BUILDDATE))
@@ -46,21 +48,12 @@ func main() {
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
 
-	nodes := ncli.Command("node", "Interact with execution engine nodes")
 	nodes_ls := nodes.Command("ls", "List nodes")
 	nodes_ls.Action(ListNodes)
 
 	nodes_info := nodes.Command("info", "Get information for an engine node")
 	nodes_info.Arg("id", "Public key of the node you're interested in").Required().String()
 	nodes_info.Action(NodeInfo)
-
-	node_up := nodes.Command("up", "Starts a NEX node")
-	node_up.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.Config)
-	node_preflight := nodes.Command("preflight", "Checks system for node requirements and installs missing")
-	node_preflight.Flag("force", "installs missing dependencies without prompt").Default("false").BoolVar(&NodeOpts.ForceDepInstall)
-	node_preflight.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.Config)
-	node_up.Action(RunNodeUp)
-	node_preflight.Action(RunNodePreflight)
 
 	run := ncli.Command("run", "Run a workload on a target node")
 	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
@@ -97,10 +90,6 @@ func main() {
 
 	evts := ncli.Command("events", "Live monitor events from nex nodes")
 	evts.Action(WatchEvents)
-
-	ui := ncli.Command("ui", "Starts a web server for interacting with Nex")
-	ui.Flag("port", "Port on which to run the UI").Default("8080").IntVar(&GuiOpts.Port)
-	ui.Action(RunUI)
 
 	ncli.MustParseWithUsage(os.Args[1:])
 }
