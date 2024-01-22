@@ -15,8 +15,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/ConnectEverything/nex/internal/models"
-	nexnode "github.com/ConnectEverything/nex/internal/node"
+	"github.com/synadia-io/nex/internal/models"
+	nexnode "github.com/synadia-io/nex/internal/node"
 )
 
 const defaultCNIPluginBinPath = "/opt/cni/bin"

@@ -1,4 +1,4 @@
-module github.com/ConnectEverything/nex
+module github.com/synadia-io/nex
 
 go 1.21
 

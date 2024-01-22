@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Discussion
-    url: https://github.com/ConnectEverything/nex/discussions
+    url: https://github.com/synadia-io/nex/discussions
     about: Ideal for ideas, feedback, or longer form questions.
   - name: Chat
     url: https://slack.nats.io

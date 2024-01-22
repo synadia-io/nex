@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 // MmdsAddress is the address used by the agent to query firecracker MMDS

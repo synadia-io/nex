@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
 	"github.com/nats-io/nats.go"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	v8 "rogchap.com/v8go"
 )
 

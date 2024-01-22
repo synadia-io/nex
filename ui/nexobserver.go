@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
-	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/nats-io/nats.go"
 	"github.com/sirupsen/logrus"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 type NexObserver struct {

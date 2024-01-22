@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // Issues a request to stop a running workload

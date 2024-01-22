@@ -3,8 +3,8 @@
 package main
 
 import (
-	nexui "github.com/ConnectEverything/nex/ui"
 	"github.com/choria-io/fisk"
+	nexui "github.com/synadia-io/nex/ui"
 )
 
 func init() {

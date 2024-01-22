@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
-	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // Represents an instance of a single firecracker VM containing the nex agent.

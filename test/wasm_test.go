@@ -3,8 +3,8 @@ package test
 import (
 	"testing"
 
-	"github.com/ConnectEverything/nex/agent/providers/lib"
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
+	"github.com/synadia-io/nex/agent/providers/lib"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 func TestWasmExecution(t *testing.T) {

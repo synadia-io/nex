@@ -9,10 +9,10 @@ import (
 	"path"
 	"time"
 
-	"github.com/ConnectEverything/nex/agent/providers"
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/nats-io/nats.go"
+	"github.com/synadia-io/nex/agent/providers"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 const defaultAgentHandshakeTimeoutMillis = 250

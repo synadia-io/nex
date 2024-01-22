@@ -11,12 +11,12 @@ import (
 	"strconv"
 	"time"
 
-	agentapi "github.com/ConnectEverything/nex/internal/agent-api"
-	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/sirupsen/logrus"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 const (

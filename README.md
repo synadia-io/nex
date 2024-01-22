@@ -1,5 +1,5 @@
-[![Lint | Test | Build](https://github.com/ConnectEverything/nex/actions/workflows/build.yml/badge.svg)](https://github.com/ConnectEverything/nex/actions/workflows/build.yml)
-![Release](https://github.com/ConnectEverything/nex/actions/workflows/release.yml/badge.svg)
+[![Lint | Test | Build](https://github.com/synadia-io/nex/actions/workflows/build.yml/badge.svg)](https://github.com/synadia-io/nex/actions/workflows/build.yml)
+![Release](https://github.com/synadia-io/nex/actions/workflows/release.yml/badge.svg)
 
 # NATS Execution Engine
 Leverage and extend your investment in NATS infrastructure to deploy functions and services, turning NATS into the ultimate platform for building distributed applications.
@@ -10,7 +10,7 @@ The easiest way to get started with Nex is to check out our [Using Nex](https://
 If you're already familiar with Nex and how it works, then you can get going quickly by installing the Nex CLI:
 
 ```
-go install github.com/ConnectEverything/nex/nex@latest
+go install github.com/synadia-io/nex/nex@latest
 ```
 
 _**Note** that an installation method that doesn't require Go is coming soon._

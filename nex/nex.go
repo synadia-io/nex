@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ConnectEverything/nex/internal/models"
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 var (

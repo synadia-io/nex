@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 
-	nexnode "github.com/ConnectEverything/nex/internal/node"
 	"github.com/choria-io/fisk"
 	"github.com/sirupsen/logrus"
+	nexnode "github.com/synadia-io/nex/internal/node"
 )
 
 func init() {

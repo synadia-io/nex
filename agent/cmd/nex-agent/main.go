@@ -8,7 +8,7 @@ import (
 	"os"
 	"syscall"
 
-	nexagent "github.com/ConnectEverything/nex/agent"
+	nexagent "github.com/synadia-io/nex/agent"
 )
 
 var (

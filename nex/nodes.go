@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	controlapi "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/choria-io/fisk"
 	"github.com/nats-io/natscli/columns"
 	"github.com/sirupsen/logrus"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // Uses a control API client to request a node list from a NATS environment
