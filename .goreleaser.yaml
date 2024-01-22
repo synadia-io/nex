@@ -37,6 +37,7 @@ builds:
     hooks:
       post:
         - go run ./agent/fc-image/. {{.Path}} 
+        - ls -lah
 
 archives:
   - id: binaries
