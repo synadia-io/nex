@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"os"
@@ -162,7 +163,17 @@ func build(ctx context.Context, tempdir string, mountPoint string) error {
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile("rootfs.ext4", input, 0644)
+
+	rfs, err := os.Create("rootfs.ext4.gz")
+	if err != nil {
+		return err
+	}
+	defer rfs.Close()
+
+	gw := gzip.NewWriter(rfs)
+	defer gw.Close()
+
+	_, err = gw.Write(input)
 	if err != nil {
 		return err
 	}
