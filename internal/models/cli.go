@@ -76,23 +76,23 @@ type WatchOptions struct {
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeOptions struct {
-	Config          string `json:"-"`
+	ConfigFilepath  string `json:"-"`
 	ForceDepInstall bool   `json:"-"`
 
-	KernelFile       string            `json:"kernel_file"`
-	RootFsFile       string            `json:"rootfs_file"`
-	DefaultDir       string            `json:"default_resource_dir"`
-	CNI              CNIDefinition     `json:"cni"`
-	InternalNodeHost *string           `json:"internal_node_host,omitempty"`
-	InternalNodePort *int              `json:"internal_node_port"`
-	KernelPath       *string           `json:"kernel_path"`
-	MachinePoolSize  int               `json:"machine_pool_size"`
-	MachineTemplate  MachineTemplate   `json:"machine_template"`
-	RateLimiters     *Limiters         `json:"rate_limiters,omitempty"`
-	RootFsPath       *string           `json:"rootfs_path"`
-	ValidIssuers     []string          `json:"valid_issuers,omitempty"`
-	WorkloadTypes    []string          `json:"workload_types,omitempty"`
-	Tags             map[string]string `json:"tags,omitempty"`
+	CNI                CNIDefinition     `json:"cni"`
+	DefaultResourceDir string            `json:"default_resource_dir"`
+	InternalNodeHost   *string           `json:"internal_node_host,omitempty"`
+	InternalNodePort   *int              `json:"internal_node_port"`
+	KernelFilepath     string            `json:"kernel_file"`
+	KernelPath         *string           `json:"kernel_path"` // FIXME-- audit json
+	MachinePoolSize    int               `json:"machine_pool_size"`
+	MachineTemplate    MachineTemplate   `json:"machine_template"`
+	RateLimiters       *Limiters         `json:"rate_limiters,omitempty"`
+	RootFsFilepath     string            `json:"rootfs_file"` // FIXME-- audit json
+	RootFsPath         *string           `json:"rootfs_path"`
+	Tags               map[string]string `json:"tags,omitempty"`
+	ValidIssuers       []string          `json:"valid_issuers,omitempty"`
+	WorkloadTypes      []string          `json:"workload_types,omitempty"`
 
 	Errors []error `json:"errors,omitempty"`
 }
@@ -125,7 +125,6 @@ type MachineTemplate struct {
 }
 
 type TokenBucket struct {
-
 	// The initial size of a token bucket.
 	// Minimum: 0
 	OneTimeBurst *int64 `json:"one_time_burst,omitempty"`

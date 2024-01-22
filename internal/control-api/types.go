@@ -77,10 +77,10 @@ type EmittedLog struct {
 	NodeId    string `json:"node_id"`
 	Workload  string `json:"workload_id"`
 	Timestamp string `json:"timestamp"`
-	rawLog
+	RawLog
 }
 
-type rawLog struct {
+type RawLog struct {
 	Text      string       `json:"text"`
 	Level     logrus.Level `json:"level"`
 	MachineId string       `json:"machine_id"`

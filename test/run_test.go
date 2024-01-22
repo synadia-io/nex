@@ -1,8 +1,9 @@
-package controlapi
+package test
 
 import (
 	"testing"
 
+	. "github.com/ConnectEverything/nex/internal/control-api"
 	"github.com/nats-io/nkeys"
 )
 
