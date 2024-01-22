@@ -11,13 +11,25 @@ builds:
     binary: "nex"
     goos:
       - linux
+      - darwin
+      - windows
     goarch:
       - amd64
+      - arm64
+      - arm
+    goarm:
+      - 7
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: windows 
+        goarch: arm
     ldflags:
       - -s -w --X main.VERSION={{.Version}} -X main.COMMIT={{.Commit}} -X main.BUILDDATE={{.Date}}
       - -extldflags "-static"
     tags:
       - netgo
+      - withui
     hooks:
       pre:
         - go run ./ui/web/build/main.go ./ui/web
@@ -37,7 +49,6 @@ builds:
     hooks:
       post:
         - sudo go run ./agent/fc-image/. {{.Path}} 
-        - ls -lah
 
 archives:
   - id: binaries
