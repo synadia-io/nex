@@ -7,7 +7,7 @@ import (
 	nexnode "github.com/synadia-io/nex/internal/node"
 )
 
-func init() {
+func setConditionalCommands() {
 	node_up = nodes.Command("up", "Starts a NEX node")
 	node_preflight = nodes.Command("preflight", "Checks system for node requirements and installs missing")
 

@@ -93,8 +93,8 @@ func init() {
 }
 
 func main() {
-
-	// ---------------------------
+	setConditionalCommands()
+	cmd := fisk.MustParse(ncli.Parse(os.Args[1:]))
 
 	ctx := context.Background()
 	opts := slog.HandlerOptions{}
@@ -117,9 +117,8 @@ func main() {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &opts))
 	}
 
-	switch fisk.MustParse(ncli.Parse(os.Args[1:])) {
+	switch cmd {
 	case nodes_ls.FullCommand():
-		fmt.Println(nodes_ls.FullCommand())
 		err := ListNodes(ctx, logger)
 		if err != nil {
 			logger.Error("list nodes failed to execute", slog.Any("err", err))
