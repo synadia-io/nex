@@ -148,9 +148,9 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 
 	log.Info("Machine started",
 		slog.String("vmid", vmmID),
-		slog.String("ip", string(ip)),
-		slog.String("gateway", string(gw)),
-		slog.String("netmask", string(mask)),
+		slog.Any("ip", ip),
+		slog.Any("gateway", gw),
+		slog.Any("netmask", mask),
 		slog.String("hosttap", hosttap),
 		slog.String("nats_host", *md.NodeNatsHost),
 		slog.Int("nats_port", *md.NodeNatsPort),
