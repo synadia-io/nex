@@ -3,21 +3,21 @@ package nexnode
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // FIXME-- move this to types repo-- audit other places where it is redeclared (nex-cli)
 type emittedLog struct {
-	Text      string       `json:"text"`
-	Level     logrus.Level `json:"level"`
-	MachineId string       `json:"machine_id"`
+	Text      string     `json:"text"`
+	Level     slog.Level `json:"level"`
+	MachineId string     `json:"machine_id"`
 }
 
 // PublishCloudEvent writes the given $NEX event to an arbitrary namespace
@@ -28,7 +28,7 @@ func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.E
 	subject := fmt.Sprintf("%s.%s.%s", EventSubjectPrefix, namespace, event.Type())
 	err := m.nc.Publish(subject, raw)
 	if err != nil {
-		m.log.WithError(err).Error("Failed to publish cloud event")
+		m.log.Error("Failed to publish cloud event", slog.Any("err", err))
 	}
 
 	return m.nc.Flush()
@@ -63,7 +63,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) error {
 
 		emitLog := emittedLog{
 			Text:      "Workload stopped",
-			Level:     logrus.DebugLevel,
+			Level:     slog.LevelDebug,
 			MachineId: vm.vmmID,
 		}
 		logBytes, _ := json.Marshal(emitLog)
@@ -71,7 +71,7 @@ func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) error {
 		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, workloadName, vm.vmmID)
 		err = m.nc.Publish(subject, logBytes)
 		if err != nil {
-			m.log.WithError(err).Error("Failed to publish machine stopped event")
+			m.log.Error("Failed to publish machine stopped event", slog.Any("err", err))
 		}
 
 		return m.nc.Flush()

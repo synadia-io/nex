@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path"
@@ -14,7 +15,6 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/sirupsen/logrus"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
@@ -37,7 +37,7 @@ type MachineManager struct {
 	kp          nkeys.KeyPair
 	nc          *nats.Conn
 	ncInternal  *nats.Conn
-	log         *logrus.Logger
+	log         *slog.Logger
 	allVms      map[string]*runningFirecracker
 	warmVms     chan *runningFirecracker
 
@@ -48,7 +48,7 @@ type MachineManager struct {
 	publicKey    string
 }
 
-func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.Conn, config *NodeConfiguration, log *logrus.Logger) (*MachineManager, error) {
+func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.Conn, config *NodeConfiguration, log *slog.Logger) (*MachineManager, error) {
 	// Validate the node config
 	if !config.Validate() {
 		return nil, fmt.Errorf("failed to create new machine manager; invalid node config; %v", config.Errors)
@@ -92,7 +92,7 @@ func (m *MachineManager) Start() error {
 	}
 
 	m.ncInternal = ncInternal
-	m.log.WithField("client_url", natsServer.ClientURL()).Info("Internal NATS server started")
+	m.log.Info("Internal NATs server started", slog.String("client_url", natsServer.ClientURL()))
 
 	_, err = m.ncInternal.Subscribe("agentint.*.logs", handleAgentLog(m))
 	if err != nil {
@@ -128,9 +128,9 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 	bytes, _ := json.Marshal(req)
 
 	status := m.ncInternal.Status()
-	m.log.WithField("vmid", vm.vmmID).
-		WithField("status", status.String()).
-		Debug("NATS internal connection status")
+	m.log.Debug("NATS internal connection status",
+		slog.String("vmid", vm.vmmID),
+		slog.String("status", status.String()))
 
 	subject := fmt.Sprintf("agentint.%s.deploy", vm.vmmID)
 	resp, err := m.ncInternal.Request(subject, bytes, 1*time.Second)
@@ -159,42 +159,46 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 
 				resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
 				if err != nil {
-					m.log.WithField("vmid", vm.vmmID).
-						WithField("trigger_subject", tsub).
-						WithField("workload_type", *request.WorkloadType).
-						WithError(err).
-						Error("Failed to request agent execution via internal trigger subject")
+					m.log.Error("Failed to request agent execution via internal trigger subject",
+						slog.Any("err", err),
+						slog.String("trigger_subject", tsub),
+						slog.String("workload_type", *request.WorkloadType),
+						slog.String("vmid", vm.vmmID),
+					)
 				} else if resp != nil {
-					m.log.WithField("vmid", vm.vmmID).
-						WithField("trigger_subject", tsub).
-						WithField("workload_type", *request.WorkloadType).
-						WithField("payload_size", len(resp.Data)).
-						Debug("Received response from execution via trigger subject")
-
+					m.log.Debug("Received response from execution via trigger subject",
+						slog.String("vmid", vm.vmmID),
+						slog.String("trigger_subject", tsub),
+						slog.String("workload_type", *request.WorkloadType),
+						slog.Int("payload_size", len(resp.Data)),
+					)
 					err = msg.Respond(resp.Data)
 					if err != nil {
-						m.log.WithField("vmid", vm.vmmID).
-							WithField("trigger_subject", tsub).
-							WithField("workload_type", *request.WorkloadType).
-							WithError(err).
-							Error("Failed to respond to trigger subject subscription request for deployed workload")
+						m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
+							slog.String("vmid", vm.vmmID),
+							slog.String("trigger_subject", tsub),
+							slog.String("workload_type", *request.WorkloadType),
+							slog.Any("err", err),
+						)
 					}
 				}
 			})
 			if err != nil {
-				m.log.WithField("vmid", vm.vmmID).
-					WithField("trigger_subject", tsub).
-					WithField("workload_type", *request.WorkloadType).
-					WithError(err).
-					Error("Failed to create trigger subject subscription for deployed workload")
+				m.log.Error("Failed to create trigger subject subscription for deployed workload",
+					slog.String("vmid", vm.vmmID),
+					slog.String("trigger_subject", tsub),
+					slog.String("workload_type", *request.WorkloadType),
+					slog.Any("err", err),
+				)
 				// TODO-- rollback the otherwise accepted deployment and return the error below...
 				// return err
 			}
 
-			m.log.WithField("vmid", vm.vmmID).
-				WithField("trigger_subject", tsub).
-				WithField("workload_type", *request.WorkloadType).
-				Info("Created trigger subject subscription for deployed workload")
+			m.log.Info("Created trigger subject subscription for deployed workload",
+				slog.String("vmid", vm.vmmID),
+				slog.String("trigger_subject", tsub),
+				slog.String("workload_type", *request.WorkloadType),
+			)
 		}
 	}
 
@@ -214,14 +218,14 @@ func (m *MachineManager) Stop() error {
 	m.rootCancel() // stops the pool from refilling
 	for _, vm := range m.allVms {
 		_ = m.PublishMachineStopped(vm)
-		vm.shutDown()
+		vm.shutDown(m.log)
 	}
 
 	_ = m.PublishNodeStopped()
 
 	// Now empty the leftovers in the pool
 	for vm := range m.warmVms {
-		vm.shutDown()
+		vm.shutDown(m.log)
 	}
 	time.Sleep(100 * time.Millisecond)
 
@@ -238,7 +242,7 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	}
 
 	_ = m.PublishMachineStopped(vm)
-	vm.shutDown()
+	vm.shutDown(m.log)
 	delete(m.allVms, vmId)
 
 	return nil
@@ -268,15 +272,15 @@ func (m *MachineManager) fillPool() {
 		case <-m.rootContext.Done():
 			return
 		default:
-			vm, err := createAndStartVM(m.rootContext, m.config)
+			vm, err := createAndStartVM(m.rootContext, m.config, m.log)
 			if err != nil {
-				m.log.WithError(err).Error("Failed to create VMM for warming pool. Aborting.")
+				m.log.Error("Failed to create VMM for warming pool. Aborting.", slog.Any("err", err))
 				// if we can't create a vm, there's no point in this app staying up
 				panic(err)
 			}
 
 			go m.awaitHandshake(vm.vmmID)
-			m.log.WithField("ip", vm.ip).WithField("vmid", vm.vmmID).Info("Adding new VM to warm pool")
+			m.log.Info("Adding new VM to warm pool", slog.String("ip", string(vm.ip)), slog.String("vmid", vm.vmmID))
 
 			// If the pool is full, this line will block until a slot is available.
 			m.warmVms <- vm
@@ -293,7 +297,7 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 	handshakeOk := false
 	for !handshakeOk {
 		if time.Now().UTC().After(timeoutAt) {
-			m.log.WithField("vmid", vmid).Error("Did not receive NATS handshake from agent within timeout. Exiting unstable node")
+			m.log.Error("Did not receive NATS handshake from agent within timeout. Exiting unstable node", slog.String("vmid", vmid))
 			_ = m.Stop()
 			os.Exit(1) // FIXME
 		}

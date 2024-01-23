@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/choria-io/fisk"
-	// nexnode "github.com/synadia-io/nex/internal/node"
+	nexnode "github.com/synadia-io/nex/internal/node"
 )
 
 func init() {
@@ -52,15 +52,15 @@ func init() {
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
-	// ctx, cancel := context.WithCancel(ctx)
-	// nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
-	// <-ctx.Done()
+	ctx, cancel := context.WithCancel(ctx)
+	nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
+	<-ctx.Done()
 	return nil
 }
 
 func RunNodePreflight(ctx context.Context, logger *slog.Logger) error {
-	// ctx, cancel := context.WithCancel(ctx)
-	// nexnode.CmdPreflight(Opts, NodeOpts, ctx, cancel, logger)
-
+	ctx, cancel := context.WithCancel(ctx)
+	nexnode.CmdPreflight(Opts, NodeOpts, ctx, cancel, logger)
+	<-ctx.Done()
 	return nil
 }
