@@ -26,6 +26,6 @@ func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
 func RunNodePreflight(ctx context.Context, logger *slog.Logger) error {
 	ctx, cancel := context.WithCancel(ctx)
 	nexnode.CmdPreflight(Opts, NodeOpts, ctx, cancel, logger)
-	<-ctx.Done()
+
 	return nil
 }
