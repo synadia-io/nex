@@ -143,7 +143,7 @@ func handleEventEntry(log *slog.Logger, emittedEvent controlapi.EmittedEvent) {
 		attrs = append(attrs, slog.Any(k, v))
 	}
 
-	log.LogAttrs(nil, slog.LevelInfo, "Received", attrs...)
+	log.LogAttrs(context.Background(), slog.LevelInfo, "Received", attrs...)
 }
 
 func handleLogEntry(log *slog.Logger, entry controlapi.EmittedLog) {
