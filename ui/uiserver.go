@@ -96,8 +96,8 @@ func (w WebServer) ServeUI() error {
 	}
 
 	http.Handle("/", http.FileServer(http.FS(dist)))
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
+	http.HandleFunc("/ws", func(ww http.ResponseWriter, r *http.Request) {
+		serveWs(w.Logger, hub, ww, r)
 	})
 
 	w.Logger.Info("Starting nex UI server", "host", w.host, "port", w.port)
