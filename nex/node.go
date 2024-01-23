@@ -2,9 +2,14 @@
 
 package main
 
+import (
+	"context"
+	"log/slog"
+)
+
 func init() {
-	node_up := nodes.Command("up", "Starts a NEX node").Hidden()
-	node_preflight := nodes.Command("preflight", "Checks system for node requirements and installs missing").Hidden()
+	node_up = nodes.Command("up", "Starts a NEX node").Hidden()
+	node_preflight = nodes.Command("preflight", "Checks system for node requirements and installs missing").Hidden()
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger) error {

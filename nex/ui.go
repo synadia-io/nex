@@ -14,7 +14,7 @@ func init() {
 }
 
 func RunUI(ctx *fisk.ParseContext) error {
-	nexui.ServeUI(GuiOpts.Port)
+	ws := nexui.NewWebServer()
 
-	return nil
+	return ws.ServeUI()
 }
