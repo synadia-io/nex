@@ -2,10 +2,10 @@ package nexui
 
 import (
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
@@ -13,10 +13,10 @@ type NexObserver struct {
 	hub     *Hub
 	conn    *nats.Conn
 	nodeCtl *controlapi.Client
-	log     *logrus.Logger
+	log     *slog.Logger
 }
 
-func newObserver(hub *Hub, nc *nats.Conn, log *logrus.Logger) (*NexObserver, error) {
+func newObserver(hub *Hub, nc *nats.Conn, log *slog.Logger) (*NexObserver, error) {
 	return &NexObserver{
 		hub:     hub,
 		conn:    nc,
@@ -43,24 +43,26 @@ func (observer *NexObserver) run() error {
 	return nil
 }
 
-func dispatchEvents(eventChannel chan controlapi.EmittedEvent, hub *Hub, log *logrus.Logger) {
+func dispatchEvents(eventChannel chan controlapi.EmittedEvent, hub *Hub, log *slog.Logger) {
 	for {
 		event := <-eventChannel
-		log.WithField("event_type", event.EventType).Info("Dispatching event")
+		log.Info("Dispatching event", "event_type", event.EventType)
 		eventBytes, err := json.Marshal(event)
 		if err != nil {
+			log.Error("failed to marchal event bytes", err)
 			continue
 		}
 		hub.broadcastMessage(eventBytes)
 	}
 }
 
-func dispatchLogs(logChannel chan controlapi.EmittedLog, hub *Hub, log *logrus.Logger) {
+func dispatchLogs(logChannel chan controlapi.EmittedLog, hub *Hub, log *slog.Logger) {
 	for {
 		logLine := <-logChannel
-		log.WithField("namespace", logLine.Namespace).Info("Dispatching log line")
+		log.Info("Dispatching log line", "namespace", logLine.Namespace)
 		logBytes, err := json.Marshal(logLine)
 		if err != nil {
+			log.Error("failed to marchal log bytes", err)
 			continue
 		}
 		hub.broadcastMessage(logBytes)

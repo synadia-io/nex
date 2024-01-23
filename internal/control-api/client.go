@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 )
 
 // API subjects:
@@ -23,18 +23,18 @@ type Client struct {
 	nc        *nats.Conn
 	timeout   time.Duration
 	namespace string
-	log       *logrus.Logger
+	log       *slog.Logger
 }
 
 // Creates a new client to communicate with a group of NEX nodes, using the
 // namespace of 'default' for applicable requests
-func NewApiClient(nc *nats.Conn, timeout time.Duration, log *logrus.Logger) *Client {
+func NewApiClient(nc *nats.Conn, timeout time.Duration, log *slog.Logger) *Client {
 	return NewApiClientWithNamespace(nc, timeout, "default", log)
 }
 
 // Creates a new client to communicate with a group of NEX nodes all within a given namespace. Note that
 // this namespace is used for requests where it is mandatory
-func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace string, log *logrus.Logger) *Client {
+func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace string, log *slog.Logger) *Client {
 	return &Client{nc: nc, timeout: timeout, namespace: namespace, log: log}
 }
 
@@ -226,16 +226,15 @@ func handleLogEntry(api *Client, ch chan EmittedLog) func(m *nats.Msg) {
 		*/
 		tokens := strings.Split(m.Subject, ".")
 		if len(tokens) != 6 {
+			api.log.Debug("token length not 6", "length", len(tokens), "subject", m.Subject)
 			return
 		}
+
 		var logEntry RawLog
 		err := json.Unmarshal(m.Data, &logEntry)
 		if err != nil {
-			api.log.WithError(err).Error("Log entry deserialization failure")
+			api.log.Error("Log entry deserialization failure", err)
 			return
-		}
-		if logEntry.Level == 0 {
-			logEntry.Level = logrus.DebugLevel
 		}
 
 		ch <- EmittedLog{
