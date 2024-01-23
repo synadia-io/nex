@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	NEX_UI_PORT_ENV            = "NEX_UI_PORT"
-	NEX_UI_HOST_ENV            = "NEX_UI_HOST"
-	NEX_UI_NATS_SERVER_URL_ENV = "NEX_UI_NATS_SERVER_URL"
-	NEX_UI_LOG_LEVEL_ENV       = "NEX_UI_LOG_LEVEL"
-	NEX_UI_LOG_JSON_ENV        = "NEX_UI_LOG_JSON"
+	nexUiPortEnv       = "NEX_UI_PORT"
+	nexUiHostEnv       = "NEX_UI_HOST"
+	nexUiNatsServerEnv = "NEX_UI_NATS_SERVER_URL"
+	nexUiLogLevelEnv   = "NEX_UI_LOG_LEVEL"
+	nexUiLogJsonEnv    = "NEX_UI_LOG_JSON"
 )
 
 // This is a convenience binary if you just want to run the UI. The "normal"
@@ -22,7 +22,7 @@ const (
 func main() {
 	opts := slog.HandlerOptions{}
 
-	switch getEnv(NEX_UI_LOG_LEVEL_ENV, "error") {
+	switch getEnv(nexUiLogLevelEnv, "error") {
 	case "debug":
 		opts.Level = slog.LevelDebug
 	case "info":
@@ -34,21 +34,21 @@ func main() {
 	}
 
 	var logger *slog.Logger
-	logJson, _ := strconv.ParseBool(getEnv(NEX_UI_LOG_JSON_ENV, "false"))
+	logJson, _ := strconv.ParseBool(getEnv(nexUiLogJsonEnv, "false"))
 	if logJson {
 		logger = slog.New(slog.NewJSONHandler(os.Stdout, &opts))
 	} else {
 		logger = slog.New(slog.NewTextHandler(os.Stdout, &opts))
 	}
 
-	uiport, err := strconv.ParseInt(getEnv(NEX_UI_PORT_ENV, "8080"), 10, 64)
+	uiport, err := strconv.ParseInt(getEnv(nexUiPortEnv, "8080"), 10, 64)
 	if err != nil {
 		logger.Error("invalid port", err)
 		return
 	}
 
-	uihost := getEnv(NEX_UI_HOST_ENV, "127.0.0.1")
-	uinats := getEnv(NEX_UI_NATS_SERVER_URL_ENV, "nats://127.0.0.1:4222")
+	uihost := getEnv(nexUiHostEnv, "127.0.0.1")
+	uinats := getEnv(nexUiNatsServerEnv, "nats://127.0.0.1:4222")
 
 	ws := nexui.NewWebServer(
 		nexui.WithLogger(logger),
