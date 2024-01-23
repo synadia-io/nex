@@ -1,24 +1,23 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
-	"github.com/choria-io/fisk"
 	"github.com/nats-io/natscli/columns"
-	"github.com/sirupsen/logrus"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // Uses a control API client to request a node list from a NATS environment
-func ListNodes(ctx *fisk.ParseContext) error {
-
+func ListNodes(ctx context.Context, logger *slog.Logger) error {
 	nc, err := generateConnectionFromOpts()
 	if err != nil {
 		return err
 	}
-	log := logrus.New()
+	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout, log)
 
 	nodes, err := nodeClient.ListNodes()
@@ -32,20 +31,19 @@ func ListNodes(ctx *fisk.ParseContext) error {
 }
 
 // Uses a control API client to retrieve info on a single node
-func NodeInfo(ctx *fisk.ParseContext) error {
+func NodeInfo(ctx context.Context, logger *slog.Logger, nodeid string) error {
 
 	nc, err := generateConnectionFromOpts()
 	if err != nil {
 		return err
 	}
-	log := logrus.New()
+	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
-	id := ctx.SelectedCommand.Model().Args[0].Value.String()
-	nodeInfo, err := nodeClient.NodeInfo(id)
+	nodeInfo, err := nodeClient.NodeInfo(nodeid)
 	if err != nil {
 		return err
 	}
-	renderNodeInfo(nodeInfo, id)
+	renderNodeInfo(nodeInfo, nodeid)
 
 	return nil
 }

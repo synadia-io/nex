@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/choria-io/fisk"
@@ -14,8 +16,30 @@ var (
 	COMMIT    = ""
 	BUILDDATE = ""
 
-	ncli  = fisk.New("nex", "")
+	blue = color.New(color.FgBlue).SprintFunc()
+
+	ncli = fisk.New("nex", fmt.Sprintf("%s\nNATS Execution Engine CLI Version %s\n", blue(Banner), VERSION))
+	_    = ncli.Author("Synadia Communications")
+	_    = ncli.UsageWriter(os.Stdout)
+	_    = ncli.Version(fmt.Sprintf("v%s [%s] | Built-on: %s", VERSION, COMMIT, BUILDDATE))
+	_    = ncli.HelpFlag.Short('h')
+	_    = ncli.WithCheats().CheatCommand.Hidden()
+
 	nodes = ncli.Command("node", "Interact with execution engine nodes")
+	run   = ncli.Command("run", "Run a workload on a target node")
+	yeet  = ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
+	stop  = ncli.Command("stop", "Stop a running workload")
+	logs  = ncli.Command("logs", "Live monitor workload log emissions")
+	evts  = ncli.Command("events", "Live monitor events from nex nodes")
+
+	nodes_ls   = nodes.Command("ls", "List nodes")
+	nodes_info = nodes.Command("info", "Get information for an engine node")
+
+	// These two commands are GOOS/GOARCH dependent
+	node_up        *fisk.CmdClause
+	node_preflight *fisk.CmdClause
+
+	node_info_id_arg = nodes_info.Arg("id", "Public key of the node you're interested in").Required().String()
 
 	Opts       = &models.Options{}
 	GuiOpts    = &models.UiOptions{}
@@ -26,16 +50,7 @@ var (
 	NodeOpts   = &models.NodeOptions{}
 )
 
-func main() {
-	blue := color.New(color.FgBlue).SprintFunc()
-	ncli.Help = fmt.Sprintf("%s\nNATS Execution Engine CLI Version %s\n", blue(Banner), VERSION)
-
-	ncli.Author("Synadia Communications")
-	ncli.UsageWriter(os.Stdout)
-	ncli.Version(fmt.Sprintf("v%s [%s] | Built-on: %s", VERSION, COMMIT, BUILDDATE))
-	ncli.HelpFlag.Short('h')
-	ncli.WithCheats().CheatCommand.Hidden()
-
+func init() {
 	ncli.Flag("server", "NATS server urls").Short('s').Envar("NATS_URL").PlaceHolder("URL").StringVar(&Opts.Servers)
 	ncli.Flag("user", "Username or Token").Envar("NATS_USER").PlaceHolder("USER").StringVar(&Opts.Username)
 	ncli.Flag("password", "Password").Envar("NATS_PASSWORD").PlaceHolder("PASSWORD").StringVar(&Opts.Password)
@@ -47,15 +62,9 @@ func main() {
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
+	ncli.Flag("loglevel", "Log level").Default("error").Envar("NEX_LOGLEVEL").StringVar(&Opts.LogLevel)
+	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").BoolVar(&Opts.LogJSON)
 
-	nodes_ls := nodes.Command("ls", "List nodes")
-	nodes_ls.Action(ListNodes)
-
-	nodes_info := nodes.Command("info", "Get information for an engine node")
-	nodes_info.Arg("id", "Public key of the node you're interested in").Required().String()
-	nodes_info.Action(NodeInfo)
-
-	run := ncli.Command("run", "Run a workload on a target node")
 	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
 	run.Arg("id", "Public key of the target node to run the workload").Required().StringVar(&RunOpts.TargetNode)
 	run.Flag("xkey", "Path to publisher's Xkey required to encrypt environment").Required().ExistingFileVar(&RunOpts.PublisherXkeyFile)
@@ -65,31 +74,96 @@ func main() {
 	run.Flag("type", "Type of workload, e.g., \"elf\", \"v8\", \"oci\", \"wasm\"").StringVar(&RunOpts.WorkloadType)
 	run.Flag("description", "Description of the workload").StringVar(&RunOpts.Description)
 	run.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
-	run.Action(RunWorkload)
 
-	yeet := ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
 	yeet.Arg("file", "File to run").Required().ExistingFileVar(&DevRunOpts.Filename)
 	yeet.Arg("env", "Environment variables to pass to workload").StringMapVar(&RunOpts.Env)
 	yeet.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
-	yeet.Action(RunDevWorkload)
 
-	stop := ncli.Command("stop", "Stop a running workload")
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
 	stop.Flag("name", "Name of the workload to stop").Required().StringVar(&StopOpts.WorkloadName)
 	stop.Flag("issuer", "Path to the issuer seed key originally used to start the workload").Required().ExistingFileVar(&StopOpts.ClaimsIssuerFile)
-	stop.Action(StopWorkload)
 
-	logs := ncli.Command("logs", "Live monitor workload log emissions")
 	logs.Flag("node", "Public key of the nex node to filter on").Default("*").StringVar(&WatchOpts.NodeId)
 	logs.Flag("workload_name", "Name of the workload to filter on").Default("*").StringVar(&WatchOpts.WorkloadName)
 	logs.Flag("workload_id", "ID of the workload machine to filter on").Default("*").StringVar(&WatchOpts.WorkloadId)
 	logs.Flag("level", "Log level filter").Default("debug").StringVar(&WatchOpts.LogLevel)
-	logs.Action(WatchLogs)
 
-	evts := ncli.Command("events", "Live monitor events from nex nodes")
-	evts.Action(WatchEvents)
+}
 
-	ncli.MustParseWithUsage(os.Args[1:])
+func main() {
+
+	// ---------------------------
+
+	ctx := context.Background()
+	opts := slog.HandlerOptions{}
+
+	switch Opts.LogLevel {
+	case "debug":
+		opts.Level = slog.LevelDebug
+	case "info":
+		opts.Level = slog.LevelInfo
+	case "warn":
+		opts.Level = slog.LevelWarn
+	default:
+		opts.Level = slog.LevelError
+	}
+
+	var logger *slog.Logger
+	if Opts.LogJSON {
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &opts))
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stdout, &opts))
+	}
+
+	switch fisk.MustParse(ncli.Parse(os.Args[1:])) {
+	case nodes_ls.FullCommand():
+		fmt.Println(nodes_ls.FullCommand())
+		err := ListNodes(ctx, logger)
+		if err != nil {
+			logger.Error("list nodes failed to execute", slog.Any("err", err))
+		}
+	case nodes_info.FullCommand():
+		err := NodeInfo(ctx, logger, *node_info_id_arg)
+		if err != nil {
+			logger.Error("failed to get node info", slog.Any("err", err))
+		}
+	case run.FullCommand():
+		err := RunWorkload(ctx, logger)
+		if err != nil {
+			logger.Error("failed to run workload", slog.Any("err", err))
+		}
+	case yeet.FullCommand():
+		err := RunDevWorkload(ctx, logger)
+		if err != nil {
+			logger.Error("failed to devrun workload", slog.Any("err", err))
+		}
+	case stop.FullCommand():
+		err := StopWorkload(ctx, logger)
+		if err != nil {
+			logger.Error("failed to stop workload", slog.Any("err", err))
+		}
+	case logs.FullCommand():
+		err := WatchLogs(ctx, logger)
+		if err != nil {
+			logger.Error("failed to start log watcher", slog.Any("err", err))
+		}
+	case evts.FullCommand():
+		err := WatchEvents(ctx, logger)
+		if err != nil {
+			logger.Error("failed to start event watcher", slog.Any("err", err))
+		}
+	case node_up.FullCommand():
+		err := RunNodeUp(ctx, logger)
+		if err != nil {
+			logger.Error("failed to start node", slog.Any("err", err))
+		}
+	case node_preflight.FullCommand():
+		err := RunNodePreflight(ctx, logger)
+		if err != nil {
+			logger.Error("failed to start node", slog.Any("err", err))
+		}
+
+	}
 }

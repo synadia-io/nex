@@ -44,6 +44,10 @@ type Options struct {
 	TlsFirst bool
 	// Namespace for scoping workload requests
 	Namespace string
+	// LogLevel is the log level to use
+	LogLevel string
+	// LogJSON enables JSON logging
+	LogJSON bool
 }
 
 type RunOptions struct {
