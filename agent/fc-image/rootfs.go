@@ -135,7 +135,10 @@ func build(ctx context.Context, tempdir string, mountPoint string) error {
 		WithMountedFile("/etc/init.d/agent", orcFile).
 		WithMountedFile("/usr/local/bin/agent", nexagent).
 		WithMountedFile("/setup-alpine.sh", bootstrapScript).
-		WithExec([]string{"sh", "/setup-alpine.sh"})
+		WithExec([]string{"sh", "/setup-alpine.sh"}).
+		WithExec([]string{"chown", "1000:1000", "/etc/init.d/agent"}).
+		WithExec([]string{"chown", "-R", "1000:1000", "/home/nex"}).
+		WithExec([]string{"chown", "1000:1000", "/usr/local/bin/agent"})
 
 	_, err = c.Directory("/tmp/rootfs").
 		Export(ctx, "./rootfs-mount")
