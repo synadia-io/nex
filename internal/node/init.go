@@ -3,45 +3,44 @@ package nexnode
 import (
 	"context"
 	"fmt"
+	"github.com/nats-io/jsm.go/natscontext"
+	"github.com/nats-io/nats.go"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path"
 	"strings"
 	"syscall"
 
-	"github.com/nats-io/jsm.go/natscontext"
-	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
-
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
 
-func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
+func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
 	nc, err := generateConnectionFromOpts(opts)
 	if err != nil {
-		log.WithError(err).Error("Failed to connect to NATS server")
+		log.Error("Failed to connect to NATS server", slog.Any("err", err))
 		panic("failed to connect to NATS server")
 	}
 
-	log.Infof("Established node NATS connection to: %s", opts.Servers)
+	log.Info("Established node NATS connection", slog.String("servers", opts.Servers))
 
 	config, err := LoadNodeConfiguration(nodeopts.ConfigFilepath)
 	if err != nil {
-		log.WithError(err).WithField("file", nodeopts.ConfigFilepath).Error("Failed to load node configuration file")
+		log.Error("Failed to load node configuration file", slog.Any("err", err), slog.String("config_path", nodeopts.ConfigFilepath))
 		panic("failed to load node configuration file")
 	}
 
-	log.Infof("Loaded node configuration from '%s'", nodeopts.ConfigFilepath)
+	log.Info("Loaded node configuration from '%s'", slog.String("config_path", nodeopts.ConfigFilepath))
 
 	manager, err := NewMachineManager(ctx, cancel, nc, config, log)
 	if err != nil {
-		log.WithError(err).Error("Failed to initialize machine manager")
+		log.Error("Failed to initialize machine manager", slog.Any("err", err))
 		panic("failed to initialize machine manager")
 	}
 
 	err = manager.Start()
 	if err != nil {
-		log.WithError(err).Error("Failed to start machine manager")
+		log.Error("Failed to start machine manager", slog.Any("err", err))
 		panic("failed to start machine manager")
 	}
 
@@ -50,7 +49,7 @@ func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context
 	api := NewApiListener(log, manager, config)
 	err = api.Start()
 	if err != nil {
-		log.WithError(err).Error("Failed to start API listener")
+		log.Error("Failed to start API listener", slog.Any("err", err))
 		panic("failed to start API listener")
 	}
 }
@@ -97,7 +96,7 @@ func generateConnectionFromOpts(opts *nexmodels.Options) (*nats.Conn, error) {
 	return conn, nil
 }
 
-func setupSignalHandlers(log *logrus.Logger, manager *MachineManager) {
+func setupSignalHandlers(log *slog.Logger, manager *MachineManager) {
 	go func() {
 		// both firecracker and the embedded NATS server register signal handlers... wipe those so ours are the ones being used
 		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
@@ -107,27 +106,27 @@ func setupSignalHandlers(log *logrus.Logger, manager *MachineManager) {
 		for {
 			switch s := <-c; {
 			case s == syscall.SIGTERM || s == os.Interrupt:
-				log.Infof("Caught signal: %s, requesting clean shutdown", s.String())
+				log.Info("Caught signal, requesting clean shutdown", slog.String("signal", s.String()))
 				err := manager.Stop()
 				if err != nil {
-					log.WithError(err).Warn("Machine manager failed to stop")
+					log.Warn("Machine manager failed to stop", slog.Any("err", err))
 				}
-				cleanSockets()
+				cleanSockets(log)
 				os.Exit(0) // FIXME
 			case s == syscall.SIGQUIT:
-				log.Infof("Caught quit signal: %s, still trying graceful shutdown", s.String())
+				log.Info("Caught quit signal, still trying graceful shutdown", slog.String("signal", s.String()))
 				err := manager.Stop()
 				if err != nil {
-					log.WithError(err).Warn("Machine manager failed to stop")
+					log.Warn("Machine manager failed to stop", slog.Any("err", err))
 				}
-				cleanSockets()
+				cleanSockets(log)
 				os.Exit(0) // FIXME
 			}
 		}
 	}()
 }
 
-func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *logrus.Logger) {
+func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
 	config, err := LoadNodeConfiguration(nodeopts.ConfigFilepath)
 	if err != nil {
 		panic(fmt.Errorf("failed to load configuration file: %s", err))
@@ -145,10 +144,10 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 // to ensure we get the full IP range
 
 // Remove firecracker VM sockets created by this pid
-func cleanSockets() {
+func cleanSockets(logger *slog.Logger) {
 	dir, err := os.ReadDir(os.TempDir())
 	if err != nil {
-		logrus.WithError(err).Error("Failed to read temp directory")
+		logger.Error("Failed to read temp directory", slog.Any("err", err))
 	}
 	for _, d := range dir {
 		if strings.Contains(d.Name(), fmt.Sprintf(".firecracker.sock-%d-", os.Getpid())) {

@@ -1,19 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/choria-io/fisk"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/sirupsen/logrus"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
@@ -44,15 +44,14 @@ func init() {
 
 // Attempts to "run a file" by finding a suitable target and publishing the workload to an ad-hoc created bucket
 // and using default issuer and publisher keys stored in ~/.nex. This should be as easy as typing "nex devrun ./amazingapp env1=foo env2=bar"
-func RunDevWorkload(ctx *fisk.ParseContext) error {
+func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	nc, err := generateConnectionFromOpts()
 	if err != nil {
 		return err
 	}
 	// developer mode can have a smaller discovery timeout, since we're assuming there's a NEX
 	// node "nearby"
-	log := logrus.New()
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, "default", log)
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, "default", logger)
 
 	candidates, err := nodeClient.ListNodes()
 	if err != nil {

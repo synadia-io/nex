@@ -1,8 +1,9 @@
 package controlapi
 
 import (
+	"log/slog"
+
 	cloudevents "github.com/cloudevents/sdk-go"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -81,9 +82,9 @@ type EmittedLog struct {
 }
 
 type RawLog struct {
-	Text      string       `json:"text"`
-	Level     logrus.Level `json:"level"`
-	MachineId string       `json:"machine_id"`
+	Text      string     `json:"text"`
+	Level     slog.Level `json:"level"`
+	MachineId string     `json:"machine_id"`
 }
 
 // Note this a wrapper to add context to a cloud event

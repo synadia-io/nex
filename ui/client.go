@@ -5,11 +5,11 @@
 package nexui
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -47,7 +47,7 @@ type Client struct {
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *Client) readPump() {
+func (c *Client) readPump(logger *slog.Logger) {
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
@@ -57,7 +57,7 @@ func (c *Client) readPump() {
 	c.conn.SetPongHandler(func(string) error {
 		err := c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		if err != nil {
-			logrus.StandardLogger().WithError(err).Error("Failed to set socket read deadline")
+			logger.Error("Failed to set socket read deadline", slog.Any("err", err))
 			return err
 		}
 		return nil
@@ -67,7 +67,7 @@ func (c *Client) readPump() {
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				// TODO: should this be the propogated log variable?
-				logrus.StandardLogger().WithError(err).Error("Unexpected socket close")
+				logger.Error("Unexpected socket close", slog.Any("err", err))
 			}
 			break
 		}
@@ -80,7 +80,7 @@ func (c *Client) readPump() {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Client) writePump() {
+func (c *Client) writePump(logger *slog.Logger) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
@@ -106,10 +106,10 @@ func (c *Client) writePump() {
 }
 
 // serveWs handles websocket requests from the peer.
-func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
+func serveWs(logger *slog.Logger, hub *Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logrus.StandardLogger().WithError(err).Error("Failed to upgrade socket")
+		logger.Error("Failed to upgrade socket", slog.Any("err", err))
 		return
 	}
 	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 256)}
@@ -117,6 +117,6 @@ func serveWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 	// Allow collection of memory referenced by the caller by doing all work in
 	// new goroutines.
-	go client.writePump()
-	go client.readPump()
+	go client.writePump(logger)
+	go client.readPump(logger)
 }

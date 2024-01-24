@@ -3,12 +3,12 @@ package nexnode
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -28,19 +28,19 @@ func handleAgentLog(mgr *MachineManager) func(m *nats.Msg) {
 		var logentry agentapi.LogEntry
 		err := json.Unmarshal(m.Data, &logentry)
 		if err != nil {
-			mgr.log.WithError(err).Error("Failed to unmarshal log entry from agent")
+			mgr.log.Error("Failed to unmarshal log entry from agent", slog.Any("err", err))
 			return
 		}
 
 		outLog := emittedLog{
 			Text:      logentry.Text,
-			Level:     logrus.Level(logentry.Level),
+			Level:     slog.Level(logentry.Level),
 			MachineId: vmId,
 		}
 
 		bytes, err := json.Marshal(outLog)
 		if err != nil {
-			mgr.log.WithError(err).Error("Failed to marshal our own log entry!")
+			mgr.log.Error("Failed to marshal our own log entry", slog.Any("err", err))
 			return
 		}
 
@@ -65,19 +65,19 @@ func handleAgentEvent(mgr *MachineManager) func(m *nats.Msg) {
 		var evt cloudevents.Event
 		err := json.Unmarshal(m.Data, &evt)
 		if err != nil {
-			mgr.log.WithError(err).Error("Failed to deserialize cloudevent from agent")
+			mgr.log.Error("Failed to deserialize cloudevent from agent", slog.Any("err", err))
 			return
 		}
-		mgr.log.WithField("vmid", vmId).WithField("type", evt.Type()).Info("Received agent event")
+		mgr.log.Info("Received agent event", slog.String("vmid", vmId), slog.String("type", evt.Type()))
 
 		err = mgr.PublishCloudEvent(vm.namespace, evt)
 		if err != nil {
-			mgr.log.WithError(err).Error("Failed to publish cloudevent")
+			mgr.log.Error("Failed to publish cloudevent", slog.Any("err", err))
 			return
 		}
 
 		if evt.Type() == agentapi.WorkloadStoppedEventType {
-			vm.shutDown()
+			vm.shutDown(mgr.log)
 		}
 	}
 }
@@ -89,17 +89,17 @@ func handleHandshake(mgr *MachineManager) func(m *nats.Msg) {
 		var shake agentapi.HandshakeRequest
 		err := json.Unmarshal(m.Data, &shake)
 		if err != nil {
-			mgr.log.WithField("vmid", *shake.MachineId).WithField("message", *shake.Message).Error("Failed to handle agent handshake")
+			mgr.log.Error("Failed to handle agent handshake", slog.String("vmid", *shake.MachineId), slog.String("message", *shake.Message))
 			return
 		}
 
 		now := time.Now().UTC()
 		mgr.handshakes[*shake.MachineId] = now.Format(time.RFC3339)
 
-		mgr.log.WithField("vmid", *shake.MachineId).WithField("message", *shake.Message).Info("Received agent handshake")
+		mgr.log.Info("Received agent handshake", slog.String("vmid", *shake.MachineId), slog.String("message", *shake.Message))
 		err = m.Respond([]byte("OK"))
 		if err != nil {
-			mgr.log.WithError(err).Error("Failed to reply to agent handshake")
+			mgr.log.Error("Failed to reply to agent handshake", slog.Any("err", err))
 		}
 	}
 }

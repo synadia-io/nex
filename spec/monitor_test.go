@@ -3,11 +3,12 @@ package spec
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 
 	. "github.com/synadia-io/nex/internal/control-api"
 
@@ -17,7 +18,7 @@ import (
 
 var _ = Describe("event monitor", func() {
 	var nc *nats.Conn
-	var log *logrus.Logger
+	var log *slog.Logger
 	var client *Client
 	var ch chan EmittedEvent
 	var subject EmittedEvent
@@ -33,7 +34,7 @@ var _ = Describe("event monitor", func() {
 		nc, err = nats.Connect(fmt.Sprintf("nats://0.0.0.0:%d", *_fixtures.natsPort))
 		Expect(err).To(BeNil())
 
-		log = logrus.New()
+		log = slog.New(slog.NewTextHandler(os.Stdout, nil))
 		client = NewApiClient(nc, time.Second, log)
 		ch, err = client.MonitorEvents("*", "*", 0)
 		Expect(err).To(BeNil())
@@ -81,7 +82,7 @@ var _ = Describe("event monitor", func() {
 
 var _ = Describe("log monitor", func() {
 	var nc *nats.Conn
-	var log *logrus.Logger
+	var log *slog.Logger
 	var client *Client
 	var ch chan EmittedLog
 	var subject EmittedLog
@@ -94,12 +95,12 @@ var _ = Describe("log monitor", func() {
 		nc, err = nats.Connect(fmt.Sprintf("nats://0.0.0.0:%d", *_fixtures.natsPort))
 		Expect(err).To(BeNil())
 
-		log = logrus.New()
+		log = slog.New(slog.NewTextHandler(os.Stdout, nil))
 		client = NewApiClient(nc, time.Second, log)
 		ch, err = client.MonitorLogs("*", "*", "*", "*", 0)
 		Expect(err).To(BeNil())
 
-		raw = RawLog{Text: "hey from test", Level: logrus.DebugLevel, MachineId: "vm1234"}
+		raw = RawLog{Text: "hey from test", Level: slog.LevelDebug, MachineId: "vm1234"}
 		bytes, _ := json.Marshal(raw)
 
 		_ = nc.Publish("$NEX.logs.default.Nxxxx.echoservice.vm1234", bytes)

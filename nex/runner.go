@@ -1,23 +1,23 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
-	"github.com/choria-io/fisk"
 	"github.com/nats-io/nkeys"
-	"github.com/sirupsen/logrus"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // Issues a request to stop a running workload
-func StopWorkload(ctx *fisk.ParseContext) error {
+func StopWorkload(ctx context.Context, logger *slog.Logger) error {
 	nc, err := generateConnectionFromOpts()
 	if err != nil {
 		return err
 	}
-	log := logrus.New()
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
+
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, logger)
 
 	issuerSeed, err := os.ReadFile(StopOpts.ClaimsIssuerFile)
 	if err != nil {
@@ -44,13 +44,12 @@ func StopWorkload(ctx *fisk.ParseContext) error {
 }
 
 // Submits a run request for the given workload to the specified node
-func RunWorkload(ctx *fisk.ParseContext) error {
+func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 	nc, err := generateConnectionFromOpts()
 	if err != nil {
 		return err
 	}
-	log := logrus.New()
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, logger)
 
 	// Get node info so we can get public xkey from the target for env encryption
 	nodeInfo, err := nodeClient.NodeInfo(RunOpts.TargetNode)

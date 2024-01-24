@@ -2,23 +2,23 @@ package nexnode
 
 import (
 	"io"
+	"log/slog"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/nats-io/nats.go"
-	"github.com/sirupsen/logrus"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 type payloadCache struct {
 	rootDir string
-	log     *logrus.Logger
+	log     *slog.Logger
 	nc      *nats.Conn
 }
 
-func NewPayloadCache(nc *nats.Conn, log *logrus.Logger, dir string) *payloadCache {
+func NewPayloadCache(nc *nats.Conn, log *slog.Logger, dir string) *payloadCache {
 	return &payloadCache{
 		rootDir: dir,
 		log:     log,
@@ -29,7 +29,7 @@ func NewPayloadCache(nc *nats.Conn, log *logrus.Logger, dir string) *payloadCach
 func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
-	m.log.WithField("bucket", bucket).WithField("key", key).WithField("url", m.nc.Opts.Url).Info("Attempting object store download")
+	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.nc.Opts.Url))
 
 	opts := []nats.JSOpt{}
 	if request.JsDomain != nil {
@@ -43,20 +43,20 @@ func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 
 	store, err := js.ObjectStore(bucket)
 	if err != nil {
-		m.log.WithError(err).WithField("bucket", bucket).Error("Failed to bind to source object store")
+		m.log.Error("Failed to bind to source object store", slog.Any("err", err), slog.String("bucket", bucket))
 		return err
 	}
 
 	_, err = store.GetInfo(key)
 	if err != nil {
-		m.log.WithError(err).WithField("key", key).WithField("bucket", bucket).Error("Failed to locate workload binary in source object store")
+		m.log.Error("Failed to locate workload binary in source object store", slog.Any("err", err), slog.String("key", key), slog.String("bucket", bucket))
 		return err
 	}
 
 	filename := path.Join(os.TempDir(), "sus") // lol... sus.
 	err = store.GetFile(key, filename)
 	if err != nil {
-		m.log.WithError(err).WithField("key", key).Error("Failed to download bytes from source object store")
+		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
 		return err
 	}
 
@@ -67,7 +67,7 @@ func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 
 	workload, err := io.ReadAll(f)
 	if err != nil {
-		m.log.WithError(err).Error("Couldn't read the file we just wrote")
+		m.log.Error("Couldn't read the file we just wrote", slog.Any("err", err))
 		return err
 	}
 
@@ -75,22 +75,22 @@ func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 
 	jsInternal, err := m.ncInternal.JetStream()
 	if err != nil {
-		m.log.WithError(err).Error("Failed to acquire JetStream context for internal object store.")
+		m.log.Error("Failed to acquire JetStream context for internal object store.", slog.Any("err", err))
 		panic(err)
 	}
 
 	cache, err := jsInternal.ObjectStore(agentapi.WorkloadCacheBucket)
 	if err != nil {
-		m.log.WithError(err).Error("Failed to get object store reference for internal cache.")
+		m.log.Error("Failed to get object store reference for internal cache.", slog.Any("err", err))
 		panic(err)
 	}
 
 	_, err = cache.PutBytes(request.DecodedClaims.Subject, workload)
 	if err != nil {
-		m.log.WithError(err).Error("Failed to write workload to internal cache.")
+		m.log.Error("Failed to write workload to internal cache.", slog.Any("err", err))
 		panic(err)
 	}
 
-	m.log.WithField("name", request.DecodedClaims.Subject).Info("Successfully stored workload in internal object store")
+	m.log.Info("Successfully stored workload in internal object store", slog.String("name", request.DecodedClaims.Subject))
 	return nil
 }

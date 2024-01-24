@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"path/filepath"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,7 +23,7 @@ const defaultCNIConfigurationPath = "/etc/cni/conf.d"
 const defaultFirecrackerBinPath = "/usr/local/bin/firecracker"
 
 var _ = Describe("nex node", func() {
-	var log *logrus.Logger
+	var log *slog.Logger
 	var ctxx context.Context
 	var cancel context.CancelFunc
 
@@ -38,7 +37,7 @@ var _ = Describe("nex node", func() {
 
 	BeforeEach(func() {
 		ctxx, cancel = context.WithCancel(context.Background())
-		log = logrus.New()
+		log = slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 		opts = &models.Options{
 			Servers: _fixtures.natsServer.ClientURL(),

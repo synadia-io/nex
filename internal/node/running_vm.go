@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -16,7 +17,7 @@ import (
 	"github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"github.com/rs/xid"
-	log "github.com/sirupsen/logrus"
+
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
@@ -34,19 +35,20 @@ type runningFirecracker struct {
 	namespace             string
 }
 
-func (vm *runningFirecracker) shutDown() {
-	log.WithField("vmid", vm.vmmID).
-		WithField("ip", vm.ip).
-		Info("Machine stopping")
+func (vm *runningFirecracker) shutDown(log *slog.Logger) {
+	log.Info("Machine stopping",
+		slog.String("vmid", vm.vmmID),
+		slog.String("ip", string(vm.ip)),
+	)
 
 	err := vm.machine.StopVMM()
 	if err != nil {
-		log.WithError(err).Error("Failed to stop firecracker VM")
+		log.Error("Failed to stop firecracker VM", slog.Any("err", err))
 	}
 	err = os.Remove(vm.machine.Cfg.SocketPath)
 	if err != nil {
 		if !errors.Is(err, fs.ErrExist) {
-			log.WithError(err).Warn("Failed to delete firecracker socket")
+			log.Warn("Failed to delete firecracker socket", slog.Any("err", err))
 		}
 	}
 
@@ -57,36 +59,31 @@ func (vm *runningFirecracker) shutDown() {
 	err = os.Remove(rootFs)
 	if err != nil {
 		if !errors.Is(err, fs.ErrExist) {
-			log.WithError(err).Warn("Failed to delete firecracker rootfs")
+			log.Warn("Failed to delete firecracker rootfs", slog.Any("err", err))
 		}
 	}
 }
 
 // Create a VMM with a given set of options and start the VM
-func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningFirecracker, error) {
+func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.Logger) (*runningFirecracker, error) {
 	vmmID := xid.New().String()
 
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
 	if err != nil {
-		log.WithError(err).Error("Failed to generate firecracker configuration")
+		log.Error("Failed to generate firecracker configuration", slog.Any("config", config))
 		return nil, err
 	}
 
 	err = copy(config.RootFsFile, *fcCfg.Drives[0].PathOnHost)
 
 	if err != nil {
-		log.WithError(err).Error("Failed to copy rootfs to temp location")
+		log.Error("Failed to copy rootfs to temp location", slog.Any("err", err))
 		return nil, err
 	}
 
-	if err != nil {
-		log.Errorf("Error: %s", err)
-		return nil, err
-	}
-	logger := log.New()
-
+	// TODO: can we please not use logrus here amazon?
 	machineOpts := []firecracker.Opt{
-		firecracker.WithLogger(log.NewEntry(logger)),
+		firecracker.WithLogger(log.With(slog.Bool("firecracker", true), slog.String("vmmid", vmmID))),
 	}
 
 	firecrackerBinary, err := exec.LookPath("firecracker")
@@ -149,14 +146,15 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration) (*runningF
 	hosttap := m.Cfg.NetworkInterfaces[0].StaticConfiguration.HostDevName
 	mask := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.IPAddr.Mask
 
-	log.WithField("vmid", vmmID).
-		WithField("ip", ip).
-		WithField("gateway", gw).
-		WithField("netmask", mask).
-		WithField("hosttap", hosttap).
-		WithField("nats_host", *md.NodeNatsHost).
-		WithField("nats_port", *md.NodeNatsPort).
-		Info("Machine started")
+	log.Info("Machine started",
+		slog.String("vmid", vmmID),
+		slog.Any("ip", ip),
+		slog.Any("gateway", gw),
+		slog.String("netmask", mask.String()),
+		slog.String("hosttap", hosttap),
+		slog.String("nats_host", *md.NodeNatsHost),
+		slog.Int("nats_port", *md.NodeNatsPort),
+	)
 
 	return &runningFirecracker{
 		vmmCtx:         vmmCtx,
