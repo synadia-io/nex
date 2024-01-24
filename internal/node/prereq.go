@@ -143,7 +143,20 @@ func CheckPreRequisites(config *NodeConfiguration) error {
 				return err
 			}
 		}
-		if config.ForceDepInstall || string(input) == "y\n" {
+		if config.ForceDepInstall || strings.ToUpper(string(input)) == "Y\n" {
+			var path string
+			for _, f := range r.files {
+				if r.directory == "" {
+					path = filepath.Dir(f.name)
+				} else {
+					path = r.directory
+				}
+				err = os.MkdirAll(path, 0755)
+				if err != nil {
+					return err
+				}
+			}
+
 			for _, iF := range r.initFuncs {
 				err := iF(r, config)
 				if err != nil {
