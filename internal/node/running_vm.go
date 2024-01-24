@@ -17,7 +17,7 @@ import (
 	"github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
 	"github.com/rs/xid"
-	"github.com/sirupsen/logrus"
+
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
@@ -83,7 +83,7 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 
 	// TODO: can we please not use logrus here amazon?
 	machineOpts := []firecracker.Opt{
-		firecracker.WithLogger(logrus.NewEntry(logrus.New())),
+		firecracker.WithLogger(log),
 	}
 
 	firecrackerBinary, err := exec.LookPath("firecracker")
