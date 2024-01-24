@@ -83,7 +83,7 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 
 	// TODO: can we please not use logrus here amazon?
 	machineOpts := []firecracker.Opt{
-		firecracker.WithLogger(log),
+		firecracker.WithLogger(log.With(slog.Bool("firecracker", true), slog.String("vmmid", vmmID))),
 	}
 
 	firecrackerBinary, err := exec.LookPath("firecracker")
