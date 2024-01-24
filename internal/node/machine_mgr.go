@@ -280,7 +280,7 @@ func (m *MachineManager) fillPool() {
 			}
 
 			go m.awaitHandshake(vm.vmmID)
-			m.log.Info("Adding new VM to warm pool", slog.String("ip", string(vm.ip)), slog.String("vmid", vm.vmmID))
+			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 
 			// If the pool is full, this line will block until a slot is available.
 			m.warmVms <- vm
