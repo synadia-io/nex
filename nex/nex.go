@@ -16,6 +16,11 @@ var (
 	COMMIT    = ""
 	BUILDDATE = ""
 
+	LevelTrace = slog.Level(-8)
+	LevelNames = map[slog.Leveler]string{
+		LevelTrace: "TRACE",
+	}
+
 	blue = color.New(color.FgBlue).SprintFunc()
 
 	ncli = fisk.New("nex", fmt.Sprintf("%s\nNATS Execution Engine CLI Version %s\n", blue(Banner), VERSION))
@@ -62,7 +67,7 @@ func init() {
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
-	ncli.Flag("loglevel", "Log level").Default("error").Envar("NEX_LOGLEVEL").StringVar(&Opts.LogLevel)
+	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").StringVar(&Opts.LogLevel)
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").BoolVar(&Opts.LogJSON)
 
 	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
@@ -97,7 +102,19 @@ func main() {
 	cmd := fisk.MustParse(ncli.Parse(os.Args[1:]))
 
 	ctx := context.Background()
-	opts := slog.HandlerOptions{}
+	opts := slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.LevelKey {
+				level := a.Value.Any().(slog.Level)
+				levelLabel, exists := LevelNames[level]
+				if !exists {
+					levelLabel = level.String()
+				}
+				a.Value = slog.StringValue(levelLabel)
+			}
+			return a
+		},
+	}
 
 	switch Opts.LogLevel {
 	case "debug":
@@ -106,6 +123,8 @@ func main() {
 		opts.Level = slog.LevelInfo
 	case "warn":
 		opts.Level = slog.LevelWarn
+	case "trace":
+		opts.Level = LevelTrace
 	default:
 		opts.Level = slog.LevelError
 	}
