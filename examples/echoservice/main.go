@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/nats-io/nats.go"
 	services "github.com/nats-io/nats.go/micro"
@@ -22,6 +25,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	setupSignalHandlers(nc)
 
 	// request handler
 	echoHandler := func(req services.Request) {
@@ -46,4 +50,25 @@ func main() {
 
 	<-ctx.Done()
 
+}
+
+func setupSignalHandlers(nc *nats.Conn) {
+	go func() {
+		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+		for {
+			switch s := <-c; {
+			case s == syscall.SIGTERM || s == os.Interrupt || s == syscall.SIGQUIT:
+				slog.Info("Caught signal, requesting clean shutdown", slog.String("signal", s.String()))
+				nc.Drain()
+				os.Exit(0)
+
+			default:
+				nc.Drain()
+				os.Exit(0)
+			}
+		}
+	}()
 }

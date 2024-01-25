@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -24,8 +25,19 @@ type ELF struct {
 	run  chan bool
 	exit chan int
 
+	cmd *exec.Cmd
+
 	stderr io.Writer
 	stdout io.Writer
+}
+
+func (e *ELF) UnDeploy() error {
+	err := e.cmd.Process.Signal(os.Kill)
+	if err != nil {
+		e.fail <- true
+		return err
+	}
+	return nil
 }
 
 // Deploy the ELF binary
@@ -45,6 +57,8 @@ func (e *ELF) Deploy() error {
 		e.fail <- true
 		return err
 	}
+
+	e.cmd = cmd
 
 	go func() {
 		go func() {
