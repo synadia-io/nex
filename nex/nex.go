@@ -16,6 +16,11 @@ var (
 	COMMIT    = ""
 	BUILDDATE = ""
 
+	LevelTrace = slog.Level(-8)
+	LevelNames = map[slog.Leveler]string{
+		LevelTrace: "TRACE",
+	}
+
 	blue = color.New(color.FgBlue).SprintFunc()
 
 	ncli = fisk.New("nex", fmt.Sprintf("%s\nNATS Execution Engine CLI Version %s\n", blue(Banner), VERSION))
@@ -97,7 +102,19 @@ func main() {
 	cmd := fisk.MustParse(ncli.Parse(os.Args[1:]))
 
 	ctx := context.Background()
-	opts := slog.HandlerOptions{}
+	opts := slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.LevelKey {
+				level := a.Value.Any().(slog.Level)
+				levelLabel, exists := LevelNames[level]
+				if !exists {
+					levelLabel = level.String()
+				}
+				a.Value = slog.StringValue(levelLabel)
+			}
+			return a
+		},
+	}
 
 	switch Opts.LogLevel {
 	case "debug":
@@ -106,6 +123,8 @@ func main() {
 		opts.Level = slog.LevelInfo
 	case "warn":
 		opts.Level = slog.LevelWarn
+	case "trace":
+		opts.Level = LevelTrace
 	default:
 		opts.Level = slog.LevelError
 	}
