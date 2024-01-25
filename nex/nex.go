@@ -67,7 +67,7 @@ func init() {
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
-	ncli.Flag("loglevel", "Log level").Default("error").Envar("NEX_LOGLEVEL").StringVar(&Opts.LogLevel)
+	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").StringVar(&Opts.LogLevel)
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").BoolVar(&Opts.LogJSON)
 
 	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
