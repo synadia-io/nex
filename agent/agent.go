@@ -25,6 +25,8 @@ type Agent struct {
 	agentLogs chan *agentapi.LogEntry
 	eventLogs chan *cloudevents.Event
 
+	provider providers.ExecutionProvider
+
 	cacheBucket nats.ObjectStore
 	md          *agentapi.MachineMetadata
 	nc          *nats.Conn
@@ -87,6 +89,13 @@ func (a *Agent) Start() error {
 		return err
 	}
 
+	udsubject := fmt.Sprintf("agentint.%s.undeploy", *a.md.VmId)
+	_, err = a.nc.Subscribe(udsubject, a.handleUndeploy)
+	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err))
+		return err
+	}
+
 	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
 	go a.dispatchLogs()
@@ -112,6 +121,16 @@ func (a *Agent) RequestHandshake() error {
 
 	a.LogInfo("Agent is up")
 	return nil
+}
+
+func (a *Agent) handleUndeploy(m *nats.Msg) {
+	err := a.provider.UnDeploy()
+	if err != nil {
+		// don't return an error here so worst-case scenario is an ungraceful shutdown,
+		// not a failure
+		a.LogError(fmt.Sprintf("Failed to undeploy workload: %s", err))
+	}
+	_ = m.Respond([]byte{})
 }
 
 // Pull a RunRequest off the wire, get the payload from the shared
@@ -151,8 +170,9 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		_ = a.workAck(m, false, msg)
 		return
 	}
+	a.provider = provider
 
-	err = provider.Validate()
+	err = a.provider.Validate()
 	if err != nil {
 		msg := fmt.Sprintf("Failed to validate workload: %s", err)
 		a.LogError(msg)
@@ -162,7 +182,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 
 	_ = a.workAck(m, true, "Workload accepted")
 
-	err = provider.Deploy()
+	err = a.provider.Deploy()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to deploy workload: %s", err))
 	}

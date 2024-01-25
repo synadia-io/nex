@@ -30,6 +30,11 @@ type Wasm struct {
 	nc *nats.Conn // agent NATS connection
 }
 
+func (e *Wasm) UnDeploy() error {
+	// We shouldn't have to do anything here since the wasm "owns" no resources
+	return nil
+}
+
 func (e *Wasm) Deploy() error {
 	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {

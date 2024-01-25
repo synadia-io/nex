@@ -241,6 +241,14 @@ func (m *MachineManager) StopMachine(vmId string) error {
 		return errors.New("no such workload")
 	}
 
+	subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
+	// we do a request here so we don't tell firecracker to shut down until
+	// we get a reply
+	_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond)
+	if err != nil {
+		return err
+	}
+
 	_ = m.PublishMachineStopped(vm)
 	vm.shutDown(m.log)
 	delete(m.allVms, vmId)

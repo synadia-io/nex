@@ -34,6 +34,11 @@ type V8 struct {
 	ubs *v8.UnboundScript
 }
 
+func (v *V8) UnDeploy() error {
+	// We shouldn't have to do anything here since the script "owns" no resources
+	return nil
+}
+
 // Deploy expects a `Validate` to have succeeded and `ubs` to be non-nil
 func (v *V8) Deploy() error {
 	if v.ubs == nil {
