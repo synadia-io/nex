@@ -10,14 +10,12 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/nats-io/jsm.go/natscontext"
-	"github.com/nats-io/nats.go"
-
+	"github.com/synadia-io/nex/internal/models"
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
 
 func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
-	nc, err := generateConnectionFromOpts(opts)
+	nc, err := models.GenerateConnectionFromOpts(opts)
 	if err != nil {
 		log.Error("Failed to connect to NATS server", slog.Any("err", err))
 		panic("failed to connect to NATS server")
@@ -53,70 +51,6 @@ func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context
 		log.Error("Failed to start API listener", slog.Any("err", err))
 		panic("failed to start API listener")
 	}
-}
-
-// TODO
-// FIXME
-// if I export this to the `nex` binary, then macOS won't build.
-// why? what did I do to deserve this?
-func generateConnectionFromOpts(opts *nexmodels.Options) (*nats.Conn, error) {
-	ctxOpts := []natscontext.Option{
-		natscontext.WithServerURL(opts.Servers),
-		natscontext.WithCreds(opts.Creds),
-		natscontext.WithNKey(opts.Nkey),
-		natscontext.WithCertificate(opts.TlsCert),
-		natscontext.WithKey(opts.TlsKey),
-		natscontext.WithCA(opts.TlsCA),
-	}
-
-	if opts.TlsFirst {
-		ctxOpts = append(ctxOpts, natscontext.WithTLSHandshakeFirst())
-	}
-
-	if opts.Username != "" && opts.Password == "" {
-		ctxOpts = append(ctxOpts, natscontext.WithToken(opts.Username))
-	} else {
-		ctxOpts = append(ctxOpts, natscontext.WithUser(opts.Username), natscontext.WithPassword(opts.Password))
-	}
-
-	var err error
-
-	exist, _ := fileAccessible(opts.ConfigurationContext)
-
-	if exist && strings.HasSuffix(opts.ConfigurationContext, ".json") {
-		opts.Configuration, err = natscontext.NewFromFile(opts.ConfigurationContext, ctxOpts...)
-	} else {
-		opts.Configuration, err = natscontext.New(opts.ConfigurationContext, !opts.SkipContexts, ctxOpts...)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := opts.Configuration.Connect()
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
-}
-
-func fileAccessible(f string) (bool, error) {
-	stat, err := os.Stat(f)
-	if err != nil {
-		return false, err
-	}
-
-	if stat.IsDir() {
-		return false, fmt.Errorf("is a directory")
-	}
-
-	file, err := os.Open(f)
-	if err != nil {
-		return false, err
-	}
-	file.Close()
-
-	return true, nil
 }
 
 func setupSignalHandlers(log *slog.Logger, manager *MachineManager) {

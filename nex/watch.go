@@ -10,10 +10,11 @@ import (
 
 	"github.com/cdfmlr/ellipsis"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 func WatchEvents(ctx context.Context, logger *slog.Logger) error {
-	nc, err := generateConnectionFromOpts()
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
@@ -43,7 +44,7 @@ func WatchEvents(ctx context.Context, logger *slog.Logger) error {
 }
 
 func WatchLogs(ctx context.Context, logger *slog.Logger) error {
-	nc, err := generateConnectionFromOpts()
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}

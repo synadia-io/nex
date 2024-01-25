@@ -16,6 +16,7 @@ import (
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 var (
@@ -45,7 +46,7 @@ func init() {
 // Attempts to "run a file" by finding a suitable target and publishing the workload to an ad-hoc created bucket
 // and using default issuer and publisher keys stored in ~/.nex. This should be as easy as typing "nex devrun ./amazingapp env1=foo env2=bar"
 func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
-	nc, err := generateConnectionFromOpts()
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
