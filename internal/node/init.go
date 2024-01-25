@@ -3,14 +3,15 @@ package nexnode
 import (
 	"context"
 	"fmt"
-	"github.com/nats-io/jsm.go/natscontext"
-	"github.com/nats-io/nats.go"
 	"log/slog"
 	"os"
 	"os/signal"
 	"path"
 	"strings"
 	"syscall"
+
+	"github.com/nats-io/jsm.go/natscontext"
+	"github.com/nats-io/nats.go"
 
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
@@ -54,10 +55,11 @@ func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context
 	}
 }
 
+// TODO
+// FIXME
+// if I export this to the `nex` binary, then macOS won't build.
+// why? what did I do to deserve this?
 func generateConnectionFromOpts(opts *nexmodels.Options) (*nats.Conn, error) {
-	if len(strings.TrimSpace(opts.Servers)) == 0 {
-		opts.Servers = nats.DefaultURL
-	}
 	ctxOpts := []natscontext.Option{
 		natscontext.WithServerURL(opts.Servers),
 		natscontext.WithCreds(opts.Creds),
@@ -77,23 +79,44 @@ func generateConnectionFromOpts(opts *nexmodels.Options) (*nats.Conn, error) {
 		ctxOpts = append(ctxOpts, natscontext.WithUser(opts.Username), natscontext.WithPassword(opts.Password))
 	}
 
-	natsContext, err := natscontext.New("nexnode", false, ctxOpts...)
+	var err error
+
+	exist, _ := fileAccessible(opts.ConfigurationContext)
+
+	if exist && strings.HasSuffix(opts.ConfigurationContext, ".json") {
+		opts.Configuration, err = natscontext.NewFromFile(opts.ConfigurationContext, ctxOpts...)
+	} else {
+		opts.Configuration, err = natscontext.New(opts.ConfigurationContext, !opts.SkipContexts, ctxOpts...)
+	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	natsOpts, err := natsContext.NATSOptions()
+	conn, err := opts.Configuration.Connect()
 	if err != nil {
 		return nil, err
 	}
-
-	conn, err := nats.Connect(opts.Servers, natsOpts...)
-	if err != nil {
-		return nil, err
-	}
-
 	return conn, nil
+}
+
+func fileAccessible(f string) (bool, error) {
+	stat, err := os.Stat(f)
+	if err != nil {
+		return false, err
+	}
+
+	if stat.IsDir() {
+		return false, fmt.Errorf("is a directory")
+	}
+
+	file, err := os.Open(f)
+	if err != nil {
+		return false, err
+	}
+	file.Close()
+
+	return true, nil
 }
 
 func setupSignalHandlers(log *slog.Logger, manager *MachineManager) {

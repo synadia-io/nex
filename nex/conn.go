@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
 	"github.com/nats-io/jsm.go/natscontext"
@@ -8,9 +10,6 @@ import (
 )
 
 func generateConnectionFromOpts() (*nats.Conn, error) {
-	if len(strings.TrimSpace(Opts.Servers)) == 0 {
-		Opts.Servers = "0.0.0.0:4222"
-	}
 	ctxOpts := []natscontext.Option{
 		natscontext.WithServerURL(Opts.Servers),
 		natscontext.WithCreds(Opts.Creds),
@@ -30,20 +29,42 @@ func generateConnectionFromOpts() (*nats.Conn, error) {
 		ctxOpts = append(ctxOpts, natscontext.WithUser(Opts.Username), natscontext.WithPassword(Opts.Password))
 	}
 
-	natsContext, err := natscontext.New("nexnode", false, ctxOpts...)
+	var err error
+
+	exist, _ := fileAccessible(Opts.ConfigurationContext)
+
+	if exist && strings.HasSuffix(Opts.ConfigurationContext, ".json") {
+		Opts.Configuration, err = natscontext.NewFromFile(Opts.ConfigurationContext, ctxOpts...)
+	} else {
+		Opts.Configuration, err = natscontext.New(Opts.ConfigurationContext, !Opts.SkipContexts, ctxOpts...)
+	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	natsOpts, err := natsContext.NATSOptions()
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := nats.Connect(Opts.Servers, natsOpts...)
+	conn, err := Opts.Configuration.Connect()
 	if err != nil {
 		return nil, err
 	}
 	return conn, nil
+}
+
+func fileAccessible(f string) (bool, error) {
+	stat, err := os.Stat(f)
+	if err != nil {
+		return false, err
+	}
+
+	if stat.IsDir() {
+		return false, fmt.Errorf("is a directory")
+	}
+
+	file, err := os.Open(f)
+	if err != nil {
+		return false, err
+	}
+	file.Close()
+
+	return true, nil
 }

@@ -3,6 +3,8 @@ package models
 import (
 	"net/url"
 	"time"
+
+	"github.com/nats-io/jsm.go/natscontext"
 )
 
 type UiOptions struct {
@@ -48,6 +50,12 @@ type Options struct {
 	LogLevel string
 	// LogJSON enables JSON logging
 	LogJSON bool
+	// Name or path to a configuration context
+	ConfigurationContext string
+	// Effective configuration
+	Configuration *natscontext.Context
+	// Indicates whether contexts should not be used
+	SkipContexts bool
 }
 
 type RunOptions struct {
