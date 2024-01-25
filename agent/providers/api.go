@@ -26,6 +26,9 @@ type ExecutionProvider interface {
 	// Deploy a service (e.g., "elf" and "oci" types) or executable function (e.g., "v8" and "wasm" types)
 	Deploy() error
 
+	// Undeploy a workload, giving it a chance to gracefully clean up after itself (if applicable)
+	UnDeploy() error
+
 	// Execute a deployed function, if supported by the execution provider implementation (e.g., "v8" and "wasm" types)
 	Execute(subject string, payload []byte) ([]byte, error)
 
