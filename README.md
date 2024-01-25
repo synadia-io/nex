@@ -1,5 +1,9 @@
 [![Lint | Test | Build](https://github.com/synadia-io/nex/actions/workflows/build.yml/badge.svg)](https://github.com/synadia-io/nex/actions/workflows/build.yml)
 ![Release](https://github.com/synadia-io/nex/actions/workflows/release.yml/badge.svg)
+![Homepage and Documentation](https://img.shields.io/website?label=Homepage&url=https%3A%2F%2Fnats.io)
+![eg](https://img.shields.io/badge/Powered%20By-NATS-green)
+![GitHub License](https://img.shields.io/github/license/ConnectEverything/nex)
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/ConnectEverything/nex)
 
 # NATS Execution Engine
 Leverage and extend your investment in NATS infrastructure to deploy functions and services, turning NATS into the ultimate platform for building distributed applications.
