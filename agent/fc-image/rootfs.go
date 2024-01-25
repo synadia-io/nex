@@ -146,6 +146,19 @@ func build(ctx context.Context, tempdir string, mountPoint string) error {
 		return err
 	}
 
+	err = os.Chown(filepath.Join(mountPoint, "/home/nex"), 1000, 1000)
+	if err != nil {
+		return err
+	}
+	err = os.Chown(filepath.Join(mountPoint, "/etc/init.d/agent"), 1000, 1000)
+	if err != nil {
+		return err
+	}
+	err = os.Chown(filepath.Join(mountPoint, "/usr/local/bin/agent"), 1000, 1000)
+	if err != nil {
+		return err
+	}
+
 	_, err = c.Stdout(ctx)
 	if err != nil {
 		return err
