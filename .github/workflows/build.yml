@@ -18,7 +18,7 @@ jobs:
       name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version: '1.21.5'
     - 
       name: Install lint deps
       shell: bash --noprofile --norc -x -eo pipefail {0}
@@ -46,10 +46,10 @@ jobs:
       name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version: '1.21.5'
     -
       name: Symlink go
-      run: sudo ln -f -s /opt/hostedtoolcache/go/1.21.6/x64/bin/* /usr/bin/
+      run: sudo ln -f -s /opt/hostedtoolcache/go/1.21.5/x64/bin/* /usr/bin/
     - 
       name: Install ginkgo
       shell: bash --noprofile --norc -x -eo pipefail {0}
@@ -80,7 +80,7 @@ jobs:
       name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version: '1.21.5'
     - 
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
@@ -109,7 +109,7 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.21.5'
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
