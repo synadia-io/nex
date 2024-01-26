@@ -8,8 +8,11 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"os/signal"
 	"path"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
@@ -31,6 +34,7 @@ const (
 // The machine manager is responsible for the pool of warm firecracker VMs. This includes starting new
 // VMs, stopping VMs, and pulling VMs from the pool on demand
 type MachineManager struct {
+	api         *ApiListener
 	rootContext context.Context
 	rootCancel  context.CancelFunc
 	config      *NodeConfiguration
@@ -65,7 +69,7 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 		return nil, fmt.Errorf("failed to create new machine manager; failed to encode public key; %s", err)
 	}
 
-	return &MachineManager{
+	m := &MachineManager{
 		rootContext:      ctx,
 		rootCancel:       cancel,
 		config:           config,
@@ -78,7 +82,11 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 		natsStoreDir:     defaultNatsStoreDir,
 		allVms:           make(map[string]*runningFirecracker),
 		warmVms:          make(chan *runningFirecracker, config.MachinePoolSize-1),
-	}, nil
+	}
+
+	m.api = NewApiListener(log, m, config)
+
+	return m, nil
 }
 
 // Starts the machine manager. Publishes a node started event and starts the goroutine responsible for
@@ -109,8 +117,16 @@ func (m *MachineManager) Start() error {
 		return err
 	}
 
+	err = m.api.Start()
+	if err != nil {
+		m.log.Error("Failed to start API listener", slog.Any("err", err))
+		return err
+	}
+
 	go m.fillPool()
 	_ = m.PublishNodeStarted()
+
+	m.setupSignalHandlers()
 
 	return nil
 }
@@ -283,8 +299,7 @@ func (m *MachineManager) fillPool() {
 			vm, err := createAndStartVM(m.rootContext, m.config, m.log)
 			if err != nil {
 				m.log.Error("Failed to create VMM for warming pool. Aborting.", slog.Any("err", err))
-				// if we can't create a vm, there's no point in this app staying up
-				panic(err)
+				return
 			}
 
 			go m.awaitHandshake(vm.vmmID)
@@ -313,6 +328,53 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 		_, handshakeOk = m.handshakes[vmid]
 		time.Sleep(time.Millisecond * agentapi.DefaultRunloopSleepTimeoutMillis)
 	}
+}
+
+// TODO : look into also pre-removing /var/lib/cni/networks/fcnet/ during startup sequence
+// to ensure we get the full IP range
+
+// Remove firecracker VM sockets created by this pid
+func (m *MachineManager) cleanSockets() {
+	dir, err := os.ReadDir(os.TempDir())
+	if err != nil {
+		m.log.Error("Failed to read temp directory", slog.Any("err", err))
+	}
+
+	for _, d := range dir {
+		if strings.Contains(d.Name(), fmt.Sprintf(".firecracker.sock-%d-", os.Getpid())) {
+			os.Remove(path.Join([]string{"tmp", d.Name()}...))
+		}
+	}
+}
+
+func (m *MachineManager) setupSignalHandlers() {
+	go func() {
+		// both firecracker and the embedded NATS server register signal handlers... wipe those so ours are the ones being used
+		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+		stop := func() {
+			err := m.Stop()
+			if err != nil {
+				m.log.Warn("Machine manager failed to stop", slog.Any("err", err))
+			}
+
+			m.cleanSockets()
+			os.Exit(0) // FIXME
+		}
+
+		for {
+			switch s := <-c; {
+			case s == syscall.SIGTERM || s == os.Interrupt:
+				m.log.Info("Caught signal, requesting clean shutdown", slog.String("signal", s.String()))
+				stop()
+			case s == syscall.SIGQUIT:
+				m.log.Info("Caught quit signal, still trying graceful shutdown", slog.String("signal", s.String()))
+				stop()
+			}
+		}
+	}()
 }
 
 func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error) {
