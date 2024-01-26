@@ -18,14 +18,16 @@ func setConditionalCommands() {
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
 	ctx, cancel := context.WithCancel(ctx)
-	nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
+	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
+	if err != nil {
+		return err
+	}
 	<-ctx.Done()
+
 	return nil
 }
 
 func RunNodePreflight(ctx context.Context, logger *slog.Logger) error {
 	ctx, cancel := context.WithCancel(ctx)
-	nexnode.CmdPreflight(Opts, NodeOpts, ctx, cancel, logger)
-
-	return nil
+	return nexnode.CmdPreflight(Opts, NodeOpts, ctx, cancel, logger)
 }

@@ -58,10 +58,10 @@ var _ = Describe("nex node", func() {
 				nodeOpts.ConfigFilepath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 
-			It("should panic", func(ctx SpecContext) {
-				Expect(func() {
-					nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-				}).To(PanicWith(fmt.Errorf("failed to load configuration file: open %s: no such file or directory", nodeOpts.ConfigFilepath)))
+			It("should return an error", func(ctx SpecContext) {
+				Expect(
+					nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log),
+				).To(MatchError(fmt.Errorf("failed to load configuration file: open %s: no such file or directory", nodeOpts.ConfigFilepath)))
 			})
 		})
 
@@ -87,10 +87,10 @@ var _ = Describe("nex node", func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 						})
 
-						It("should panic", func(ctx SpecContext) {
-							Expect(func() {
-								nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-							}).To(PanicWith(errors.New("preflight checks failed: EOF")))
+						It("should return an error", func(ctx SpecContext) {
+							Expect(
+								nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log),
+							).To(MatchError(errors.New("preflight checks failed: EOF")))
 						})
 					})
 
@@ -102,7 +102,7 @@ var _ = Describe("nex node", func() {
 						})
 
 						JustBeforeEach(func() {
-							nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+							_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 						})
 
 						It("should install the host-local CNI plugin", func(ctx SpecContext) {
