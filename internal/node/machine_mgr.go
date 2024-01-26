@@ -20,6 +20,7 @@ import (
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -222,6 +223,53 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 	vm.namespace = namespace
 	vm.workloadSpecification = request
 
+	_, ok := namespaceWorkloadCounter[vm.namespace]
+	if !ok {
+		namespaceCounter, err := nexNodeMeter.
+			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-workload-count",
+				metric.WithDescription("Number of workloads in namespace "+vm.namespace),
+			)
+		if err != nil {
+			m.log.Error("Failed to create namespace workload counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
+		}
+
+		namespaceWorkloadCounter[vm.namespace] = namespaceCounter
+	}
+
+	_, ok = namespaceAllocatedMemoryCounter[vm.namespace]
+	if !ok {
+		namespaceCounter, err := nexNodeMeter.
+			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-allocated-memory-count",
+				metric.WithDescription("Allocated memory for namespace "+vm.namespace),
+			)
+		if err != nil {
+			m.log.Error("Failed to create namespace memory counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
+		}
+
+		namespaceAllocatedMemoryCounter[vm.namespace] = namespaceCounter
+	}
+
+	_, ok = namespaceAllocatedVCPUCounter[vm.namespace]
+	if !ok {
+		namespaceCounter, err := nexNodeMeter.
+			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-allocated-vcpu-count",
+				metric.WithDescription("Allocated VCPU for namespace "+vm.namespace),
+			)
+		if err != nil {
+			m.log.Error("Failed to create namespace vcpu counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
+		}
+
+		namespaceAllocatedVCPUCounter[vm.namespace] = namespaceCounter
+	}
+
+	namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), 1)
+	namespaceAllocatedMemoryCounter[vm.namespace].Add(context.TODO(), *vm.machine.Cfg.MachineCfg.MemSizeMib)
+	namespaceAllocatedVCPUCounter[vm.namespace].Add(context.TODO(), *vm.machine.Cfg.MachineCfg.VcpuCount)
+
+	workloadCounter.Add(m.rootContext, 1)
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount)
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib)
+
 	return nil
 }
 
@@ -242,6 +290,11 @@ func (m *MachineManager) Stop() error {
 	// Now empty the leftovers in the pool
 	for vm := range m.warmVms {
 		vm.shutDown(m.log)
+		// TODO: confirm this needs to be here
+		workloadCounter.Add(m.rootContext, -1)
+		namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), -1)
+		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
 	}
 	time.Sleep(100 * time.Millisecond)
 
@@ -270,6 +323,12 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	delete(m.allVms, vmId)
 
 	workloadCounter.Add(m.rootContext, -1)
+	namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), -1)
+	namespaceAllocatedMemoryCounter[vm.namespace].Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+	namespaceAllocatedVCPUCounter[vm.namespace].Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+
 	return nil
 }
 
@@ -302,13 +361,11 @@ func (m *MachineManager) fillPool() {
 				m.log.Error("Failed to create VMM for warming pool. Aborting.", slog.Any("err", err))
 				return
 			}
-
 			go m.awaitHandshake(vm.vmmID)
 			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 
 			// If the pool is full, this line will block until a slot is available.
 			m.warmVms <- vm
-			workloadCounter.Add(m.rootContext, 1)
 
 			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
 			m.allVms[vm.vmmID] = vm

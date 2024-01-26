@@ -2,16 +2,10 @@ package nexnode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"os/signal"
-	"path"
-	"strings"
-	"syscall"
 
-	"github.com/nats-io/jsm.go/natscontext"
-	"github.com/nats-io/nats.go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 
@@ -22,20 +16,29 @@ import (
 var (
 	nexNodeMeter = otel.Meter("nex-node")
 
-	workloadCounter metric.Int64UpDownCounter
+	workloadCounter        metric.Int64UpDownCounter
+	deployedByteCounter    metric.Int64UpDownCounter
+	allocatedMemoryCounter metric.Int64UpDownCounter
+	allocatedVCPUCounter   metric.Int64UpDownCounter
+
+	namespaceWorkloadCounter        map[string]metric.Int64UpDownCounter
+	namespaceDeployedByteCounter    map[string]metric.Int64UpDownCounter
+	namespaceAllocatedMemoryCounter map[string]metric.Int64UpDownCounter
+	namespaceAllocatedVCPUCounter   map[string]metric.Int64UpDownCounter
 )
 
-func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
-	var err error
-	workloadCounter, err = nexNodeMeter.
-		Int64UpDownCounter("nex-workload-count",
-			metric.WithDescription("Number of workloads running"),
-		)
+func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
+	namespaceWorkloadCounter = make(map[string]metric.Int64UpDownCounter)
+	namespaceDeployedByteCounter = make(map[string]metric.Int64UpDownCounter)
+	namespaceAllocatedMemoryCounter = make(map[string]metric.Int64UpDownCounter)
+	namespaceAllocatedVCPUCounter = make(map[string]metric.Int64UpDownCounter)
+
+	err := createCounters()
 	if err != nil {
-		log.Error("Failed to create workload counter", slog.Any("err", err))
+		log.Warn("failed to create all OTel counters", slog.Any("err", err))
 	}
 
-	nc, err := generateConnectionFromOpts(opts)
+	nc, err := models.GenerateConnectionFromOpts(opts)
 	if err != nil {
 		log.Error("Failed to connect to NATS server", slog.Any("err", err))
 		return fmt.Errorf("failed to connect to NATS server: %s", err)
@@ -80,4 +83,37 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 	}
 
 	return nil
+}
+
+func createCounters() error {
+	var e, err error
+	workloadCounter, e = nexNodeMeter.
+		Int64UpDownCounter("nex-workload-count",
+			metric.WithDescription("Number of workloads running"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
+	deployedByteCounter, e = nexNodeMeter.
+		Int64UpDownCounter("nex-deployed-bytes-count",
+			metric.WithDescription("Total number of bytes deployed"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
+	allocatedMemoryCounter, e = nexNodeMeter.
+		Int64UpDownCounter("nex-total-memory-allocation-mib-count",
+			metric.WithDescription("Total allocated memory based on firecracker config"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
+	allocatedVCPUCounter, e = nexNodeMeter.
+		Int64UpDownCounter("nex-total-vcpu-allocation-count",
+			metric.WithDescription("Total allocated VCPU based on firecracker config"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
+	return err
 }
