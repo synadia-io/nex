@@ -95,21 +95,22 @@ type NodeOptions struct {
 	ConfigFilepath  string `json:"-"`
 	ForceDepInstall bool   `json:"-"`
 
-	CNI                CNIDefinition     `json:"cni"`
-	DefaultResourceDir string            `json:"default_resource_dir"`
-	InternalNodeHost   *string           `json:"internal_node_host,omitempty"`
-	InternalNodePort   *int              `json:"internal_node_port"`
-	KernelFilepath     string            `json:"kernel_file"`
-	KernelPath         *string           `json:"kernel_path"` // FIXME-- audit json
-	MachinePoolSize    int               `json:"machine_pool_size"`
-	MachineTemplate    MachineTemplate   `json:"machine_template"`
-	RateLimiters       *Limiters         `json:"rate_limiters,omitempty"`
-	RootFsFilepath     string            `json:"rootfs_file"` // FIXME-- audit json
-	RootFsPath         *string           `json:"rootfs_path"`
-	Tags               map[string]string `json:"tags,omitempty"`
-	ValidIssuers       []string          `json:"valid_issuers,omitempty"`
-	WorkloadTypes      []string          `json:"workload_types,omitempty"`
-	OtelMetrics        bool              `json:"-"`
+	CNI                 CNIDefinition     `json:"cni"`
+	DefaultResourceDir  string            `json:"default_resource_dir"`
+	InternalNodeHost    *string           `json:"internal_node_host,omitempty"`
+	InternalNodePort    *int              `json:"internal_node_port"`
+	KernelFilepath      string            `json:"kernel_file"`
+	KernelPath          *string           `json:"kernel_path"` // FIXME-- audit json
+	MachinePoolSize     int               `json:"machine_pool_size"`
+	MachineTemplate     MachineTemplate   `json:"machine_template"`
+	RateLimiters        *Limiters         `json:"rate_limiters,omitempty"`
+	RootFsFilepath      string            `json:"rootfs_file"` // FIXME-- audit json
+	RootFsPath          *string           `json:"rootfs_path"`
+	Tags                map[string]string `json:"tags,omitempty"`
+	ValidIssuers        []string          `json:"valid_issuers,omitempty"`
+	WorkloadTypes       []string          `json:"workload_types,omitempty"`
+	OtelMetrics         bool              `json:"-"`
+	OtelMetricsExporter string            `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }

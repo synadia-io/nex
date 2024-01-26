@@ -67,8 +67,8 @@ func init() {
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
-	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").StringVar(&Opts.LogLevel)
-	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").BoolVar(&Opts.LogJSON)
+	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "trace", "debug", "info", "warn", "error")
+	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").UnNegatableBoolVar(&Opts.LogJSON)
 	ncli.Flag("context", "Configuration context").Envar("NATS_CONTEXT").PlaceHolder("NAME").StringVar(&Opts.ConfigurationContext)
 	ncli.Flag("no-context", "Disable NATS context discovery").UnNegatableBoolVar(&Opts.SkipContexts)
 

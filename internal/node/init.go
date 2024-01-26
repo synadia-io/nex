@@ -28,7 +28,7 @@ var (
 func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
 	var err error
 	workloadCounter, err = nexNodeMeter.
-		Int64UpDownCounter("nex-workload-counter",
+		Int64UpDownCounter("nex-workload-count",
 			metric.WithDescription("Number of workloads running"),
 		)
 	if err != nil {
