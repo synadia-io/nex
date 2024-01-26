@@ -8,11 +8,12 @@ import (
 
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 // Issues a request to stop a running workload
 func StopWorkload(ctx context.Context, logger *slog.Logger) error {
-	nc, err := generateConnectionFromOpts()
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
@@ -45,7 +46,7 @@ func StopWorkload(ctx context.Context, logger *slog.Logger) error {
 
 // Submits a run request for the given workload to the specified node
 func RunWorkload(ctx context.Context, logger *slog.Logger) error {
-	nc, err := generateConnectionFromOpts()
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}

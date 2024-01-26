@@ -3,21 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
 
 	"github.com/nats-io/natscli/columns"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 // Uses a control API client to request a node list from a NATS environment
-func ListNodes(ctx context.Context, logger *slog.Logger) error {
-	nc, err := generateConnectionFromOpts()
+func ListNodes(ctx context.Context) error {
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
-	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout, log)
 
 	nodes, err := nodeClient.ListNodes()
@@ -31,13 +33,12 @@ func ListNodes(ctx context.Context, logger *slog.Logger) error {
 }
 
 // Uses a control API client to retrieve info on a single node
-func NodeInfo(ctx context.Context, logger *slog.Logger, nodeid string) error {
-
-	nc, err := generateConnectionFromOpts()
+func NodeInfo(ctx context.Context, nodeid string) error {
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
-	log := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
 	nodeInfo, err := nodeClient.NodeInfo(nodeid)
 	if err != nil {

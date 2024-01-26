@@ -3,8 +3,6 @@ package nexnode
 import (
 	"context"
 	"fmt"
-	"github.com/nats-io/jsm.go/natscontext"
-	"github.com/nats-io/nats.go"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -12,11 +10,12 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/synadia-io/nex/internal/models"
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
 
 func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
-	nc, err := generateConnectionFromOpts(opts)
+	nc, err := models.GenerateConnectionFromOpts(opts)
 	if err != nil {
 		log.Error("Failed to connect to NATS server", slog.Any("err", err))
 		panic("failed to connect to NATS server")
@@ -52,48 +51,6 @@ func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context
 		log.Error("Failed to start API listener", slog.Any("err", err))
 		panic("failed to start API listener")
 	}
-}
-
-func generateConnectionFromOpts(opts *nexmodels.Options) (*nats.Conn, error) {
-	if len(strings.TrimSpace(opts.Servers)) == 0 {
-		opts.Servers = nats.DefaultURL
-	}
-	ctxOpts := []natscontext.Option{
-		natscontext.WithServerURL(opts.Servers),
-		natscontext.WithCreds(opts.Creds),
-		natscontext.WithNKey(opts.Nkey),
-		natscontext.WithCertificate(opts.TlsCert),
-		natscontext.WithKey(opts.TlsKey),
-		natscontext.WithCA(opts.TlsCA),
-	}
-
-	if opts.TlsFirst {
-		ctxOpts = append(ctxOpts, natscontext.WithTLSHandshakeFirst())
-	}
-
-	if opts.Username != "" && opts.Password == "" {
-		ctxOpts = append(ctxOpts, natscontext.WithToken(opts.Username))
-	} else {
-		ctxOpts = append(ctxOpts, natscontext.WithUser(opts.Username), natscontext.WithPassword(opts.Password))
-	}
-
-	natsContext, err := natscontext.New("nexnode", false, ctxOpts...)
-
-	if err != nil {
-		return nil, err
-	}
-
-	natsOpts, err := natsContext.NATSOptions()
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := nats.Connect(opts.Servers, natsOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
 }
 
 func setupSignalHandlers(log *slog.Logger, manager *MachineManager) {

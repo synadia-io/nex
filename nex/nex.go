@@ -69,6 +69,8 @@ func init() {
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
 	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").StringVar(&Opts.LogLevel)
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").BoolVar(&Opts.LogJSON)
+	ncli.Flag("context", "Configuration context").Envar("NATS_CONTEXT").PlaceHolder("NAME").StringVar(&Opts.ConfigurationContext)
+	ncli.Flag("no-context", "Disable NATS context discovery").UnNegatableBoolVar(&Opts.SkipContexts)
 
 	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
 	run.Arg("id", "Public key of the target node to run the workload").Required().StringVar(&RunOpts.TargetNode)
@@ -138,14 +140,14 @@ func main() {
 
 	switch cmd {
 	case nodes_ls.FullCommand():
-		err := ListNodes(ctx, logger)
+		err := ListNodes(ctx)
 		if err != nil {
-			logger.Error("list nodes failed to execute", slog.Any("err", err))
+			fmt.Printf("Failed to list nodes: %s\n", err)
 		}
 	case nodes_info.FullCommand():
-		err := NodeInfo(ctx, logger, *node_info_id_arg)
+		err := NodeInfo(ctx, *node_info_id_arg)
 		if err != nil {
-			logger.Error("failed to get node info", slog.Any("err", err))
+			fmt.Printf("Failed to get node info: %s\n", err)
 		}
 	case run.FullCommand():
 		err := RunWorkload(ctx, logger)
