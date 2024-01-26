@@ -20,12 +20,14 @@ import (
 )
 
 var (
+	nexNodeMeter = otel.Meter("nex-node")
+
 	workloadCounter metric.Int64UpDownCounter
 )
 
 func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
 	var err error
-	workloadCounter, err = otel.Meter("nex-workload").
+	workloadCounter, err = nexNodeMeter.
 		Int64UpDownCounter("nex-workload-counter",
 			metric.WithDescription("Number of workloads running"),
 		)
