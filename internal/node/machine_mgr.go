@@ -269,7 +269,7 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	vm.shutDown(m.log)
 	delete(m.allVms, vmId)
 
-	runningWorkloads.Dec()
+	workloadCounter.Add(m.rootContext, -1)
 	return nil
 }
 
@@ -308,7 +308,7 @@ func (m *MachineManager) fillPool() {
 
 			// If the pool is full, this line will block until a slot is available.
 			m.warmVms <- vm
-			runningWorkloads.Inc()
+			workloadCounter.Add(m.rootContext, 1)
 
 			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
 			m.allVms[vm.vmmID] = vm

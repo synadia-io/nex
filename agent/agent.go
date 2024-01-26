@@ -73,6 +73,14 @@ func NewAgent() (*Agent, error) {
 	}, nil
 }
 
+func (a *Agent) Version() string {
+	return VERSION
+}
+
+func (a *Agent) FullVersion() string {
+	return fmt.Sprintf("%s [%s] BuildDate: %s", VERSION, COMMIT, BUILDDATE)
+}
+
 // Start the agent
 // NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() error {

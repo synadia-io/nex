@@ -109,7 +109,7 @@ type NodeOptions struct {
 	Tags               map[string]string `json:"tags,omitempty"`
 	ValidIssuers       []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes      []string          `json:"workload_types,omitempty"`
-	PromMetrics        bool              `json:"-"`
+	OtelMetrics        bool              `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }

@@ -250,7 +250,7 @@ func handlePing(api *ApiListener) func(m *nats.Msg) {
 		now := time.Now().UTC()
 		res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
 			NodeId:          api.nodeId,
-			Version:         VERSION,
+			Version:         Version(),
 			Uptime:          myUptime(now.Sub(api.start)),
 			RunningMachines: len(api.mgr.allVms),
 			Tags:            api.config.Tags,

@@ -4,13 +4,36 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"os/signal"
+	"path"
+	"strings"
+	"syscall"
+
+	"github.com/nats-io/jsm.go/natscontext"
+	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
 
 	"github.com/synadia-io/nex/internal/models"
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
 
-func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
-	nc, err := models.GenerateConnectionFromOpts(opts)
+var (
+	workloadCounter metric.Int64UpDownCounter
+)
+
+func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) {
+	var err error
+	workloadCounter, err = otel.Meter("nex-workload").
+		Int64UpDownCounter("nex-workload-counter",
+			metric.WithDescription("Number of workloads running"),
+		)
+	if err != nil {
+		log.Error("Failed to create workload counter", slog.Any("err", err))
+	}
+
+	nc, err := generateConnectionFromOpts(opts)
 	if err != nil {
 		log.Error("Failed to connect to NATS server", slog.Any("err", err))
 		return fmt.Errorf("failed to connect to NATS server: %s", err)
