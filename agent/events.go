@@ -36,7 +36,7 @@ func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
 }
 
 // FIXME-- revisit error handling
-func (a *Agent) PublishWorkloadStarted(vmID, workloadName string, totalBytes *int32) {
+func (a *Agent) PublishWorkloadStarted(vmID, workloadName string, totalBytes int64) {
 	select {
 	case a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,

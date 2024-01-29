@@ -132,17 +132,12 @@ func (m *MachineManager) Start() error {
 	return nil
 }
 
-func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, namespace string, request controlapi.RunRequest) error {
+func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest controlapi.RunRequest, deployRequest agentapi.DeployRequest) error {
 	// TODO: make the bytes and hash/digest available to the agent
-	req := agentapi.DeployRequest{
-		WorkloadName:    &workloadName,
-		Hash:            nil, // FIXME
-		TotalBytes:      nil, // FIXME
-		TriggerSubjects: request.TriggerSubjects,
-		WorkloadType:    request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
-		Environment:     request.WorkloadEnvironment,
+	bytes, err := json.Marshal(deployRequest)
+	if err != nil {
+		return err
 	}
-	bytes, _ := json.Marshal(req)
 
 	status := m.ncInternal.Status()
 	m.log.Debug("NATS internal connection status",
@@ -167,8 +162,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 
 	if !deployResponse.Accepted {
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
-	} else if request.SupportsTriggerSubjects() {
-		for _, tsub := range request.TriggerSubjects {
+	} else if runRequest.SupportsTriggerSubjects() {
+		for _, tsub := range runRequest.TriggerSubjects {
 			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
 				intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
 				intmsg.Data = msg.Data
@@ -179,14 +174,14 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 					m.log.Error("Failed to request agent execution via internal trigger subject",
 						slog.Any("err", err),
 						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
+						slog.String("workload_type", *runRequest.WorkloadType),
 						slog.String("vmid", vm.vmmID),
 					)
 				} else if resp != nil {
 					m.log.Debug("Received response from execution via trigger subject",
 						slog.String("vmid", vm.vmmID),
 						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
+						slog.String("workload_type", *runRequest.WorkloadType),
 						slog.Int("payload_size", len(resp.Data)),
 					)
 					err = msg.Respond(resp.Data)
@@ -194,7 +189,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 						m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
 							slog.String("vmid", vm.vmmID),
 							slog.String("trigger_subject", tsub),
-							slog.String("workload_type", *request.WorkloadType),
+							slog.String("workload_type", *runRequest.WorkloadType),
 							slog.Any("err", err),
 						)
 					}
@@ -204,7 +199,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 				m.log.Error("Failed to create trigger subject subscription for deployed workload",
 					slog.String("vmid", vm.vmmID),
 					slog.String("trigger_subject", tsub),
-					slog.String("workload_type", *request.WorkloadType),
+					slog.String("workload_type", *runRequest.WorkloadType),
 					slog.Any("err", err),
 				)
 				// TODO-- rollback the otherwise accepted deployment and return the error below...
@@ -214,20 +209,20 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 			m.log.Info("Created trigger subject subscription for deployed workload",
 				slog.String("vmid", vm.vmmID),
 				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *request.WorkloadType),
+				slog.String("workload_type", *runRequest.WorkloadType),
 			)
 		}
 	}
 
 	vm.workloadStarted = time.Now().UTC()
-	vm.namespace = namespace
-	vm.workloadSpecification = request
+	vm.namespace = *deployRequest.Namespace
+	vm.workloadSpecification = runRequest
 
 	_, ok := namespaceWorkloadCounter[vm.namespace]
 	if !ok {
 		namespaceCounter, err := nexNodeMeter.
 			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-workload-count",
-				metric.WithDescription("Number of workloads in namespace "+vm.namespace),
+				metric.WithDescription("Number of workloads in namespace: "+vm.namespace),
 			)
 		if err != nil {
 			m.log.Error("Failed to create namespace workload counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
@@ -236,11 +231,24 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 		namespaceWorkloadCounter[vm.namespace] = namespaceCounter
 	}
 
+	_, ok = namespaceDeployedByteCounter[vm.namespace]
+	if !ok {
+		namespaceCounter, err := nexNodeMeter.
+			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-deployed-bytes-count",
+				metric.WithDescription("Deployed bytes in namespace: "+vm.namespace),
+			)
+		if err != nil {
+			m.log.Error("Failed to create namespace byte counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
+		}
+
+		namespaceDeployedByteCounter[vm.namespace] = namespaceCounter
+	}
+
 	_, ok = namespaceAllocatedMemoryCounter[vm.namespace]
 	if !ok {
 		namespaceCounter, err := nexNodeMeter.
 			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-allocated-memory-count",
-				metric.WithDescription("Allocated memory for namespace "+vm.namespace),
+				metric.WithDescription("Allocated memory for namespace: "+vm.namespace),
 			)
 		if err != nil {
 			m.log.Error("Failed to create namespace memory counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
@@ -253,7 +261,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 	if !ok {
 		namespaceCounter, err := nexNodeMeter.
 			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-allocated-vcpu-count",
-				metric.WithDescription("Allocated VCPU for namespace "+vm.namespace),
+				metric.WithDescription("Allocated VCPU for namespace: "+vm.namespace),
 			)
 		if err != nil {
 			m.log.Error("Failed to create namespace vcpu counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
@@ -263,10 +271,12 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 	}
 
 	namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), 1)
+	namespaceDeployedByteCounter[vm.namespace].Add(m.rootContext, deployRequest.TotalBytes)
 	namespaceAllocatedMemoryCounter[vm.namespace].Add(context.TODO(), *vm.machine.Cfg.MachineCfg.MemSizeMib)
 	namespaceAllocatedVCPUCounter[vm.namespace].Add(context.TODO(), *vm.machine.Cfg.MachineCfg.VcpuCount)
 
 	workloadCounter.Add(m.rootContext, 1)
+	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes)
 	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount)
 	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib)
 
@@ -322,6 +332,7 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	vm.shutDown(m.log)
 	delete(m.allVms, vmId)
 
+	// FIX: we dont have access to the byte size in Stop, so that metric is never subtracted
 	workloadCounter.Add(m.rootContext, -1)
 	namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), -1)
 	namespaceAllocatedMemoryCounter[vm.namespace].Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)

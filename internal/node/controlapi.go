@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/pkg/errors"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
@@ -196,7 +197,7 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
 		}
 
-		err = api.mgr.CacheWorkload(&request)
+		numBytes, workloadHash, err := api.mgr.CacheWorkload(&request)
 		if err != nil {
 			api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
 			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))
@@ -217,10 +218,22 @@ func handleRun(api *ApiListener) func(m *nats.Msg) {
 				slog.String("vmid", runningVm.vmmID),
 				slog.String("namespace", namespace),
 				slog.String("workload", workloadName),
+				slog.Uint64("workload_size", numBytes),
+				slog.String("workload_sha256", *workloadHash),
 				slog.String("type", *request.WorkloadType),
 			)
 
-		err = api.mgr.DeployWorkload(runningVm, workloadName, namespace, request)
+		req := agentapi.DeployRequest{
+			WorkloadName:    &workloadName,
+			Hash:            *workloadHash,
+			TotalBytes:      int64(numBytes),
+			TriggerSubjects: request.TriggerSubjects,
+			WorkloadType:    request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
+			Environment:     request.WorkloadEnvironment,
+			Namespace:       &namespace,
+		}
+
+		err = api.mgr.DeployWorkload(runningVm, request, req)
 
 		if err != nil {
 			api.log.Error("Failed to start workload in VM", slog.Any("err", err))

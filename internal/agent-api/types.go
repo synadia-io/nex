@@ -57,11 +57,12 @@ type ExecutionProviderParams struct {
 // FIXME? DeployRequest -> DeployRequest?
 type DeployRequest struct {
 	Environment     map[string]string `json:"environment"`
-	Hash            *string           `json:"hash,omitempty"`
-	TotalBytes      *int32            `json:"total_bytes,omitempty"`
+	Hash            string            `json:"hash,omitempty"`
+	TotalBytes      int64             `json:"total_bytes,omitempty"`
 	TriggerSubjects []string          `json:"trigger_subjects"`
 	WorkloadName    *string           `json:"workload_name,omitempty"`
 	WorkloadType    *string           `json:"workload_type,omitempty"`
+	Namespace       *string           `json:"namespace,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`

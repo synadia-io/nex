@@ -1,6 +1,8 @@
 package nexnode
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"log/slog"
 	"os"
@@ -26,7 +28,7 @@ func NewPayloadCache(nc *nats.Conn, log *slog.Logger, dir string) *payloadCache 
 	}
 }
 
-func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
+func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) (uint64, *string, error) {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.nc.Opts.Url))
@@ -38,37 +40,37 @@ func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 
 	js, err := m.nc.JetStream(opts...)
 	if err != nil {
-		return err
+		return 0, nil, err
 	}
 
 	store, err := js.ObjectStore(bucket)
 	if err != nil {
 		m.log.Error("Failed to bind to source object store", slog.Any("err", err), slog.String("bucket", bucket))
-		return err
+		return 0, nil, err
 	}
 
 	_, err = store.GetInfo(key)
 	if err != nil {
 		m.log.Error("Failed to locate workload binary in source object store", slog.Any("err", err), slog.String("key", key), slog.String("bucket", bucket))
-		return err
+		return 0, nil, err
 	}
 
 	filename := path.Join(os.TempDir(), "sus") // lol... sus.
 	err = store.GetFile(key, filename)
 	if err != nil {
 		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
-		return err
+		return 0, nil, err
 	}
 
 	f, err := os.Open(filename)
 	if err != nil {
-		return err
+		return 0, nil, err
 	}
 
 	workload, err := io.ReadAll(f)
 	if err != nil {
 		m.log.Error("Couldn't read the file we just wrote", slog.Any("err", err))
-		return err
+		return 0, nil, err
 	}
 
 	os.Remove(filename)
@@ -85,12 +87,16 @@ func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) error {
 		panic(err)
 	}
 
-	_, err = cache.PutBytes(request.DecodedClaims.Subject, workload)
+	obj, err := cache.PutBytes(request.DecodedClaims.Subject, workload)
 	if err != nil {
 		m.log.Error("Failed to write workload to internal cache.", slog.Any("err", err))
 		panic(err)
 	}
 
-	m.log.Info("Successfully stored workload in internal object store", slog.String("name", request.DecodedClaims.Subject))
-	return nil
+	workloadHash := sha256.New()
+	workloadHash.Write(workload)
+	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
+
+	m.log.Info("Successfully stored workload in internal object store", slog.String("name", request.DecodedClaims.Subject), slog.Int64("bytes", int64(obj.Size)))
+	return obj.Size, &workloadHashString, nil
 }
