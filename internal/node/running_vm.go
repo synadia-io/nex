@@ -33,6 +33,7 @@ type runningFirecracker struct {
 	machineStarted        time.Time
 	workloadSpecification controlapi.RunRequest
 	namespace             string
+	deployedWorkload      agentapi.DeployRequest
 }
 
 func (vm *runningFirecracker) shutDown(log *slog.Logger) {

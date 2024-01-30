@@ -217,6 +217,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 	vm.workloadStarted = time.Now().UTC()
 	vm.namespace = *deployRequest.Namespace
 	vm.workloadSpecification = runRequest
+	vm.deployedWorkload = deployRequest
 
 	workloadCounter.Add(m.rootContext, 1)
 	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
@@ -250,6 +251,8 @@ func (m *MachineManager) Stop() error {
 		// TODO: confirm this needs to be here
 		workloadCounter.Add(m.rootContext, -1)
 		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
+		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
 		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
@@ -281,9 +284,10 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	vm.shutDown(m.log)
 	delete(m.allVms, vmId)
 
-	// FIX: we dont have access to the byte size in Stop, so that metric is never subtracted
 	workloadCounter.Add(m.rootContext, -1)
 	workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
+	deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
 	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
