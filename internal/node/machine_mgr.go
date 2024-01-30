@@ -219,8 +219,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 	vm.workloadSpecification = runRequest
 	vm.deployedWorkload = deployRequest
 
-	workloadCounter.Add(m.rootContext, 1)
-	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
+	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)), metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
 	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes)
 	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount)
@@ -249,8 +249,8 @@ func (m *MachineManager) Stop() error {
 	for vm := range m.warmVms {
 		vm.shutDown(m.log)
 		// TODO: confirm this needs to be here
-		workloadCounter.Add(m.rootContext, -1)
-		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
+		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
 		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
