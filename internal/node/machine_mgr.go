@@ -20,6 +20,7 @@ import (
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -133,7 +134,6 @@ func (m *MachineManager) Start() error {
 }
 
 func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest controlapi.RunRequest, deployRequest agentapi.DeployRequest) error {
-	// TODO: make the bytes and hash/digest available to the agent
 	bytes, err := json.Marshal(deployRequest)
 	if err != nil {
 		return err
@@ -218,67 +218,14 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 	vm.namespace = *deployRequest.Namespace
 	vm.workloadSpecification = runRequest
 
-	_, ok := namespaceWorkloadCounter[vm.namespace]
-	if !ok {
-		namespaceCounter, err := nexNodeMeter.
-			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-workload-count",
-				metric.WithDescription("Number of workloads in namespace: "+vm.namespace),
-			)
-		if err != nil {
-			m.log.Error("Failed to create namespace workload counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
-		}
-
-		namespaceWorkloadCounter[vm.namespace] = namespaceCounter
-	}
-
-	_, ok = namespaceDeployedByteCounter[vm.namespace]
-	if !ok {
-		namespaceCounter, err := nexNodeMeter.
-			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-deployed-bytes-count",
-				metric.WithDescription("Deployed bytes in namespace: "+vm.namespace),
-			)
-		if err != nil {
-			m.log.Error("Failed to create namespace byte counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
-		}
-
-		namespaceDeployedByteCounter[vm.namespace] = namespaceCounter
-	}
-
-	_, ok = namespaceAllocatedMemoryCounter[vm.namespace]
-	if !ok {
-		namespaceCounter, err := nexNodeMeter.
-			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-allocated-memory-count",
-				metric.WithDescription("Allocated memory for namespace: "+vm.namespace),
-			)
-		if err != nil {
-			m.log.Error("Failed to create namespace memory counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
-		}
-
-		namespaceAllocatedMemoryCounter[vm.namespace] = namespaceCounter
-	}
-
-	_, ok = namespaceAllocatedVCPUCounter[vm.namespace]
-	if !ok {
-		namespaceCounter, err := nexNodeMeter.
-			Int64UpDownCounter("nex-namespace-"+vm.namespace+"-allocated-vcpu-count",
-				metric.WithDescription("Allocated VCPU for namespace: "+vm.namespace),
-			)
-		if err != nil {
-			m.log.Error("Failed to create namespace vcpu counter", slog.Any("err", err), slog.String("namespace", vm.namespace))
-		}
-
-		namespaceAllocatedVCPUCounter[vm.namespace] = namespaceCounter
-	}
-
-	namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), 1)
-	namespaceDeployedByteCounter[vm.namespace].Add(m.rootContext, deployRequest.TotalBytes)
-	namespaceAllocatedMemoryCounter[vm.namespace].Add(context.TODO(), *vm.machine.Cfg.MachineCfg.MemSizeMib)
-	namespaceAllocatedVCPUCounter[vm.namespace].Add(context.TODO(), *vm.machine.Cfg.MachineCfg.VcpuCount)
-
 	workloadCounter.Add(m.rootContext, 1)
+	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes)
+	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount)
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib)
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }
@@ -302,9 +249,11 @@ func (m *MachineManager) Stop() error {
 		vm.shutDown(m.log)
 		// TODO: confirm this needs to be here
 		workloadCounter.Add(m.rootContext, -1)
-		namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), -1)
+		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	}
 	time.Sleep(100 * time.Millisecond)
 
@@ -334,11 +283,11 @@ func (m *MachineManager) StopMachine(vmId string) error {
 
 	// FIX: we dont have access to the byte size in Stop, so that metric is never subtracted
 	workloadCounter.Add(m.rootContext, -1)
-	namespaceWorkloadCounter[vm.namespace].Add(context.TODO(), -1)
-	namespaceAllocatedMemoryCounter[vm.namespace].Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
-	namespaceAllocatedVCPUCounter[vm.namespace].Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+	workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }

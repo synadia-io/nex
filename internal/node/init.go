@@ -20,19 +20,9 @@ var (
 	deployedByteCounter    metric.Int64UpDownCounter
 	allocatedMemoryCounter metric.Int64UpDownCounter
 	allocatedVCPUCounter   metric.Int64UpDownCounter
-
-	namespaceWorkloadCounter        map[string]metric.Int64UpDownCounter
-	namespaceDeployedByteCounter    map[string]metric.Int64UpDownCounter
-	namespaceAllocatedMemoryCounter map[string]metric.Int64UpDownCounter
-	namespaceAllocatedVCPUCounter   map[string]metric.Int64UpDownCounter
 )
 
 func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
-	namespaceWorkloadCounter = make(map[string]metric.Int64UpDownCounter)
-	namespaceDeployedByteCounter = make(map[string]metric.Int64UpDownCounter)
-	namespaceAllocatedMemoryCounter = make(map[string]metric.Int64UpDownCounter)
-	namespaceAllocatedVCPUCounter = make(map[string]metric.Int64UpDownCounter)
-
 	err := createCounters()
 	if err != nil {
 		log.Warn("failed to create all OTel counters", slog.Any("err", err))
