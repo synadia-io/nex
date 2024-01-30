@@ -19,12 +19,19 @@ tasks:
   clean:
     cmds:
       - rm -f nex/nex
+      - rm -f rootfs.ext4.gz
       - sudo rm -rf /opt/cni/bin/*
       - sudo rm -rf /var/lib/cni/*
       - sudo rm -rf /etc/cni/conf.d/*
       - sudo rm -f /tmp/rootfs-*
       - sudo rm -f /tmp/.firecracker.*
       - sudo rm -rf /tmp/pnats
+      - sudo rm -f /tmp/*.js
+      - sudo rm -rf /tmp/*-spec
+      - sudo rm -rf /tmp/*-spec-nex-conf.json
+      - sudo rm -rf /tmp/*-spec-nex-wd
+      - sudo rm -rf /tmp/rootfs-*.ext4
+      - sudo rm -rf /tmp/*-rootfs.ext4
 
   nex:
     dir: nex
