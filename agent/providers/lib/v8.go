@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -47,14 +48,28 @@ func (v *V8) Deploy() error {
 
 	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
 	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
+		startTime := time.Now()
 		val, err := v.Execute(msg.Header.Get("x-nex-trigger-subject"), msg.Data)
 		if err != nil {
 			// TODO-- propagate this error to agent logs
 			return
 		}
+		runLength := time.Since(startTime).Nanoseconds()
+		runLength_s := strconv.FormatInt(runLength, 10)
 
 		if len(val) > 0 {
-			_ = msg.Respond(val)
+			err := msg.RespondMsg(&nats.Msg{
+				Data: val,
+				Header: nats.Header{
+					"x-nex-run-nano-sec": []string{
+						runLength_s,
+					},
+				},
+			})
+			if err != nil {
+				// TODO-- propagate this error to agent logs
+				return
+			}
 		}
 	})
 	if err != nil {

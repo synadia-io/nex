@@ -20,6 +20,8 @@ var (
 	deployedByteCounter    metric.Int64UpDownCounter
 	allocatedMemoryCounter metric.Int64UpDownCounter
 	allocatedVCPUCounter   metric.Int64UpDownCounter
+
+	functionRunTimeNano metric.Int64Counter
 )
 
 func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
@@ -101,6 +103,14 @@ func createCounters() error {
 	allocatedVCPUCounter, e = nexNodeMeter.
 		Int64UpDownCounter("nex-total-vcpu-allocation-count",
 			metric.WithDescription("Total allocated VCPU based on firecracker config"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
+
+	functionRunTimeNano, e = nexNodeMeter.
+		Int64Counter("nex-function-runtime-nanosec",
+			metric.WithDescription("Total run time in nanoseconds for function"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)

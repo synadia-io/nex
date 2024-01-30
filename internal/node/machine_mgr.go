@@ -178,12 +178,22 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 						slog.String("vmid", vm.vmmID),
 					)
 				} else if resp != nil {
+					runTime := resp.Header.Get("x-nex-run-nano-sec")
 					m.log.Debug("Received response from execution via trigger subject",
 						slog.String("vmid", vm.vmmID),
 						slog.String("trigger_subject", tsub),
 						slog.String("workload_type", *runRequest.WorkloadType),
+						slog.String("function_run_time_nanosec", runTime),
 						slog.Int("payload_size", len(resp.Data)),
 					)
+					runTime_int64, err := strconv.ParseInt(runTime, 10, 64)
+					if err != nil {
+						m.log.Warn("failed to log function runtime", slog.Any("err", err))
+					}
+
+					functionRunTimeNano.Add(m.rootContext, runTime_int64)
+					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+
 					err = msg.Respond(resp.Data)
 					if err != nil {
 						m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
