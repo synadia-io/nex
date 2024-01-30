@@ -64,7 +64,7 @@ func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
+	_, err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
 	if err != nil {
 		return err
 	}

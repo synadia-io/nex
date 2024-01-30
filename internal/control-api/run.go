@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
@@ -74,13 +73,6 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	}
 
 	return req, nil
-}
-
-// Returns true if the run request supports trigger subjects
-func (request *RunRequest) SupportsTriggerSubjects() bool {
-	return (strings.EqualFold(*request.WorkloadType, "v8") ||
-		strings.EqualFold(*request.WorkloadType, "wasm")) &&
-		len(request.TriggerSubjects) > 0
 }
 
 // This will validate a request's workload JWT, decrypt the request environment. It will not

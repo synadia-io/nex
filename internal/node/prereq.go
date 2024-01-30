@@ -59,7 +59,11 @@ type fileSpec struct {
 	satisfied   bool
 }
 
-func CheckPreRequisites(config *NodeConfiguration) error {
+func CheckPreRequisites(config *NodeConfiguration, output bool) error {
+	// if !config.ForceDepInstall && !output {
+	// 	return fmt.Errorf("invalid call to check prereqs; output must be true when dependency install is not being forced")
+	// }
+
 	required := &requirements{
 		{
 			directory: "/opt/cni/bin",
@@ -105,7 +109,10 @@ func CheckPreRequisites(config *NodeConfiguration) error {
 
 	// Verify all directories are present
 	for _, r := range *required {
-		fmt.Printf("Validating - %s [%s]\n", magenta(r.descriptor), cyan(r.directory))
+		if output {
+			fmt.Printf("Validating - %s [%s]\n", magenta(r.descriptor), cyan(r.directory))
+		}
+
 		allDepsSatified := true
 		for _, f := range r.files {
 			path := func() string {
@@ -117,13 +124,19 @@ func CheckPreRequisites(config *NodeConfiguration) error {
 			}()
 			if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 				allDepsSatified = false
-				fmt.Printf("\t⛔ Missing Dependency - %s [%s]\n", red(filepath.Join(r.directory, f.name)), cyan(f.description))
+				if output {
+					fmt.Printf("\t⛔ Missing Dependency - %s [%s]\n", red(filepath.Join(r.directory, f.name)), cyan(f.description))
+				}
 			} else {
 				f.satisfied = true
-				fmt.Printf("\t✅ Dependency Satisfied - %s [%s]\n", green(filepath.Join(r.directory, f.name)), cyan(f.description))
+				if output {
+					fmt.Printf("\t✅ Dependency Satisfied - %s [%s]\n", green(filepath.Join(r.directory, f.name)), cyan(f.description))
+				}
 			}
 		}
-		fmt.Println()
+		if output {
+			fmt.Println()
+		}
 		r.satisfied = allDepsSatified
 	}
 

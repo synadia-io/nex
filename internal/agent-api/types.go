@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
 )
 
@@ -56,6 +57,8 @@ type ExecutionProviderParams struct {
 
 // FIXME? DeployRequest -> DeployRequest?
 type DeployRequest struct {
+	DecodedClaims   jwt.GenericClaims `json:"-"`
+	Description     *string           `json:"description"`
 	Environment     map[string]string `json:"environment"`
 	Hash            string            `json:"hash,omitempty"`
 	TotalBytes      int64             `json:"total_bytes,omitempty"`
@@ -71,32 +74,39 @@ type DeployRequest struct {
 	Errors []error `json:"errors,omitempty"`
 }
 
-func (w *DeployRequest) Validate() bool {
-	w.Errors = make([]error, 0)
+// Returns true if the run request supports trigger subjects
+func (request *DeployRequest) SupportsTriggerSubjects() bool {
+	return (strings.EqualFold(*request.WorkloadType, "v8") ||
+		strings.EqualFold(*request.WorkloadType, "wasm")) &&
+		len(request.TriggerSubjects) > 0
+}
 
-	if w.WorkloadName == nil {
-		w.Errors = append(w.Errors, errors.New("workload name is required"))
+func (r *DeployRequest) Validate() bool {
+	r.Errors = make([]error, 0)
+
+	if r.WorkloadName == nil {
+		r.Errors = append(r.Errors, errors.New("workload name is required"))
 	}
 
 	// FIXME-- this should be provided in the request
-	// if w.Hash == nil {
-	// 	w.Errors = append(w.Errors, errors.New("hash is required"))
+	// if r.Hash == nil {
+	// 	r.Errors = append(r.Errors, errors.New("hash is required"))
 	// }
 
 	// FIXME-- this should be provided in the request
-	// if w.TotalBytes == nil {
-	// 	w.Errors = append(w.Errors, errors.New("total bytes is required"))
+	// if r.TotalBytes == nil {
+	// 	r.Errors = append(r.Errors, errors.New("total bytes is required"))
 	// }
 
-	if w.WorkloadType == nil {
-		w.Errors = append(w.Errors, errors.New("workload type is required"))
-	} else if (strings.EqualFold(*w.WorkloadType, NexExecutionProviderV8) ||
-		strings.EqualFold(*w.WorkloadType, NexExecutionProviderWasm)) &&
-		len(w.TriggerSubjects) == 0 {
-		w.Errors = append(w.Errors, errors.New("at least one trigger subject is required for this workload type"))
+	if r.WorkloadType == nil {
+		r.Errors = append(r.Errors, errors.New("workload type is required"))
+	} else if (strings.EqualFold(*r.WorkloadType, NexExecutionProviderV8) ||
+		strings.EqualFold(*r.WorkloadType, NexExecutionProviderWasm)) &&
+		len(r.TriggerSubjects) == 0 {
+		r.Errors = append(r.Errors, errors.New("at least one trigger subject is required for this workload type"))
 	}
 
-	return len(w.Errors) == 0
+	return len(r.Errors) == 0
 }
 
 type DeployResponse struct {

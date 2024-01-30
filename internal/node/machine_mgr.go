@@ -6,20 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
-	"os/signal"
 	"path"
 	"strconv"
 	"strings"
-	"syscall"
+	"sync/atomic"
 	"time"
 
-	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -30,22 +26,23 @@ const (
 	WorkloadCacheBucketName = "NEXCACHE"
 
 	defaultHandshakeTimeoutMillis = 5000
-	defaultNatsStoreDir           = "pnats"
 )
 
 // The machine manager is responsible for the pool of warm firecracker VMs. This includes starting new
 // VMs, stopping VMs, and pulling VMs from the pool on demand
 type MachineManager struct {
-	api         *ApiListener
-	rootContext context.Context
-	rootCancel  context.CancelFunc
+	closing     uint32
 	config      *NodeConfiguration
 	kp          nkeys.KeyPair
+	log         *slog.Logger
 	nc          *nats.Conn
 	ncInternal  *nats.Conn
-	log         *slog.Logger
-	allVms      map[string]*runningFirecracker
-	warmVms     chan *runningFirecracker
+	rootContext context.Context
+	rootCancel  context.CancelFunc
+	t           *Telemetry
+
+	allVms  map[string]*runningFirecracker
+	warmVms chan *runningFirecracker
 
 	handshakes       map[string]string
 	handshakeTimeout time.Duration // TODO: make configurable...
@@ -54,7 +51,7 @@ type MachineManager struct {
 	publicKey    string
 }
 
-func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.Conn, config *NodeConfiguration, log *slog.Logger) (*MachineManager, error) {
+func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc, ncint *nats.Conn, config *NodeConfiguration, log *slog.Logger, telemetry *Telemetry) (*MachineManager, error) {
 	// Validate the node config
 	if !config.Validate() {
 		return nil, fmt.Errorf("failed to create new machine manager; invalid node config; %v", config.Errors)
@@ -72,21 +69,37 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 	}
 
 	m := &MachineManager{
-		rootContext:      ctx,
-		rootCancel:       cancel,
 		config:           config,
-		nc:               nc,
-		log:              log,
-		kp:               server,
-		publicKey:        pubkey,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
+		kp:               server,
+		log:              log,
 		natsStoreDir:     defaultNatsStoreDir,
-		allVms:           make(map[string]*runningFirecracker),
-		warmVms:          make(chan *runningFirecracker, config.MachinePoolSize-1),
+		nc:               nc,
+		ncInternal:       ncint,
+		publicKey:        pubkey,
+		t:                telemetry,
+		rootContext:      ctx,
+		rootCancel:       cancel,
+
+		allVms:  make(map[string]*runningFirecracker),
+		warmVms: make(chan *runningFirecracker, config.MachinePoolSize-1),
 	}
 
-	m.api = NewApiListener(log, m, config)
+	_, err = m.ncInternal.Subscribe("agentint.*.logs", m.handleAgentLog)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.ncInternal.Subscribe("agentint.*.events.*", m.handleAgentEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
+	if err != nil {
+		return nil, err
+	}
 
 	return m, nil
 }
@@ -96,45 +109,16 @@ func NewMachineManager(ctx context.Context, cancel context.CancelFunc, nc *nats.
 func (m *MachineManager) Start() error {
 	m.log.Info("Virtual machine manager starting")
 
-	natsServer, ncInternal, err := m.startInternalNats()
-	if err != nil {
-		return err
-	}
-
-	m.ncInternal = ncInternal
-	m.log.Info("Internal NATs server started", slog.String("client_url", natsServer.ClientURL()))
-
-	_, err = m.ncInternal.Subscribe("agentint.*.logs", handleAgentLog(m))
-	if err != nil {
-		return err
-	}
-
-	_, err = m.ncInternal.Subscribe("agentint.*.events.*", handleAgentEvent(m))
-	if err != nil {
-		return err
-	}
-
-	_, err = m.ncInternal.Subscribe("agentint.handshake", handleHandshake(m))
-	if err != nil {
-		return err
-	}
-
-	err = m.api.Start()
-	if err != nil {
-		m.log.Error("Failed to start API listener", slog.Any("err", err))
-		return err
-	}
-
 	go m.fillPool()
 	_ = m.PublishNodeStarted()
 
-	m.setupSignalHandlers()
+	// m.setupSignalHandlers()
 
 	return nil
 }
 
-func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest controlapi.RunRequest, deployRequest agentapi.DeployRequest) error {
-	bytes, err := json.Marshal(deployRequest)
+func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentapi.DeployRequest) error {
+	bytes, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
@@ -162,8 +146,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 
 	if !deployResponse.Accepted {
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
-	} else if runRequest.SupportsTriggerSubjects() {
-		for _, tsub := range runRequest.TriggerSubjects {
+	} else if request.SupportsTriggerSubjects() {
+		for _, tsub := range request.TriggerSubjects {
 			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
 				intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
 				intmsg.Data = msg.Data
@@ -174,18 +158,18 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 					m.log.Error("Failed to request agent execution via internal trigger subject",
 						slog.Any("err", err),
 						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *runRequest.WorkloadType),
+						slog.String("workload_type", *request.WorkloadType),
 						slog.String("vmid", vm.vmmID),
 					)
-					functionFailedTriggers.Add(m.rootContext, 1)
-					functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
+					m.t.functionFailedTriggers.Add(m.rootContext, 1)
+					m.t.functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					m.t.functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
 				} else if resp != nil {
 					runTime := resp.Header.Get("x-nex-run-nano-sec")
 					m.log.Debug("Received response from execution via trigger subject",
 						slog.String("vmid", vm.vmmID),
 						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *runRequest.WorkloadType),
+						slog.String("workload_type", *request.WorkloadType),
 						slog.String("function_run_time_nanosec", runTime),
 						slog.Int("payload_size", len(resp.Data)),
 					)
@@ -194,19 +178,19 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 						m.log.Warn("failed to log function runtime", slog.Any("err", err))
 					}
 
-					functionTriggers.Add(m.rootContext, 1)
-					functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
-					functionRunTimeNano.Add(m.rootContext, runTime_int64)
-					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
+					m.t.functionTriggers.Add(m.rootContext, 1)
+					m.t.functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					m.t.functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
+					m.t.functionRunTimeNano.Add(m.rootContext, runTime_int64)
+					m.t.functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					m.t.functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
 
 					err = msg.Respond(resp.Data)
 					if err != nil {
 						m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
 							slog.String("vmid", vm.vmmID),
 							slog.String("trigger_subject", tsub),
-							slog.String("workload_type", *runRequest.WorkloadType),
+							slog.String("workload_type", *request.WorkloadType),
 							slog.Any("err", err),
 						)
 					}
@@ -216,7 +200,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 				m.log.Error("Failed to create trigger subject subscription for deployed workload",
 					slog.String("vmid", vm.vmmID),
 					slog.String("trigger_subject", tsub),
-					slog.String("workload_type", *runRequest.WorkloadType),
+					slog.String("workload_type", *request.WorkloadType),
 					slog.Any("err", err),
 				)
 				// TODO-- rollback the otherwise accepted deployment and return the error below...
@@ -226,24 +210,23 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 			m.log.Info("Created trigger subject subscription for deployed workload",
 				slog.String("vmid", vm.vmmID),
 				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *runRequest.WorkloadType),
+				slog.String("workload_type", *request.WorkloadType),
 			)
 		}
 	}
 
 	vm.workloadStarted = time.Now().UTC()
-	vm.namespace = *deployRequest.Namespace
-	vm.workloadSpecification = runRequest
-	vm.deployedWorkload = deployRequest
+	vm.namespace = *request.Namespace
+	vm.deployedWorkload = request
 
-	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
-	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)), metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
-	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes)
-	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount)
-	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib)
-	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	m.t.workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_type", *vm.deployedWorkload.WorkloadType)))
+	m.t.workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)), metric.WithAttributes(attribute.String("workload_type", *vm.deployedWorkload.WorkloadType)))
+	m.t.deployedByteCounter.Add(m.rootContext, request.TotalBytes)
+	m.t.deployedByteCounter.Add(m.rootContext, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount)
+	m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib)
+	m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }
@@ -252,32 +235,39 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 // up any applicable resources. Note that all "stopped" events emitted during a stop are best-effort
 // and not guaranteed.
 func (m *MachineManager) Stop() error {
-	m.log.Info("Virtual machine manager stopping")
+	if atomic.AddUint32(&m.closing, 1) == 1 {
+		m.log.Info("Virtual machine manager stopping")
 
-	m.rootCancel() // stops the pool from refilling
-	for _, vm := range m.allVms {
-		_ = m.PublishMachineStopped(vm)
-		vm.shutDown(m.log)
+		// m.rootCancel() // stops the pool from refilling
+		for _, vm := range m.allVms {
+			_ = m.PublishMachineStopped(vm)
+			vm.shutdown(m.log)
+		}
+
+		_ = m.PublishNodeStopped()
+
+		// Now empty the leftovers in the pool
+		for vm := range m.warmVms {
+			vm.shutdown(m.log)
+
+			if vm.deployedWorkload != nil {
+				m.t.workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployedWorkload.WorkloadType)))
+				m.t.workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployedWorkload.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+				m.t.deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
+				m.t.deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			}
+
+			m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+			m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+			m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		}
+		time.Sleep(100 * time.Millisecond)
+
+		_ = m.nc.Drain()
+
+		m.cleanSockets()
 	}
-
-	_ = m.PublishNodeStopped()
-
-	// Now empty the leftovers in the pool
-	for vm := range m.warmVms {
-		vm.shutDown(m.log)
-		// TODO: confirm this needs to be here
-		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
-		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
-		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
-		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
-		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	}
-	time.Sleep(100 * time.Millisecond)
-
-	_ = m.nc.Drain()
 
 	return nil
 }
@@ -298,17 +288,20 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	}
 
 	_ = m.PublishMachineStopped(vm)
-	vm.shutDown(m.log)
+	vm.shutdown(m.log)
 	delete(m.allVms, vmId)
 
-	workloadCounter.Add(m.rootContext, -1)
-	workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
-	deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
-	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
-	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	if vm.deployedWorkload != nil {
+		m.t.workloadCounter.Add(m.rootContext, -1) // FIXME?
+		m.t.workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		m.t.deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
+		m.t.deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	}
+
+	m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+	m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+	m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }
@@ -332,15 +325,15 @@ func (m *MachineManager) TakeFromPool() (*runningFirecracker, error) {
 }
 
 func (m *MachineManager) fillPool() {
-	for {
+	for !m.stopping() {
 		select {
 		case <-m.rootContext.Done():
 			return
 		default:
 			vm, err := createAndStartVM(m.rootContext, m.config, m.log)
 			if err != nil {
-				m.log.Error("Failed to create VMM for warming pool. Aborting.", slog.Any("err", err))
-				return
+				m.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
+				continue
 			}
 			go m.awaitHandshake(vm.vmmID)
 			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
@@ -360,9 +353,10 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 	handshakeOk := false
 	for !handshakeOk {
 		if time.Now().UTC().After(timeoutAt) {
-			m.log.Error("Did not receive NATS handshake from agent within timeout. Exiting unstable node", slog.String("vmid", vmid))
-			_ = m.Stop()
-			os.Exit(1) // FIXME
+			m.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("vmid", vmid))
+			return
+			// _ = m.Stop()
+			// FIXME!!! os.Exit(1) // FIXME
 		}
 
 		_, handshakeOk = m.handshakes[vmid]
@@ -387,77 +381,6 @@ func (m *MachineManager) cleanSockets() {
 	}
 }
 
-func (m *MachineManager) setupSignalHandlers() {
-	go func() {
-		// both firecracker and the embedded NATS server register signal handlers... wipe those so ours are the ones being used
-		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-
-		stop := func() {
-			err := m.Stop()
-			if err != nil {
-				m.log.Warn("Machine manager failed to stop", slog.Any("err", err))
-			}
-
-			m.cleanSockets()
-			os.Exit(0) // FIXME
-		}
-
-		for {
-			switch s := <-c; {
-			case s == syscall.SIGTERM || s == os.Interrupt:
-				m.log.Info("Caught signal, requesting clean shutdown", slog.String("signal", s.String()))
-				stop()
-			case s == syscall.SIGQUIT:
-				m.log.Info("Caught quit signal, still trying graceful shutdown", slog.String("signal", s.String()))
-				stop()
-			}
-		}
-	}()
-}
-
-func (m *MachineManager) startInternalNats() (*server.Server, *nats.Conn, error) {
-	natsServer, err := server.NewServer(&server.Options{
-		Host:      "0.0.0.0",
-		Port:      -1,
-		JetStream: true,
-		NoLog:     true,
-		StoreDir:  path.Join(os.TempDir(), m.natsStoreDir),
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	natsServer.Start()
-	time.Sleep(50 * time.Millisecond) // TODO: unsure if we need to give the server time to start
-
-	clientUrl, err := url.Parse(natsServer.ClientURL())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse internal NATS client URL: %s", err)
-	}
-	p, err := strconv.Atoi(clientUrl.Port())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse internal NATS client URL: %s", err)
-	}
-	m.config.InternalNodePort = &p
-	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to internal nats: %s", err)
-	}
-
-	jsCtx, err := nc.JetStream()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to establish jetstream connection to internal nats: %s", err)
-	}
-
-	_, err = jsCtx.CreateObjectStore(&nats.ObjectStoreConfig{
-		Bucket:      WorkloadCacheBucketName,
-		Description: "Object store cache for nex-node workloads",
-		Storage:     nats.MemoryStorage,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create internal object store: %s", err)
-	}
-
-	return natsServer, nc, nil
+func (m *MachineManager) stopping() bool {
+	return (atomic.LoadUint32(&m.closing) > 0)
 }

@@ -60,7 +60,7 @@ func (api *Client) StopWorkload(stopRequest *StopRequest) (*StopResponse, error)
 // Attempts to start a workload. The workload URI, at the moment, must always point to a NATS object store
 // bucket in the form of `nats://{bucket}/{key}`
 func (api *Client) StartWorkload(request *RunRequest) (*RunResponse, error) {
-	subject := fmt.Sprintf("%s.RUN.%s.%s", APIPrefix, api.namespace, *request.TargetNode)
+	subject := fmt.Sprintf("%s.DEPLOY.%s.%s", APIPrefix, api.namespace, *request.TargetNode)
 	bytes, err := api.performRequest(subject, request)
 	if err != nil {
 		return nil, err
