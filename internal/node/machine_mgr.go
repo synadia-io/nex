@@ -191,6 +191,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 						m.log.Warn("failed to log function runtime", slog.Any("err", err))
 					}
 
+					functionTriggers.Add(m.rootContext, 1)
+					functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 					functionRunTimeNano.Add(m.rootContext, runTime_int64)
 					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 

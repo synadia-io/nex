@@ -21,6 +21,7 @@ var (
 	allocatedMemoryCounter metric.Int64UpDownCounter
 	allocatedVCPUCounter   metric.Int64UpDownCounter
 
+	functionTriggers    metric.Int64Counter
 	functionRunTimeNano metric.Int64Counter
 )
 
@@ -108,6 +109,13 @@ func createCounters() error {
 		err = errors.Join(err, e)
 	}
 
+	functionTriggers, e = nexNodeMeter.
+		Int64Counter("nex-function-trigger",
+			metric.WithDescription("Total number of times a function was triggered"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
 	functionRunTimeNano, e = nexNodeMeter.
 		Int64Counter("nex-function-runtime-nanosec",
 			metric.WithDescription("Total run time in nanoseconds for function"),
