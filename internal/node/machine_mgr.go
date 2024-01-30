@@ -193,8 +193,10 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 
 					functionTriggers.Add(m.rootContext, 1)
 					functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
 					functionRunTimeNano.Add(m.rootContext, runTime_int64)
 					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
 
 					err = msg.Respond(resp.Data)
 					if err != nil {
