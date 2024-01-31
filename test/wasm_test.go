@@ -13,8 +13,8 @@ func TestWasmExecution(t *testing.T) {
 	params := &agentapi.ExecutionProviderParams{
 		DeployRequest: agentapi.DeployRequest{
 			Environment:  map[string]string{},
-			Hash:         new(string),
-			TotalBytes:   new(int32),
+			Hash:         "",
+			TotalBytes:   0,
 			WorkloadName: new(string),
 			WorkloadType: new(string),
 			Stderr:       nil,

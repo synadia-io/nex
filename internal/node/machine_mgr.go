@@ -20,6 +20,8 @@ import (
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -131,17 +133,11 @@ func (m *MachineManager) Start() error {
 	return nil
 }
 
-func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, namespace string, request controlapi.RunRequest) error {
-	// TODO: make the bytes and hash/digest available to the agent
-	req := agentapi.DeployRequest{
-		WorkloadName:    &workloadName,
-		Hash:            nil, // FIXME
-		TotalBytes:      nil, // FIXME
-		TriggerSubjects: request.TriggerSubjects,
-		WorkloadType:    request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
-		Environment:     request.WorkloadEnvironment,
+func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest controlapi.RunRequest, deployRequest agentapi.DeployRequest) error {
+	bytes, err := json.Marshal(deployRequest)
+	if err != nil {
+		return err
 	}
-	bytes, _ := json.Marshal(req)
 
 	status := m.ncInternal.Status()
 	m.log.Debug("NATS internal connection status",
@@ -166,8 +162,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 
 	if !deployResponse.Accepted {
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
-	} else if request.SupportsTriggerSubjects() {
-		for _, tsub := range request.TriggerSubjects {
+	} else if runRequest.SupportsTriggerSubjects() {
+		for _, tsub := range runRequest.TriggerSubjects {
 			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
 				intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
 				intmsg.Data = msg.Data
@@ -178,22 +174,39 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 					m.log.Error("Failed to request agent execution via internal trigger subject",
 						slog.Any("err", err),
 						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
+						slog.String("workload_type", *runRequest.WorkloadType),
 						slog.String("vmid", vm.vmmID),
 					)
+					functionFailedTriggers.Add(m.rootContext, 1)
+					functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
 				} else if resp != nil {
+					runTime := resp.Header.Get("x-nex-run-nano-sec")
 					m.log.Debug("Received response from execution via trigger subject",
 						slog.String("vmid", vm.vmmID),
 						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
+						slog.String("workload_type", *runRequest.WorkloadType),
+						slog.String("function_run_time_nanosec", runTime),
 						slog.Int("payload_size", len(resp.Data)),
 					)
+					runTime_int64, err := strconv.ParseInt(runTime, 10, 64)
+					if err != nil {
+						m.log.Warn("failed to log function runtime", slog.Any("err", err))
+					}
+
+					functionTriggers.Add(m.rootContext, 1)
+					functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					functionTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
+					functionRunTimeNano.Add(m.rootContext, runTime_int64)
+					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					functionRunTimeNano.Add(m.rootContext, runTime_int64, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
+
 					err = msg.Respond(resp.Data)
 					if err != nil {
 						m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
 							slog.String("vmid", vm.vmmID),
 							slog.String("trigger_subject", tsub),
-							slog.String("workload_type", *request.WorkloadType),
+							slog.String("workload_type", *runRequest.WorkloadType),
 							slog.Any("err", err),
 						)
 					}
@@ -203,7 +216,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 				m.log.Error("Failed to create trigger subject subscription for deployed workload",
 					slog.String("vmid", vm.vmmID),
 					slog.String("trigger_subject", tsub),
-					slog.String("workload_type", *request.WorkloadType),
+					slog.String("workload_type", *runRequest.WorkloadType),
 					slog.Any("err", err),
 				)
 				// TODO-- rollback the otherwise accepted deployment and return the error below...
@@ -213,14 +226,24 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, workloadName, na
 			m.log.Info("Created trigger subject subscription for deployed workload",
 				slog.String("vmid", vm.vmmID),
 				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *request.WorkloadType),
+				slog.String("workload_type", *runRequest.WorkloadType),
 			)
 		}
 	}
 
 	vm.workloadStarted = time.Now().UTC()
-	vm.namespace = namespace
-	vm.workloadSpecification = request
+	vm.namespace = *deployRequest.Namespace
+	vm.workloadSpecification = runRequest
+	vm.deployedWorkload = deployRequest
+
+	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
+	workloadCounter.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)), metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
+	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes)
+	deployedByteCounter.Add(m.rootContext, deployRequest.TotalBytes, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount)
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib)
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }
@@ -242,6 +265,15 @@ func (m *MachineManager) Stop() error {
 	// Now empty the leftovers in the pool
 	for vm := range m.warmVms {
 		vm.shutDown(m.log)
+		// TODO: confirm this needs to be here
+		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)))
+		workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("workload_type", *vm.workloadSpecification.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
+		deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+		allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+		allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	}
 	time.Sleep(100 * time.Millisecond)
 
@@ -268,6 +300,15 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	_ = m.PublishMachineStopped(vm)
 	vm.shutDown(m.log)
 	delete(m.allVms, vmId)
+
+	workloadCounter.Add(m.rootContext, -1)
+	workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
+	deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+	allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+	allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }
@@ -301,7 +342,6 @@ func (m *MachineManager) fillPool() {
 				m.log.Error("Failed to create VMM for warming pool. Aborting.", slog.Any("err", err))
 				return
 			}
-
 			go m.awaitHandshake(vm.vmmID)
 			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 

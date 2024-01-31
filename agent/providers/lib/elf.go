@@ -18,7 +18,7 @@ type ELF struct {
 	environment map[string]string
 	name        string
 	tmpFilename string
-	totalBytes  int32
+	totalBytes  int64
 	vmID        string
 
 	fail chan bool
@@ -107,16 +107,15 @@ func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) (*ELF
 		return nil, errors.New("ELF execution provider requires a temporary filename parameter")
 	}
 
-	if params.TotalBytes == nil {
-		totalBytes := int32(0) // FIXME
-		params.TotalBytes = &totalBytes
+	if params.TotalBytes == 0 {
+		params.TotalBytes = 0
 	}
 
 	return &ELF{
 		environment: params.Environment,
 		name:        *params.WorkloadName,
 		tmpFilename: *params.TmpFilename,
-		totalBytes:  *params.TotalBytes,
+		totalBytes:  params.TotalBytes,
 		vmID:        params.VmID,
 
 		stderr: params.Stderr,

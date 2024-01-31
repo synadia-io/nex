@@ -1,5 +1,7 @@
 package nexagent
 
 const (
-	VERSION = "0.0.1"
+	VERSION   = "development"
+	COMMIT    = ""
+	BUILDDATE = ""
 )
