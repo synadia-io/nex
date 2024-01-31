@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -23,6 +24,7 @@ func setConditionalCommands() {
 
 	node_up.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
 	node_up.Flag("metrics", "enable open telemetry metrics endpoint").Default("false").UnNegatableBoolVar(&NodeOpts.OtelMetrics)
+	node_up.Flag("metrics_port", "enable open telemetry metrics endpoint").Default("8085").IntVar(&NodeOpts.OtelMetricsPort)
 	node_up.Flag("otel_metrics_exporter", "OTel exporter for metrics").Default("stdout").EnumVar(&NodeOpts.OtelMetricsExporter, "stdout", "prometheus")
 	node_preflight.Flag("force", "installs missing dependencies without prompt").Default("false").BoolVar(&NodeOpts.ForceDepInstall)
 	node_preflight.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
@@ -80,9 +82,9 @@ func createMetricsReader(log *slog.Logger) (metric.Reader, error) {
 	switch NodeOpts.OtelMetricsExporter {
 	case "prometheus":
 		go func() {
-			log.Info("serving metrics at localhost:8085/metrics")
+			log.Info(fmt.Sprintf("serving metrics at localhost:%d/metrics", NodeOpts.OtelMetricsPort))
 			http.Handle("/metrics", promhttp.Handler())
-			err := http.ListenAndServe(":8085", nil)
+			err := http.ListenAndServe(fmt.Sprintf(":%d", NodeOpts.OtelMetricsPort), nil)
 			if err != nil {
 				log.Warn("failed to start prometheus web server", slog.Any("err", err))
 			}

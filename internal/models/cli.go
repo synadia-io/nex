@@ -110,6 +110,7 @@ type NodeOptions struct {
 	ValidIssuers        []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes       []string          `json:"workload_types,omitempty"`
 	OtelMetrics         bool              `json:"-"`
+	OtelMetricsPort     int               `json:"-"`
 	OtelMetricsExporter string            `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
