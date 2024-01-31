@@ -177,6 +177,9 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, runRequest contr
 						slog.String("workload_type", *runRequest.WorkloadType),
 						slog.String("vmid", vm.vmmID),
 					)
+					functionFailedTriggers.Add(m.rootContext, 1)
+					functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					functionFailedTriggers.Add(m.rootContext, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployedWorkload.WorkloadName)))
 				} else if resp != nil {
 					runTime := resp.Header.Get("x-nex-run-nano-sec")
 					m.log.Debug("Received response from execution via trigger subject",

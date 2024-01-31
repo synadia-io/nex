@@ -21,8 +21,9 @@ var (
 	allocatedMemoryCounter metric.Int64UpDownCounter
 	allocatedVCPUCounter   metric.Int64UpDownCounter
 
-	functionTriggers    metric.Int64Counter
-	functionRunTimeNano metric.Int64Counter
+	functionTriggers       metric.Int64Counter
+	functionFailedTriggers metric.Int64Counter
+	functionRunTimeNano    metric.Int64Counter
 )
 
 func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
@@ -112,6 +113,13 @@ func createCounters() error {
 	functionTriggers, e = nexNodeMeter.
 		Int64Counter("nex-function-trigger",
 			metric.WithDescription("Total number of times a function was triggered"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
+	functionFailedTriggers, e = nexNodeMeter.
+		Int64Counter("nex-function-failed-trigger",
+			metric.WithDescription("Total number of times a function failed to triggered"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
