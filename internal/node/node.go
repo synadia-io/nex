@@ -250,7 +250,7 @@ func (n *Node) installSignalHandlers() {
 func (n *Node) shutdown() {
 	if atomic.AddUint32(&n.closing, 1) == 1 {
 		n.log.Debug("shutting down")
-		n.manager.Stop()
+		_ = n.manager.Stop()
 		n.nc.Close()
 		n.ncint.Close()
 		n.natsint.WaitForShutdown()
