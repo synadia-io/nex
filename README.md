@@ -19,8 +19,6 @@ If you're already familiar with Nex and how it works, then you can get going qui
 curl -sSf https://nex.synadia.com/install.sh | sh 
 ```
 
-_**Note** that an installation method that doesn't require Go is coming soon._
-
 ## Preflight Check
 
 If you haven't already, please make sure that `/usr/local/bin` is in your path. 
