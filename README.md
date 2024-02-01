@@ -4,6 +4,8 @@
 ![eg](https://img.shields.io/badge/Powered%20By-NATS-green)
 ![GitHub License](https://img.shields.io/github/license/synadia-io/nex)
 ![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/synadia-io/nex)
+[![Go Report Card](https://goreportcard.com/badge/github.com/synadia-io/nex)](https://goreportcard.com/report/github.com/synadia-io/nex)
+[![Go Reference](https://pkg.go.dev/badge/github.com/synadia-io/nex.svg)](https://pkg.go.dev/github.com/synadia-io/nex)
 
 # NATS Execution Engine
 Leverage and extend your investment in NATS infrastructure to deploy functions and services, turning NATS into the ultimate platform for building distributed applications.
@@ -14,7 +16,7 @@ The easiest way to get started with Nex is to check out our [Using Nex](https://
 If you're already familiar with Nex and how it works, then you can get going quickly by installing the Nex CLI:
 
 ```
-go install github.com/synadia-io/nex/nex@latest
+curl -sSf https://nex.synadia.com/install.sh | sh 
 ```
 
 _**Note** that an installation method that doesn't require Go is coming soon._
