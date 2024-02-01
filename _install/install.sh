@@ -18,8 +18,6 @@ get_version() {
 }
 
 get_arch() {
-	# darwin/amd64: Darwin axetroydeMacBook-Air.local 20.5.0 Darwin Kernel Version 20.5.0: Sat May  8 05:10:33 PDT 2021; root:xnu-7195.121.3~9/RELEASE_X86_64 x86_64
-	# linux/amd64: Linux test-ubuntu1804 5.4.0-42-generic #46~18.04.1-Ubuntu SMP Fri Jul 10 07:21:24 UTC 2020 x86_64 x86_64 x86_64 GNU/Linux
 	a=$(uname -m)
 	case ${a} in
 	"x86_64" | "amd64")
@@ -47,7 +45,6 @@ get_arch() {
 }
 
 get_os() {
-	# darwin: Darwin
 	echo $(uname -s | awk '{print tolower($0)}')
 }
 
@@ -62,13 +59,13 @@ echo "
 os=$(get_os)
 arch=$(get_arch)
 binary_version=$(get_version)
-file_name="nex_${binary_version}_${os}_${arch}" # the file name should be download
+file_name="nex_${binary_version}_${os}_${arch}"
 asset_uri="https://github.com/synadia-io/nex/releases/download/${binary_version}/${file_name}"
 
 downloadFolder="${TMPDIR:-/tmp}"
-mkdir -p ${downloadFolder}              # make sure download folder exists
-downloaded_file="${downloadFolder}/nex" # the file path should be download
-executable_folder="/usr/local/bin"      # Eventually, the executable file will be placed here
+mkdir -p ${downloadFolder}
+downloaded_file="${downloadFolder}/nex"
+executable_folder="/usr/local/bin"
 
 echo "[1/3] Download ${asset_uri} to ${downloadFolder}"
 rm -f ${downloaded_file}
