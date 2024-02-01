@@ -50,7 +50,7 @@ type Node struct {
 	telemetry *Telemetry
 }
 
-func Up(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Context, cancelF context.CancelFunc, log *slog.Logger) (*Node, error) {
+func NewNode(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Context, cancelF context.CancelFunc, log *slog.Logger) (*Node, error) {
 	node := &Node{
 		ctx:      ctx,
 		cancelF:  cancelF,
@@ -59,12 +59,10 @@ func Up(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Context,
 		opts:     opts,
 	}
 
-	err := node.preflight()
+	err := node.validateConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start node: %s", err.Error())
 	}
-
-	go node.Start()
 
 	return node, nil
 }
@@ -227,7 +225,7 @@ func (n *Node) loadNodeConfig() error {
 	return nil
 }
 
-func (n *Node) preflight() error {
+func (n *Node) validateConfig() error {
 	if n.config == nil {
 		err := n.loadNodeConfig()
 		if err != nil {
@@ -235,7 +233,7 @@ func (n *Node) preflight() error {
 		}
 	}
 
-	return CheckPreRequisites(n.config, false) // FIXME?
+	return CheckPrerequisites(n.config, true) // FIXME?
 }
 
 func (n *Node) installSignalHandlers() {

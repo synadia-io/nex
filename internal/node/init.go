@@ -8,8 +8,15 @@ import (
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
 
-func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) (*Node, error) {
-	return Up(opts, nodeopts, ctx, cancel, log)
+func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
+	node, err := NewNode(opts, nodeopts, ctx, cancel, log)
+	if err != nil {
+		return fmt.Errorf("failed to initialize node: %s", err)
+	}
+
+	go node.Start()
+
+	return nil
 }
 
 func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
@@ -20,7 +27,7 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 
 	config.ForceDepInstall = nodeopts.ForceDepInstall
 
-	err = CheckPreRequisites(config, true)
+	err = CheckPrerequisites(config, false)
 	if err != nil {
 		return fmt.Errorf("preflight checks failed: %s", err)
 	}

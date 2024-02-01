@@ -85,6 +85,7 @@ func init() {
 
 	yeet.Arg("file", "File to run").Required().ExistingFileVar(&DevRunOpts.Filename)
 	yeet.Arg("env", "Environment variables to pass to workload").StringMapVar(&RunOpts.Env)
+	yeet.Flag("argv", "Arguments to pass to the workload, if applicable").StringVar(&RunOpts.Argv)
 	yeet.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
 
