@@ -37,14 +37,14 @@ var (
 	logs  = ncli.Command("logs", "Live monitor workload log emissions")
 	evts  = ncli.Command("events", "Live monitor events from nex nodes")
 
-	nodes_ls   = nodes.Command("ls", "List nodes")
-	nodes_info = nodes.Command("info", "Get information for an engine node")
+	nodesLs   = nodes.Command("ls", "List nodes")
+	nodesInfo = nodes.Command("info", "Get information for an engine node")
 
 	// These two commands are GOOS/GOARCH dependent
-	node_up        *fisk.CmdClause
-	node_preflight *fisk.CmdClause
+	nodeUp        *fisk.CmdClause
+	nodePreflight *fisk.CmdClause
 
-	node_info_id_arg = nodes_info.Arg("id", "Public key of the node you're interested in").Required().String()
+	node_info_id_arg = nodesInfo.Arg("id", "Public key of the node you're interested in").Required().String()
 
 	Opts       = &models.Options{}
 	GuiOpts    = &models.UiOptions{}
@@ -141,12 +141,12 @@ func main() {
 	}
 
 	switch cmd {
-	case nodes_ls.FullCommand():
+	case nodesLs.FullCommand():
 		err := ListNodes(ctx)
 		if err != nil {
 			fmt.Printf("Failed to list nodes: %s\n", err)
 		}
-	case nodes_info.FullCommand():
+	case nodesInfo.FullCommand():
 		err := NodeInfo(ctx, *node_info_id_arg)
 		if err != nil {
 			fmt.Printf("Failed to get node info: %s\n", err)
@@ -176,12 +176,12 @@ func main() {
 		if err != nil {
 			logger.Error("failed to start event watcher", slog.Any("err", err))
 		}
-	case node_up.FullCommand():
+	case nodeUp.FullCommand():
 		err := RunNodeUp(ctx, logger)
 		if err != nil {
 			logger.Error("failed to start node", slog.Any("err", err))
 		}
-	case node_preflight.FullCommand():
+	case nodePreflight.FullCommand():
 		err := RunNodePreflight(ctx, logger)
 		if err != nil {
 			logger.Error("failed to start node", slog.Any("err", err))

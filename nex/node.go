@@ -8,8 +8,8 @@ import (
 )
 
 func setConditionalCommands() {
-	node_up = nodes.Command("up", "Starts a NEX node").Hidden()
-	node_preflight = nodes.Command("preflight", "Checks system for node requirements and installs missing").Hidden()
+	nodeUp = nodes.Command("up", "Starts a Nex node").Hidden()
+	nodePreflight = nodes.Command("preflight", "Checks system for node requirements and installs missing").Hidden()
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
