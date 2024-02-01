@@ -257,6 +257,7 @@ func (m *MachineManager) Stop() error {
 				m.t.deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 			}
 
+			m.t.vmCounter.Add(m.rootContext, -1)
 			m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
 			m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 			m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
@@ -292,12 +293,12 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	delete(m.allVms, vmId)
 
 	if vm.deployedWorkload != nil {
-		m.t.workloadCounter.Add(m.rootContext, -1) // FIXME?
 		m.t.workloadCounter.Add(m.rootContext, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		m.t.deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1)
 		m.t.deployedByteCounter.Add(m.rootContext, vm.deployedWorkload.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	}
 
+	m.t.vmCounter.Add(m.rootContext, -1)
 	m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
 	m.t.allocatedVCPUCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	m.t.allocatedMemoryCounter.Add(m.rootContext, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
@@ -343,6 +344,8 @@ func (m *MachineManager) fillPool() {
 
 			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
 			m.allVms[vm.vmmID] = vm
+
+			m.t.vmCounter.Add(m.rootContext, 1)
 		}
 	}
 }

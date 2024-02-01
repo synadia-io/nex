@@ -13,7 +13,9 @@ type Telemetry struct {
 	allocatedMemoryCounter metric.Int64UpDownCounter
 	allocatedVCPUCounter   metric.Int64UpDownCounter
 	deployedByteCounter    metric.Int64UpDownCounter
-	workloadCounter        metric.Int64UpDownCounter
+
+	vmCounter       metric.Int64UpDownCounter
+	workloadCounter metric.Int64UpDownCounter
 
 	functionTriggers       metric.Int64Counter
 	functionFailedTriggers metric.Int64Counter
@@ -39,9 +41,16 @@ func (t *Telemetry) init() error {
 	}
 
 	var e, err error
+	t.vmCounter, e = t.meter.
+		Int64UpDownCounter("nex-vm-count",
+			metric.WithDescription("Number of VMs started"),
+		)
+	if e != nil {
+		err = errors.Join(err, e)
+	}
 	t.workloadCounter, e = t.meter.
 		Int64UpDownCounter("nex-workload-count",
-			metric.WithDescription("Number of workloads running"),
+			metric.WithDescription("Number of workloads deployed"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
