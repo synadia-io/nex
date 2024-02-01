@@ -60,13 +60,17 @@ func NewTelemetry(log *slog.Logger, metricsExporter string, metricsPort int) (*T
 }
 
 func (t *Telemetry) init() error {
-	t.initMeterProvider()
+	var e, err error
+
+	e = t.initMeterProvider()
+	if err != nil {
+		err = errors.Join(err, e)
+	}
 
 	if t.meter == nil {
 		return errors.New("failed to initialize telemetry instance: nil meter")
 	}
 
-	var e, err error
 	t.vmCounter, e = t.meter.
 		Int64UpDownCounter("nex-vm-count",
 			metric.WithDescription("Number of VMs started"),

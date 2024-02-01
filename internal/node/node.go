@@ -107,12 +107,14 @@ func (n *Node) init() error {
 	var err error
 
 	n.initOnce.Do(func() {
-		n.telemetry, err = NewTelemetry(n.log, n.nodeOpts.OtelMetricsExporter, n.nodeOpts.OtelMetricsPort)
-		if err != nil {
-			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
-			err = fmt.Errorf("failed to initialize telemetry: %s", err)
+		if n.nodeOpts.OtelMetrics {
+			n.telemetry, err = NewTelemetry(n.log, n.nodeOpts.OtelMetricsExporter, n.nodeOpts.OtelMetricsPort)
+			if err != nil {
+				n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
+				err = fmt.Errorf("failed to initialize telemetry: %s", err)
+			}
+			n.log.Info("Initialized telemetry")
 		}
-		n.log.Info("Initialized telemetry")
 
 		err = n.loadNodeConfig()
 
@@ -121,16 +123,18 @@ func (n *Node) init() error {
 		if err != nil {
 			n.log.Error("Failed to connect to NATS server", slog.Any("err", err))
 			err = fmt.Errorf("failed to connect to NATS server: %s", err)
+		} else {
+			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
-		n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 
 		// init internal NATS server
 		err = n.initInternalNATS()
 		if err != nil {
 			n.log.Error("Failed to initialize internal NATS server", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize internal NATS server: %s", err)
+		} else {
+			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 		}
-		n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 
 		// init machine manager
 		n.manager, err = NewMachineManager(n.ctx, n.nc, n.ncint, n.config, n.log, n.telemetry)
