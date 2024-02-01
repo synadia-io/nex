@@ -63,6 +63,7 @@ type Options struct {
 }
 
 type RunOptions struct {
+	Argv              string
 	TargetNode        string
 	WorkloadUrl       *url.URL
 	Name              string

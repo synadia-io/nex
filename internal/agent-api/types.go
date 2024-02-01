@@ -57,6 +57,7 @@ type ExecutionProviderParams struct {
 
 // FIXME? DeployRequest -> DeployRequest?
 type DeployRequest struct {
+	Argv            []string          `json:"argv,omitempty"`
 	DecodedClaims   jwt.GenericClaims `json:"-"`
 	Description     *string           `json:"description"`
 	Environment     map[string]string `json:"environment"`

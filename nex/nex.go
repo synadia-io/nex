@@ -80,6 +80,7 @@ func init() {
 	run.Flag("name", "Name of the workload. Must be alphabetic (lowercase)").Required().StringVar(&RunOpts.Name)
 	run.Flag("type", "Type of workload, e.g., \"elf\", \"v8\", \"oci\", \"wasm\"").StringVar(&RunOpts.WorkloadType)
 	run.Flag("description", "Description of the workload").StringVar(&RunOpts.Description)
+	run.Flag("argv", "Arguments to pass to the workload, if applicable").StringVar(&RunOpts.Argv)
 	run.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 
 	yeet.Arg("file", "File to run").Required().ExistingFileVar(&DevRunOpts.Filename)

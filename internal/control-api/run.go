@@ -13,6 +13,7 @@ import (
 )
 
 type RunRequest struct {
+	Argv         []string `json:"argv,omitempty"`
 	Description  *string  `json:"description,omitempty"`
 	WorkloadType *string  `json:"type"`
 	Location     *url.URL `json:"location"`
@@ -61,6 +62,7 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	senderPublic, _ := reqOpts.senderXkey.PublicKey()
 
 	req := &RunRequest{
+		Argv:            reqOpts.argv,
 		Description:     &reqOpts.workloadDescription,
 		WorkloadType:    &reqOpts.workloadType,
 		Location:        &reqOpts.location,
@@ -140,6 +142,7 @@ func (request *RunRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair
 }
 
 type requestOptions struct {
+	argv                []string
 	workloadName        string
 	workloadType        string
 	workloadDescription string
@@ -155,6 +158,14 @@ type requestOptions struct {
 }
 
 type RequestOption func(o requestOptions) requestOptions
+
+// Arguments to be passed to the workload, if applicable
+func Argv(argv []string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.argv = argv
+		return o
+	}
+}
 
 // Name of the workload. Conforms to the same name rules as the services API
 func WorkloadName(name string) RequestOption {

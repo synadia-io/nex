@@ -15,6 +15,7 @@ import (
 
 // ELF execution provider implementation
 type ELF struct {
+	argv        []string
 	environment map[string]string
 	name        string
 	tmpFilename string
@@ -42,7 +43,7 @@ func (e *ELF) UnDeploy() error {
 
 // Deploy the ELF binary
 func (e *ELF) Deploy() error {
-	cmd := exec.Command(e.tmpFilename)
+	cmd := exec.Command(e.tmpFilename, e.argv...)
 	cmd.Stdout = e.stdout
 	cmd.Stderr = e.stderr
 
@@ -112,6 +113,7 @@ func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) (*ELF
 	}
 
 	return &ELF{
+		argv:        params.Argv,
 		environment: params.Environment,
 		name:        *params.WorkloadName,
 		tmpFilename: *params.TmpFilename,
