@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,20 +19,24 @@ func main() {
 	if len(strings.TrimSpace(natsUrl)) == 0 {
 		natsUrl = nats.DefaultURL
 	}
-	fmt.Printf("Echo service using NATS url '%s'\n", natsUrl)
+
+	fmt.Fprintf(os.Stdout, "Echo service using NATS url '%s'\n", natsUrl)
 	nc, err := nats.Connect(natsUrl)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Error connecting to NATs server: %v\n", err)
+		return
 	}
 	setupSignalHandlers(nc)
 
 	// request handler
 	echoHandler := func(req services.Request) {
-		req.Respond(req.Data())
+		err := req.Respond(req.Data())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error responding to request: %v\n", err)
+		}
 	}
 
-	fmt.Println("Starting echo service")
-
+	fmt.Fprint(os.Stdout, "Starting echo service")
 	_, err = services.AddService(nc, services.Config{
 		Name:    "EchoService",
 		Version: "1.0.0",
@@ -43,9 +46,9 @@ func main() {
 			Handler: services.HandlerFunc(echoHandler),
 		},
 	})
-
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "Error adding service: %v\n", err)
+		return
 	}
 
 	<-ctx.Done()
@@ -61,7 +64,7 @@ func setupSignalHandlers(nc *nats.Conn) {
 		for {
 			switch s := <-c; {
 			case s == syscall.SIGTERM || s == os.Interrupt || s == syscall.SIGQUIT:
-				slog.Info("Caught signal, requesting clean shutdown", slog.String("signal", s.String()))
+				fmt.Fprintf(os.Stdout, "Caught signal [%s], requesting clean shutdown", s.String())
 				nc.Drain()
 				os.Exit(0)
 
