@@ -71,7 +71,7 @@ echo "[1/3] Download ${asset_uri} to ${downloadFolder}"
 rm -f ${downloaded_file}
 curl --silent --fail --location --output "${downloaded_file}" "${asset_uri}"
 
-echo "[2/3] Install nex to the ${executable_folder}"
+echo "[2/3] Install nex to ${executable_folder}"
 mv ${downloaded_file} ${executable_folder}
 exe=${executable_folder}/nex
 chmod +x ${exe}
