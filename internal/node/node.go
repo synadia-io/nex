@@ -85,8 +85,7 @@ func (n *Node) Start() {
 	for !n.shuttingDown() {
 		select {
 		case <-timer.C:
-			n.log.Info("tick!")
-			// TODO: check NATS subscription statuses
+			// TODO: check NATS subscription statuses, machine manager, telemetry etc.
 		case sig := <-n.sigs:
 			n.log.Debug("received signal: %s", sig)
 			n.shutdown()
@@ -136,7 +135,7 @@ func (n *Node) init() error {
 		n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 
 		// init machine manager
-		n.manager, err = NewMachineManager(n.ctx, n.cancelF, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		n.manager, err = NewMachineManager(n.ctx, n.nc, n.ncint, n.config, n.log, n.telemetry)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize machine manager: %s", err)
@@ -253,8 +252,8 @@ func (n *Node) shutdown() {
 		_ = n.manager.Stop()
 		n.nc.Close()
 		n.ncint.Close()
+		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
-		n.cancelF()
 	}
 }
 
