@@ -1,14 +1,34 @@
 package nexnode
 
 import (
+	"context"
 	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
+	metricsdk "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+const defaultServiceName = "nex-node"
+
 type Telemetry struct {
+	log   *slog.Logger
 	meter metric.Meter
+
+	metricsExporter string
+	metricsPort     int
+
+	serviceName string
 
 	allocatedMemoryCounter metric.Int64UpDownCounter
 	allocatedVCPUCounter   metric.Int64UpDownCounter
@@ -22,9 +42,13 @@ type Telemetry struct {
 	functionRunTimeNano    metric.Int64Counter
 }
 
-func NewTelemetry() (*Telemetry, error) {
+func NewTelemetry(log *slog.Logger, metricsExporter string, metricsPort int) (*Telemetry, error) {
 	t := &Telemetry{
-		meter: otel.Meter("nex-node"),
+		log:             log,
+		meter:           otel.Meter(defaultServiceName),
+		metricsExporter: metricsExporter,
+		metricsPort:     metricsPort,
+		serviceName:     defaultServiceName,
 	}
 
 	err := t.init()
@@ -36,6 +60,8 @@ func NewTelemetry() (*Telemetry, error) {
 }
 
 func (t *Telemetry) init() error {
+	t.initMeterProvider()
+
 	if t.meter == nil {
 		return errors.New("failed to initialize telemetry instance: nil meter")
 	}
@@ -99,4 +125,66 @@ func (t *Telemetry) init() error {
 		err = errors.Join(err, e)
 	}
 	return err
+}
+
+func (t *Telemetry) initMeterProvider() error {
+	resource, err := resource.Merge(resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName(t.serviceName),
+			semconv.ServiceVersion(VERSION),
+		))
+
+	if err != nil {
+		t.log.Warn("failed to create OTel resource", slog.Any("err", err))
+		return err
+	}
+
+	metricReader, err := t.serveMetrics()
+	if err != nil {
+		t.log.Warn("failed to create OTel metrics exporter", slog.Any("err", err))
+		return err
+	}
+
+	meterProvider := metricsdk.NewMeterProvider(
+		metricsdk.WithResource(resource),
+		metricsdk.WithReader(
+			metricReader,
+		),
+	)
+
+	defer func() {
+		if err := meterProvider.Shutdown(context.Background()); err != nil {
+			t.log.Error("failed to shutdown OTel meter provider", slog.Any("err", err))
+		}
+	}()
+
+	otel.SetMeterProvider(meterProvider)
+	return nil
+}
+
+func (t *Telemetry) serveMetrics() (metricsdk.Reader, error) {
+	switch t.metricsExporter {
+	case "prometheus":
+		go func() {
+			t.log.Info(fmt.Sprintf("serving metrics at localhost:%d/metrics", t.metricsPort))
+			http.Handle("/metrics", promhttp.Handler())
+			err := http.ListenAndServe(fmt.Sprintf(":%d", t.metricsPort), nil)
+			if err != nil {
+				t.log.Warn("failed to start prometheus web server", slog.Any("err", err))
+			}
+		}()
+
+		return prometheus.New()
+	default:
+		reader, err := stdoutmetric.New()
+		if err != nil {
+			return nil, err
+		}
+
+		return metricsdk.NewPeriodicReader(
+			reader,
+			metricsdk.WithInterval(3*time.Second), // FIXME-- make configurable!
+		), nil
+	}
 }

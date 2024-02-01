@@ -107,7 +107,7 @@ func (n *Node) init() error {
 	var err error
 
 	n.initOnce.Do(func() {
-		n.telemetry, err = NewTelemetry()
+		n.telemetry, err = NewTelemetry(n.log, n.nodeOpts.OtelMetricsExporter, n.nodeOpts.OtelMetricsPort)
 		if err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize telemetry: %s", err)
