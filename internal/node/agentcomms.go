@@ -43,7 +43,7 @@ func (mgr *MachineManager) handleAgentLog(m *nats.Msg) {
 		return
 	}
 
-	_ = mgr.nc.Publish(logPublishSubject(vm.namespace, mgr.publicKey, vm.deployedWorkload.DecodedClaims.Subject, vmId), bytes)
+	_ = mgr.nc.Publish(logPublishSubject(vm.namespace, mgr.publicKey, vm.deployRequest.DecodedClaims.Subject, vmId), bytes)
 }
 
 // Called when the node server gets an event from the nex agent inside firecracker. The data here is already a fully formed

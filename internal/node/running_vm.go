@@ -27,12 +27,12 @@ type runningFirecracker struct {
 	vmmCancel context.CancelFunc
 	vmmID     string
 
-	deployedWorkload *agentapi.DeployRequest
-	ip               net.IP
-	machine          *firecracker.Machine
-	machineStarted   time.Time
-	namespace        string
-	workloadStarted  time.Time
+	deployRequest   *agentapi.DeployRequest
+	ip              net.IP
+	machine         *firecracker.Machine
+	machineStarted  time.Time
+	namespace       string
+	workloadStarted time.Time
 }
 
 func (vm *runningFirecracker) shutdown(log *slog.Logger) {

@@ -36,7 +36,7 @@ func (m *MachineManager) PublishCloudEvent(namespace string, event cloudevents.E
 
 // PublishMachineStopped writes a workload stopped event for the provided firecracker VM
 func (m *MachineManager) PublishMachineStopped(vm *runningFirecracker) error {
-	workloadName := strings.TrimSpace(vm.deployedWorkload.DecodedClaims.Subject)
+	workloadName := strings.TrimSpace(vm.deployRequest.DecodedClaims.Subject)
 	if len(workloadName) > 0 {
 		workloadStopped := struct {
 			Name   string `json:"name"`

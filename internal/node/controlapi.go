@@ -124,7 +124,7 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 		return
 	}
 
-	err = request.Validate(&vm.deployedWorkload.DecodedClaims)
+	err = request.Validate(&vm.deployRequest.DecodedClaims)
 	if err != nil {
 		api.log.Error("Failed to validate stop request", slog.Any("err", err))
 		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
@@ -139,8 +139,8 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 
 	res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
 		Stopped:   true,
-		Name:      vm.deployedWorkload.DecodedClaims.Subject,
-		Issuer:    vm.deployedWorkload.DecodedClaims.Issuer,
+		Name:      vm.deployRequest.DecodedClaims.Subject,
+		Issuer:    vm.deployRequest.DecodedClaims.Issuer,
 		MachineId: vm.vmmID,
 	}, nil)
 	raw, err := json.Marshal(res)
@@ -242,7 +242,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 		Started:   true,
 		Name:      workloadName,
-		Issuer:    runningVM.deployedWorkload.DecodedClaims.Issuer,
+		Issuer:    runningVM.deployRequest.DecodedClaims.Issuer,
 		MachineId: runningVM.vmmID,
 	}, nil)
 
@@ -307,13 +307,13 @@ func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []
 	for _, v := range *vms {
 		if v.namespace == namespace {
 			var desc string
-			if v.deployedWorkload.Description != nil {
-				desc = *v.deployedWorkload.Description // FIXME-- audit controlapi.WorkloadSummary
+			if v.deployRequest.Description != nil {
+				desc = *v.deployRequest.Description // FIXME-- audit controlapi.WorkloadSummary
 			}
 
 			var workloadType string
-			if v.deployedWorkload.WorkloadType != nil {
-				workloadType = *v.deployedWorkload.WorkloadType
+			if v.deployRequest.WorkloadType != nil {
+				workloadType = *v.deployRequest.WorkloadType
 			}
 
 			machine := controlapi.MachineSummary{
@@ -321,7 +321,7 @@ func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []
 				Healthy: true, // TODO cache last health status
 				Uptime:  myUptime(now.Sub(v.machineStarted)),
 				Workload: controlapi.WorkloadSummary{
-					Name:         v.deployedWorkload.DecodedClaims.Subject,
+					Name:         v.deployRequest.DecodedClaims.Subject,
 					Description:  desc,
 					Runtime:      myUptime(now.Sub(v.workloadStarted)),
 					WorkloadType: workloadType,
