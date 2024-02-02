@@ -364,7 +364,7 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 	timeoutAt := time.Now().UTC().Add(m.handshakeTimeout)
 
 	handshakeOk := false
-	for !handshakeOk {
+	for !handshakeOk && !m.stopping() {
 		if time.Now().UTC().After(timeoutAt) {
 			m.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("vmid", vmid))
 			return
