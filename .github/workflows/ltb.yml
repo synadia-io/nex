@@ -10,6 +10,7 @@ on:
 
 jobs:
   lint:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
     - 
@@ -38,6 +39,7 @@ jobs:
         golangci-lint run --timeout 5m
 
   test:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
     - 
@@ -80,6 +82,7 @@ jobs:
       run: sudo -E ~/go/bin/ginkgo run -r --randomize-all --vv --trace --keep-going --output-interceptor-mode=none ./spec
 
   build:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       -
