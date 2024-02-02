@@ -244,7 +244,7 @@ var _ = Describe("nex node", func() {
 
 						nodeID, _ = node.PublicKey()
 						nodeProxy = nexnode.NewNodeProxyWith(node)
-						time.Sleep(time.Millisecond * 2500) // FIXME-- support reading this timeout from an env var, default to 500
+						time.Sleep(time.Millisecond * 500)
 					})
 
 					It("should generate a keypair for the node", func(ctx SpecContext) {
@@ -342,8 +342,7 @@ var _ = Describe("nex node", func() {
 							manager = nodeProxy.MachineManager()
 							fmt.Printf("%v", manager) // HACK-- remove once we use manager for assertions... this is just here to remove the unused warning for now...
 
-							// FIXME-- support reading this timeout from an env var, default to 2500 locally...
-							time.Sleep(time.Millisecond * 5000) // allow enough time for the pool to warm up...
+							time.Sleep(time.Millisecond * 2500) // allow enough time for the pool to warm up...
 						})
 
 						Describe("agent internal API subscriptions", func() {
