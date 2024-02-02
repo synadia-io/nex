@@ -181,14 +181,16 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 					m.t.functionRunTimeNano.Add(m.ctx, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 					m.t.functionRunTimeNano.Add(m.ctx, runTime_int64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
 
-					err = msg.Respond(resp.Data)
-					if err != nil {
-						m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
-							slog.String("vmid", vm.vmmID),
-							slog.String("trigger_subject", tsub),
-							slog.String("workload_type", *request.WorkloadType),
-							slog.Any("err", err),
-						)
+					if len(resp.Data) > 0 {
+						err = msg.Respond(resp.Data)
+						if err != nil {
+							m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
+								slog.String("vmid", vm.vmmID),
+								slog.String("trigger_subject", tsub),
+								slog.String("workload_type", *request.WorkloadType),
+								slog.Any("err", err),
+							)
+						}
 					}
 				}
 			})
