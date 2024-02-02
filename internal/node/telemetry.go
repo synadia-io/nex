@@ -25,6 +25,7 @@ type Telemetry struct {
 	log   *slog.Logger
 	meter metric.Meter
 
+	metricsEnabled  bool
 	metricsExporter string
 	metricsPort     int
 
@@ -42,12 +43,13 @@ type Telemetry struct {
 	functionRunTimeNano    metric.Int64Counter
 }
 
-func NewTelemetry(log *slog.Logger, metricsExporter string, metricsPort int) (*Telemetry, error) {
+func NewTelemetry(log *slog.Logger, config *NodeConfiguration) (*Telemetry, error) {
 	t := &Telemetry{
 		log:             log,
-		meter:           otel.Meter(defaultServiceName),
-		metricsExporter: metricsExporter,
-		metricsPort:     metricsPort,
+		meter:           nil,
+		metricsEnabled:  config.OtelMetrics,
+		metricsExporter: config.OtelMetricsExporter,
+		metricsPort:     config.OtelMetricsPort,
 		serviceName:     defaultServiceName,
 	}
 
@@ -62,9 +64,11 @@ func NewTelemetry(log *slog.Logger, metricsExporter string, metricsPort int) (*T
 func (t *Telemetry) init() error {
 	var e, err error
 
-	e = t.initMeterProvider()
-	if err != nil {
-		err = errors.Join(err, e)
+	if t.metricsEnabled {
+		e = t.initMeterProvider()
+		if err != nil {
+			err = errors.Join(err, e)
+		}
 	}
 
 	if t.meter == nil {
@@ -144,7 +148,7 @@ func (t *Telemetry) initMeterProvider() error {
 		return err
 	}
 
-	metricReader, err := t.serveMetrics()
+	metricReader, err := t.serveMetrics() // FIXME-- this seems to require some additional discussion-- it may be better suited to live in Node
 	if err != nil {
 		t.log.Warn("failed to create OTel metrics exporter", slog.Any("err", err))
 		return err
@@ -164,6 +168,8 @@ func (t *Telemetry) initMeterProvider() error {
 	}()
 
 	otel.SetMeterProvider(meterProvider)
+	t.meter = otel.Meter(t.serviceName)
+
 	return nil
 }
 

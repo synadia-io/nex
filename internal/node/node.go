@@ -146,14 +146,12 @@ func (n *Node) init() error {
 		err = n.loadNodeConfig()
 		// TODO-- handle this err
 
-		if n.config.OtelMetrics {
-			n.telemetry, err = NewTelemetry(n.log, n.config.OtelMetricsExporter, n.config.OtelMetricsPort)
-			if err != nil {
-				n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
-				err = fmt.Errorf("failed to initialize telemetry: %s", err)
-			}
-			n.log.Info("Initialized telemetry")
+		n.telemetry, err = NewTelemetry(n.log, n.config)
+		if err != nil {
+			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
+			err = fmt.Errorf("failed to initialize telemetry: %s", err)
 		}
+		n.log.Info("Initialized telemetry")
 
 		// setup NATS connection
 		n.nc, err = models.GenerateConnectionFromOpts(n.opts)
