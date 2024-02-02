@@ -24,22 +24,24 @@ var (
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
-	KernelFile         string            `json:"kernel_file"`
-	RootFsFile         string            `json:"rootfs_file"`
-	DefaultResourceDir string            `json:"default_resource_dir"`
-	CNI                CNIDefinition     `json:"cni"`
-	InternalNodeHost   *string           `json:"internal_node_host,omitempty"`
-	InternalNodePort   *int              `json:"internal_node_port"`
-	KernelPath         *string           `json:"kernel_path"` // FIXME
-	MachinePoolSize    int               `json:"machine_pool_size"`
-	MachineTemplate    MachineTemplate   `json:"machine_template"`
-	RateLimiters       *Limiters         `json:"rate_limiters,omitempty"`
-	RootFsPath         *string           `json:"rootfs_path"` // FIXME
-	ValidIssuers       []string          `json:"valid_issuers,omitempty"`
-	WorkloadTypes      []string          `json:"workload_types,omitempty"`
-	Tags               map[string]string `json:"tags,omitempty"`
-	ForensicMode       bool              `json:"-"`
-	ForceDepInstall    bool              `json:"-"`
+	DefaultResourceDir string `json:"default_resource_dir"`
+	KernelFilepath     string `json:"kernel_filepath"`
+	RootFsFilepath     string `json:"rootfs_filepath"`
+
+	CNI                 CNIDefinition     `json:"cni"`
+	ForensicMode        bool              `json:"-"`
+	ForceDepInstall     bool              `json:"-"`
+	InternalNodeHost    *string           `json:"internal_node_host,omitempty"`
+	InternalNodePort    *int              `json:"internal_node_port"`
+	MachinePoolSize     int               `json:"machine_pool_size"`
+	MachineTemplate     MachineTemplate   `json:"machine_template"`
+	OtelMetrics         bool              `json:"otel_metrics"`
+	OtelMetricsPort     int               `json:"otel_metrics_port"`
+	OtelMetricsExporter string            `json:"otel_metrics_exporter"`
+	RateLimiters        *Limiters         `json:"rate_limiters,omitempty"`
+	Tags                map[string]string `json:"tags,omitempty"`
+	ValidIssuers        []string          `json:"valid_issuers,omitempty"`
+	WorkloadTypes       []string          `json:"workload_types,omitempty"`
 
 	Errors []error `json:"errors,omitempty"`
 }
@@ -47,11 +49,11 @@ type NodeConfiguration struct {
 func (c *NodeConfiguration) Validate() bool {
 	c.Errors = make([]error, 0)
 
-	if _, err := os.Stat(c.KernelFile); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(c.KernelFilepath); errors.Is(err, os.ErrNotExist) {
 		c.Errors = append(c.Errors, err)
 	}
 
-	if _, err := os.Stat(c.RootFsFile); errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(c.RootFsFilepath); errors.Is(err, os.ErrNotExist) {
 		c.Errors = append(c.Errors, err)
 	}
 
@@ -119,8 +121,8 @@ func DefaultNodeConfiguration() NodeConfiguration {
 }
 
 // Reads the node configuration from the specified configuration file path
-func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
-	bytes, err := os.ReadFile(configFilePath)
+func LoadNodeConfiguration(configFilepath string) (*NodeConfiguration, error) {
+	bytes, err := os.ReadFile(configFilepath)
 	if err != nil {
 		return nil, err
 	}
@@ -135,15 +137,17 @@ func LoadNodeConfiguration(configFilePath string) (*NodeConfiguration, error) {
 		config.WorkloadTypes = defaultWorkloadTypes
 	}
 
-	if config.KernelFile == "" && config.DefaultResourceDir != "" {
-		config.KernelFile = filepath.Join(config.DefaultResourceDir, "vmlinux")
-	} else if config.KernelFile == "" && config.DefaultResourceDir == "" {
+	// TODO-- audit for *string
+	if config.KernelFilepath == "" && config.DefaultResourceDir != "" {
+		config.KernelFilepath = filepath.Join(config.DefaultResourceDir, "vmlinux")
+	} else if config.KernelFilepath == "" && config.DefaultResourceDir == "" {
 		return nil, errors.New("invalid kernel file setting")
 	}
 
-	if config.RootFsFile == "" && config.DefaultResourceDir != "" {
-		config.RootFsFile = filepath.Join(config.DefaultResourceDir, "rootfs.ext4")
-	} else if config.KernelFile == "" && config.DefaultResourceDir == "" {
+	// TODO-- audit for *string
+	if config.RootFsFilepath == "" && config.DefaultResourceDir != "" {
+		config.RootFsFilepath = filepath.Join(config.DefaultResourceDir, "rootfs.ext4")
+	} else if config.RootFsFilepath == "" && config.DefaultResourceDir == "" {
 		return nil, errors.New("invalid rootfs file setting")
 	}
 

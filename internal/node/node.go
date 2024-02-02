@@ -143,16 +143,17 @@ func (n *Node) init() error {
 	var err error
 
 	n.initOnce.Do(func() {
-		if n.nodeOpts.OtelMetrics {
-			n.telemetry, err = NewTelemetry(n.log, n.nodeOpts.OtelMetricsExporter, n.nodeOpts.OtelMetricsPort)
+		err = n.loadNodeConfig()
+		// TODO-- handle this err
+
+		if n.config.OtelMetrics {
+			n.telemetry, err = NewTelemetry(n.log, n.config.OtelMetricsExporter, n.config.OtelMetricsPort)
 			if err != nil {
 				n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
 				err = fmt.Errorf("failed to initialize telemetry: %s", err)
 			}
 			n.log.Info("Initialized telemetry")
 		}
-
-		err = n.loadNodeConfig()
 
 		// setup NATS connection
 		n.nc, err = models.GenerateConnectionFromOpts(n.opts)
@@ -258,6 +259,11 @@ func (n *Node) loadNodeConfig() error {
 			err = fmt.Errorf("failed to load node configuration file: %s", err)
 			return err
 		}
+
+		// HACK-- copying these here... everything should ultimately be configurable via node JSON config...
+		n.config.OtelMetrics = n.nodeOpts.OtelMetrics
+		n.config.OtelMetricsExporter = n.nodeOpts.OtelMetricsExporter
+		n.config.OtelMetricsPort = n.nodeOpts.OtelMetricsPort
 
 		n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
 	}

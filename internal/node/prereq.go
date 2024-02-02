@@ -96,8 +96,8 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 		{
 			directory: "",
 			files: []fileSpec{
-				{name: config.KernelFile, description: "VMLinux Kernel"},
-				{name: config.RootFsFile, description: "Root Filesystem Template"},
+				{name: config.KernelFilepath, description: "VMLinux Kernel"},
+				{name: config.RootFsFilepath, description: "Root Filesystem Template"},
 			},
 			descriptor: "User provided files",
 			satisfied:  false,
@@ -144,6 +144,10 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 		var err error
 
 		if !config.ForceDepInstall {
+			if readonly {
+				return fmt.Errorf("configuration prerequisites not met")
+			}
+
 			fmt.Printf("⛔ You are missing required dependencies for [%s], do you want to install? [y/N] ", red(r.descriptor))
 			inputReader := bufio.NewReader(os.Stdin)
 			input, err = inputReader.ReadSlice('\n')
