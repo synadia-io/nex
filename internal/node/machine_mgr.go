@@ -176,8 +176,6 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 						slog.Int("payload_size", len(resp.Data)),
 					)
 
-					m.log.Info("resp via trigger", slog.String("nanos", runtimeNs))
-
 					runTimeNs64, err := strconv.ParseInt(runtimeNs, 10, 64)
 					if err != nil {
 						m.log.Warn("failed to log function runtime", slog.Any("err", err))
