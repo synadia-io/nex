@@ -102,7 +102,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		}
 	}
 
-	request, err := controlapi.NewRunRequest(
+	request, err := controlapi.NewDeployRequest(
 		controlapi.Argv(strings.Split(RunOpts.Argv, " ")),
 		controlapi.Location(workloadUrl),
 		controlapi.Environment(RunOpts.Env),

@@ -159,7 +159,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	var request controlapi.RunRequest
+	var request controlapi.DeployRequest
 	err = json.Unmarshal(m.Data, &request)
 	if err != nil {
 		api.log.Error("Failed to deserialize deploy request", slog.Any("err", err))
