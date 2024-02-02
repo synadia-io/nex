@@ -11,9 +11,11 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
@@ -217,6 +219,8 @@ var _ = Describe("nex node", func() {
 
 				Context("when the specified default_resource_dir exists on the host", func() {
 					var node *nexnode.Node
+					var nodeProxy *nexnode.NodeProxy
+					var nodeID *string // node id == node public key
 
 					BeforeEach(func() {
 						nodeConfig.DefaultResourceDir = validResourceDir
@@ -233,44 +237,104 @@ var _ = Describe("nex node", func() {
 						node, _ = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
 						go node.Start()
 
+						nodeID, _ = node.PublicKey()
+						nodeProxy = nexnode.NewNodeProxyWith(node)
 						time.Sleep(time.Millisecond * 500)
 					})
 
-					It("should initialize the node API", func(ctx SpecContext) {
-						subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{Subscriptions: true})
-						fmt.Printf("%v", subsz)
-					})
-
-					It("should initialize a machine manager instance", func(ctx SpecContext) {
-
+					It("should generate a keypair for the node", func(ctx SpecContext) {
+						publicKey, err := node.PublicKey()
+						Expect(err).To(BeNil())
+						Expect(publicKey).ToNot(BeNil())
 					})
 
 					It("should install signal handlers", func(ctx SpecContext) {
-
+						Expect(signal.Ignored(os.Interrupt)).To(BeFalse())
+						Expect(signal.Ignored(syscall.SIGTERM)).To(BeFalse())
+						Expect(signal.Ignored(syscall.SIGINT)).To(BeFalse())
+						Expect(signal.Ignored(syscall.SIGQUIT)).To(BeFalse())
 					})
 
 					It("should use the provided logger instance", func(ctx SpecContext) {
-
+						Expect(nodeProxy.Log()).To(Equal(log))
 					})
 
 					It("should initialize the node configuration", func(ctx SpecContext) {
-
+						Expect(nodeProxy.NodeConfiguration()).ToNot(BeNil()) // FIXME-- assert that it is === to the current nex node config JSON
 					})
 
-					It("should hold a reference to the given options", func(ctx SpecContext) {
+					Describe("node API listener subscriptions", func() {
+						It("should initialize a node API subscription for handling ping requests", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          "$NEX.PING",
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
 
-					})
+						It("should initialize a node API subscription for handling ping requests with a specific node id", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          fmt.Sprintf("$NEX.PING.%s", *nodeID),
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
 
-					It("should hold a reference to the given node options", func(ctx SpecContext) {
+						It("should initialize a node API subscription for handling namespaced info requests", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          fmt.Sprintf("$NEX.INFO.default.%s", *nodeID),
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
 
-					})
+						It("should initialize a node API subscription for handling namespaced deploy requests", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          fmt.Sprintf("$NEX.DEPLOY.default.%s", *nodeID),
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
 
-					It("should establish a connection with the configured NATS server", func(ctx SpecContext) {
-
+						It("should initialize a node API subscription for handling namespaced workload stop -- FIXME? should be undeploy?", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          fmt.Sprintf("$NEX.STOP.default.%s", *nodeID),
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
 					})
 
 					It("should initialize an internal NATS server for private communication between running VMs and the host", func(ctx SpecContext) {
 
+					})
+
+					Describe("machine manager instance", func() {
+						Describe("agent internal API subscriptions", func() {
+							It("should initialize an internal API subscription for handling agent handshake requests", func(ctx SpecContext) {
+								subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
+									Subscriptions: true,
+									Test:          "agentint.handshake",
+								})
+								Expect(subsz.Total).To(Equal(1))
+							})
+
+							It("should initialize an internal API subscription for handling agent events", func(ctx SpecContext) {
+								subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
+									Subscriptions: true,
+									Test:          "agentint.vmid.events.event_type",
+								})
+								Expect(subsz.Total).To(Equal(1))
+							})
+
+							It("should initialize an internal API subscription for handling agent logs", func(ctx SpecContext) {
+								subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
+									Subscriptions: true,
+									Test:          "agentint.vmid.logs",
+								})
+								Expect(subsz.Total).To(Equal(1))
+							})
+						})
 					})
 				})
 			})
