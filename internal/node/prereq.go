@@ -132,7 +132,7 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 	}
 
 	if !readonly {
-		fmt.Printf(sb.String())
+		fmt.Print(sb.String())
 	}
 
 	for _, r := range *required {
