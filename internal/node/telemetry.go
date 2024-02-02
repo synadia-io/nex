@@ -69,10 +69,8 @@ func (t *Telemetry) init() error {
 		if err != nil {
 			err = errors.Join(err, e)
 		}
-	}
-
-	if t.meter == nil {
-		return errors.New("failed to initialize telemetry instance: nil meter")
+	} else {
+		return nil
 	}
 
 	t.vmCounter, e = t.meter.
@@ -132,6 +130,7 @@ func (t *Telemetry) init() error {
 	if e != nil {
 		err = errors.Join(err, e)
 	}
+
 	return err
 }
 
@@ -168,7 +167,11 @@ func (t *Telemetry) initMeterProvider() error {
 	}()
 
 	otel.SetMeterProvider(meterProvider)
+
 	t.meter = otel.Meter(t.serviceName)
+	if t.meter == nil {
+		return errors.New("failed to initialize telemetry instance: nil meter")
+	}
 
 	return nil
 }
