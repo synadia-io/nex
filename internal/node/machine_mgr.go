@@ -53,7 +53,17 @@ type MachineManager struct {
 	publicKey    string
 }
 
-func NewMachineManager(ctx context.Context, nodeKeypair nkeys.KeyPair, publicKey string, nc, ncint *nats.Conn, config *NodeConfiguration, log *slog.Logger, telemetry *Telemetry) (*MachineManager, error) {
+// Initialize a new machine manager instance to manage firecracker VMs
+// and private communications between the host and running Nex agents.
+func NewMachineManager(
+	ctx context.Context,
+	nodeKeypair nkeys.KeyPair,
+	publicKey string,
+	nc, ncint *nats.Conn,
+	config *NodeConfiguration,
+	log *slog.Logger,
+	telemetry *Telemetry,
+) (*MachineManager, error) {
 	// Validate the node config
 	if !config.Validate() {
 		return nil, fmt.Errorf("failed to create new machine manager; invalid node config; %v", config.Errors)
@@ -94,8 +104,8 @@ func NewMachineManager(ctx context.Context, nodeKeypair nkeys.KeyPair, publicKey
 	return m, nil
 }
 
-// Starts the machine manager. Publishes a node started event and starts the goroutine responsible for
-// keeping the firecracker VM pool full
+// Starts the machine manager. Publishes a node started event and starts the
+// goroutine responsible for keeping the firecracker VM pool full
 func (m *MachineManager) Start() error {
 	m.log.Info("Virtual machine manager starting")
 
