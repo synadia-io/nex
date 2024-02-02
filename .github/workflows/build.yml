@@ -54,7 +54,7 @@ jobs:
       name: Install ginkgo
       shell: bash --noprofile --norc -x -eo pipefail {0}
       run: |
-        go install github.com/onsi/ginkgo/v2/ginkgo
+        go install github.com/onsi/ginkgo/v2/ginkgo@latest
     - 
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
