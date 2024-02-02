@@ -16,6 +16,7 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/internal/models"
 )
 
@@ -42,6 +43,9 @@ type Node struct {
 
 	initOnce sync.Once
 
+	keypair   nkeys.KeyPair
+	publicKey string
+
 	nc *nats.Conn
 
 	natsint *server.Server
@@ -64,11 +68,27 @@ func NewNode(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Con
 		return nil, fmt.Errorf("failed to start node: %s", err.Error())
 	}
 
+	err = node.generateKeypair()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate keypair for node: %s", err)
+	} else {
+		node.log.Info("Generated keypair for node", slog.String("public_key", node.publicKey))
+	}
+
 	return node, nil
 }
 
+func (n *Node) PublicKey() (*string, error) {
+	pubkey, err := n.keypair.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return &pubkey, nil
+}
+
 func (n *Node) Start() {
-	n.log.Debug("starting node")
+	n.log.Debug("starting node", slog.String("public_key", n.publicKey))
 
 	err := n.init()
 	if err != nil {
@@ -101,6 +121,22 @@ func (n *Node) Start() {
 func (n *Node) Stop() {
 	n.log.Debug("stopping node")
 	n.shutdown()
+}
+
+func (n *Node) generateKeypair() error {
+	var err error
+
+	n.keypair, err = nkeys.CreateServer()
+	if err != nil {
+		return fmt.Errorf("failed to generate node keypair: %s", err)
+	}
+
+	n.publicKey, err = n.keypair.PublicKey()
+	if err != nil {
+		return fmt.Errorf("failed to encode public key: %s", err)
+	}
+
+	return nil
 }
 
 func (n *Node) init() error {
@@ -137,7 +173,7 @@ func (n *Node) init() error {
 		}
 
 		// init machine manager
-		n.manager, err = NewMachineManager(n.ctx, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		n.manager, err = NewMachineManager(n.ctx, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize machine manager: %s", err)
@@ -223,7 +259,7 @@ func (n *Node) loadNodeConfig() error {
 			return err
 		}
 
-		n.log.Info("Loaded node configuration from '%s'", slog.String("config_path", n.nodeOpts.ConfigFilepath))
+		n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
 	}
 
 	return nil

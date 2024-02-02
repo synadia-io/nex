@@ -53,33 +53,22 @@ type MachineManager struct {
 	publicKey    string
 }
 
-func NewMachineManager(ctx context.Context, nc, ncint *nats.Conn, config *NodeConfiguration, log *slog.Logger, telemetry *Telemetry) (*MachineManager, error) {
+func NewMachineManager(ctx context.Context, nodeKeypair nkeys.KeyPair, publicKey string, nc, ncint *nats.Conn, config *NodeConfiguration, log *slog.Logger, telemetry *Telemetry) (*MachineManager, error) {
 	// Validate the node config
 	if !config.Validate() {
 		return nil, fmt.Errorf("failed to create new machine manager; invalid node config; %v", config.Errors)
-	}
-
-	// Create a new keypair
-	server, err := nkeys.CreateServer()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new machine manager; failed to generate keypair; %s", err)
-	}
-
-	pubkey, err := server.PublicKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new machine manager; failed to encode public key; %s", err)
 	}
 
 	m := &MachineManager{
 		config:           config,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
-		kp:               server,
+		kp:               nodeKeypair,
 		log:              log,
 		natsStoreDir:     defaultNatsStoreDir,
 		nc:               nc,
 		ncInternal:       ncint,
-		publicKey:        pubkey,
+		publicKey:        publicKey,
 		t:                telemetry,
 		ctx:              ctx,
 
@@ -87,7 +76,7 @@ func NewMachineManager(ctx context.Context, nc, ncint *nats.Conn, config *NodeCo
 		warmVms: make(chan *runningFirecracker, config.MachinePoolSize-1),
 	}
 
-	_, err = m.ncInternal.Subscribe("agentint.*.logs", m.handleAgentLog)
+	_, err := m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +86,7 @@ func NewMachineManager(ctx context.Context, nc, ncint *nats.Conn, config *NodeCo
 		return nil, err
 	}
 
-	_, err = m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
+	_, err = m.ncInternal.Subscribe("agentint.*.logs", m.handleAgentLog)
 	if err != nil {
 		return nil, err
 	}
@@ -249,11 +238,9 @@ func (m *MachineManager) Stop() error {
 		close(m.warmVms)
 
 		for _, vm := range m.allVms {
-			_ = m.PublishMachineStopped(vm)
 			vm.shutdown(m.log)
+			_ = m.PublishMachineStopped(vm)
 		}
-
-		_ = m.PublishNodeStopped()
 
 		// Now empty the leftovers in the pool
 		for vm := range m.warmVms {
@@ -275,10 +262,10 @@ func (m *MachineManager) Stop() error {
 			}
 		}
 
-		time.Sleep(100 * time.Millisecond)
-
 		_ = m.nc.Drain()
 		m.cleanSockets()
+
+		_ = m.PublishNodeStopped()
 	}
 
 	return nil
@@ -299,9 +286,10 @@ func (m *MachineManager) StopMachine(vmId string) error {
 		return err
 	}
 
-	_ = m.PublishMachineStopped(vm)
 	vm.shutdown(m.log)
 	delete(m.allVms, vmId)
+
+	_ = m.PublishMachineStopped(vm)
 
 	if m.t != nil {
 		if vm.deployRequest != nil {
