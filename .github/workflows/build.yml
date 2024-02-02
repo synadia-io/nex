@@ -69,7 +69,7 @@ jobs:
     - 
       name: Run spec suite
       working-directory: .
-      run: sudo -E ~/go/bin/ginkgo run -r --randomize-all --vv --trace --keep-going ./spec
+      run: sudo -E ~/go/bin/ginkgo run -r --randomize-all --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
       name: Run test suite
       working-directory: .
