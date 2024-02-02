@@ -178,11 +178,11 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	_ = a.workAck(m, true, "Workload deployed")
-
 	err = a.provider.Deploy()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to deploy workload: %s", err))
+	} else {
+		_ = a.workAck(m, true, "Workload deployed")
 	}
 }
 
