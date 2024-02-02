@@ -19,11 +19,15 @@ const defaultNodeVcpuCount = 1
 var (
 	// docker/OCI needs to be explicitly enabled in node configuration
 	defaultWorkloadTypes = []string{"elf", "v8", "wasm"}
+	defaultBinPath       = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
+	// check the default cni bin path first, otherwise look in the rest of the PATH
+	defaultCNIBinPath = append([]string{"/opt/cni/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
 )
 
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
+	BinPath            []string          `json:"bin_path"`
 	CNI                 CNIDefinition     `json:"cni"`
 	DefaultResourceDir  string            `json:"default_resource_dir"`
 	ForceDepInstall     bool              `json:"-"`
@@ -72,8 +76,9 @@ type Limiters struct {
 // Defines a reference to the CNI network name, which is defined and configured in a {network}.conflist file, as per
 // CNI convention
 type CNIDefinition struct {
-	InterfaceName *string `json:"interface_name"`
-	NetworkName   *string `json:"network_name"`
+	BinPath       []string `json:"bin_path"`
+	InterfaceName *string  `json:"interface_name"`
+	NetworkName   *string  `json:"network_name"`
 }
 
 // Defines the CPU and memory usage of a machine to be configured when it is added to the pool
@@ -104,7 +109,9 @@ func DefaultNodeConfiguration() NodeConfiguration {
 	defaultMemSizeMib := defaultNodeMemSizeMib
 
 	return NodeConfiguration{
+		BinPath: defaultBinPath,
 		CNI: CNIDefinition{
+			BinPath:       defaultCNIBinPath,
 			NetworkName:   agentapi.StringOrNil(defaultCNINetworkName),
 			InterfaceName: agentapi.StringOrNil(defaultCNIInterfaceName),
 		},
