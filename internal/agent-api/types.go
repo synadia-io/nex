@@ -86,23 +86,23 @@ func (r *DeployRequest) Validate() bool {
 	var err error
 
 	if r.WorkloadName == nil {
-		err = errors.Join(errors.New("workload name is required"))
+		err = errors.Join(err, errors.New("workload name is required"))
 	}
 
 	if r.Hash == "" { // FIXME--- this should probably be checked against *string
-		err = errors.Join(errors.New("hash is required"))
+		err = errors.Join(err, errors.New("hash is required"))
 	}
 
 	if r.TotalBytes == 0 { // FIXME--- this should probably be checked against *string
-		err = errors.Join(errors.New("total bytes is required"))
+		err = errors.Join(err, errors.New("total bytes is required"))
 	}
 
 	if r.WorkloadType == nil {
-		err = errors.Join(errors.New("workload type is required"))
+		err = errors.Join(err, errors.New("workload type is required"))
 	} else if (strings.EqualFold(*r.WorkloadType, NexExecutionProviderV8) ||
 		strings.EqualFold(*r.WorkloadType, NexExecutionProviderWasm)) &&
 		len(r.TriggerSubjects) == 0 {
-		err = errors.Join(errors.New("at least one trigger subject is required for this workload type"))
+		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
 	}
 
 	return err == nil
@@ -132,15 +132,15 @@ func (m *MachineMetadata) Validate() bool {
 	var err error
 
 	if m.VmId == nil {
-		err = errors.Join(errors.New("vm id is required"))
+		err = errors.Join(err, errors.New("vm id is required"))
 	}
 
 	if m.NodeNatsHost == nil {
-		err = errors.Join(errors.New("node NATS host is required"))
+		err = errors.Join(err, errors.New("node NATS host is required"))
 	}
 
 	if m.NodeNatsPort == nil {
-		err = errors.Join(errors.New("node NATS port is required"))
+		err = errors.Join(err, errors.New("node NATS port is required"))
 	}
 
 	return err == nil
