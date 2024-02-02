@@ -263,6 +263,27 @@ var _ = Describe("nex node", func() {
 						Expect(nodeProxy.NodeConfiguration()).ToNot(BeNil()) // FIXME-- assert that it is === to the current nex node config JSON
 					})
 
+					It("should initialize an internal NATS server for private communication between running VMs and the host", func(ctx SpecContext) {
+						Expect(nodeProxy.InternalNATS()).ToNot(BeNil())
+					})
+
+					It("should initialize a machine manager to manage firecracker VMs and communicate with running agents", func(ctx SpecContext) {
+						Expect(nodeProxy.MachineManager()).ToNot(BeNil())
+					})
+
+					It("should initialize an API listener", func(ctx SpecContext) {
+						Expect(nodeProxy.APIListener()).ToNot(BeNil())
+					})
+
+					// FIXME-- this needs to be updated
+					// It("should initialize a telemetry instance", func(ctx SpecContext) {
+					// 	Expect(nodeProxy.Telemetry()).ToNot(BeNil())
+					// })
+
+					Context("when node options enable otel", func() {
+						// TODO
+					})
+
 					Describe("node API listener subscriptions", func() {
 						It("should initialize a node API subscription for handling ping requests", func(ctx SpecContext) {
 							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
@@ -305,11 +326,20 @@ var _ = Describe("nex node", func() {
 						})
 					})
 
-					It("should initialize an internal NATS server for private communication between running VMs and the host", func(ctx SpecContext) {
+					Describe("machine manager", func() {
+						var manager *nexnode.MachineManager
 
-					})
+						JustBeforeEach(func() {
+							nodeConfig.DefaultResourceDir = validResourceDir
+							os.Mkdir(validResourceDir, 0755)
+							nodeOpts.ForceDepInstall = true
 
-					Describe("machine manager instance", func() {
+							manager = nodeProxy.MachineManager()
+							fmt.Printf("%v", manager) // HACK-- remove once we use manager for assertions... this is just here to remove the unused warning for now...
+
+							time.Sleep(time.Millisecond * 2500) // allow enough time for the pool to warm up...
+						})
+
 						Describe("agent internal API subscriptions", func() {
 							It("should initialize an internal API subscription for handling agent handshake requests", func(ctx SpecContext) {
 								subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
@@ -333,6 +363,18 @@ var _ = Describe("nex node", func() {
 									Test:          "agentint.vmid.logs",
 								})
 								Expect(subsz.Total).To(Equal(1))
+							})
+						})
+
+						Describe("VM pool", func() {
+							Context("when a VM is warm", func() {
+								It("should complete the agent handshake", func(ctx SpecContext) {
+									subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
+										Subscriptions: true,
+										Test:          "agentint.handshake",
+									})
+									Expect(subsz.Subs[0].Msgs).To(Equal(int64(1)))
+								})
 							})
 						})
 					})
