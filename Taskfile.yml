@@ -48,7 +48,7 @@ tasks:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
   test:
-    deps: [clean]
+    deps: [clean, agent]
     cmds:
       - sudo $GOPATH/bin/ginkgo run -r --randomize-all --vv --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
       - go test -v -race ./test

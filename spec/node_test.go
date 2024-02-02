@@ -68,8 +68,12 @@ var _ = Describe("nex node", func() {
 			// make sure dagger isn't already running, as this has been known to cause problems...
 			stopDaggerEngine()
 
+			// require the nex-agent binary to be built... FIXME-- build it here insteaad of relying on the Taskfile
+			_, err := os.Stat("../agent/cmd/nex-agent")
+			Expect(err).To(BeNil())
+
 			snapshotAgentRootFSPath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-rootfs.ext4", _fixtures.seededRand.Int()))
-			cmd := exec.Command("go", "run", "../agent/fc-image", "../agent/agent.go")
+			cmd := exec.Command("go", "run", "../agent/fc-image", "../agent/cmd/nex-agent/nex-agent")
 			_, _ = cmd.Output()
 
 			compressedRootFS, _ := os.Open("./rootfs.ext4.gz")
@@ -79,7 +83,7 @@ var _ = Describe("nex node", func() {
 			defer outFile.Close()
 
 			_, _ = io.Copy(outFile, uncompressedRootFS)
-			os.Remove("./rootfs.ext4.gz")
+			_ = os.Remove("./rootfs.ext4.gz")
 		})
 	})
 
@@ -224,6 +228,7 @@ var _ = Describe("nex node", func() {
 
 					BeforeEach(func() {
 						nodeConfig.DefaultResourceDir = validResourceDir
+						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
 						_ = os.Mkdir(validResourceDir, 0755)
 						nodeOpts.ForceDepInstall = true
 					})
