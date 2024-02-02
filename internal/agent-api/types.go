@@ -83,29 +83,29 @@ func (request *DeployRequest) SupportsTriggerSubjects() bool {
 }
 
 func (r *DeployRequest) Validate() bool {
-	r.Errors = make([]error, 0)
+	var err error
 
 	if r.WorkloadName == nil {
-		r.Errors = append(r.Errors, errors.New("workload name is required"))
+		err = errors.Join(errors.New("workload name is required"))
 	}
 
 	if r.Hash == "" { // FIXME--- this should probably be checked against *string
-		r.Errors = append(r.Errors, errors.New("hash is required"))
+		err = errors.Join(errors.New("hash is required"))
 	}
 
 	if r.TotalBytes == 0 { // FIXME--- this should probably be checked against *string
-		r.Errors = append(r.Errors, errors.New("total bytes is required"))
+		err = errors.Join(errors.New("total bytes is required"))
 	}
 
 	if r.WorkloadType == nil {
-		r.Errors = append(r.Errors, errors.New("workload type is required"))
+		err = errors.Join(errors.New("workload type is required"))
 	} else if (strings.EqualFold(*r.WorkloadType, NexExecutionProviderV8) ||
 		strings.EqualFold(*r.WorkloadType, NexExecutionProviderWasm)) &&
 		len(r.TriggerSubjects) == 0 {
-		r.Errors = append(r.Errors, errors.New("at least one trigger subject is required for this workload type"))
+		err = errors.Join(errors.New("at least one trigger subject is required for this workload type"))
 	}
 
-	return len(r.Errors) == 0
+	return err == nil
 }
 
 type DeployResponse struct {
@@ -129,21 +129,21 @@ type MachineMetadata struct {
 }
 
 func (m *MachineMetadata) Validate() bool {
-	m.Errors = make([]error, 0)
+	var err error
 
 	if m.VmId == nil {
-		m.Errors = append(m.Errors, errors.New("vm id is required"))
+		err = errors.Join(errors.New("vm id is required"))
 	}
 
 	if m.NodeNatsHost == nil {
-		m.Errors = append(m.Errors, errors.New("node NATS host is required"))
+		err = errors.Join(errors.New("node NATS host is required"))
 	}
 
 	if m.NodeNatsPort == nil {
-		m.Errors = append(m.Errors, errors.New("node NATS port is required"))
+		err = errors.Join(errors.New("node NATS port is required"))
 	}
 
-	return len(m.Errors) == 0
+	return err == nil
 }
 
 type LogEntry struct {
