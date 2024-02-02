@@ -50,7 +50,7 @@ tasks:
   test:
     deps: [clean]
     cmds:
-      - sudo $GOPATH/bin/ginkgo run -r --randomize-all --vv -race --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
+      - sudo $GOPATH/bin/ginkgo run -r --randomize-all --vv --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
       - go test -v -race ./test
 
   ui:
