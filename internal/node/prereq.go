@@ -19,20 +19,20 @@ import (
 )
 
 const (
-	VM_LINUX_KERNEL_URL    string = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/x86_64/vmlinux-5.10.186"
-	VM_LINUX_KERNEL_SHA256 string = "d48d320e320a8cf970184e79e66a833b044a049a4c2c645b9a1abefdb2fe7b31"
+	vmLinuxKernelURL    string = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/x86_64/vmlinux-5.10.186"
+	vmLinuxKernelSHA256 string = "d48d320e320a8cf970184e79e66a833b044a049a4c2c645b9a1abefdb2fe7b31"
 
-	CNI_PLUGINS_TARBALL_URL    string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz"
-	CNI_PLUGINS_TARBALL_SHA256 string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz.sha256"
+	cniPluginsTarballURL    string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz"
+	cniPluginsTarballSHA256 string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz.sha256"
 	// TODO: once awslabs fixes their release action, this URL needs to be changed
-	TC_REDIRECT_CNI_PLUGIN_URL    string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64"
-	TC_REDIRECT_CNI_PLUGIN_SHA256 string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64.sha256"
+	tcRedirectCNIPluginURL    string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64"
+	tcRedirectCNIPluginSHA256 string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64.sha256"
 
-	FIRECRACKER_TARBALL_URL    string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
-	FIRECRACKER_TARBALL_SHA256 string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
+	firecrackerTarballURL    string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
+	firecrackerTarballSHA256 string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
 
-	ROOTFS_GZIP_URL    string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
-	ROOTFS_GZIP_SHA256 string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
+	rootfsGzipURL    string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
+	rootfsGzipSHA256 string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
 )
 
 var (
@@ -214,7 +214,7 @@ func downloadKernel(r *requirement, _ *NodeConfiguration) error {
 			continue
 		}
 
-		respBin, err := http.Get(VM_LINUX_KERNEL_URL)
+		respBin, err := http.Get(vmLinuxKernelURL)
 
 		if err != nil {
 			return err
@@ -240,7 +240,7 @@ func downloadKernel(r *requirement, _ *NodeConfiguration) error {
 
 func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
 	// TODO: firecracker repo made the sha difficult to use
-	rawData, err := decompressTarFromURL(FIRECRACKER_TARBALL_URL, "")
+	rawData, err := decompressTarFromURL(firecrackerTarballURL, "")
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
 }
 
 func downloadCNIPlugins(r *requirement, c *NodeConfiguration) error {
-	rawData, err := decompressTarFromURL(CNI_PLUGINS_TARBALL_URL, CNI_PLUGINS_TARBALL_SHA256)
+	rawData, err := decompressTarFromURL(cniPluginsTarballURL, cniPluginsTarballSHA256)
 	if err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func downloadCNIPlugins(r *requirement, c *NodeConfiguration) error {
 }
 
 func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
-	respBin, err := http.Get(TC_REDIRECT_CNI_PLUGIN_URL)
+	respBin, err := http.Get(tcRedirectCNIPluginURL)
 	if err != nil {
 		return err
 	}
@@ -351,7 +351,7 @@ func downloadRootFS(r *requirement, _ *NodeConfiguration) error {
 			continue
 		}
 
-		respTar, err := http.Get(ROOTFS_GZIP_URL)
+		respTar, err := http.Get(rootfsGzipURL)
 		if err != nil {
 			return err
 		}
