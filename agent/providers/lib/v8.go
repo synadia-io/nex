@@ -12,10 +12,12 @@ import (
 	v8 "rogchap.com/v8go"
 )
 
-const v8MaxFileSizeBytes = int64(12288) // arbitrarily ~12K, for now
+const (
+	nexTriggerSubject = "x-nex-trigger-subject"
+	nexRuntimeNs      = "x-nex-runtime-ns"
 
-const nexTriggerSubject = "x-nex-trigger-subject"
-const nexRuntimeNs = "x-nex-runtime-ns"
+	v8MaxFileSizeBytes = int64(12288) // arbitrarily ~12K, for now
+)
 
 // V8 execution provider implementation
 type V8 struct {
