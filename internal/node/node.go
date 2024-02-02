@@ -237,7 +237,7 @@ func (n *Node) validateConfig() error {
 		}
 	}
 
-	return CheckPrerequisites(n.config, true) // FIXME?
+	return CheckPrerequisites(n.config, true)
 }
 
 func (n *Node) installSignalHandlers() {
