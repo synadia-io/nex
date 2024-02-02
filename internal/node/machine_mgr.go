@@ -26,6 +26,9 @@ const (
 	WorkloadCacheBucketName = "NEXCACHE"
 
 	defaultHandshakeTimeoutMillis = 5000
+
+	nexTriggerSubject = "x-nex-trigger-subject"
+	nexRuntimeNs      = "x-nex-runtime-ns"
 )
 
 // The machine manager is responsible for the pool of warm firecracker VMs. This includes starting new
@@ -147,7 +150,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
 				intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
 				intmsg.Data = msg.Data
-				intmsg.Header.Add("x-nex-trigger-subject", msg.Subject)
+				intmsg.Header.Add(nexTriggerSubject, msg.Subject)
 
 				resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
 				if err != nil {
@@ -157,29 +160,37 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 						slog.String("workload_type", *request.WorkloadType),
 						slog.String("vmid", vm.vmmID),
 					)
-					m.t.functionFailedTriggers.Add(m.ctx, 1)
-					m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+
+					if m.t != nil {
+						m.t.functionFailedTriggers.Add(m.ctx, 1)
+						m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+						m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+					}
 				} else if resp != nil {
-					runTime := resp.Header.Get("x-nex-run-nano-sec")
+					runtimeNs := resp.Header.Get(nexRuntimeNs)
 					m.log.Debug("Received response from execution via trigger subject",
 						slog.String("vmid", vm.vmmID),
 						slog.String("trigger_subject", tsub),
 						slog.String("workload_type", *request.WorkloadType),
-						slog.String("function_run_time_nanosec", runTime),
+						slog.String("function_run_time_nanosec", runtimeNs),
 						slog.Int("payload_size", len(resp.Data)),
 					)
-					runTime_int64, err := strconv.ParseInt(runTime, 10, 64)
+
+					m.log.Info("resp via trigger", slog.String("nanos", runtimeNs))
+
+					runTimeNs64, err := strconv.ParseInt(runtimeNs, 10, 64)
 					if err != nil {
 						m.log.Warn("failed to log function runtime", slog.Any("err", err))
 					}
 
-					m.t.functionTriggers.Add(m.ctx, 1)
-					m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-					m.t.functionRunTimeNano.Add(m.ctx, runTime_int64)
-					m.t.functionRunTimeNano.Add(m.ctx, runTime_int64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					m.t.functionRunTimeNano.Add(m.ctx, runTime_int64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+					if m.t != nil {
+						m.t.functionTriggers.Add(m.ctx, 1)
+						m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+						m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+						m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64)
+						m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+						m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+					}
 
 					if len(resp.Data) > 0 {
 						err = msg.Respond(resp.Data)
@@ -217,14 +228,16 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 	vm.namespace = *request.Namespace
 	vm.deployRequest = request
 
-	m.t.workloadCounter.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
-	m.t.workloadCounter.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)), metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
-	m.t.deployedByteCounter.Add(m.ctx, request.TotalBytes)
-	m.t.deployedByteCounter.Add(m.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount)
-	m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib)
-	m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	if m.t != nil {
+		m.t.workloadCounter.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
+		m.t.workloadCounter.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)), metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
+		m.t.deployedByteCounter.Add(m.ctx, request.TotalBytes)
+		m.t.deployedByteCounter.Add(m.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount)
+		m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib)
+		m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	}
 
 	return nil
 }
@@ -248,23 +261,25 @@ func (m *MachineManager) Stop() error {
 		for vm := range m.warmVms {
 			vm.shutdown(m.log)
 
-			if vm.deployRequest != nil {
-				m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
-				m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-				m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1)
-				m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-			}
+			if m.t != nil {
+				if vm.deployRequest != nil {
+					m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
+					m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+					m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1)
+					m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+				}
 
-			m.t.vmCounter.Add(m.ctx, -1)
-			m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
-			m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-			m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
-			m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+				m.t.vmCounter.Add(m.ctx, -1)
+				m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+				m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+				m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+				m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			}
 		}
+
 		time.Sleep(100 * time.Millisecond)
 
 		_ = m.nc.Drain()
-
 		m.cleanSockets()
 	}
 
@@ -290,17 +305,19 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	vm.shutdown(m.log)
 	delete(m.allVms, vmId)
 
-	if vm.deployRequest != nil {
-		m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-		m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1)
-		m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	}
+	if m.t != nil {
+		if vm.deployRequest != nil {
+			m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1)
+			m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		}
 
-	m.t.vmCounter.Add(m.ctx, -1)
-	m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
-	m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
-	m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		m.t.vmCounter.Add(m.ctx, -1)
+		m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+		m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+		m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	}
 
 	return nil
 }
@@ -350,7 +367,9 @@ func (m *MachineManager) fillPool() {
 			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
 			m.allVms[vm.vmmID] = vm
 
-			m.t.vmCounter.Add(m.ctx, 1)
+			if m.t != nil {
+				m.t.vmCounter.Add(m.ctx, 1)
+			}
 		}
 	}
 }
