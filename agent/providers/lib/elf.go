@@ -32,15 +32,6 @@ type ELF struct {
 	stdout io.Writer
 }
 
-func (e *ELF) UnDeploy() error {
-	err := e.cmd.Process.Signal(os.Kill)
-	if err != nil {
-		e.fail <- true
-		return err
-	}
-	return nil
-}
-
 // Deploy the ELF binary
 func (e *ELF) Deploy() error {
 	cmd := exec.Command(e.tmpFilename, e.argv...)
@@ -90,6 +81,17 @@ func (e *ELF) Deploy() error {
 
 func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
 	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
+}
+
+// Undeploy the ELF binary
+func (e *ELF) Undeploy() error {
+	err := e.cmd.Process.Signal(os.Kill)
+	if err != nil {
+		e.fail <- true
+		return err
+	}
+
+	return nil
 }
 
 // Validate the underlying artifact to be a 64-bit linux native ELF

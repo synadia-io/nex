@@ -36,12 +36,12 @@ func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
 }
 
 // FIXME-- revisit error handling
-func (a *Agent) PublishWorkloadStarted(vmID, workloadName string, totalBytes int64) {
+func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes int64) {
 	select {
 	case a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,
 		Level:  agentapi.LogLevelInfo,
-		Text:   fmt.Sprintf("Workload %s started", workloadName),
+		Text:   fmt.Sprintf("Workload %s deployed", workloadName),
 	}: // noop
 	default:
 		// noop
@@ -64,9 +64,9 @@ func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bo
 	}
 
 	// FIXME-- this hack is here to get things working... refactor me
-	txt := fmt.Sprintf("Workload %s stopped", workloadName)
+	txt := fmt.Sprintf("Workload %s exited", workloadName)
 	if code == -1 {
-		txt = fmt.Sprintf("Workload %s failed to start", workloadName)
+		txt = fmt.Sprintf("Workload %s failed to deploy", workloadName)
 	}
 
 	select {

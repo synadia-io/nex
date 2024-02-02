@@ -131,19 +131,9 @@ func (a *Agent) RequestHandshake() error {
 	return nil
 }
 
-func (a *Agent) handleUndeploy(m *nats.Msg) {
-	err := a.provider.UnDeploy()
-	if err != nil {
-		// don't return an error here so worst-case scenario is an ungraceful shutdown,
-		// not a failure
-		a.LogError(fmt.Sprintf("Failed to undeploy workload: %s", err))
-	}
-	_ = m.Respond([]byte{})
-}
-
-// Pull a RunRequest off the wire, get the payload from the shared
-// bucket, write it to temp, initialize the execution provider per
-// the request, and then validate and deploy a workload
+// Pull a deploy request off the wire, get the payload from the shared
+// bucket, write it to tmp, initialize the execution provider per the
+// request, and then validate and deploy a workload
 func (a *Agent) handleDeploy(m *nats.Msg) {
 	var request agentapi.DeployRequest
 	err := json.Unmarshal(m.Data, &request)
@@ -188,12 +178,23 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	_ = a.workAck(m, true, "Workload accepted")
+	_ = a.workAck(m, true, "Workload deployed")
 
 	err = a.provider.Deploy()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to deploy workload: %s", err))
 	}
+}
+
+func (a *Agent) handleUndeploy(m *nats.Msg) {
+	err := a.provider.Undeploy()
+	if err != nil {
+		// don't return an error here so worst-case scenario is an ungraceful shutdown,
+		// not a failure
+		a.LogError(fmt.Sprintf("Failed to undeploy workload: %s", err))
+	}
+
+	_ = m.Respond([]byte{})
 }
 
 // cacheExecutableArtifact uses the underlying agent configuration to fetch
@@ -257,7 +258,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 				return
 
 			case <-params.Run:
-				a.PublishWorkloadStarted(params.VmID, *params.WorkloadName, params.TotalBytes)
+				a.PublishWorkloadDeployed(params.VmID, *params.WorkloadName, params.TotalBytes)
 				sleepMillis = workloadExecutionSleepTimeoutMillis
 
 			case exit := <-params.Exit:

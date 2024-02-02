@@ -14,12 +14,12 @@ func (o *OCI) Deploy() error {
 	return errors.New("oci execution provider not yet implemented")
 }
 
-func (o *OCI) UnDeploy() error {
-	return errors.New("oci execution provider not yet implemented")
-}
-
 func (o *OCI) Execute(subject string, payload []byte) ([]byte, error) {
 	return nil, errors.New("oci execution provider does not support execution via trigger subjects")
+}
+
+func (o *OCI) Undeploy() error {
+	return errors.New("oci execution provider not yet implemented")
 }
 
 func (o *OCI) Validate() error {

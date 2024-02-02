@@ -55,7 +55,7 @@ type ExecutionProviderParams struct {
 	NATSConn *nats.Conn `json:"-"`
 }
 
-// FIXME? DeployRequest -> DeployRequest?
+// DeployRequest processed by the agent
 type DeployRequest struct {
 	Argv            []string          `json:"argv,omitempty"`
 	DecodedClaims   jwt.GenericClaims `json:"-"`
@@ -89,15 +89,13 @@ func (r *DeployRequest) Validate() bool {
 		r.Errors = append(r.Errors, errors.New("workload name is required"))
 	}
 
-	// FIXME-- this should be provided in the request
-	// if r.Hash == nil {
-	// 	r.Errors = append(r.Errors, errors.New("hash is required"))
-	// }
+	if r.Hash == "" { // FIXME--- this should probably be checked against *string
+		r.Errors = append(r.Errors, errors.New("hash is required"))
+	}
 
-	// FIXME-- this should be provided in the request
-	// if r.TotalBytes == nil {
-	// 	r.Errors = append(r.Errors, errors.New("total bytes is required"))
-	// }
+	if r.TotalBytes == 0 { // FIXME--- this should probably be checked against *string
+		r.Errors = append(r.Errors, errors.New("total bytes is required"))
+	}
 
 	if r.WorkloadType == nil {
 		r.Errors = append(r.Errors, errors.New("workload type is required"))
