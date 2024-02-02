@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 )
 
-type RunRequest struct {
+type DeployRequest struct {
+	Argv         []string `json:"argv,omitempty"`
 	Description  *string  `json:"description,omitempty"`
 	WorkloadType *string  `json:"type"`
 	Location     *url.URL `json:"location"`
@@ -39,9 +39,9 @@ var (
 	validWorkloadName = regexp.MustCompile(`^[a-z]+$`)
 )
 
-// Creates a new run request based on the supplied options. Note that there is a fluent API function
+// Creates a new deploy request based on the supplied options. Note that there is a fluent API function
 // for each available option
-func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
+func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 	reqOpts := requestOptions{}
 	for _, o := range opts {
 		reqOpts = o(reqOpts)
@@ -61,7 +61,8 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 
 	senderPublic, _ := reqOpts.senderXkey.PublicKey()
 
-	req := &RunRequest{
+	req := &DeployRequest{
+		Argv:            reqOpts.argv,
 		Description:     &reqOpts.workloadDescription,
 		WorkloadType:    &reqOpts.workloadType,
 		Location:        &reqOpts.location,
@@ -76,16 +77,9 @@ func NewRunRequest(opts ...RequestOption) (*RunRequest, error) {
 	return req, nil
 }
 
-// Returns true if the run request supports trigger subjects
-func (request *RunRequest) SupportsTriggerSubjects() bool {
-	return (strings.EqualFold(*request.WorkloadType, "v8") ||
-		strings.EqualFold(*request.WorkloadType, "wasm")) &&
-		len(request.TriggerSubjects) > 0
-}
-
 // This will validate a request's workload JWT, decrypt the request environment. It will not
 // perform a comparison of the hash found in the claims with a recipient's expected hash
-func (request *RunRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims, error) {
+func (request *DeployRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims, error) {
 	claims, err := jwt.DecodeGeneric(*request.WorkloadJwt)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode workload JWT: %s", err)
@@ -125,7 +119,7 @@ func EncryptRequestEnvironment(senderXKey nkeys.KeyPair, recipientPublicKey stri
 	return hexenv, nil
 }
 
-func (request *RunRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair) error {
+func (request *DeployRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair) error {
 	data, err := base64.StdEncoding.DecodeString(*request.Environment)
 	if err != nil {
 		return err
@@ -148,6 +142,7 @@ func (request *RunRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyPair
 }
 
 type requestOptions struct {
+	argv                []string
 	workloadName        string
 	workloadType        string
 	workloadDescription string
@@ -163,6 +158,14 @@ type requestOptions struct {
 }
 
 type RequestOption func(o requestOptions) requestOptions
+
+// Arguments to be passed to the workload, if applicable
+func Argv(argv []string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.argv = argv
+		return o
+	}
+}
 
 // Name of the workload. Conforms to the same name rules as the services API
 func WorkloadName(name string) RequestOption {

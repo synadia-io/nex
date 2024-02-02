@@ -61,28 +61,28 @@ func (api *ApiListener) PublicKey() string {
 }
 
 func (api *ApiListener) Start() error {
-	_, err := api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING", handlePing(api))
+	_, err := api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
 	if err != nil {
 		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.nodeId))
 	}
 
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, handlePing(api))
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, api.handlePing)
 	if err != nil {
 		api.log.Error("Failed to subscribe to node-specific ping subject", slog.Any("err", err), slog.String("id", api.nodeId))
 	}
 
 	// Namespaced subscriptions, the * below is for the namespace
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, handleInfo(api))
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, api.handleInfo)
 	if err != nil {
 		api.log.Error("Failed to subscribe to info subject", slog.Any("err", err), slog.String("id", api.nodeId))
 	}
 
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".RUN.*."+api.nodeId, handleRun(api))
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".DEPLOY.*."+api.nodeId, api.handleDeploy)
 	if err != nil {
 		api.log.Error("Failed to subscribe to run subject", slog.Any("err", err), slog.String("id", api.nodeId))
 	}
 
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, handleStop(api))
+	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, api.handleStop)
 	if err != nil {
 		api.log.Error("Failed to subscribe to stop subject", slog.Any("err", err), slog.String("id", api.nodeId))
 	}
@@ -91,221 +91,213 @@ func (api *ApiListener) Start() error {
 	return nil
 }
 
-func handleStop(api *ApiListener) func(m *nats.Msg) {
-	return func(m *nats.Msg) {
-		namespace, err := extractNamespace(m.Subject)
-		if err != nil {
-			api.log.Error("Invalid subject for workload stop", slog.Any("err", err))
-			respondFail(controlapi.StopResponseType, m, "Invalid subject for workload stop")
-			return
-		}
+func (api *ApiListener) handleStop(m *nats.Msg) {
+	namespace, err := extractNamespace(m.Subject)
+	if err != nil {
+		api.log.Error("Invalid subject for workload stop", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, "Invalid subject for workload stop")
+		return
+	}
 
-		var request controlapi.StopRequest
-		err = json.Unmarshal(m.Data, &request)
-		if err != nil {
-			api.log.Error("Failed to deserialize stop request", slog.Any("err", err))
-			respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Unable to deserialize stop request: %s", err))
-			return
-		}
+	var request controlapi.StopRequest
+	err = json.Unmarshal(m.Data, &request)
+	if err != nil {
+		api.log.Error("Failed to deserialize stop request", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Unable to deserialize stop request: %s", err))
+		return
+	}
 
-		vm := api.mgr.LookupMachine(request.WorkloadId)
-		if vm == nil {
-			api.log.Error("Stop request: no such workload", slog.String("vmid", request.WorkloadId))
-			respondFail(controlapi.StopResponseType, m, "No such workload")
-			return
-		}
+	vm := api.mgr.LookupMachine(request.WorkloadId)
+	if vm == nil {
+		api.log.Error("Stop request: no such workload", slog.String("vmid", request.WorkloadId))
+		respondFail(controlapi.StopResponseType, m, "No such workload")
+		return
+	}
 
-		if vm.namespace != namespace {
-			api.log.Error("Namespace mismatch on workload stop request",
-				slog.String("namespace", vm.namespace),
-				slog.String("targetnamespace", namespace),
-			)
+	if vm.namespace != namespace {
+		api.log.Error("Namespace mismatch on workload stop request",
+			slog.String("namespace", vm.namespace),
+			slog.String("targetnamespace", namespace),
+		)
 
-			respondFail(controlapi.StopResponseType, m, "No such workload") // do not expose ID existence to avoid existence probes
-			return
-		}
+		respondFail(controlapi.StopResponseType, m, "No such workload") // do not expose ID existence to avoid existence probes
+		return
+	}
 
-		err = request.Validate(&vm.workloadSpecification.DecodedClaims)
-		if err != nil {
-			api.log.Error("Failed to validate stop request", slog.Any("err", err))
-			respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
-			return
-		}
+	err = request.Validate(&vm.deployRequest.DecodedClaims)
+	if err != nil {
+		api.log.Error("Failed to validate stop request", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
+		return
+	}
 
-		err = api.mgr.StopMachine(request.WorkloadId)
-		if err != nil {
-			api.log.Error("Failed to stop workload", slog.Any("err", err))
-			respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
-		}
+	err = api.mgr.StopMachine(request.WorkloadId)
+	if err != nil {
+		api.log.Error("Failed to stop workload", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
+	}
 
-		res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
-			Stopped:   true,
-			Name:      vm.workloadSpecification.DecodedClaims.Subject,
-			Issuer:    vm.workloadSpecification.DecodedClaims.Issuer,
-			MachineId: vm.vmmID,
-		}, nil)
-		raw, err := json.Marshal(res)
-		if err != nil {
-			api.log.Error("Failed to marshal run response", slog.Any("err", err))
-		} else {
-			_ = m.Respond(raw)
-		}
+	res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
+		Stopped:   true,
+		Name:      vm.deployRequest.DecodedClaims.Subject,
+		Issuer:    vm.deployRequest.DecodedClaims.Issuer,
+		MachineId: vm.vmmID,
+	}, nil)
+	raw, err := json.Marshal(res)
+	if err != nil {
+		api.log.Error("Failed to marshal run response", slog.Any("err", err))
+	} else {
+		_ = m.Respond(raw)
 	}
 }
 
-func handleRun(api *ApiListener) func(m *nats.Msg) {
-	return func(m *nats.Msg) {
-		namespace, err := extractNamespace(m.Subject)
-		if err != nil {
-			api.log.Error("Invalid subject for workload run", slog.Any("err", err))
-			respondFail(controlapi.RunResponseType, m, "Invalid subject for workload run")
-			return
-		}
+func (api *ApiListener) handleDeploy(m *nats.Msg) {
+	namespace, err := extractNamespace(m.Subject)
+	if err != nil {
+		api.log.Error("Invalid subject for workload deployment", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, "Invalid subject for workload deployment")
+		return
+	}
 
-		var request controlapi.RunRequest
-		err = json.Unmarshal(m.Data, &request)
-		if err != nil {
-			api.log.Error("Failed to deserialize run request", slog.Any("err", err))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deserialize run request: %s", err))
-			return
-		}
+	var request controlapi.DeployRequest
+	err = json.Unmarshal(m.Data, &request)
+	if err != nil {
+		api.log.Error("Failed to deserialize deploy request", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deserialize deploy request: %s", err))
+		return
+	}
 
-		if !slices.Contains(api.config.WorkloadTypes, *request.WorkloadType) {
-			api.log.Error("This node does not support the given workload type", slog.String("workload_type", *request.WorkloadType))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", *request.WorkloadType))
-			return
-		}
+	if !slices.Contains(api.config.WorkloadTypes, *request.WorkloadType) {
+		api.log.Error("This node does not support the given workload type", slog.String("workload_type", *request.WorkloadType))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", *request.WorkloadType))
+		return
+	}
 
-		if len(request.TriggerSubjects) > 0 && (!strings.EqualFold(*request.WorkloadType, "v8") &&
-			!strings.EqualFold(*request.WorkloadType, "wasm")) { // FIXME -- workload type comparison
-			api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", *request.WorkloadType))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", *request.WorkloadType))
-			return
-		}
+	if len(request.TriggerSubjects) > 0 && (!strings.EqualFold(*request.WorkloadType, "v8") &&
+		!strings.EqualFold(*request.WorkloadType, "wasm")) { // FIXME -- workload type comparison
+		api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", *request.WorkloadType))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", *request.WorkloadType))
+		return
+	}
 
-		decodedClaims, err := request.Validate(api.xk)
-		if err != nil {
-			api.log.Error("Invalid run request", slog.Any("err", err))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid run request: %s", err))
-			return
-		}
+	decodedClaims, err := request.Validate(api.xk)
+	if err != nil {
+		api.log.Error("Invalid deploy request", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid deploy request: %s", err))
+		return
+	}
 
-		request.DecodedClaims = *decodedClaims
-		if !validateIssuer(request.DecodedClaims.Issuer, api.mgr.config.ValidIssuers) {
-			err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
-			api.log.Error("Workload validation failed", slog.Any("err", err))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
-		}
+	request.DecodedClaims = *decodedClaims
+	if !validateIssuer(request.DecodedClaims.Issuer, api.mgr.config.ValidIssuers) {
+		err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
+		api.log.Error("Workload validation failed", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
+	}
 
-		numBytes, workloadHash, err := api.mgr.CacheWorkload(&request)
-		if err != nil {
-			api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))
-			return
-		}
+	numBytes, workloadHash, err := api.mgr.CacheWorkload(&request)
+	if err != nil {
+		api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))
+		return
+	}
 
-		runningVm, err := api.mgr.TakeFromPool()
-		if err != nil {
-			api.log.Error("Failed to get warm VM from pool", slog.Any("err", err))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to pull warm VM from ready pool: %s", err))
-			return
-		}
+	runningVM, err := api.mgr.TakeFromPool()
+	if err != nil {
+		api.log.Error("Failed to get warm VM from pool", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to pull warm VM from ready pool: %s", err))
+		return
+	}
 
-		workloadName := request.DecodedClaims.Subject
+	workloadName := request.DecodedClaims.Subject
 
-		api.log.
-			Info("Submitting workload to VM",
-				slog.String("vmid", runningVm.vmmID),
-				slog.String("namespace", namespace),
-				slog.String("workload", workloadName),
-				slog.Uint64("workload_size", numBytes),
-				slog.String("workload_sha256", *workloadHash),
-				slog.String("type", *request.WorkloadType),
-			)
+	api.log.
+		Info("Submitting workload to VM",
+			slog.String("vmid", runningVM.vmmID),
+			slog.String("namespace", namespace),
+			slog.String("workload", workloadName),
+			slog.Uint64("workload_size", numBytes),
+			slog.String("workload_sha256", *workloadHash),
+			slog.String("type", *request.WorkloadType),
+		)
 
-		req := agentapi.DeployRequest{
-			WorkloadName:    &workloadName,
-			Hash:            *workloadHash,
-			TotalBytes:      int64(numBytes),
-			TriggerSubjects: request.TriggerSubjects,
-			WorkloadType:    request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
-			Environment:     request.WorkloadEnvironment,
-			Namespace:       &namespace,
-		}
+	err = api.mgr.DeployWorkload(runningVM, &agentapi.DeployRequest{
+		DecodedClaims:   request.DecodedClaims,
+		Description:     request.Description,
+		Environment:     request.WorkloadEnvironment,
+		Hash:            *workloadHash,
+		Namespace:       &namespace,
+		TotalBytes:      int64(numBytes),
+		TriggerSubjects: request.TriggerSubjects,
+		WorkloadName:    &workloadName,
+		WorkloadType:    request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
+	})
 
-		err = api.mgr.DeployWorkload(runningVm, request, req)
+	if err != nil {
+		api.log.Error("Failed to deploy workload in VM", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deploy workload: %s", err))
+		return
+	}
+	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("vmid", runningVM.vmmID))
 
-		if err != nil {
-			api.log.Error("Failed to start workload in VM", slog.Any("err", err))
-			respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to start workload: %s", err))
-			return
-		}
-		api.log.Info("Work accepted", slog.String("workload", workloadName), slog.String("vmid", runningVm.vmmID))
+	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
+		Started:   true,
+		Name:      workloadName,
+		Issuer:    runningVM.deployRequest.DecodedClaims.Issuer,
+		MachineId: runningVM.vmmID,
+	}, nil)
 
-		res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
-			Started:   true,
-			Name:      workloadName,
-			Issuer:    runningVm.workloadSpecification.DecodedClaims.Issuer,
-			MachineId: runningVm.vmmID,
-		}, nil)
-
-		raw, err := json.Marshal(res)
-		if err != nil {
-			api.log.Error("Failed to marshal run response", slog.Any("err", err))
-		} else {
-			_ = m.Respond(raw)
-		}
+	raw, err := json.Marshal(res)
+	if err != nil {
+		api.log.Error("Failed to marshal deploy response", slog.Any("err", err))
+	} else {
+		_ = m.Respond(raw)
 	}
 }
 
-func handlePing(api *ApiListener) func(m *nats.Msg) {
-	return func(m *nats.Msg) {
-		now := time.Now().UTC()
-		res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
-			NodeId:          api.nodeId,
-			Version:         Version(),
-			Uptime:          myUptime(now.Sub(api.start)),
-			RunningMachines: len(api.mgr.allVms),
-			Tags:            api.config.Tags,
-		}, nil)
+func (api *ApiListener) handlePing(m *nats.Msg) {
+	now := time.Now().UTC()
+	res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
+		NodeId:          api.nodeId,
+		Version:         Version(),
+		Uptime:          myUptime(now.Sub(api.start)),
+		RunningMachines: len(api.mgr.allVms),
+		Tags:            api.config.Tags,
+	}, nil)
 
-		raw, err := json.Marshal(res)
-		if err != nil {
-			api.log.Error("Failed to marshal ping response", slog.Any("err", err))
-		} else {
-			_ = m.Respond(raw)
-		}
+	raw, err := json.Marshal(res)
+	if err != nil {
+		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
+	} else {
+		_ = m.Respond(raw)
 	}
 }
 
-func handleInfo(api *ApiListener) func(m *nats.Msg) {
-	return func(m *nats.Msg) {
-		namespace, err := extractNamespace(m.Subject)
-		if err != nil {
-			api.log.Error("Failed to extract namespace for info request", slog.Any("err", err))
-			respondFail(controlapi.InfoResponseType, m, "Failed to extract namespace for info request")
-			return
-		}
+func (api *ApiListener) handleInfo(m *nats.Msg) {
+	namespace, err := extractNamespace(m.Subject)
+	if err != nil {
+		api.log.Error("Failed to extract namespace for info request", slog.Any("err", err))
+		respondFail(controlapi.InfoResponseType, m, "Failed to extract namespace for info request")
+		return
+	}
 
-		pubX, _ := api.xk.PublicKey()
-		now := time.Now().UTC()
-		stats, _ := ReadMemoryStats()
-		res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
-			Version:                VERSION,
-			PublicXKey:             pubX,
-			Uptime:                 myUptime(now.Sub(api.start)),
-			Tags:                   api.config.Tags,
-			SupportedWorkloadTypes: api.config.WorkloadTypes,
-			Machines:               summarizeMachines(&api.mgr.allVms, namespace),
-			Memory:                 stats,
-		}, nil)
+	pubX, _ := api.xk.PublicKey()
+	now := time.Now().UTC()
+	stats, _ := ReadMemoryStats()
+	res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
+		Version:                VERSION,
+		PublicXKey:             pubX,
+		Uptime:                 myUptime(now.Sub(api.start)),
+		Tags:                   api.config.Tags,
+		SupportedWorkloadTypes: api.config.WorkloadTypes,
+		Machines:               summarizeMachines(&api.mgr.allVms, namespace),
+		Memory:                 stats,
+	}, nil)
 
-		raw, err := json.Marshal(res)
-		if err != nil {
-			api.log.Error("Failed to marshal ping response", slog.Any("err", err))
-		} else {
-			_ = m.Respond(raw)
-		}
+	raw, err := json.Marshal(res)
+	if err != nil {
+		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
+	} else {
+		_ = m.Respond(raw)
 	}
 }
 
@@ -315,13 +307,13 @@ func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []
 	for _, v := range *vms {
 		if v.namespace == namespace {
 			var desc string
-			if v.workloadSpecification.Description != nil {
-				desc = *v.workloadSpecification.Description // FIXME-- audit controlapi.WorkloadSummary
+			if v.deployRequest.Description != nil {
+				desc = *v.deployRequest.Description // FIXME-- audit controlapi.WorkloadSummary
 			}
 
 			var workloadType string
-			if v.workloadSpecification.WorkloadType != nil {
-				workloadType = *v.workloadSpecification.WorkloadType
+			if v.deployRequest.WorkloadType != nil {
+				workloadType = *v.deployRequest.WorkloadType
 			}
 
 			machine := controlapi.MachineSummary{
@@ -329,11 +321,11 @@ func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []
 				Healthy: true, // TODO cache last health status
 				Uptime:  myUptime(now.Sub(v.machineStarted)),
 				Workload: controlapi.WorkloadSummary{
-					Name:         v.workloadSpecification.DecodedClaims.Subject,
+					Name:         v.deployRequest.DecodedClaims.Subject,
 					Description:  desc,
 					Runtime:      myUptime(now.Sub(v.workloadStarted)),
 					WorkloadType: workloadType,
-					//Hash:         v.workloadSpecification.DecodedClaims.Data["hash"].(string),
+					//Hash:         v.deployedWorkload.DecodedClaims.Data["hash"].(string),
 				},
 			}
 

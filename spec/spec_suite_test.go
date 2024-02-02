@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -10,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/client"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -35,6 +39,7 @@ func TestSpec(t *testing.T) {
 	}
 
 	defer cleanupFixtures()
+	defer stopDaggerEngine()
 
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Spec Suite")
@@ -93,4 +98,27 @@ func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
 	}
 
 	return ns, nc, &port, nil
+}
+
+func stopDaggerEngine() {
+	cli, err := client.NewClientWithOpts(client.FromEnv)
+	if err != nil {
+		return
+	}
+
+	ctx := context.Background()
+
+	containers, _ := cli.ContainerList(ctx, container.ListOptions{
+		All: true,
+		Filters: filters.NewArgs([]filters.KeyValuePair{
+			{
+				Key:   "name",
+				Value: "dagger-engine",
+			},
+		}...),
+	})
+
+	for _, c := range containers {
+		_ = cli.ContainerStop(ctx, c.ID, container.StopOptions{})
+	}
 }

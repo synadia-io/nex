@@ -28,7 +28,7 @@ func NewPayloadCache(nc *nats.Conn, log *slog.Logger, dir string) *payloadCache 
 	}
 }
 
-func (m *MachineManager) CacheWorkload(request *controlapi.RunRequest) (uint64, *string, error) {
+func (m *MachineManager) CacheWorkload(request *controlapi.DeployRequest) (uint64, *string, error) {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.nc.Opts.Url))

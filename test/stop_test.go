@@ -17,7 +17,7 @@ func TestStopValidation(t *testing.T) {
 
 	issuerAccount, _ := nkeys.CreateAccount()
 
-	request, _ := NewRunRequest(
+	request, _ := NewDeployRequest(
 		WorkloadName("testworkload"),
 		WorkloadType("elf"),
 		WorkloadDescription("testy mctesto"),

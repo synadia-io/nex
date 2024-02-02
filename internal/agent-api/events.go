@@ -10,8 +10,10 @@ import (
 const (
 	AgentStartedEventType    = "agent_started"
 	AgentStoppedEventType    = "agent_stopped"
-	WorkloadStartedEventType = "workload_started"
-	WorkloadStoppedEventType = "workload_stopped"
+	WorkloadStartedEventType = "workload_started" // FIXME-- should this be WorkloadDeployed?
+	WorkloadStoppedEventType = "workload_stopped" // FIXME-- should this be in addition to WorkloadUndeployed (likely yes, in case of something bad happening...)
+	// FIXME-- where is WorkloadDeployedEventType? (likely just need to rename WorkloadStartedEventType -> WorkloadDeployedEventType)
+	// FIXME-- where is WorkloadStoppedEventType?
 )
 
 type AgentStartedEvent struct {

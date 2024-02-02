@@ -12,7 +12,12 @@ import (
 	v8 "rogchap.com/v8go"
 )
 
-const v8MaxFileSizeBytes = int64(12288) // arbitrarily ~12K, for now
+const (
+	nexTriggerSubject = "x-nex-trigger-subject"
+	nexRuntimeNs      = "x-nex-runtime-ns"
+
+	v8MaxFileSizeBytes = int64(12288) // arbitrarily ~12K, for now
+)
 
 // V8 execution provider implementation
 type V8 struct {
@@ -35,11 +40,6 @@ type V8 struct {
 	ubs *v8.UnboundScript
 }
 
-func (v *V8) UnDeploy() error {
-	// We shouldn't have to do anything here since the script "owns" no resources
-	return nil
-}
-
 // Deploy expects a `Validate` to have succeeded and `ubs` to be non-nil
 func (v *V8) Deploy() error {
 	if v.ubs == nil {
@@ -49,27 +49,22 @@ func (v *V8) Deploy() error {
 	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
 	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
 		startTime := time.Now()
-		val, err := v.Execute(msg.Header.Get("x-nex-trigger-subject"), msg.Data)
+		val, err := v.Execute(msg.Header.Get(nexTriggerSubject), msg.Data)
 		if err != nil {
 			// TODO-- propagate this error to agent logs
 			return
 		}
-		runLength := time.Since(startTime).Nanoseconds()
-		runLength_s := strconv.FormatInt(runLength, 10)
 
-		if len(val) > 0 {
-			err := msg.RespondMsg(&nats.Msg{
-				Data: val,
-				Header: nats.Header{
-					"x-nex-run-nano-sec": []string{
-						runLength_s,
-					},
-				},
-			})
-			if err != nil {
-				// TODO-- propagate this error to agent logs
-				return
-			}
+		runtimeNanos := time.Since(startTime).Nanoseconds()
+		err = msg.RespondMsg(&nats.Msg{
+			Data: val,
+			Header: nats.Header{
+				nexRuntimeNs: []string{strconv.FormatInt(runtimeNanos, 10)},
+			},
+		})
+		if err != nil {
+			// TODO-- propagate this error to agent logs
+			return
 		}
 	})
 	if err != nil {
@@ -87,13 +82,6 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 	if v.ubs == nil {
 		return nil, fmt.Errorf("invalid state for execution; no compiled code available for vm: %s", v.name)
 	}
-
-	// TODO-- implement the following
-	// cmd.Env = make([]string, len(e.environment))
-	// for k, v := range e.environment {
-	// 	item := fmt.Sprintf("%s=%s", strings.ToUpper(k), v)
-	// 	cmd.Env = append(cmd.Env, item)
-	// }
 
 	var err error
 
@@ -151,6 +139,11 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 	}
 
 	return nil, nil
+}
+
+func (v *V8) Undeploy() error {
+	// We shouldn't have to do anything here since the script "owns" no resources
+	return nil
 }
 
 // Validate has the side effect of compiling the executable javascript source

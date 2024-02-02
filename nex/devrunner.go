@@ -43,7 +43,7 @@ func init() {
 	}
 }
 
-// Attempts to "run a file" by finding a suitable target and publishing the workload to an ad-hoc created bucket
+// Attempts to "deploy a file" by finding a suitable target and publishing the workload to an ad-hoc created bucket
 // and using default issuer and publisher keys stored in ~/.nex. This should be as easy as typing "nex devrun ./amazingapp env1=foo env2=bar"
 func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	nc, err := models.GenerateConnectionFromOpts(Opts)
@@ -102,7 +102,8 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		}
 	}
 
-	request, err := controlapi.NewRunRequest(
+	request, err := controlapi.NewDeployRequest(
+		controlapi.Argv(strings.Split(RunOpts.Argv, " ")),
 		controlapi.Location(workloadUrl),
 		controlapi.Environment(RunOpts.Env),
 		controlapi.Issuer(issuerKp),

@@ -16,7 +16,7 @@ func TestEncryption(t *testing.T) {
 
 	issuerAccount, _ := nkeys.CreateAccount()
 
-	request, _ := NewRunRequest(
+	request, _ := NewDeployRequest(
 		WorkloadName("testworkload"),
 		WorkloadDescription("testy mctesto"),
 		Checksum("hashbrowns"),
