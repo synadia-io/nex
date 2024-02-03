@@ -14,9 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go"
+	"github.com/google/uuid"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"github.com/synadia-io/nex/internal/models"
 )
 
@@ -51,6 +54,7 @@ type Node struct {
 	natsint *server.Server
 	ncint   *nats.Conn
 
+	startedAt time.Time
 	telemetry *Telemetry
 }
 
@@ -89,13 +93,14 @@ func (n *Node) PublicKey() (*string, error) {
 
 func (n *Node) Start() {
 	n.log.Debug("starting node", slog.String("public_key", n.publicKey))
+	n.startedAt = time.Now()
 
 	err := n.init()
 	if err != nil {
 		panic(err) // FIXME-- this panics here because this is written like a proper main() entrypoint (it should never actually panic in practice)
 	}
 
-	// startAt := time.Now()
+	_ = n.publishNodeStarted()
 
 	timer := time.NewTicker(runloopTickInterval)
 	defer timer.Stop()
@@ -178,11 +183,7 @@ func (n *Node) init() error {
 			err = fmt.Errorf("failed to initialize machine manager: %s", err)
 		}
 
-		err = n.manager.Start()
-		if err != nil {
-			n.log.Error("Failed to start machine manager", slog.Any("err", err))
-			err = fmt.Errorf("failed to start machine manager: %s", err)
-		}
+		go n.manager.Start()
 
 		// init API listener
 		n.api = NewApiListener(n.log, n.manager, n.config)
@@ -269,6 +270,42 @@ func (n *Node) loadNodeConfig() error {
 	return nil
 }
 
+func (n *Node) publishNodeStarted() error {
+	nodeStart := controlapi.NodeStartedEvent{
+		Version: VERSION,
+		Id:      n.publicKey,
+	}
+
+	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetSource(n.publicKey)
+	cloudevent.SetID(uuid.NewString())
+	cloudevent.SetTime(n.startedAt)
+	cloudevent.SetType(controlapi.NodeStartedEventType)
+	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
+	_ = cloudevent.SetData(nodeStart)
+
+	n.log.Info("Publishing node started event")
+	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
+}
+
+func (n *Node) publishNodeStopped() error {
+	evt := controlapi.NodeStoppedEvent{
+		Id:       n.publicKey,
+		Graceful: true,
+	}
+
+	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetSource(n.publicKey)
+	cloudevent.SetID(uuid.NewString())
+	cloudevent.SetTime(time.Now().UTC())
+	cloudevent.SetType(controlapi.NodeStoppedEventType)
+	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
+	_ = cloudevent.SetData(evt)
+
+	n.log.Info("Publishing node stopped event")
+	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
+}
+
 func (n *Node) validateConfig() error {
 	if n.config == nil {
 		err := n.loadNodeConfig()
@@ -292,6 +329,8 @@ func (n *Node) shutdown() {
 	if atomic.AddUint32(&n.closing, 1) == 1 {
 		n.log.Debug("shutting down")
 		_ = n.manager.Stop()
+		_ = n.publishNodeStopped()
+		// _ = n.nc.Drain()
 		n.nc.Close()
 		n.ncint.Close()
 		n.natsint.Shutdown()

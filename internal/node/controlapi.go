@@ -201,13 +201,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	runningVM, err := api.mgr.TakeFromPool()
-	if err != nil {
-		api.log.Error("Failed to get warm VM from pool", slog.Any("err", err))
-		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to pull warm VM from ready pool: %s", err))
-		return
-	}
-
+	runningVM := <-api.mgr.warmVms
 	workloadName := request.DecodedClaims.Subject
 
 	api.log.
