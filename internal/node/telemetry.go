@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	metricsdk "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
@@ -64,13 +65,9 @@ func NewTelemetry(log *slog.Logger, config *NodeConfiguration) (*Telemetry, erro
 func (t *Telemetry) init() error {
 	var e, err error
 
-	if t.metricsEnabled {
-		e = t.initMeterProvider()
-		if err != nil {
-			err = errors.Join(err, e)
-		}
-	} else {
-		return nil
+	e = t.initMeterProvider()
+	if err != nil {
+		err = errors.Join(err, e)
 	}
 
 	t.vmCounter, e = t.meter.
@@ -135,36 +132,42 @@ func (t *Telemetry) init() error {
 }
 
 func (t *Telemetry) initMeterProvider() error {
-	resource, err := resource.Merge(resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(t.serviceName),
-			semconv.ServiceVersion(VERSION),
-		))
+	var meterProvider metric.MeterProvider
 
-	if err != nil {
-		t.log.Warn("failed to create OTel resource", slog.Any("err", err))
-		return err
-	}
+	if t.metricsEnabled {
+		resource, err := resource.Merge(resource.Default(),
+			resource.NewWithAttributes(
+				semconv.SchemaURL,
+				semconv.ServiceName(t.serviceName),
+				semconv.ServiceVersion(VERSION),
+			))
 
-	metricReader, err := t.serveMetrics() // FIXME-- this seems to require some additional discussion-- it may be better suited to live in Node
-	if err != nil {
-		t.log.Warn("failed to create OTel metrics exporter", slog.Any("err", err))
-		return err
-	}
-
-	meterProvider := metricsdk.NewMeterProvider(
-		metricsdk.WithResource(resource),
-		metricsdk.WithReader(
-			metricReader,
-		),
-	)
-
-	defer func() {
-		if err := meterProvider.Shutdown(context.Background()); err != nil {
-			t.log.Error("failed to shutdown OTel meter provider", slog.Any("err", err))
+		if err != nil {
+			t.log.Warn("failed to create OTel resource", slog.Any("err", err))
+			return err
 		}
-	}()
+
+		metricReader, err := t.serveMetrics() // FIXME-- this seems to require some additional discussion-- it may be better suited to live in Node
+		if err != nil {
+			t.log.Warn("failed to create OTel metrics exporter", slog.Any("err", err))
+			return err
+		}
+
+		meterProvider = metricsdk.NewMeterProvider(
+			metricsdk.WithResource(resource),
+			metricsdk.WithReader(
+				metricReader,
+			),
+		)
+
+		defer func() {
+			if err := meterProvider.(*metricsdk.MeterProvider).Shutdown(context.Background()); err != nil {
+				t.log.Error("failed to shutdown OTel meter provider", slog.Any("err", err))
+			}
+		}()
+	} else {
+		meterProvider = noop.NewMeterProvider()
+	}
 
 	otel.SetMeterProvider(meterProvider)
 
