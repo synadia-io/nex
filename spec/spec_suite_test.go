@@ -67,6 +67,8 @@ func cleanupFixtures() {
 	_fixtures.natsServer.WaitForShutdown()
 
 	os.RemoveAll(_fixtures.natsStoreDir)
+
+	time.Sleep(time.Millisecond * 5000)
 }
 
 func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
