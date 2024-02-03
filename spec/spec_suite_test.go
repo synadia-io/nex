@@ -99,7 +99,32 @@ func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
 		return nil, nil, nil, fmt.Errorf("failed to connect to NATS server: %s", err)
 	}
 
+	js, err := nc.JetStream()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to resolve jetstream context via NATS connection: %s", err)
+	}
+
+	_, err = js.CreateObjectStore(&nats.ObjectStoreConfig{
+		Bucket:      "NEXCLIFILES",
+		Description: "Client-facing cache for deploying workloads",
+		Storage:     nats.MemoryStorage,
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create jetstream object store: %s", err)
+	}
+
 	return ns, nc, &port, nil
+}
+
+// return a new NATS connection to the server running on `_fixtures.natsPort`
+func newNATSConn() (*nats.Conn, error) {
+	nc, err := nats.Connect(_fixtures.natsServer.ClientURL())
+	if err != nil {
+		fmt.Printf("failed to connect to NATS server: %s", err)
+		return nil, err
+	}
+
+	return nc, err
 }
 
 func stopDaggerEngine() {
@@ -124,3 +149,4 @@ func stopDaggerEngine() {
 		_ = cli.ContainerStop(ctx, c.ID, container.StopOptions{})
 	}
 }
+
