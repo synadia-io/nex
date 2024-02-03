@@ -14,14 +14,19 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"github.com/synadia-io/nex/internal/models"
 	nexnode "github.com/synadia-io/nex/internal/node"
 )
@@ -190,7 +195,7 @@ var _ = Describe("nex node", func() {
 			It("should return an error", func(ctx SpecContext) {
 				err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to load node configuration file"))
+				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: no such file or directory", nodeOpts.ConfigFilepath)))
 			})
 		})
 
@@ -236,6 +241,9 @@ var _ = Describe("nex node", func() {
 
 					AfterEach(func() {
 						node.Stop()
+
+						node = nil
+						nodeProxy = nil
 					})
 
 					JustBeforeEach(func() {
@@ -281,14 +289,13 @@ var _ = Describe("nex node", func() {
 						Expect(nodeProxy.APIListener()).ToNot(BeNil())
 					})
 
-					// FIXME-- this needs to be updated
-					// It("should initialize a telemetry instance", func(ctx SpecContext) {
-					// 	Expect(nodeProxy.Telemetry()).ToNot(BeNil())
-					// })
-
-					Context("when node options enable otel", func() {
-						// TODO
+					It("should initialize a telemetry instance", func(ctx SpecContext) {
+						Expect(nodeProxy.Telemetry()).ToNot(BeNil())
 					})
+
+					// Context("when node options enable otel", func() {
+					// TODO
+					// })
 
 					Describe("node API listener subscriptions", func() {
 						It("should initialize a node API subscription for handling ping requests", func(ctx SpecContext) {
@@ -334,6 +341,10 @@ var _ = Describe("nex node", func() {
 
 					Describe("machine manager", func() {
 						var manager *nexnode.MachineManager
+
+						AfterEach(func() {
+							manager = nil
+						})
 
 						JustBeforeEach(func() {
 							nodeConfig.DefaultResourceDir = validResourceDir
@@ -382,6 +393,39 @@ var _ = Describe("nex node", func() {
 									Expect(subsz.Subs[0].Msgs).To(Equal(int64(1)))
 								})
 							})
+
+							Describe("deploying an ELF binary workload", func() {
+								var deployRequest *controlapi.DeployRequest
+
+								Context("when the ELF binary is not statically-linked", func() {
+									var err error
+
+									AfterEach(func() {
+										os.Remove("./echoservice")
+									})
+
+									BeforeEach(func() {
+										cmd := exec.Command("go", "build", "../examples/echoservice")
+										_ = cmd.Start()
+										_ = cmd.Wait()
+									})
+
+									JustBeforeEach(func() {
+										deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, log)
+										Expect(err).To(BeNil())
+
+										rawDeployRequest, _ := json.MarshalIndent(deployRequest, "", "  ")
+										fmt.Printf(string(rawDeployRequest))
+
+										nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+										_, err = nodeClient.StartWorkload(deployRequest)
+									})
+
+									It("should fail to deploy the ELF workload", func(ctx SpecContext) {
+										Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
+									})
+								})
+							})
 						})
 					})
 				})
@@ -389,3 +433,105 @@ var _ = Describe("nex node", func() {
 		})
 	})
 })
+
+func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, string, error) {
+	js, err := nc.JetStream()
+	if err != nil {
+		panic(err)
+	}
+	var bucket nats.ObjectStore
+	bucket, err = js.ObjectStore("NEXCLIFILES")
+	if err != nil {
+		bucket, err = js.CreateObjectStore(&nats.ObjectStoreConfig{
+			Bucket:      agentapi.WorkloadCacheBucket,
+			Description: "Ad hoc object storage for NEX CLI developer mode uploads",
+		})
+		if err != nil {
+			return "", "", "", err
+		}
+	}
+	bytes, err := os.ReadFile(filename)
+	if err != nil {
+		return "", "", "", err
+	}
+	key := filepath.Base(filename)
+	key = strings.ReplaceAll(key, ".", "")
+
+	_, err = bucket.PutBytes(key, bytes)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	var workloadType string
+	switch strings.Replace(filepath.Ext(filename), ".", "", 1) {
+	case "js":
+		workloadType = agentapi.NexExecutionProviderV8
+	case "wasm":
+		workloadType = agentapi.NexExecutionProviderWasm
+	default:
+		workloadType = "elf"
+	}
+
+	return fmt.Sprintf("nats://%s/%s", "NEXCLIFILES", key), key, workloadType, nil
+}
+
+func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, error) {
+	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+
+	nodes, err := nodeClient.ListNodes()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(nodes) == 0 {
+		return nil, errors.New("no nodes discovered")
+	}
+
+	for _, candidate := range nodes {
+		if strings.EqualFold(candidate.NodeId, nodeID) {
+			info, err := nodeClient.NodeInfo(nodes[0].NodeId)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get node info for potential execution target: %s", err)
+			}
+
+			return &info.PublicXKey, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no node discovered which matched %s", nodeID)
+}
+
+// newDeployRequest() generates a new deploy request given the workload name, description, and file path
+func newDeployRequest(nodeID, name, desc, path string, env map[string]string, log *slog.Logger) (*controlapi.DeployRequest, error) { // initializes new sender and issuer keypairs and returns a new deploy request
+	senderKey, _ := nkeys.CreateCurveKeys()
+	issuerKey, _ := nkeys.CreateAccount()
+
+	location, _, workloadType, err := cacheWorkloadArtifact(_fixtures.natsConn, path)
+	if err != nil {
+		return nil, err
+	}
+
+	targetPublicXKey, err := resolveNodeTargetPublicXKey(nodeID, log)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := []controlapi.RequestOption{
+		controlapi.WorkloadName(name),
+		controlapi.WorkloadType(workloadType),
+		controlapi.WorkloadDescription(desc),
+		controlapi.Location(location),
+		// controlapi.Checksum(""),
+		controlapi.SenderXKey(senderKey),
+		controlapi.Issuer(issuerKey),
+		controlapi.TargetNode(nodeID),
+		controlapi.TargetPublicXKey(*targetPublicXKey),
+	}
+
+	for k, v := range env {
+		opts = append(opts, controlapi.EnvironmentValue(k, v))
+	}
+
+	return controlapi.NewDeployRequest(opts...)
+}
+
