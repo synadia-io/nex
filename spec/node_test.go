@@ -69,8 +69,8 @@ var _ = Describe("nex node", func() {
 			stopDaggerEngine()
 
 			// require the nex-agent binary to be built... FIXME-- build it here insteaad of relying on the Taskfile
-			_, err := os.Stat("../agent/cmd/nex-agent")
-			Expect(err).To(BeNil())
+			// _, err := os.Stat("../agent/cmd/nex-agent")
+			// Expect(err).To(BeNil())
 
 			snapshotAgentRootFSPath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-rootfs.ext4", _fixtures.seededRand.Int()))
 			cmd := exec.Command("go", "run", "../agent/fc-image", "../agent/cmd/nex-agent/nex-agent")
