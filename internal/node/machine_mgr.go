@@ -264,10 +264,10 @@ func (m *MachineManager) Stop() error {
 			m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		}
 
-		_ = m.nc.Drain()
-		m.cleanSockets()
-
 		_ = m.PublishNodeStopped()
+		_ = m.nc.Drain()
+
+		m.cleanSockets()
 	}
 
 	return nil
