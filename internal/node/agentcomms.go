@@ -67,7 +67,7 @@ func (mgr *MachineManager) handleAgentEvent(m *nats.Msg) {
 	}
 	mgr.log.Info("Received agent event", slog.String("vmid", vmId), slog.String("type", evt.Type()))
 
-	err = mgr.PublishCloudEvent(vm.namespace, evt)
+	err = PublishCloudEvent(mgr.nc, vm.namespace, evt, mgr.log)
 	if err != nil {
 		mgr.log.Error("Failed to publish cloudevent", slog.Any("err", err))
 		return

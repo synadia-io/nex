@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go"
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -104,13 +106,39 @@ func NewMachineManager(
 	return m, nil
 }
 
-// Starts the machine manager. Publishes a node started event and starts the
-// goroutine responsible for keeping the firecracker VM pool full
+// Start the machine manager, maintaining the firecracker VM pool
 func (m *MachineManager) Start() error {
 	m.log.Info("Virtual machine manager starting")
 
-	go m.fillPool()
-	_ = m.PublishNodeStarted()
+	defer func() {
+		if r := recover(); r != nil {
+			m.log.Info(fmt.Sprintf("recovered: %s", r))
+		}
+	}()
+
+	for !m.stopping() {
+		select {
+		case <-m.ctx.Done():
+			return nil
+		default:
+			vm, err := createAndStartVM(m.ctx, m.config, m.log)
+			if err != nil {
+				m.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
+				continue
+			}
+
+			go m.awaitHandshake(vm.vmmID)
+			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
+
+			// If the pool is full, this line will block until a slot is available.
+			m.warmVms <- vm
+
+			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
+			m.allVms[vm.vmmID] = vm
+
+			m.t.vmCounter.Add(m.ctx, 1)
+		}
+	}
 
 	return nil
 }
@@ -243,7 +271,7 @@ func (m *MachineManager) Stop() error {
 
 		for _, vm := range m.allVms {
 			vm.shutdown(m.log)
-			_ = m.PublishMachineStopped(vm)
+			_ = m.publishMachineStopped(vm)
 		}
 
 		// Now empty the leftovers in the pool
@@ -264,9 +292,6 @@ func (m *MachineManager) Stop() error {
 			m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		}
 
-		_ = m.PublishNodeStopped()
-		_ = m.nc.Drain()
-
 		m.cleanSockets()
 	}
 
@@ -280,9 +305,8 @@ func (m *MachineManager) StopMachine(vmId string) error {
 		return errors.New("no such VM")
 	}
 
+	// we do a request here to allow graceful shutdown of the workload being undeployed
 	subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
-	// we do a request here so we don't tell firecracker to shut down until
-	// we get a reply
 	_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond)
 	if err != nil {
 		return err
@@ -291,7 +315,7 @@ func (m *MachineManager) StopMachine(vmId string) error {
 	vm.shutdown(m.log)
 	delete(m.allVms, vmId)
 
-	_ = m.PublishMachineStopped(vm)
+	_ = m.publishMachineStopped(vm)
 
 	if vm.deployRequest != nil {
 		m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
@@ -315,47 +339,6 @@ func (m *MachineManager) LookupMachine(vmId string) *runningFirecracker {
 		return nil
 	}
 	return vm
-}
-
-// Called by a consumer looking to submit a workload into a virtual machine. Prior to that, the machine
-// must be taken out of the pool. Taking a machine out of the pool unblocks a goroutine that will automatically
-// replenish
-func (m *MachineManager) TakeFromPool() (*runningFirecracker, error) {
-	running := <-m.warmVms
-	//m.allVms[running.vmmID] = running
-	return running, nil
-}
-
-func (m *MachineManager) fillPool() {
-	defer func() {
-		if r := recover(); r != nil {
-			m.log.Info(fmt.Sprintf("recovered: %s", r))
-		}
-	}()
-
-	for !m.stopping() {
-		select {
-		case <-m.ctx.Done():
-			return
-		default:
-			vm, err := createAndStartVM(m.ctx, m.config, m.log)
-			if err != nil {
-				m.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
-				continue
-			}
-
-			go m.awaitHandshake(vm.vmmID)
-			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
-
-			// If the pool is full, this line will block until a slot is available.
-			m.warmVms <- vm
-
-			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
-			m.allVms[vm.vmmID] = vm
-
-			m.t.vmCounter.Add(m.ctx, 1)
-		}
-	}
 }
 
 func (m *MachineManager) awaitHandshake(vmid string) {
@@ -390,6 +373,52 @@ func (m *MachineManager) cleanSockets() {
 			os.Remove(path.Join([]string{"tmp", d.Name()}...))
 		}
 	}
+}
+
+// publishMachineStopped writes a workload stopped event for the provided firecracker VM
+func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
+	workloadName := strings.TrimSpace(vm.deployRequest.DecodedClaims.Subject)
+	if len(workloadName) > 0 {
+		workloadStopped := struct {
+			Name   string `json:"name"`
+			Reason string `json:"reason,omitempty"`
+			VmId   string `json:"vmid"`
+		}{
+			Name:   workloadName,
+			Reason: "Workload shutdown requested",
+			VmId:   vm.vmmID,
+		}
+
+		cloudevent := cloudevents.NewEvent()
+		cloudevent.SetSource(m.publicKey)
+		cloudevent.SetID(uuid.NewString())
+		cloudevent.SetTime(time.Now().UTC())
+		cloudevent.SetType(agentapi.WorkloadStoppedEventType)
+		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
+		_ = cloudevent.SetData(workloadStopped)
+
+		err := PublishCloudEvent(m.nc, vm.namespace, cloudevent, m.log)
+		if err != nil {
+			return err
+		}
+
+		emitLog := emittedLog{
+			Text:      "Workload stopped",
+			Level:     slog.LevelDebug,
+			MachineId: vm.vmmID,
+		}
+		logBytes, _ := json.Marshal(emitLog)
+
+		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, workloadName, vm.vmmID)
+		err = m.nc.Publish(subject, logBytes)
+		if err != nil {
+			m.log.Error("Failed to publish machine stopped event", slog.Any("err", err))
+		}
+
+		return m.nc.Flush()
+	}
+
+	return nil
 }
 
 func (m *MachineManager) stopping() bool {
