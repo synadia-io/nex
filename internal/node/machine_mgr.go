@@ -107,7 +107,7 @@ func NewMachineManager(
 }
 
 // Start the machine manager, maintaining the firecracker VM pool
-func (m *MachineManager) Start() error {
+func (m *MachineManager) Start() {
 	m.log.Info("Virtual machine manager starting")
 
 	defer func() {
@@ -119,7 +119,7 @@ func (m *MachineManager) Start() error {
 	for !m.stopping() {
 		select {
 		case <-m.ctx.Done():
-			return nil
+			return
 		default:
 			vm, err := createAndStartVM(m.ctx, m.config, m.log)
 			if err != nil {
@@ -139,8 +139,6 @@ func (m *MachineManager) Start() error {
 			m.t.vmCounter.Add(m.ctx, 1)
 		}
 	}
-
-	return nil
 }
 
 func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentapi.DeployRequest) error {
