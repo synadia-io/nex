@@ -117,15 +117,15 @@ func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
 }
 
 // return a new NATS connection to the server running on `_fixtures.natsPort`
-func newNATSConn() (*nats.Conn, error) {
-	nc, err := nats.Connect(_fixtures.natsServer.ClientURL())
-	if err != nil {
-		fmt.Printf("failed to connect to NATS server: %s", err)
-		return nil, err
-	}
+// func newNATSConn() (*nats.Conn, error) {
+// 	nc, err := nats.Connect(_fixtures.natsServer.ClientURL())
+// 	if err != nil {
+// 		fmt.Printf("failed to connect to NATS server: %s", err)
+// 		return nil, err
+// 	}
 
-	return nc, err
-}
+// 	return nc, err
+// }
 
 func stopDaggerEngine() {
 	cli, err := client.NewClientWithOpts(client.FromEnv)
@@ -149,4 +149,3 @@ func stopDaggerEngine() {
 		_ = cli.ContainerStop(ctx, c.ID, container.StopOptions{})
 	}
 }
-
