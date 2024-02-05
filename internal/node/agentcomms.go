@@ -26,7 +26,7 @@ func (mgr *MachineManager) handleAgentLog(m *nats.Msg) {
 
 	if vm.deployRequest == nil {
 		mgr.log.Warn("Received a log message from a VM without a reference to its deploy request; attempting redelivery in 50ms.")
-		m.NakWithDelay(time.Millisecond * 50)
+		_ = m.NakWithDelay(time.Millisecond * 50)
 		return
 	}
 
@@ -109,4 +109,3 @@ func logPublishSubject(namespace string, node string, workload string, vm string
 	// $NEX.logs.{namespace}.{node}.{workload name}.{vm}
 	return fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, namespace, node, workload, vm)
 }
-

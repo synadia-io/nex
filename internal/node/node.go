@@ -338,7 +338,7 @@ func (n *Node) shutdown() {
 			time.Sleep(time.Millisecond * 25)
 		}
 
-		n.ncint.Drain()
+		_ = n.ncint.Drain()
 		for !n.ncint.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
 		}
@@ -352,4 +352,3 @@ func (n *Node) shutdown() {
 func (n *Node) shuttingDown() bool {
 	return (atomic.LoadUint32(&n.closing) > 0)
 }
-
