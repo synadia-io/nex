@@ -149,14 +149,20 @@ func (n *Node) init() error {
 
 	n.initOnce.Do(func() {
 		err = n.loadNodeConfig()
-		// TODO-- handle this err
+		if err != nil {
+			n.log.Error("Failed to load node configuration file", slog.Any("err", err), slog.String("config_path", n.nodeOpts.ConfigFilepath))
+			err = fmt.Errorf("failed to load node configuration file: %s", err)
+		} else {
+			n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
+		}
 
 		n.telemetry, err = NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
 		if err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize telemetry: %s", err)
+		} else {
+			n.log.Info("Initialized telemetry")
 		}
-		n.log.Info("Initialized telemetry")
 
 		// setup NATS connection
 		n.nc, err = models.GenerateConnectionFromOpts(n.opts)
@@ -254,8 +260,6 @@ func (n *Node) loadNodeConfig() error {
 
 		n.config, err = LoadNodeConfiguration(n.nodeOpts.ConfigFilepath)
 		if err != nil {
-			n.log.Error("Failed to load node configuration file", slog.Any("err", err), slog.String("config_path", n.nodeOpts.ConfigFilepath))
-			err = fmt.Errorf("failed to load node configuration file: %s", err)
 			return err
 		}
 
@@ -263,8 +267,6 @@ func (n *Node) loadNodeConfig() error {
 		n.config.OtelMetrics = n.nodeOpts.OtelMetrics
 		n.config.OtelMetricsExporter = n.nodeOpts.OtelMetricsExporter
 		n.config.OtelMetricsPort = n.nodeOpts.OtelMetricsPort
-
-		n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
 	}
 
 	return nil
@@ -350,3 +352,4 @@ func (n *Node) shutdown() {
 func (n *Node) shuttingDown() bool {
 	return (atomic.LoadUint32(&n.closing) > 0)
 }
+
