@@ -32,6 +32,7 @@ type Telemetry struct {
 	metricsPort     int
 
 	serviceName string
+	nodePubKey  string
 
 	allocatedMemoryCounter metric.Int64UpDownCounter
 	allocatedVCPUCounter   metric.Int64UpDownCounter
@@ -45,7 +46,7 @@ type Telemetry struct {
 	functionRunTimeNano    metric.Int64Counter
 }
 
-func NewTelemetry(log *slog.Logger, config *NodeConfiguration) (*Telemetry, error) {
+func NewTelemetry(log *slog.Logger, config *NodeConfiguration, nodePubKey string) (*Telemetry, error) {
 	t := &Telemetry{
 		log:             log,
 		meter:           nil,
@@ -53,6 +54,7 @@ func NewTelemetry(log *slog.Logger, config *NodeConfiguration) (*Telemetry, erro
 		metricsExporter: config.OtelMetricsExporter,
 		metricsPort:     config.OtelMetricsPort,
 		serviceName:     defaultServiceName,
+		nodePubKey:      nodePubKey,
 	}
 
 	err := t.init()
@@ -141,7 +143,7 @@ func (t *Telemetry) initMeterProvider() error {
 				semconv.SchemaURL,
 				semconv.ServiceName(t.serviceName),
 				semconv.ServiceVersion(VERSION),
-				attribute.String("node_id", "1234"), // FIXME-- this should be a unique identifier for the node
+				attribute.String("node_pub_key", t.nodePubKey),
 			))
 
 		if err != nil {
