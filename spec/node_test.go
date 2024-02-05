@@ -396,30 +396,41 @@ var _ = Describe("nex node", func() {
 
 							Describe("deploying an ELF binary workload", func() {
 								var deployRequest *controlapi.DeployRequest
+								var err error
+
+								AfterEach(func() {
+									os.Remove("./echoservice")
+								})
+
+								JustBeforeEach(func() {
+									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, log)
+									Expect(err).To(BeNil())
+
+									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+									_, err = nodeClient.StartWorkload(deployRequest)
+								})
 
 								Context("when the ELF binary is not statically-linked", func() {
-									var err error
-
-									AfterEach(func() {
-										os.Remove("./echoservice")
-									})
-
 									BeforeEach(func() {
 										cmd := exec.Command("go", "build", "../examples/echoservice")
 										_ = cmd.Start()
 										_ = cmd.Wait()
 									})
 
-									JustBeforeEach(func() {
-										deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, log)
-										Expect(err).To(BeNil())
-
-										nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
-										_, err = nodeClient.StartWorkload(deployRequest)
-									})
-
 									It("should fail to deploy the ELF workload", func(ctx SpecContext) {
 										Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
+									})
+								})
+
+								Context("when the ELF binary is statically-linked", func() {
+									BeforeEach(func() {
+										cmd := exec.Command("go", "build", "-tags", "netgo", "-ldflags", "-extldflags -static", "../examples/echoservice")
+										_ = cmd.Start()
+										_ = cmd.Wait()
+									})
+
+									It("should deploy the ELF workload", func(ctx SpecContext) {
+										Expect(err).To(BeNil())
 									})
 								})
 							})
@@ -531,3 +542,4 @@ func newDeployRequest(nodeID, name, desc, path string, env map[string]string, lo
 
 	return controlapi.NewDeployRequest(opts...)
 }
+
