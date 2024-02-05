@@ -330,9 +330,17 @@ func (n *Node) shutdown() {
 		n.log.Debug("shutting down")
 		_ = n.manager.Stop()
 		_ = n.publishNodeStopped()
-		// _ = n.nc.Drain()
-		n.nc.Close()
-		n.ncint.Close()
+
+		_ = n.nc.Drain()
+		for !n.nc.IsClosed() {
+			time.Sleep(time.Millisecond * 25)
+		}
+
+		n.ncint.Drain()
+		for !n.ncint.IsClosed() {
+			time.Sleep(time.Millisecond * 25)
+		}
+
 		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
 		_ = n.telemetry.Shutdown()
