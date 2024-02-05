@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
@@ -140,6 +141,7 @@ func (t *Telemetry) initMeterProvider() error {
 				semconv.SchemaURL,
 				semconv.ServiceName(t.serviceName),
 				semconv.ServiceVersion(VERSION),
+				attribute.String("node_id", "1234"), // FIXME-- this should be a unique identifier for the node
 			))
 
 		if err != nil {
@@ -147,7 +149,7 @@ func (t *Telemetry) initMeterProvider() error {
 			return err
 		}
 
-		metricReader, err := t.serveMetrics() // FIXME-- this seems to require some additional discussion-- it may be better suited to live in Node
+		metricReader, err := t.serveMetrics()
 		if err != nil {
 			t.log.Warn("failed to create OTel metrics exporter", slog.Any("err", err))
 			return err
