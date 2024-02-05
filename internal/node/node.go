@@ -335,6 +335,7 @@ func (n *Node) shutdown() {
 		n.ncint.Close()
 		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
+		_ = n.telemetry.providerShutdown(n.ctx)
 	}
 }
 

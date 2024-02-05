@@ -24,8 +24,9 @@ import (
 const defaultServiceName = "nex-node"
 
 type Telemetry struct {
-	log   *slog.Logger
-	meter metric.Meter
+	log              *slog.Logger
+	meter            metric.Meter
+	providerShutdown func(context.Context) error
 
 	metricsEnabled  bool
 	metricsExporter string
@@ -48,13 +49,14 @@ type Telemetry struct {
 
 func NewTelemetry(log *slog.Logger, config *NodeConfiguration, nodePubKey string) (*Telemetry, error) {
 	t := &Telemetry{
-		log:             log,
-		meter:           nil,
-		metricsEnabled:  config.OtelMetrics,
-		metricsExporter: config.OtelMetricsExporter,
-		metricsPort:     config.OtelMetricsPort,
-		serviceName:     defaultServiceName,
-		nodePubKey:      nodePubKey,
+		log:              log,
+		meter:            nil,
+		metricsEnabled:   config.OtelMetrics,
+		metricsExporter:  config.OtelMetricsExporter,
+		metricsPort:      config.OtelMetricsPort,
+		serviceName:      defaultServiceName,
+		nodePubKey:       nodePubKey,
+		providerShutdown: func(_ context.Context) error { return nil },
 	}
 
 	err := t.init()
@@ -67,7 +69,6 @@ func NewTelemetry(log *slog.Logger, config *NodeConfiguration, nodePubKey string
 
 func (t *Telemetry) init() error {
 	var e, err error
-
 	e = t.initMeterProvider()
 	if err != nil {
 		err = errors.Join(err, e)
@@ -138,6 +139,8 @@ func (t *Telemetry) initMeterProvider() error {
 	var meterProvider metric.MeterProvider
 
 	if t.metricsEnabled {
+		t.log.Debug("Metrics enabled")
+
 		resource, err := resource.Merge(resource.Default(),
 			resource.NewWithAttributes(
 				semconv.SchemaURL,
@@ -164,11 +167,10 @@ func (t *Telemetry) initMeterProvider() error {
 			),
 		)
 
-		defer func() {
-			if err := meterProvider.(*metricsdk.MeterProvider).Shutdown(context.Background()); err != nil {
-				t.log.Error("failed to shutdown OTel meter provider", slog.Any("err", err))
-			}
-		}()
+		if _, ok := meterProvider.(*metricsdk.MeterProvider); ok {
+			t.providerShutdown = meterProvider.(*metricsdk.MeterProvider).Shutdown
+		}
+
 	} else {
 		meterProvider = noop.NewMeterProvider()
 	}
@@ -186,6 +188,7 @@ func (t *Telemetry) initMeterProvider() error {
 func (t *Telemetry) serveMetrics() (metricsdk.Reader, error) {
 	switch t.metricsExporter {
 	case "prometheus":
+		t.log.Debug("Starting prometheus exporter")
 		go func() {
 			t.log.Info(fmt.Sprintf("serving metrics at localhost:%d/metrics", t.metricsPort))
 			http.Handle("/metrics", promhttp.Handler())
@@ -197,6 +200,7 @@ func (t *Telemetry) serveMetrics() (metricsdk.Reader, error) {
 
 		return prometheus.New()
 	default:
+		t.log.Debug("Starting standard out exporter")
 		reader, err := stdoutmetric.New()
 		if err != nil {
 			return nil, err
