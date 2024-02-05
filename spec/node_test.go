@@ -414,9 +414,6 @@ var _ = Describe("nex node", func() {
 										deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, log)
 										Expect(err).To(BeNil())
 
-										rawDeployRequest, _ := json.MarshalIndent(deployRequest, "", "  ")
-										fmt.Printf(string(rawDeployRequest))
-
 										nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
 										_, err = nodeClient.StartWorkload(deployRequest)
 									})
@@ -534,4 +531,3 @@ func newDeployRequest(nodeID, name, desc, path string, env map[string]string, lo
 
 	return controlapi.NewDeployRequest(opts...)
 }
-
