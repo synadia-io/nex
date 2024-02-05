@@ -1,6 +1,6 @@
 package nexagent
 
-const (
+var (
 	VERSION   = "development"
 	COMMIT    = ""
 	BUILDDATE = ""

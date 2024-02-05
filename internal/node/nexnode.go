@@ -2,7 +2,7 @@ package nexnode
 
 import "fmt"
 
-const (
+var (
 	VERSION   = "development"
 	COMMIT    = ""
 	BUILDDATE = ""

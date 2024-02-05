@@ -1,6 +1,6 @@
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
 
-name: Build
+name: Lint | Test | Build
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
 
 jobs:
   lint:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
     - 
@@ -38,6 +39,7 @@ jobs:
         golangci-lint run --timeout 5m
 
   test:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
     - 
@@ -74,34 +76,13 @@ jobs:
       name: Run test suite
       working-directory: .
       run: go test -v -race ./test
+    - 
+      name: Run spec suite
+      working-directory: .
+      run: sudo -E ~/go/bin/ginkgo run -r --randomize-all --vv --trace --keep-going --output-interceptor-mode=none ./spec
 
   build:
-    runs-on: ubuntu-latest
-    steps:
-    - 
-      uses: actions/checkout@v4
-    - 
-      name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21.5'
-    - 
-      name: Build agent
-      working-directory: ./agent/cmd/nex-agent
-      run: go build -tags netgo -ldflags '-extldflags "-static"'
-    - 
-      name: Build ui
-      working-directory: ./ui/web
-      run: |
-        curl -fsSL https://get.pnpm.io/install.sh | SHELL=bash sh -
-        ~/.local/share/pnpm/pnpm install
-        ~/.local/share/pnpm/pnpm build
-    - 
-      name: Build nex cli
-      working-directory: ./nex
-      run: go build .
-
-  goreleaser:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       -
@@ -120,5 +101,5 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --verbose --clean --snapshot
+          args: build --clean --snapshot
 

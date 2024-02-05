@@ -78,7 +78,7 @@ func init() {
 	run.Flag("issuer", "Path to a seed key to sign the workload JWT as the issuer").Required().ExistingFileVar(&RunOpts.ClaimsIssuerFile)
 	run.Arg("env", "Environment variables to pass to workload").StringMapVar(&RunOpts.Env)
 	run.Flag("name", "Name of the workload. Must be alphabetic (lowercase)").Required().StringVar(&RunOpts.Name)
-	run.Flag("type", "Type of workload, e.g., \"elf\", \"v8\", \"oci\", \"wasm\"").StringVar(&RunOpts.WorkloadType)
+	run.Flag("type", "Type of workload").EnumVar(&RunOpts.WorkloadType, "elf", "v8", "wasm")
 	run.Flag("description", "Description of the workload").StringVar(&RunOpts.Description)
 	run.Flag("argv", "Arguments to pass to the workload, if applicable").StringVar(&RunOpts.Argv)
 	run.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
