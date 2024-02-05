@@ -20,7 +20,13 @@ func (mgr *MachineManager) handleAgentLog(m *nats.Msg) {
 
 	vm, ok := mgr.allVms[vmId]
 	if !ok {
-		mgr.log.Warn("Received a log from a VM we don't know about. Rejecting")
+		mgr.log.Warn("Received a log message from an unknown VM.")
+		return
+	}
+
+	if vm.deployRequest == nil {
+		mgr.log.Warn("Received a log message from a VM without a reference to its deploy request; attempting redelivery in 50ms.")
+		m.NakWithDelay(time.Millisecond * 50)
 		return
 	}
 
@@ -43,7 +49,8 @@ func (mgr *MachineManager) handleAgentLog(m *nats.Msg) {
 		return
 	}
 
-	_ = mgr.nc.Publish(logPublishSubject(vm.namespace, mgr.publicKey, vm.deployRequest.DecodedClaims.Subject, vmId), bytes)
+	subject := logPublishSubject(vm.namespace, mgr.publicKey, *vm.deployRequest.WorkloadName, vmId)
+	_ = mgr.nc.Publish(subject, bytes)
 }
 
 // Called when the node server gets an event from the nex agent inside firecracker. The data here is already a fully formed
@@ -74,7 +81,7 @@ func (mgr *MachineManager) handleAgentEvent(m *nats.Msg) {
 	}
 
 	if evt.Type() == agentapi.WorkloadStoppedEventType {
-		vm.shutdown(mgr.log)
+		vm.shutdown()
 	}
 }
 
@@ -102,3 +109,4 @@ func logPublishSubject(namespace string, node string, workload string, vm string
 	// $NEX.logs.{namespace}.{node}.{workload name}.{vm}
 	return fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, namespace, node, workload, vm)
 }
+

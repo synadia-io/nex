@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/firecracker-microvm/firecracker-go-sdk"
@@ -27,40 +28,45 @@ type runningFirecracker struct {
 	vmmCancel context.CancelFunc
 	vmmID     string
 
-	deployRequest   *agentapi.DeployRequest
-	ip              net.IP
-	machine         *firecracker.Machine
-	machineStarted  time.Time
+	closing        uint32
+	deployRequest  *agentapi.DeployRequest
+	ip             net.IP
+	log            *slog.Logger
+	machine        *firecracker.Machine
+	machineStarted time.Time
+	// mutex           sync.Mutex
 	namespace       string
 	workloadStarted time.Time
 }
 
-func (vm *runningFirecracker) shutdown(log *slog.Logger) {
-	log.Info("Machine stopping",
-		slog.String("vmid", vm.vmmID),
-		slog.String("ip", vm.ip.String()),
-	)
+func (vm *runningFirecracker) shutdown() {
+	if atomic.AddUint32(&vm.closing, 1) == 1 {
+		vm.log.Info("Machine stopping",
+			slog.String("vmid", vm.vmmID),
+			slog.String("ip", vm.ip.String()),
+		)
 
-	err := vm.machine.StopVMM()
-	if err != nil {
-		log.Error("Failed to stop firecracker VM", slog.Any("err", err))
-	}
-
-	err = os.Remove(vm.machine.Cfg.SocketPath)
-	if err != nil {
-		if !errors.Is(err, fs.ErrExist) {
-			log.Warn("Failed to delete firecracker socket", slog.Any("err", err))
+		err := vm.machine.StopVMM()
+		if err != nil {
+			vm.log.Error("Failed to stop firecracker VM", slog.Any("err", err))
 		}
-	}
 
-	// NOTE: we're not deleting the firecracker machine logs ... they're in a tempfs so they'll eventually
-	// go away but we might want them kept around for troubleshooting
+		err = os.Remove(vm.machine.Cfg.SocketPath)
+		if err != nil {
+			if !errors.Is(err, fs.ErrExist) {
+				vm.log.Warn("Failed to delete firecracker socket", slog.Any("err", err))
+			}
+		}
 
-	rootFs := getRootFsPath(vm.vmmID)
-	err = os.Remove(rootFs)
-	if err != nil {
-		if !errors.Is(err, fs.ErrExist) {
-			log.Warn("Failed to delete firecracker rootfs", slog.Any("err", err))
+		// NOTE: we're not deleting the firecracker machine logs ... they're in a tempfs so they'll eventually
+		// go away but we might want them kept around for troubleshooting
+
+		rootFs := getRootFsPath(vm.vmmID)
+		err = os.Remove(rootFs)
+		if err != nil {
+			if !errors.Is(err, fs.ErrExist) {
+				vm.log.Warn("Failed to delete firecracker rootfs", slog.Any("err", err))
+			}
 		}
 	}
 }
@@ -158,12 +164,13 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 	)
 
 	return &runningFirecracker{
-		vmmCtx:         vmmCtx,
-		vmmCancel:      vmmCancel,
-		vmmID:          vmmID,
+		log:            log,
 		machine:        m,
 		ip:             ip,
 		machineStarted: time.Now().UTC(),
+		vmmCancel:      vmmCancel,
+		vmmCtx:         vmmCtx,
+		vmmID:          vmmID,
 	}, nil
 }
 
@@ -241,3 +248,4 @@ func getSocketPath(vmmID string) string {
 
 	return filepath.Join(dir, filename)
 }
+
