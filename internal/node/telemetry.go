@@ -24,9 +24,10 @@ import (
 const defaultServiceName = "nex-node"
 
 type Telemetry struct {
-	log              *slog.Logger
-	meter            metric.Meter
-	providerShutdown func(context.Context) error
+	ctx           context.Context
+	log           *slog.Logger
+	meter         metric.Meter
+	meterProvider metric.MeterProvider
 
 	metricsEnabled  bool
 	metricsExporter string
@@ -47,16 +48,17 @@ type Telemetry struct {
 	functionRunTimeNano    metric.Int64Counter
 }
 
-func NewTelemetry(log *slog.Logger, config *NodeConfiguration, nodePubKey string) (*Telemetry, error) {
+func NewTelemetry(ctx context.Context, log *slog.Logger, config *NodeConfiguration, nodePubKey string) (*Telemetry, error) {
 	t := &Telemetry{
-		log:              log,
-		meter:            nil,
-		metricsEnabled:   config.OtelMetrics,
-		metricsExporter:  config.OtelMetricsExporter,
-		metricsPort:      config.OtelMetricsPort,
-		serviceName:      defaultServiceName,
-		nodePubKey:       nodePubKey,
-		providerShutdown: func(_ context.Context) error { return nil },
+		ctx:             ctx,
+		log:             log,
+		meter:           nil,
+		metricsEnabled:  config.OtelMetrics,
+		metricsExporter: config.OtelMetricsExporter,
+		metricsPort:     config.OtelMetricsPort,
+		serviceName:     defaultServiceName,
+		nodePubKey:      nodePubKey,
+		meterProvider:   noop.NewMeterProvider(),
 	}
 
 	err := t.init()
@@ -135,9 +137,14 @@ func (t *Telemetry) init() error {
 	return err
 }
 
-func (t *Telemetry) initMeterProvider() error {
-	var meterProvider metric.MeterProvider
+func (t *Telemetry) Shutdown() error {
+	if _, ok := t.meterProvider.(*metricsdk.MeterProvider); ok {
+		return t.meterProvider.(*metricsdk.MeterProvider).Shutdown(t.ctx)
+	}
+	return nil
+}
 
+func (t *Telemetry) initMeterProvider() error {
 	if t.metricsEnabled {
 		t.log.Debug("Metrics enabled")
 
@@ -160,22 +167,15 @@ func (t *Telemetry) initMeterProvider() error {
 			return err
 		}
 
-		meterProvider = metricsdk.NewMeterProvider(
+		t.meterProvider = metricsdk.NewMeterProvider(
 			metricsdk.WithResource(resource),
 			metricsdk.WithReader(
 				metricReader,
 			),
 		)
-
-		if _, ok := meterProvider.(*metricsdk.MeterProvider); ok {
-			t.providerShutdown = meterProvider.(*metricsdk.MeterProvider).Shutdown
-		}
-
-	} else {
-		meterProvider = noop.NewMeterProvider()
 	}
 
-	otel.SetMeterProvider(meterProvider)
+	otel.SetMeterProvider(t.meterProvider)
 
 	t.meter = otel.Meter(t.serviceName)
 	if t.meter == nil {
