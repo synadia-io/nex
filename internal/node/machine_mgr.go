@@ -268,13 +268,13 @@ func (m *MachineManager) Stop() error {
 		close(m.warmVms)
 
 		for _, vm := range m.allVms {
-			vm.shutdown(m.log)
-			_ = m.publishMachineStopped(vm)
+			vm.shutdown()
+			_ = m.publishMachineStopped(vm) // FIXME-- this is confusing to be here as well as in StopMachine()
 		}
 
 		// Now empty the leftovers in the pool
 		for vm := range m.warmVms {
-			vm.shutdown(m.log)
+			vm.shutdown()
 
 			if vm.deployRequest != nil {
 				m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
@@ -297,10 +297,10 @@ func (m *MachineManager) Stop() error {
 }
 
 // Stops a single machine. Will return an error if called with a non-existent workload/vm ID
-func (m *MachineManager) StopMachine(vmId string) error {
-	vm, exists := m.allVms[vmId]
+func (m *MachineManager) StopMachine(vmID string) error {
+	vm, exists := m.allVms[vmID]
 	if !exists {
-		return errors.New("no such VM")
+		return fmt.Errorf("failed to stop machine %s", vmID)
 	}
 
 	// we do a request here to allow graceful shutdown of the workload being undeployed
@@ -310,8 +310,8 @@ func (m *MachineManager) StopMachine(vmId string) error {
 		return err
 	}
 
-	vm.shutdown(m.log)
-	delete(m.allVms, vmId)
+	vm.shutdown()
+	delete(m.allVms, vmID)
 
 	_ = m.publishMachineStopped(vm)
 
@@ -375,6 +375,10 @@ func (m *MachineManager) cleanSockets() {
 
 // publishMachineStopped writes a workload stopped event for the provided firecracker VM
 func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
+	if vm.deployRequest == nil {
+		return errors.New("machine stopped event was not published")
+	}
+
 	workloadName := strings.TrimSpace(vm.deployRequest.DecodedClaims.Subject)
 	if len(workloadName) > 0 {
 		workloadStopped := struct {
@@ -422,3 +426,4 @@ func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 func (m *MachineManager) stopping() bool {
 	return (atomic.LoadUint32(&m.closing) > 0)
 }
+
