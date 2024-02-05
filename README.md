@@ -1,4 +1,4 @@
-[![Lint | Test | Build](https://github.com/synadia-io/nex/actions/workflows/build.yml/badge.svg)](https://github.com/synadia-io/nex/actions/workflows/build.yml)
+[![Lint | Test | Build](https://github.com/synadia-io/nex/actions/workflows/ltb.yml/badge.svg)](https://github.com/synadia-io/nex/actions/workflows/ltb.yml)
 ![Release](https://github.com/synadia-io/nex/actions/workflows/release.yml/badge.svg)
 ![Homepage and Documentation](https://img.shields.io/website?label=Homepage&url=https%3A%2F%2Fnats.io)
 ![eg](https://img.shields.io/badge/Powered%20By-NATS-green)

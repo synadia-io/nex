@@ -151,7 +151,7 @@ func (n *Node) init() error {
 		err = n.loadNodeConfig()
 		// TODO-- handle this err
 
-		n.telemetry, err = NewTelemetry(n.log, n.config)
+		n.telemetry, err = NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
 		if err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize telemetry: %s", err)
@@ -335,6 +335,7 @@ func (n *Node) shutdown() {
 		n.ncint.Close()
 		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
+		_ = n.telemetry.Shutdown()
 	}
 }
 
