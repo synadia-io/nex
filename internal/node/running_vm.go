@@ -28,13 +28,12 @@ type runningFirecracker struct {
 	vmmCancel context.CancelFunc
 	vmmID     string
 
-	closing        uint32
-	deployRequest  *agentapi.DeployRequest
-	ip             net.IP
-	log            *slog.Logger
-	machine        *firecracker.Machine
-	machineStarted time.Time
-	// mutex           sync.Mutex
+	closing         uint32
+	deployRequest   *agentapi.DeployRequest
+	ip              net.IP
+	log             *slog.Logger
+	machine         *firecracker.Machine
+	machineStarted  time.Time
 	namespace       string
 	workloadStarted time.Time
 }
@@ -164,9 +163,9 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 	)
 
 	return &runningFirecracker{
+		ip:             ip,
 		log:            log,
 		machine:        m,
-		ip:             ip,
 		machineStarted: time.Now().UTC(),
 		vmmCancel:      vmmCancel,
 		vmmCtx:         vmmCtx,
