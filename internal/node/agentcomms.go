@@ -18,7 +18,7 @@ func (mgr *MachineManager) handleAgentLog(m *nats.Msg) {
 	tokens := strings.Split(m.Subject, ".")
 	vmId := tokens[1]
 
-	vm, ok := mgr.allVms[vmId]
+	vm, ok := mgr.allVMs[vmId]
 	if !ok {
 		mgr.log.Warn("Received a log message from an unknown VM.")
 		return
@@ -60,7 +60,7 @@ func (mgr *MachineManager) handleAgentEvent(m *nats.Msg) {
 	tokens := strings.Split(m.Subject, ".")
 	vmId := tokens[1]
 
-	vm, ok := mgr.allVms[vmId]
+	vm, ok := mgr.allVMs[vmId]
 	if !ok {
 		mgr.log.Warn("Received an event from a VM we don't know about. Rejecting.")
 		return
@@ -109,3 +109,4 @@ func logPublishSubject(namespace string, node string, workload string, vm string
 	// $NEX.logs.{namespace}.{node}.{workload name}.{vm}
 	return fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, namespace, node, workload, vm)
 }
+

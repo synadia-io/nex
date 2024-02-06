@@ -72,10 +72,10 @@ func (m *MachineManagerProxy) Telemetry() *Telemetry {
 }
 
 func (m *MachineManagerProxy) VMs() map[string]*runningFirecracker {
-	return m.m.allVms
+	return m.m.allVMs
 }
 
 func (m *MachineManagerProxy) PoolVMs() chan *runningFirecracker {
-	return m.m.warmVms
+	return m.m.warmVMs
 }
 
