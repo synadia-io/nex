@@ -281,6 +281,10 @@ var _ = Describe("nex node", func() {
 						Expect(nodeProxy.InternalNATS()).ToNot(BeNil())
 					})
 
+					It("should initialize a connection to the internal NATS server", func(ctx SpecContext) {
+						Expect(nodeProxy.InternalNATSConn()).ToNot(BeNil())
+					})
+
 					It("should initialize a machine manager to manage firecracker VMs and communicate with running agents", func(ctx SpecContext) {
 						Expect(nodeProxy.MachineManager()).ToNot(BeNil())
 					})
@@ -341,9 +345,11 @@ var _ = Describe("nex node", func() {
 
 					Describe("machine manager", func() {
 						var manager *nexnode.MachineManager
+						var managerProxy *nexnode.MachineManagerProxy
 
 						AfterEach(func() {
 							manager = nil
+							managerProxy = nil
 						})
 
 						JustBeforeEach(func() {
@@ -352,9 +358,25 @@ var _ = Describe("nex node", func() {
 							nodeOpts.ForceDepInstall = true
 
 							manager = nodeProxy.MachineManager()
-							fmt.Printf("%v", manager) // HACK-- remove once we use manager for assertions... this is just here to remove the unused warning for now...
+							managerProxy = nexnode.NewMachineManagerProxyWith(manager)
 
-							time.Sleep(time.Millisecond * 2500) // allow enough time for the pool to warm up...
+							time.Sleep(time.Millisecond * 5000) // allow enough time for the pool to warm up...
+						})
+
+						It("should use the provided logger instance", func(ctx SpecContext) {
+							Expect(managerProxy.Log()).To(Equal(log))
+						})
+
+						It("should receive a reference to the node configuration", func(ctx SpecContext) {
+							Expect(managerProxy.NodeConfiguration()).To(Equal(nodeProxy.NodeConfiguration())) // FIXME-- assert that it is === to the current nex node config JSON
+						})
+
+						It("should receive a reference to the internal NATS server connection", func(ctx SpecContext) {
+							Expect(managerProxy.InternalNATSConn()).To(Equal(nodeProxy.InternalNATSConn()))
+						})
+
+						It("should receive a reference to the telemetry instance", func(ctx SpecContext) {
+							Expect(managerProxy.Telemetry()).To(Equal(nodeProxy.Telemetry()))
 						})
 
 						Describe("agent internal API subscriptions", func() {
@@ -384,13 +406,21 @@ var _ = Describe("nex node", func() {
 						})
 
 						Describe("VM pool", func() {
-							Context("when a VM is warm", func() {
-								It("should complete the agent handshake", func(ctx SpecContext) {
+							Context("when no workloads have been deployed", func() {
+								It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
 									subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
 										Subscriptions: true,
 										Test:          "agentint.handshake",
 									})
-									Expect(subsz.Subs[0].Msgs).To(Equal(int64(1)))
+									Expect(subsz.Subs[0].Msgs).To(Equal(int64(nodeProxy.NodeConfiguration().MachinePoolSize)))
+								})
+
+								It("should keep a reference to all running VMs", func(ctx SpecContext) {
+									Expect(len(managerProxy.VMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+								})
+
+								It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
+									Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 								})
 							})
 
@@ -403,11 +433,13 @@ var _ = Describe("nex node", func() {
 								})
 
 								JustBeforeEach(func() {
-									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, log)
+									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
 									Expect(err).To(BeNil())
 
 									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
 									_, err = nodeClient.StartWorkload(deployRequest)
+
+									time.Sleep(time.Millisecond * 5000)
 								})
 
 								Context("when the ELF binary is not statically-linked", func() {
@@ -420,6 +452,14 @@ var _ = Describe("nex node", func() {
 									It("should fail to deploy the ELF workload", func(ctx SpecContext) {
 										Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
 									})
+
+									It("should keep a reference to all running VMs", func(ctx SpecContext) {
+										Expect(len(managerProxy.VMs())).To(Equal(2))
+									})
+
+									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+									})
 								})
 
 								Context("when the ELF binary is statically-linked", func() {
@@ -431,6 +471,45 @@ var _ = Describe("nex node", func() {
 
 									It("should deploy the ELF workload", func(ctx SpecContext) {
 										Expect(err).To(BeNil())
+									})
+
+									It("should keep a reference to all running VMs", func(ctx SpecContext) {
+										Expect(len(managerProxy.VMs())).To(Equal(2))
+									})
+
+									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+									})
+								})
+							})
+
+							Describe("deploying a v8 workload", func() {
+								var deployRequest *controlapi.DeployRequest
+								var triggerSubject string
+								var err error
+
+								JustBeforeEach(func() {
+									triggerSubject = "helloworld"
+									deployRequest, err = newDeployRequest(*nodeID, "echofunction", "nex example echoservice", "../examples/v8/echofunction/src/echofunction.js", map[string]string{}, []string{triggerSubject}, log)
+									Expect(err).To(BeNil())
+
+									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+									_, err = nodeClient.StartWorkload(deployRequest)
+
+									time.Sleep(time.Millisecond * 5000)
+								})
+
+								Context("when the javascript is valid", func() {
+									It("should deploy the v8 workload", func(ctx SpecContext) {
+										Expect(err).To(BeNil())
+									})
+
+									It("should keep a reference to all running VMs", func(ctx SpecContext) {
+										Expect(len(managerProxy.VMs())).To(Equal(2))
+									})
+
+									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 							})
@@ -510,7 +589,7 @@ func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, erro
 }
 
 // newDeployRequest() generates a new deploy request given the workload name, description, and file path
-func newDeployRequest(nodeID, name, desc, path string, env map[string]string, log *slog.Logger) (*controlapi.DeployRequest, error) { // initializes new sender and issuer keypairs and returns a new deploy request
+func newDeployRequest(nodeID, name, desc, path string, env map[string]string, triggerSubjects []string, log *slog.Logger) (*controlapi.DeployRequest, error) { // initializes new sender and issuer keypairs and returns a new deploy request
 	senderKey, _ := nkeys.CreateCurveKeys()
 	issuerKey, _ := nkeys.CreateAccount()
 
@@ -534,6 +613,7 @@ func newDeployRequest(nodeID, name, desc, path string, env map[string]string, lo
 		controlapi.Issuer(issuerKey),
 		controlapi.TargetNode(nodeID),
 		controlapi.TargetPublicXKey(*targetPublicXKey),
+		controlapi.TriggerSubjects(triggerSubjects),
 	}
 
 	for k, v := range env {
