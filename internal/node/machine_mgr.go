@@ -265,7 +265,7 @@ func (m *MachineManager) Stop() error {
 		close(m.warmVMs)
 
 		for _, vm := range m.allVMs {
-			m.StopMachine(vm.vmmID)
+			_ = m.StopMachine(vm.vmmID)
 		}
 
 		m.cleanSockets()
