@@ -201,7 +201,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	runningVM := <-api.mgr.warmVms
+	runningVM := <-api.mgr.warmVMs
 	workloadName := request.DecodedClaims.Subject
 
 	api.log.
@@ -255,7 +255,7 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 		NodeId:          api.nodeId,
 		Version:         Version(),
 		Uptime:          myUptime(now.Sub(api.start)),
-		RunningMachines: len(api.mgr.allVms),
+		RunningMachines: len(api.mgr.allVMs),
 		Tags:            api.config.Tags,
 	}, nil)
 
@@ -284,7 +284,7 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 		Uptime:                 myUptime(now.Sub(api.start)),
 		Tags:                   api.config.Tags,
 		SupportedWorkloadTypes: api.config.WorkloadTypes,
-		Machines:               summarizeMachines(&api.mgr.allVms, namespace),
+		Machines:               summarizeMachines(&api.mgr.allVMs, namespace),
 		Memory:                 stats,
 	}, nil)
 
@@ -376,3 +376,4 @@ func extractNamespace(subject string) (string, error) {
 	}
 	return tokens[2], nil
 }
+

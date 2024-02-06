@@ -50,15 +50,8 @@ func (vm *runningFirecracker) shutdown() {
 			vm.log.Error("Failed to stop firecracker VM", slog.Any("err", err))
 		}
 
-		err = os.Remove(vm.machine.Cfg.SocketPath)
-		if err != nil {
-			if !errors.Is(err, fs.ErrExist) {
-				vm.log.Warn("Failed to delete firecracker socket", slog.Any("err", err))
-			}
-		}
-
-		// NOTE: we're not deleting the firecracker machine logs ... they're in a tempfs so they'll eventually
-		// go away but we might want them kept around for troubleshooting
+		_ = os.Remove(vm.machine.Cfg.SocketPath)
+		_ = os.Remove(fmt.Sprintf("%s.log", vm.machine.Cfg.SocketPath))
 
 		rootFs := getRootFsPath(vm.vmmID)
 		err = os.Remove(rootFs)

@@ -45,8 +45,8 @@ type MachineManager struct {
 	ctx        context.Context
 	t          *Telemetry
 
-	allVms  map[string]*runningFirecracker
-	warmVms chan *runningFirecracker
+	allVMs  map[string]*runningFirecracker
+	warmVMs chan *runningFirecracker
 
 	handshakes       map[string]string
 	handshakeTimeout time.Duration // TODO: make configurable...
@@ -84,8 +84,8 @@ func NewMachineManager(
 		t:                telemetry,
 		ctx:              ctx,
 
-		allVms:  make(map[string]*runningFirecracker),
-		warmVms: make(chan *runningFirecracker, config.MachinePoolSize-1),
+		allVMs:  make(map[string]*runningFirecracker),
+		warmVMs: make(chan *runningFirecracker, config.MachinePoolSize-1),
 	}
 
 	_, err := m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
@@ -130,13 +130,11 @@ func (m *MachineManager) Start() {
 			go m.awaitHandshake(vm.vmmID)
 			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 
-			// If the pool is full, this line will block until a slot is available.
-			m.warmVms <- vm
-
-			// This gets executed when another goroutine pulls a vm out of the warmVms channel and unblocks
-			m.allVms[vm.vmmID] = vm
-
+			m.allVMs[vm.vmmID] = vm
 			m.t.vmCounter.Add(m.ctx, 1)
+
+			// If the pool is full, this line will block until a slot is available.
+			m.warmVMs <- vm
 		}
 	}
 }
@@ -265,29 +263,10 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 func (m *MachineManager) Stop() error {
 	if atomic.AddUint32(&m.closing, 1) == 1 {
 		m.log.Info("Virtual machine manager stopping")
-		close(m.warmVms)
+		close(m.warmVMs)
 
-		for _, vm := range m.allVms {
-			vm.shutdown()
-			_ = m.publishMachineStopped(vm) // FIXME-- this is confusing to be here as well as in StopMachine()
-		}
-
-		// Now empty the leftovers in the pool
-		for vm := range m.warmVms {
-			vm.shutdown()
-
-			if vm.deployRequest != nil {
-				m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
-				m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-				m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1)
-				m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-			}
-
-			m.t.vmCounter.Add(m.ctx, -1)
-			m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
-			m.t.allocatedVCPUCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-			m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
-			m.t.allocatedMemoryCounter.Add(m.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		for _, vm := range m.allVMs {
+			m.StopMachine(vm.vmmID)
 		}
 
 		m.cleanSockets()
@@ -298,25 +277,28 @@ func (m *MachineManager) Stop() error {
 
 // Stops a single machine. Will return an error if called with a non-existent workload/vm ID
 func (m *MachineManager) StopMachine(vmID string) error {
-	vm, exists := m.allVms[vmID]
+	vm, exists := m.allVMs[vmID]
 	if !exists {
 		return fmt.Errorf("failed to stop machine %s", vmID)
 	}
 
-	// we do a request here to allow graceful shutdown of the workload being undeployed
-	subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
-	_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond)
-	if err != nil {
-		return err
+	if vm.deployRequest != nil {
+		// we do a request here to allow graceful shutdown of the workload being undeployed
+		subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
+		_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
+		if err != nil {
+			return err
+		}
 	}
 
 	vm.shutdown()
-	delete(m.allVms, vmID)
+	delete(m.allVMs, vmID)
 
 	_ = m.publishMachineStopped(vm)
 
 	if vm.deployRequest != nil {
-		m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
+		m.t.workloadCounter.Add(m.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1)
 		m.t.deployedByteCounter.Add(m.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	}
@@ -332,7 +314,7 @@ func (m *MachineManager) StopMachine(vmID string) error {
 
 // Looks up a virtual machine by workload/vm ID. Returns nil if machine doesn't exist
 func (m *MachineManager) LookupMachine(vmId string) *runningFirecracker {
-	vm, exists := m.allVms[vmId]
+	vm, exists := m.allVMs[vmId]
 	if !exists {
 		return nil
 	}
