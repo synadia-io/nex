@@ -215,6 +215,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		)
 
 	err = api.mgr.DeployWorkload(runningVM, &agentapi.DeployRequest{
+		Argv:            request.Argv,
 		DecodedClaims:   request.DecodedClaims,
 		Description:     request.Description,
 		Environment:     request.WorkloadEnvironment,
