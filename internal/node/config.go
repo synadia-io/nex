@@ -49,6 +49,10 @@ type NodeConfiguration struct {
 func (c *NodeConfiguration) Validate() bool {
 	c.Errors = make([]error, 0)
 
+	if c.MachinePoolSize < 1 {
+		c.Errors = append(c.Errors, errors.New("machine pool size must be >= 1"))
+	}
+
 	if _, err := os.Stat(c.KernelFilepath); errors.Is(err, os.ErrNotExist) {
 		c.Errors = append(c.Errors, err)
 	}
@@ -157,3 +161,4 @@ func LoadNodeConfiguration(configFilepath string) (*NodeConfiguration, error) {
 
 	return &config, nil
 }
+
