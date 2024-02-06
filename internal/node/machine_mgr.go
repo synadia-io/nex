@@ -128,13 +128,12 @@ func (m *MachineManager) Start() {
 			}
 
 			go m.awaitHandshake(vm.vmmID)
-			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 
 			m.allVMs[vm.vmmID] = vm
 			m.t.vmCounter.Add(m.ctx, 1)
 
-			// If the pool is full, this line will block until a slot is available.
-			m.warmVMs <- vm
+			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
+			m.warmVMs <- vm // If the pool is full, this line will block until a slot is available.
 		}
 	}
 }
@@ -408,4 +407,3 @@ func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 func (m *MachineManager) stopping() bool {
 	return (atomic.LoadUint32(&m.closing) > 0)
 }
-

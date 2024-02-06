@@ -240,4 +240,3 @@ func getSocketPath(vmmID string) string {
 
 	return filepath.Join(dir, filename)
 }
-

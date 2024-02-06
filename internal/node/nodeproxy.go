@@ -78,4 +78,3 @@ func (m *MachineManagerProxy) VMs() map[string]*runningFirecracker {
 func (m *MachineManagerProxy) PoolVMs() chan *runningFirecracker {
 	return m.m.warmVMs
 }
-
