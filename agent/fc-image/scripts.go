@@ -25,6 +25,7 @@ chmod +x /etc/init.d/agent
 
 apk add --no-cache openrc
 apk add --no-cache util-linux
+apk add --no-cache curl
 
 ln -s agetty /etc/init.d/agetty.ttyS0
 echo ttyS0 >/etc/securetty
@@ -33,6 +34,8 @@ rc-update add agetty.ttyS0 default
 echo "root:root" | chpasswd
 
 addgroup -g 1000 -S nex && adduser -u 1000 -S nex -G nex
+curl https://binaries.nats.dev/nats-io/natscli/nats@latest | sh
+./nats context save nhg_tokens -s 192.168.127.1
 
 rc-update add devfs boot
 rc-update add procfs boot
@@ -46,5 +49,9 @@ for dir in dev proc run sys var tmp; do mkdir /tmp/rootfs/${dir}; done
 
 chmod 1777 /tmp/rootfs/tmp
 mkdir -p /tmp/rootfs/home/nex/
+mkdir -p /tmp/rootfs/home/nex/.config/nats/context
+mv /root/.config/nats/context/* /tmp/rootfs/home/nex/.config/nats/context/
+cat /tmp/rootfs/home/nex/.config/nats/context/*
+
 chown 1000:1000 /tmp/rootfs/home/nex/`
 )

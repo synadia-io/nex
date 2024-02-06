@@ -72,7 +72,7 @@ func main() {
 		return
 	}
 
-	err = fs.Truncate(1 * 1024 * 1024 * 100)
+	err = fs.Truncate(1 * 1024 * 1024 * 150)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -146,7 +146,7 @@ func build(ctx context.Context, tempdir string, mountPoint string) error {
 		return err
 	}
 
-	err = os.Chown(filepath.Join(mountPoint, "/home/nex"), 1000, 1000)
+	err = ChownRecursively(filepath.Join(mountPoint, "/home/nex"))
 	if err != nil {
 		return err
 	}
@@ -195,4 +195,20 @@ func build(ctx context.Context, tempdir string, mountPoint string) error {
 	}
 
 	return nil
+}
+
+func ChownRecursively(root string) error {
+	return filepath.Walk(root,
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			err = os.Chown(path, 1000, 1000)
+			if err != nil {
+				return err
+			} else {
+				fmt.Printf("File ownership of %s changed.\n", path)
+			}
+			return nil
+		})
 }
