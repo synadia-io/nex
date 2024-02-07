@@ -515,6 +515,37 @@ var _ = Describe("nex node", func() {
 									})
 								})
 							})
+
+							Describe("deploying a wasm workload", func() {
+								var deployRequest *controlapi.DeployRequest
+								var triggerSubject string
+								var err error
+
+								JustBeforeEach(func() {
+									triggerSubject = "helloworld"
+									deployRequest, err = newDeployRequest(*nodeID, "echofunction", "nex example echoservice", "../examples/wasm/echofunction/echofunction.wasm", map[string]string{}, []string{triggerSubject}, log)
+									Expect(err).To(BeNil())
+
+									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
+									_, err = nodeClient.StartWorkload(deployRequest)
+
+									time.Sleep(time.Millisecond * 2500)
+								})
+
+								Context("when the wasm is valid", func() {
+									It("should deploy the wasm workload", func(ctx SpecContext) {
+										Expect(err).To(BeNil())
+									})
+
+									It("should keep a reference to all running VMs", func(ctx SpecContext) {
+										Expect(len(managerProxy.VMs())).To(Equal(2))
+									})
+
+									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
+									})
+								})
+							})
 						})
 					})
 				})
