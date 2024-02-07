@@ -24,21 +24,20 @@ var (
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
-	DefaultResourceDir string `json:"default_resource_dir"`
-	KernelFilepath     string `json:"kernel_filepath"`
-	RootFsFilepath     string `json:"rootfs_filepath"`
-
 	CNI                 CNIDefinition     `json:"cni"`
-	ForensicMode        bool              `json:"-"`
+	DefaultResourceDir  string            `json:"default_resource_dir"`
 	ForceDepInstall     bool              `json:"-"`
 	InternalNodeHost    *string           `json:"internal_node_host,omitempty"`
 	InternalNodePort    *int              `json:"internal_node_port"`
+	KernelFilepath      string            `json:"kernel_filepath"`
 	MachinePoolSize     int               `json:"machine_pool_size"`
 	MachineTemplate     MachineTemplate   `json:"machine_template"`
 	OtelMetrics         bool              `json:"otel_metrics"`
 	OtelMetricsPort     int               `json:"otel_metrics_port"`
 	OtelMetricsExporter string            `json:"otel_metrics_exporter"`
+	PreserveNetwork     bool              `json:"preserve_network,omitempty"`
 	RateLimiters        *Limiters         `json:"rate_limiters,omitempty"`
+	RootFsFilepath      string            `json:"rootfs_filepath"`
 	Tags                map[string]string `json:"tags,omitempty"`
 	ValidIssuers        []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes       []string          `json:"workload_types,omitempty"`
