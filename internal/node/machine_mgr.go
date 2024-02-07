@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -115,6 +116,13 @@ func (m *MachineManager) Start() {
 			m.log.Debug(fmt.Sprintf("recovered: %s", r))
 		}
 	}()
+
+	if !m.config.PreserveNetwork {
+		err := m.resetCNI()
+		if err != nil {
+			m.log.Warn("Failed to reset network.", slog.Any("err", err))
+		}
+	}
 
 	for !m.stopping() {
 		select {
@@ -338,8 +346,31 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 	}
 }
 
-// TODO : look into also pre-removing /var/lib/cni/networks/fcnet/ during startup sequence
-// to ensure we get the full IP range
+func (m *MachineManager) resetCNI() error {
+	m.log.Info("Resetting network")
+
+	err := os.RemoveAll("/var/lib/cni")
+	if err != nil {
+		return err
+	}
+
+	err = os.Mkdir("/var/lib/cni", 0755)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("bash", "-c", "for name in $(ifconfig -a | sed 's/[ \t].*//;/^\\(lo\\|\\)$/d' | grep veth); do ip link delete $name; done")
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // Remove firecracker VM sockets created by this pid
 func (m *MachineManager) cleanSockets() {
