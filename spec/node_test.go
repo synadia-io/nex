@@ -422,7 +422,7 @@ var _ = Describe("nex node", func() {
 								})
 
 								It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-									Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
+									Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 								})
 							})
 
@@ -460,7 +460,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 
@@ -480,7 +480,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 							})
@@ -511,7 +511,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 							})
@@ -542,7 +542,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 							})

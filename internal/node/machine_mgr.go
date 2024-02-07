@@ -86,7 +86,7 @@ func NewMachineManager(
 		ctx:              ctx,
 
 		allVMs:  make(map[string]*runningFirecracker),
-		warmVMs: make(chan *runningFirecracker, config.MachinePoolSize-1),
+		warmVMs: make(chan *runningFirecracker, config.MachinePoolSize),
 	}
 
 	_, err := m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
@@ -129,6 +129,11 @@ func (m *MachineManager) Start() {
 		case <-m.ctx.Done():
 			return
 		default:
+			if len(m.warmVMs) == m.config.MachinePoolSize {
+				time.Sleep(runloopSleepInterval)
+				continue
+			}
+
 			vm, err := createAndStartVM(m.ctx, m.config, m.log)
 			if err != nil {
 				m.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
