@@ -161,4 +161,3 @@ func LoadNodeConfiguration(configFilepath string) (*NodeConfiguration, error) {
 
 	return &config, nil
 }
-
