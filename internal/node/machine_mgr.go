@@ -149,6 +149,10 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 		slog.String("vmid", vm.vmmID),
 		slog.String("status", status.String()))
 
+	vm.deployRequest = request
+	vm.namespace = *request.Namespace
+	vm.workloadStarted = time.Now().UTC()
+
 	subject := fmt.Sprintf("agentint.%s.deploy", vm.vmmID)
 	resp, err := m.ncInternal.Request(subject, bytes, 1*time.Second)
 	if err != nil {
@@ -166,6 +170,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 	}
 
 	if !deployResponse.Accepted {
+		_ = m.StopMachine(vm.vmmID)
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	} else if request.SupportsTriggerSubjects() {
 		for _, tsub := range request.TriggerSubjects {
@@ -239,10 +244,6 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 			)
 		}
 	}
-
-	vm.workloadStarted = time.Now().UTC()
-	vm.namespace = *request.Namespace
-	vm.deployRequest = request
 
 	m.t.workloadCounter.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
 	m.t.workloadCounter.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)), metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
