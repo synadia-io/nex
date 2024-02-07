@@ -333,13 +333,13 @@ func (n *Node) shutdown() {
 		_ = n.manager.Stop()
 		_ = n.publishNodeStopped()
 
-		_ = n.nc.Drain()
-		for !n.nc.IsClosed() {
+		_ = n.ncint.Drain()
+		for !n.ncint.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
 		}
 
-		_ = n.ncint.Drain()
-		for !n.ncint.IsClosed() {
+		_ = n.nc.Drain()
+		for !n.nc.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
 		}
 
