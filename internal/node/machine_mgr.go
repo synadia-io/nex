@@ -112,7 +112,7 @@ func (m *MachineManager) Start() {
 
 	defer func() {
 		if r := recover(); r != nil {
-			m.log.Info(fmt.Sprintf("recovered: %s", r))
+			m.log.Debug(fmt.Sprintf("recovered: %s", r))
 		}
 	}()
 
