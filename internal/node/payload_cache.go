@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
@@ -55,7 +56,7 @@ func (m *MachineManager) CacheWorkload(request *controlapi.DeployRequest) (uint6
 		return 0, nil, err
 	}
 
-	filename := path.Join(os.TempDir(), "sus") // lol... sus.
+	filename := path.Join(os.TempDir(), uuid.NewString())
 	err = store.GetFile(key, filename)
 	if err != nil {
 		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
