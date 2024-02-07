@@ -376,4 +376,3 @@ func extractNamespace(subject string) (string, error) {
 	}
 	return tokens[2], nil
 }
-

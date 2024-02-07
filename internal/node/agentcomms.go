@@ -109,4 +109,3 @@ func logPublishSubject(namespace string, node string, workload string, vm string
 	// $NEX.logs.{namespace}.{node}.{workload name}.{vm}
 	return fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, namespace, node, workload, vm)
 }
-
