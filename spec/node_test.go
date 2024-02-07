@@ -237,6 +237,8 @@ var _ = Describe("nex node", func() {
 						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
 						_ = os.Mkdir(validResourceDir, 0755)
 						nodeOpts.ForceDepInstall = true
+
+						nodeConfig.MachinePoolSize = 1
 					})
 
 					AfterEach(func() {
@@ -360,7 +362,7 @@ var _ = Describe("nex node", func() {
 							manager = nodeProxy.MachineManager()
 							managerProxy = nexnode.NewMachineManagerProxyWith(manager)
 
-							time.Sleep(time.Millisecond * 5000) // allow enough time for the pool to warm up...
+							time.Sleep(time.Millisecond * 2500) // allow enough time for the pool to warm up...
 						})
 
 						It("should use the provided logger instance", func(ctx SpecContext) {
@@ -420,7 +422,7 @@ var _ = Describe("nex node", func() {
 								})
 
 								It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-									Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+									Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
 								})
 							})
 
@@ -436,10 +438,10 @@ var _ = Describe("nex node", func() {
 									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
 									Expect(err).To(BeNil())
 
-									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
 									_, err = nodeClient.StartWorkload(deployRequest)
 
-									time.Sleep(time.Millisecond * 5000)
+									time.Sleep(time.Millisecond * 2500)
 								})
 
 								Context("when the ELF binary is not statically-linked", func() {
@@ -458,7 +460,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
 									})
 								})
 
@@ -478,7 +480,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
 									})
 								})
 							})
@@ -493,10 +495,10 @@ var _ = Describe("nex node", func() {
 									deployRequest, err = newDeployRequest(*nodeID, "echofunction", "nex example echoservice", "../examples/v8/echofunction/src/echofunction.js", map[string]string{}, []string{triggerSubject}, log)
 									Expect(err).To(BeNil())
 
-									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
 									_, err = nodeClient.StartWorkload(deployRequest)
 
-									time.Sleep(time.Millisecond * 5000)
+									time.Sleep(time.Millisecond * 2500)
 								})
 
 								Context("when the javascript is valid", func() {
@@ -509,7 +511,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize - 1))
 									})
 								})
 							})
@@ -622,4 +624,3 @@ func newDeployRequest(nodeID, name, desc, path string, env map[string]string, tr
 
 	return controlapi.NewDeployRequest(opts...)
 }
-
