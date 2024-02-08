@@ -24,6 +24,7 @@ import (
 )
 
 const defaultNatsStoreDir = "pnats"
+const defaultPidFilepath = "/var/run/nex.pid"
 
 const runloopSleepInterval = 250 * time.Millisecond
 const runloopTickInterval = 2500 * time.Millisecond
@@ -68,6 +69,11 @@ func NewNode(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Con
 	}
 
 	err := node.validateConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to start node: %s", err.Error())
+	}
+
+	err = node.createPid()
 	if err != nil {
 		return nil, fmt.Errorf("failed to start node: %s", err.Error())
 	}
@@ -126,6 +132,44 @@ func (n *Node) Start() {
 func (n *Node) Stop() {
 	n.log.Debug("stopping node")
 	n.shutdown()
+}
+
+func (n *Node) createPid() error {
+	if _, err := os.Stat(defaultPidFilepath); err == nil {
+		raw, err := os.ReadFile(defaultPidFilepath)
+		if err != nil {
+			return err
+		}
+
+		pid, err := strconv.Atoi(string(raw))
+		if err != nil {
+			return err
+		}
+
+		process, err := os.FindProcess(int(pid))
+		if err != nil {
+			return err
+		}
+
+		err = process.Signal(syscall.Signal(0))
+		if err == nil {
+			return fmt.Errorf("node process already running; pid: %d", pid)
+		}
+	}
+
+	f, err := os.Create(defaultPidFilepath)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write([]byte(fmt.Sprintf("%d", os.Getpid())))
+	if err != nil {
+		_ = os.Remove(defaultPidFilepath)
+		return err
+	}
+
+	n.log.Debug(fmt.Sprintf("Wrote pidfile to %s", defaultPidFilepath), slog.Int("pid", os.Getpid()))
+	return nil
 }
 
 func (n *Node) generateKeypair() error {
@@ -346,6 +390,8 @@ func (n *Node) shutdown() {
 		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
 		_ = n.telemetry.Shutdown()
+
+		_ = os.Remove(defaultPidFilepath)
 	}
 }
 
