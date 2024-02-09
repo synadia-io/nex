@@ -79,11 +79,15 @@ var _ = Describe("nex node", func() {
 
 			snapshotAgentRootFSPath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-rootfs.ext4", _fixtures.seededRand.Int()))
 			cmd := exec.Command("go", "run", "../agent/fc-image", "../agent/cmd/nex-agent/nex-agent")
-			_ = cmd.Start()
-			_ = cmd.Wait()
+			_, err = cmd.CombinedOutput()
+			Expect(err).To(BeNil())
+			Expect(cmd.ProcessState.ExitCode()).To(BeZero())
 
-			compressedRootFS, _ := os.Open("./rootfs.ext4.gz")
-			uncompressedRootFS, _ := gzip.NewReader(bufio.NewReader(compressedRootFS))
+			compressedRootFS, err := os.Open("./rootfs.ext4.gz")
+			Expect(err).To(BeNil())
+
+			uncompressedRootFS, err := gzip.NewReader(bufio.NewReader(compressedRootFS))
+			Expect(err).To(BeNil())
 
 			outFile, _ := os.Create(snapshotAgentRootFSPath)
 			defer outFile.Close()
