@@ -53,6 +53,7 @@ type MachineManager struct {
 	handshakeTimeout time.Duration // TODO: make configurable...
 
 	hostServices *HostServices
+	vmsubz       map[string][]*nats.Subscription
 
 	natsStoreDir string
 	publicKey    string
@@ -76,6 +77,7 @@ func NewMachineManager(
 
 	m := &MachineManager{
 		config:           config,
+		ctx:              ctx,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
 		kp:               nodeKeypair,
@@ -85,10 +87,11 @@ func NewMachineManager(
 		ncInternal:       ncint,
 		publicKey:        publicKey,
 		t:                telemetry,
-		ctx:              ctx,
 
 		allVMs:  make(map[string]*runningFirecracker),
 		warmVMs: make(chan *runningFirecracker, config.MachinePoolSize),
+
+		vmsubz: make(map[string][]*nats.Subscription),
 	}
 
 	_, err := m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
@@ -196,7 +199,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	} else if request.SupportsTriggerSubjects() {
 		for _, tsub := range request.TriggerSubjects {
-			_, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
+			sub, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
 			if err != nil {
 				m.log.Error("Failed to create trigger subject subscription for deployed workload",
 					slog.String("vmid", vm.vmmID),
@@ -213,6 +216,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 				slog.String("trigger_subject", tsub),
 				slog.String("workload_type", *request.WorkloadType),
 			)
+
+			m.vmsubz[vm.vmmID] = append(m.vmsubz[vm.vmmID], sub)
 		}
 	}
 
@@ -262,8 +267,18 @@ func (m *MachineManager) StopMachine(vmID string) error {
 		}
 	}
 
+	for _, sub := range m.vmsubz[vmID] {
+		err := sub.Drain()
+		if err != nil {
+			m.log.Warn(fmt.Sprintf("failed to drain subscription to subject %s associated with vm %s: %s", sub.Subject, vmID, err.Error()))
+		}
+
+		m.log.Debug(fmt.Sprintf("drained subscription to subject %s associated with vm %s", sub.Subject, vmID))
+	}
+
 	vm.shutdown()
 	delete(m.allVMs, vmID)
+	delete(m.vmsubz, vmID)
 
 	_ = m.publishMachineStopped(vm)
 
