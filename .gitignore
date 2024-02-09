@@ -31,3 +31,5 @@ dist/
 # nex binaries
 nex/nex
 rootfs.ext4
+
+.idea
