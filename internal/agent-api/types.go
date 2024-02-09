@@ -1,6 +1,7 @@
 package agentapi
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"strings"
@@ -117,6 +118,11 @@ type HandshakeRequest struct {
 	MachineID *string   `json:"machine_id"`
 	StartTime time.Time `json:"start_time"`
 	Message   *string   `json:"message,omitempty"`
+}
+
+type HostServicesKeyValueRequest struct {
+	Key   *string          `json:"key"`
+	Value *json.RawMessage `json:"value,omitempty"`
 }
 
 type MachineMetadata struct {

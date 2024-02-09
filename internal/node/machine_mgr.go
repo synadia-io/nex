@@ -52,6 +52,8 @@ type MachineManager struct {
 	handshakes       map[string]string
 	handshakeTimeout time.Duration // TODO: make configurable...
 
+	hostServices *HostServices
+
 	natsStoreDir string
 	publicKey    string
 }
@@ -101,6 +103,13 @@ func NewMachineManager(
 
 	_, err = m.ncInternal.Subscribe("agentint.*.logs", m.handleAgentLog)
 	if err != nil {
+		return nil, err
+	}
+
+	m.hostServices = NewHostServices(m, m.nc, m.ncInternal, m.log)
+	err = m.hostServices.init()
+	if err != nil {
+		m.log.Warn("Failed to initialize host services.", slog.Any("err", err))
 		return nil, err
 	}
 
