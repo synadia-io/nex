@@ -1,8 +1,10 @@
 package lib
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -13,6 +15,13 @@ import (
 )
 
 const (
+	hostServicesObjectName           = "hostServices"
+	hostServicesKVObjectName         = "kv"
+	hostServicesKVGetFunctionName    = "get"
+	hostServicesKVSetFunctionName    = "set"
+	hostServicesKVDeleteFunctionName = "delete"
+	hostServicesKVKeysFunctionName   = "keys"
+
 	nexTriggerSubject = "x-nex-trigger-subject"
 	nexRuntimeNs      = "x-nex-runtime-ns"
 
@@ -23,6 +32,7 @@ const (
 type V8 struct {
 	environment map[string]string
 	name        string
+	namespace   string
 	tmpFilename string
 	totalBytes  int32
 	vmID        string
@@ -31,12 +41,13 @@ type V8 struct {
 	run  chan bool
 	exit chan int
 
-	// stderr io.Writer
-	// stdout io.Writer
+	stderr io.Writer
+	stdout io.Writer
 
 	nc *nats.Conn // agent NATS connection
 
 	ctx *v8.Context
+	iso *v8.Isolate
 	ubs *v8.UnboundScript
 }
 
@@ -51,7 +62,7 @@ func (v *V8) Deploy() error {
 		startTime := time.Now()
 		val, err := v.Execute(msg.Header.Get(nexTriggerSubject), msg.Data)
 		if err != nil {
-			// TODO-- propagate this error to agent logs
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to execute function on trigger subject %s: %s", subject, err.Error())))
 			return
 		}
 
@@ -63,7 +74,7 @@ func (v *V8) Deploy() error {
 			},
 		})
 		if err != nil {
-			// TODO-- propagate this error to agent logs
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to write %d-byte response: %s", len(val), err.Error())))
 			return
 		}
 	})
@@ -149,8 +160,17 @@ func (v *V8) Undeploy() error {
 // Validate has the side effect of compiling the executable javascript source
 // code and setting `ubs` on the underlying V8 execution provider instance.
 func (v *V8) Validate() error {
-	if v.ctx == nil {
-		return fmt.Errorf("invalid state for validation; no v8 context available for vm: %s", v.name)
+	if v.iso == nil {
+		return fmt.Errorf("invalid state for validation; v8 isolate not initialized for vm: %s", v.name)
+	}
+
+	if v.ctx != nil {
+		return fmt.Errorf("invalid state for validation; v8 context already initialized for vm: %s", v.name)
+	}
+
+	err := v.initV8Context()
+	if err != nil {
+		return fmt.Errorf("failed to initialize v8 context: %s", err)
 	}
 
 	f, err := os.Open(v.tmpFilename)
@@ -170,7 +190,7 @@ func (v *V8) Validate() error {
 
 	src, err := os.ReadFile(v.tmpFilename)
 	if err != nil {
-		return fmt.Errorf("failed to open source for execution: %s", err)
+		return fmt.Errorf("failed to open source for validation: %s", err)
 	}
 
 	v.ubs, err = v.ctx.Isolate().CompileUnboundScript(string(src), v.tmpFilename, v8.CompileOptions{})
@@ -179,6 +199,159 @@ func (v *V8) Validate() error {
 	}
 
 	return nil
+}
+
+func (v *V8) initV8Context() error {
+	global := v8.NewObjectTemplate(v.iso)
+
+	hostServices, err := v.newHostServicesTemplate()
+	if err != nil {
+		return err
+	}
+
+	err = global.Set(hostServicesObjectName, hostServices)
+	if err != nil {
+		return err
+	}
+
+	v.ctx = v8.NewContext(v.iso, global)
+
+	return nil
+}
+
+// agentint.{vmID}.rpc.{namespace}.{service}.{method}
+func (v *V8) keyValueServiceSubject(method string) string {
+	return fmt.Sprintf("agentint.%s.rpc.%s.kv.%s", v.vmID, v.namespace, method)
+}
+
+func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
+	hostServices := v8.NewObjectTemplate(v.iso)
+	kv := v8.NewObjectTemplate(v.iso)
+
+	_ = kv.Set(hostServicesKVGetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) != 1 {
+			val, _ := v8.NewValue(v.iso, false)
+			return val
+		}
+
+		key := args[0].String()
+
+		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
+			Key: &key,
+		})
+
+		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVGetFunctionName), req, time.Millisecond*250)
+		if err != nil {
+			// TODO- log
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		var kvresp *agentapi.HostServicesKeyValueRequest
+		err = json.Unmarshal(resp.Data, &kvresp)
+		if err != nil {
+			// TODO- log
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		val, err := v8.JSONParse(v.ctx, string(*kvresp.Value))
+		if err != nil {
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		return val
+	}))
+
+	_ = kv.Set(hostServicesKVSetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) != 2 {
+			val, _ := v8.NewValue(v.iso, false)
+			return val
+		}
+
+		key := args[0].String()
+		value := args[1]
+
+		raw, err := value.MarshalJSON()
+		if err != nil {
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		val := json.RawMessage(raw)
+		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
+			Key:   &key,
+			Value: &val,
+		})
+
+		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVSetFunctionName), req, time.Millisecond*250)
+		if err != nil {
+			// TODO- log
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		var kvresp *agentapi.HostServicesKeyValueRequest
+		err = json.Unmarshal(resp.Data, &kvresp)
+		if err != nil {
+			// TODO- log
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		if !*kvresp.Success {
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		return nil
+	}))
+
+	_ = kv.Set(hostServicesKVDeleteFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) != 1 {
+			val, _ := v8.NewValue(v.iso, false)
+			return val
+		}
+
+		key := args[0].String()
+
+		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
+			Key: &key,
+		})
+
+		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVDeleteFunctionName), req, time.Millisecond*250)
+		if err != nil {
+			// TODO- log
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		var kvresp *agentapi.HostServicesKeyValueRequest
+		err = json.Unmarshal(resp.Data, &kvresp)
+		if err != nil {
+			// TODO- log
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		if !*kvresp.Success {
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		return nil
+	}))
+
+	err := hostServices.Set(hostServicesKVObjectName, kv)
+	if err != nil {
+		return nil, err
+	}
+
+	return hostServices, nil
 }
 
 // convenience method to initialize a V8 execution provider
@@ -198,18 +371,20 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 	return &V8{
 		environment: params.Environment,
 		name:        *params.WorkloadName,
+		namespace:   *params.Namespace,
 		tmpFilename: *params.TmpFilename,
 		totalBytes:  0, // FIXME
 		vmID:        params.VmID,
 
-		// stderr: params.Stderr,
-		// stdout: params.Stdout,
+		stderr: params.Stderr,
+		stdout: params.Stdout,
 
 		fail: params.Fail,
 		run:  params.Run,
 		exit: params.Exit,
 
 		nc:  params.NATSConn,
-		ctx: v8.NewContext(),
+		ctx: nil,
+		iso: v8.NewIsolate(),
 	}, nil
 }

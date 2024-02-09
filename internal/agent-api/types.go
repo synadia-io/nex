@@ -63,11 +63,11 @@ type DeployRequest struct {
 	Description     *string           `json:"description"`
 	Environment     map[string]string `json:"environment"`
 	Hash            string            `json:"hash,omitempty"`
+	Namespace       *string           `json:"namespace,omitempty"`
 	TotalBytes      int64             `json:"total_bytes,omitempty"`
 	TriggerSubjects []string          `json:"trigger_subjects"`
 	WorkloadName    *string           `json:"workload_name,omitempty"`
 	WorkloadType    *string           `json:"workload_type,omitempty"`
-	Namespace       *string           `json:"namespace,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`
@@ -123,6 +123,9 @@ type HandshakeRequest struct {
 type HostServicesKeyValueRequest struct {
 	Key   *string          `json:"key"`
 	Value *json.RawMessage `json:"value,omitempty"`
+
+	Revision int64 `json:"revision,omitempty"`
+	Success  *bool `json:"success,omitempty"`
 }
 
 type MachineMetadata struct {
