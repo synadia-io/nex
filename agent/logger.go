@@ -1,11 +1,13 @@
 package nexagent
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
+
+const NexEventSourceNexAgent = "nex-agent"
 
 // logEmitter implements the writer interface that allows us to capture a workload's
 // stdout and stderr so that we can then publish those logs to the host node
@@ -35,41 +37,53 @@ func (l *logEmitter) Write(bytes []byte) (int, error) {
 	return len(bytes), nil
 }
 
-// Run inside a goroutine to pull event entries and publish them to the node host.
-func (a *Agent) dispatchEvents() {
-	for {
-		entry := <-a.eventLogs
-		bytes, err := json.Marshal(entry)
-		if err != nil {
-			continue
-		}
-
-		subject := fmt.Sprintf("agentint.%s.events.%s", *a.md.VmId, entry.Type())
-		err = a.nc.Publish(subject, bytes)
-		if err != nil {
-			continue
-		}
-
-		a.nc.Flush()
-	}
+func (a *Agent) LogDebug(msg string) {
+	a.submitLog(msg, agentapi.LogLevelDebug)
+	fmt.Fprintln(os.Stdout, msg)
 }
 
-// This is run inside a goroutine to pull log entries off the channel and publish to the
-// node host via internal NATS
-func (a *Agent) dispatchLogs() {
-	for {
-		entry := <-a.agentLogs
-		bytes, err := json.Marshal(entry)
-		if err != nil {
-			continue
-		}
+func (a *Agent) LogError(msg string) {
+	a.submitLog(msg, agentapi.LogLevelError)
+	fmt.Fprintln(os.Stderr, msg)
+}
 
-		subject := fmt.Sprintf("agentint.%s.logs", *a.md.VmId)
-		err = a.nc.Publish(subject, bytes)
-		if err != nil {
-			continue
-		}
+func (a *Agent) LogInfo(msg string) {
+	a.submitLog(msg, agentapi.LogLevelInfo)
+	fmt.Fprintln(os.Stdout, msg)
+}
 
-		a.nc.Flush()
+// FIXME-- revisit error handling
+func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes int64) {
+	a.agentLogs <- &agentapi.LogEntry{
+		Source: NexEventSourceNexAgent,
+		Level:  agentapi.LogLevelInfo,
+		Text:   fmt.Sprintf("Workload %s deployed", workloadName),
 	}
+
+	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStartedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName})
+	a.eventLogs <- &evt
+}
+
+// PublishWorkloadExited publishes a workload failed or stopped message
+// FIXME-- revisit error handling
+func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bool, code int) {
+	level := agentapi.LogLevelInfo
+	if err {
+		level = agentapi.LogLevelError
+	}
+
+	// FIXME-- this hack is here to get things working... refactor me
+	txt := fmt.Sprintf("Workload %s exited", workloadName)
+	if code == -1 {
+		txt = fmt.Sprintf("Workload %s failed to deploy", workloadName)
+	}
+
+	a.agentLogs <- &agentapi.LogEntry{
+		Source: NexEventSourceNexAgent,
+		Level:  agentapi.LogLevel(level),
+		Text:   txt,
+	}
+
+	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStoppedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
+	a.eventLogs <- &evt
 }

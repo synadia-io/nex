@@ -123,7 +123,7 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 	}
 
 	md := agentapi.MachineMetadata{
-		VmId:         &vmmID,
+		VmID:         &vmmID,
 		NodeNatsHost: config.InternalNodeHost,
 		NodeNatsPort: config.InternalNodePort,
 		Message:      agentapi.StringOrNil("Host-supplied metadata"),
