@@ -1,12 +1,15 @@
 package nexagent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path"
+	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
@@ -16,6 +19,8 @@ import (
 )
 
 const defaultAgentHandshakeTimeoutMillis = 250
+const runloopSleepInterval = 250 * time.Millisecond
+const runloopTickInterval = 2500 * time.Millisecond
 const workloadExecutionSleepTimeoutMillis = 1000
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
@@ -25,6 +30,11 @@ type Agent struct {
 	agentLogs chan *agentapi.LogEntry
 	eventLogs chan *cloudevents.Event
 
+	cancelF context.CancelFunc
+	closing uint32
+	ctx     context.Context
+	sigs    chan os.Signal
+
 	provider providers.ExecutionProvider
 
 	cacheBucket nats.ObjectStore
@@ -33,8 +43,21 @@ type Agent struct {
 	started     time.Time
 }
 
+// HaltVM stops the firecracker VM
+func HaltVM(err error) {
+	if err != nil {
+		// On the off chance the agent's log is captured from the vm
+		fmt.Fprintf(os.Stderr, "Terminating Firecracker VM due to fatal error: %s\n", err)
+	}
+
+	err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to reboot: %s", err)
+	}
+}
+
 // Initialize a new agent to facilitate communications with the host
-func NewAgent() (*Agent, error) {
+func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	metadata, err := GetMachineMetadata()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to get mmds data: %s", err)
@@ -64,17 +87,15 @@ func NewAgent() (*Agent, error) {
 	}
 
 	return &Agent{
-		agentLogs:   make(chan *agentapi.LogEntry),
-		eventLogs:   make(chan *cloudevents.Event),
+		agentLogs:   make(chan *agentapi.LogEntry, 64),
+		eventLogs:   make(chan *cloudevents.Event, 64),
+		cancelF:     cancelF,
+		ctx:         ctx,
 		cacheBucket: bucket,
 		md:          metadata,
 		nc:          nc,
 		started:     time.Now().UTC(),
 	}, nil
-}
-
-func (a *Agent) Version() string {
-	return VERSION
 }
 
 func (a *Agent) FullVersion() string {
@@ -83,39 +104,41 @@ func (a *Agent) FullVersion() string {
 
 // Start the agent
 // NOTE: agent process will request vm shutdown if this fails
-func (a *Agent) Start() error {
-	err := a.RequestHandshake()
+func (a *Agent) Start() {
+	// n.log.Info("starting agent")
+
+	err := a.init()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
-		return err
+		panic(err)
 	}
 
-	subject := fmt.Sprintf("agentint.%s.deploy", *a.md.VmId)
-	_, err = a.nc.Subscribe(subject, a.handleDeploy)
-	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err))
-		return err
+	timer := time.NewTicker(runloopTickInterval)
+	defer timer.Stop()
+
+	for !a.shuttingDown() {
+		select {
+		case <-timer.C:
+			// TODO: check NATS subscription statuses, etc.
+		case sig := <-a.sigs:
+			// a.log.Debug("received signal: %s", sig)
+			fmt.Printf("received signal: %s", sig)
+			a.shutdown()
+		case <-a.ctx.Done():
+			close(a.sigs)
+		default:
+			time.Sleep(runloopSleepInterval)
+		}
 	}
 
-	udsubject := fmt.Sprintf("agentint.%s.undeploy", *a.md.VmId)
-	_, err = a.nc.Subscribe(udsubject, a.handleUndeploy)
-	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err))
-		return err
-	}
-
-	go a.startDiagnosticEndpoint()
-	go a.dispatchEvents()
-	go a.dispatchLogs()
-
-	return nil
+	// a.log.Info("exiting agent")
+	a.cancelF()
 }
 
 // Request a handshake with the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) RequestHandshake() error {
 	msg := agentapi.HandshakeRequest{
-		MachineId: a.md.VmId,
+		MachineID: a.md.VmID,
 		StartTime: a.started,
 		Message:   a.md.Message,
 	}
@@ -129,6 +152,75 @@ func (a *Agent) RequestHandshake() error {
 
 	a.LogInfo("Agent is up")
 	return nil
+}
+
+func (a *Agent) Version() string {
+	return VERSION
+}
+
+// cacheExecutableArtifact uses the underlying agent configuration to fetch
+// the executable workload artifact from the cache bucket, write it to a
+// temporary file and make it executable; this method returns the full
+// path to the cached artifact if successful
+func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
+	tempFile := path.Join(os.TempDir(), "workload") // FIXME-- randomly generate a filename
+
+	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to write workload artifact to temp dir: %s", err)
+		a.LogError(msg)
+		return nil, errors.New(msg)
+	}
+
+	err = os.Chmod(tempFile, 0777)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to set workload artifact as executable: %s", err)
+		a.LogError(msg)
+		return nil, errors.New(msg)
+	}
+
+	return &tempFile, nil
+}
+
+// Run inside a goroutine to pull event entries and publish them to the node host.
+func (a *Agent) dispatchEvents() {
+	for !a.shuttingDown() {
+		entry := <-a.eventLogs
+		bytes, err := json.Marshal(entry)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to marshal event log to json: %s", err.Error())
+			continue
+		}
+
+		subject := fmt.Sprintf("agentint.%s.events.%s", *a.md.VmID, entry.Type())
+		err = a.nc.Publish(subject, bytes)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to publish event: %s", err.Error())
+			continue
+		}
+
+		a.nc.Flush()
+	}
+}
+
+// This is run inside a goroutine to pull log entries off the channel and publish to the
+// node host via internal NATS
+func (a *Agent) dispatchLogs() {
+	for !a.shuttingDown() {
+		entry := <-a.agentLogs
+		bytes, err := json.Marshal(entry)
+		if err != nil {
+			continue
+		}
+
+		subject := fmt.Sprintf("agentint.%s.logs", *a.md.VmID)
+		err = a.nc.Publish(subject, bytes)
+		if err != nil {
+			continue
+		}
+
+		a.nc.Flush()
+	}
 }
 
 // Pull a deploy request off the wire, get the payload from the shared
@@ -197,34 +289,52 @@ func (a *Agent) handleUndeploy(m *nats.Msg) {
 	_ = m.Respond([]byte{})
 }
 
-// cacheExecutableArtifact uses the underlying agent configuration to fetch
-// the executable workload artifact from the cache bucket, write it to a
-// temporary file and make it executable; this method returns the full
-// path to the cached artifact if successful
-func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
-	tempFile := path.Join(os.TempDir(), "workload") // FIXME-- randomly generate a filename
+// At the moment this is really not much more than an HTTP ping to verify that the host
+// can talk to the agent. As agent functionality progresses, we'll likely add more to
+// this
+func (a *Agent) handleHealthz(w http.ResponseWriter, req *http.Request) {
+	res := struct {
+		Started string `json:"started"`
+	}{
+		Started: a.started.Format(time.RFC3339),
+	}
+	bytes, _ := json.Marshal(res)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(bytes)
+}
 
-	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
+func (a *Agent) init() error {
+	err := a.RequestHandshake()
 	if err != nil {
-		msg := fmt.Sprintf("Failed to write workload artifact to temp dir: %s", err)
-		a.LogError(msg)
-		return nil, errors.New(msg)
+		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
+		return err
 	}
 
-	err = os.Chmod(tempFile, 0777)
+	subject := fmt.Sprintf("agentint.%s.deploy", *a.md.VmID)
+	_, err = a.nc.Subscribe(subject, a.handleDeploy)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to set workload artifact as executable: %s", err)
-		a.LogError(msg)
-		return nil, errors.New(msg)
+		a.LogError(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err))
+		return err
 	}
 
-	return &tempFile, nil
+	udsubject := fmt.Sprintf("agentint.%s.undeploy", *a.md.VmID)
+	_, err = a.nc.Subscribe(udsubject, a.handleUndeploy)
+	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err))
+		return err
+	}
+
+	go a.startDiagnosticEndpoint()
+	go a.dispatchEvents()
+	go a.dispatchLogs()
+
+	return nil
 }
 
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
 func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
-	if a.md.VmId == nil {
+	if a.md.VmID == nil {
 		return nil, errors.New("vm id is required to initialize execution provider params")
 	}
 
@@ -237,7 +347,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 		Stderr:        &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
 		Stdout:        &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
 		TmpFilename:   &tmpFile,
-		VmID:          *a.md.VmId,
+		VmID:          *a.md.VmID,
 
 		Fail: make(chan bool),
 		Run:  make(chan bool),
@@ -276,6 +386,35 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 	return params, nil
 }
 
+func (a *Agent) shutdown() {
+	if atomic.AddUint32(&a.closing, 1) == 1 {
+		_ = a.nc.Drain()
+		for !a.nc.IsClosed() {
+			time.Sleep(time.Millisecond * 25)
+		}
+
+		HaltVM(nil)
+	}
+}
+
+func (a *Agent) shuttingDown() bool {
+	return (atomic.LoadUint32(&a.closing) > 0)
+}
+
+func (a *Agent) startDiagnosticEndpoint() {
+	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
+	http.HandleFunc("/healthz", a.handleHealthz)
+	_ = http.ListenAndServe(":9999", nil)
+}
+
+func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
+	a.agentLogs <- &agentapi.LogEntry{
+		Source: NexEventSourceNexAgent,
+		Level:  lvl,
+		Text:   msg,
+	}
+}
+
 // workAck ACKs the provided NATS message by responding with the
 // accepted status of the attempted work request and associated message
 func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
@@ -296,27 +435,4 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	}
 
 	return nil
-}
-
-func (a *Agent) startDiagnosticEndpoint() {
-	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
-	http.HandleFunc("/healthz", handleHealthz(a))
-	_ = http.ListenAndServe(":9999", nil)
-}
-
-// At the moment this is really not much more than an HTTP ping to verify that the host
-// can talk to the agent. As agent functionality progresses, we'll likely add more to
-// this
-func handleHealthz(a *Agent) func(w http.ResponseWriter, req *http.Request) {
-	return func(w http.ResponseWriter, _req *http.Request) {
-
-		res := struct {
-			Started string `json:"started"`
-		}{
-			Started: a.started.Format(time.RFC3339),
-		}
-		bytes, _ := json.Marshal(res)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(bytes)
-	}
 }

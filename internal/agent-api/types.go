@@ -114,13 +114,13 @@ type DeployResponse struct {
 }
 
 type HandshakeRequest struct {
-	MachineId *string   `json:"machine_id"`
+	MachineID *string   `json:"machine_id"`
 	StartTime time.Time `json:"start_time"`
 	Message   *string   `json:"message,omitempty"`
 }
 
 type MachineMetadata struct {
-	VmId         *string `json:"vmid"`
+	VmID         *string `json:"vmid"`
 	NodeNatsHost *string `json:"node_nats_host"`
 	NodeNatsPort *int    `json:"node_nats_port"`
 	Message      *string `json:"message"`
@@ -131,7 +131,7 @@ type MachineMetadata struct {
 func (m *MachineMetadata) Validate() bool {
 	var err error
 
-	if m.VmId == nil {
+	if m.VmID == nil {
 		err = errors.Join(err, errors.New("vm id is required"))
 	}
 
