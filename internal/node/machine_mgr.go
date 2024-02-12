@@ -187,7 +187,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	} else if request.SupportsTriggerSubjects() {
 		for _, tsub := range request.TriggerSubjects {
-			_, err := m.nc.Subscribe(tsub, triggerHandler(vm, tsub, request, m))
+			_, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
 			if err != nil {
 				m.log.Error("Failed to create trigger subject subscription for deployed workload",
 					slog.String("vmid", vm.vmmID),
@@ -195,8 +195,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 					slog.String("workload_type", *request.WorkloadType),
 					slog.Any("err", err),
 				)
-				// TODO-- rollback the otherwise accepted deployment and return the error below...
-				// return err
+				_ = m.StopMachine(vm.vmmID)
+				return err
 			}
 
 			m.log.Info("Created trigger subject subscription for deployed workload",
@@ -479,7 +479,7 @@ func (m *MachineManager) stopping() bool {
 	return (atomic.LoadUint32(&m.closing) > 0)
 }
 
-func triggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest, m *MachineManager) func(msg *nats.Msg) {
+func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
 		intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
 		intmsg.Data = msg.Data
