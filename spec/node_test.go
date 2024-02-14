@@ -55,7 +55,9 @@ var _ = Describe("nex node", func() {
 
 	BeforeEach(func() {
 		ctxx, cancel = context.WithCancel(context.Background())
-		log = slog.New(slog.NewTextHandler(os.Stdout, nil))
+		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		}))
 
 		opts = &models.Options{
 			Servers: _fixtures.natsServer.ClientURL(),
@@ -245,6 +247,7 @@ var _ = Describe("nex node", func() {
 						node.Stop()
 
 						node = nil
+						nodeID = nil
 						nodeProxy = nil
 					})
 
@@ -362,7 +365,7 @@ var _ = Describe("nex node", func() {
 							manager = nodeProxy.MachineManager()
 							managerProxy = nexnode.NewMachineManagerProxyWith(manager)
 
-							time.Sleep(time.Millisecond * 2500) // allow enough time for the pool to warm up...
+							time.Sleep(time.Millisecond * 1000) // allow enough time for the pool to warm up...
 						})
 
 						It("should use the provided logger instance", func(ctx SpecContext) {
@@ -452,7 +455,7 @@ var _ = Describe("nex node", func() {
 									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
 									_, err = nodeClient.StartWorkload(deployRequest)
 
-									time.Sleep(time.Millisecond * 2500)
+									time.Sleep(time.Millisecond * 1000)
 								})
 
 								Context("when the ELF binary is not statically-linked", func() {
@@ -512,7 +515,7 @@ var _ = Describe("nex node", func() {
 											_, err = nodeClient.StartWorkload(deployRequest)
 											Expect(err).To(BeNil())
 
-											time.Sleep(time.Millisecond * 2500)
+											time.Sleep(time.Millisecond * 1000)
 										})
 
 										It("should deploy the v8 workload", func(ctx SpecContext) {
@@ -544,47 +547,47 @@ var _ = Describe("nex node", func() {
 								})
 
 								Describe("host services", func() {
-									JustBeforeEach(func() {
-										triggerSubject = "hellohostservices"
-										deployRequest, err = newDeployRequest(*nodeID, "echofunction", "nex host services example", "../examples/v8/echofunction/src/hostservices.js", map[string]string{}, []string{triggerSubject}, log)
-										Expect(err).To(BeNil())
-
-										nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-										_, err = nodeClient.StartWorkload(deployRequest)
-										Expect(err).To(BeNil())
-
-										time.Sleep(time.Millisecond * 2500)
-									})
-
-									// Describe("key/value service", func() {
-									Describe("triggering the deployed function", func() {
-										var respmsg *nats.Msg
-
+									Context("when the javascript is valid", func() {
 										JustBeforeEach(func() {
-											respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*5000)
+											triggerSubject = "hellohostservices"
+											deployRequest, err = newDeployRequest(*nodeID, "hostservices", "nex host services example", "../examples/v8/echofunction/src/hostservices.js", map[string]string{}, []string{triggerSubject}, log)
 											Expect(err).To(BeNil())
+
+											nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
+											_, err = nodeClient.StartWorkload(deployRequest)
+											Expect(err).To(BeNil())
+
+											time.Sleep(time.Millisecond * 1000)
 										})
 
-										It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
-											Expect(respmsg).NotTo(BeNil())
+										Describe("triggering the deployed function", func() {
+											var respmsg *nats.Msg
 
-											type hostServicesExampleResp struct {
-												Keys   []string `json:"keys"`
-												Hello2 string   `json:"hello2"`
-											}
+											JustBeforeEach(func() {
+												respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*15000)
+												Expect(err).To(BeNil())
+											})
 
-											var resp *hostServicesExampleResp
-											err = json.Unmarshal(respmsg.Data, &resp)
-											Expect(err).To(BeNil())
+											It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
+												Expect(respmsg).NotTo(BeNil())
 
-											Expect(resp).ToNot(BeNil())
+												type hostServicesExampleResp struct {
+													Keys   []string `json:"keys"`
+													Hello2 string   `json:"hello2"`
+												}
 
-											Expect(len(resp.Keys)).To(Equal(1))
-											Expect(resp.Keys[0]).To(Equal("hello2"))
-											Expect(resp.Hello2).To(Equal("hello!"))
+												var resp *hostServicesExampleResp
+												err = json.Unmarshal(respmsg.Data, &resp)
+												Expect(err).To(BeNil())
+
+												Expect(resp).ToNot(BeNil())
+
+												Expect(len(resp.Keys)).To(Equal(1))
+												Expect(resp.Keys[0]).To(Equal("hello2"))
+												Expect(resp.Hello2).To(Equal("hello!"))
+											})
 										})
 									})
-									// })
 								})
 							})
 
@@ -601,7 +604,7 @@ var _ = Describe("nex node", func() {
 									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
 									_, err = nodeClient.StartWorkload(deployRequest)
 
-									time.Sleep(time.Millisecond * 2500)
+									time.Sleep(time.Millisecond * 1000)
 								})
 
 								Context("when the wasm is valid", func() {
