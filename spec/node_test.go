@@ -428,6 +428,17 @@ var _ = Describe("nex node", func() {
 								It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
 									Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 								})
+
+								It("should assign 192.168.127.2 to the first warm VM in the pool", func(ctx SpecContext) {
+									var vmID string
+									for k := range managerProxy.VMs() {
+										vmID = k
+										break
+									}
+
+									vm := nexnode.NewVMProxyWith(managerProxy.VMs()[vmID])
+									Expect(vm.IP().String()).To(Equal("192.168.127.2"))
+								})
 							})
 
 							Describe("deploying an ELF binary workload", func() {

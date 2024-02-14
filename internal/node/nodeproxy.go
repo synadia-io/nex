@@ -2,6 +2,7 @@ package nexnode
 
 import (
 	"log/slog"
+	"net"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
@@ -77,4 +78,16 @@ func (m *MachineManagerProxy) VMs() map[string]*runningFirecracker {
 
 func (m *MachineManagerProxy) PoolVMs() chan *runningFirecracker {
 	return m.m.warmVMs
+}
+
+type VMProxy struct {
+	vm *runningFirecracker
+}
+
+func NewVMProxyWith(vm *runningFirecracker) *VMProxy {
+	return &VMProxy{vm: vm}
+}
+
+func (v *VMProxy) IP() net.IP {
+	return v.vm.ip
 }
