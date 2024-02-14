@@ -382,7 +382,7 @@ func (m *MachineManager) publishFunctionExecSucceeded(vm *runningFirecracker, ts
 	return m.nc.Flush()
 }
 
-func (m *MachineManager) publishFuncExecFailed(vm *runningFirecracker, workload string, tsub string, origErr error) error {
+func (m *MachineManager) publishFunctionExecFailed(vm *runningFirecracker, workload string, tsub string, origErr error) error {
 
 	functionExecFailed := struct {
 		Name      string `json:"workload_name"`
@@ -497,7 +497,7 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 			m.t.functionFailedTriggers.Add(m.ctx, 1)
 			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-			_ = m.publishFuncExecFailed(vm, *request.WorkloadName, tsub, err)
+			_ = m.publishFunctionExecFailed(vm, *request.WorkloadName, tsub, err)
 		} else if resp != nil {
 			runtimeNs := resp.Header.Get(nexRuntimeNs)
 			m.log.Debug("Received response from execution via trigger subject",
