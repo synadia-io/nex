@@ -256,6 +256,9 @@ var _ = Describe("nex node", func() {
 					})
 
 					JustBeforeEach(func() {
+						cfg, _ := json.Marshal(nodeConfig)
+						_ = os.WriteFile(nodeOpts.ConfigFilepath, cfg, 0644)
+
 						_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 						node, _ = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
 						go node.Start()
@@ -362,10 +365,6 @@ var _ = Describe("nex node", func() {
 						})
 
 						JustBeforeEach(func() {
-							nodeConfig.DefaultResourceDir = validResourceDir
-							_ = os.Mkdir(validResourceDir, 0755)
-							nodeOpts.ForceDepInstall = true
-
 							manager = nodeProxy.MachineManager()
 							managerProxy = nexnode.NewMachineManagerProxyWith(manager)
 
