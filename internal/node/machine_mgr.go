@@ -187,58 +187,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	} else if request.SupportsTriggerSubjects() {
 		for _, tsub := range request.TriggerSubjects {
-			_, err := m.nc.Subscribe(tsub, func(msg *nats.Msg) {
-				intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
-				intmsg.Data = msg.Data
-				intmsg.Header.Add(nexTriggerSubject, msg.Subject)
-
-				resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
-				if err != nil {
-					m.log.Error("Failed to request agent execution via internal trigger subject",
-						slog.Any("err", err),
-						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
-						slog.String("vmid", vm.vmmID),
-					)
-
-					m.t.functionFailedTriggers.Add(m.ctx, 1)
-					m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-				} else if resp != nil {
-					runtimeNs := resp.Header.Get(nexRuntimeNs)
-					m.log.Debug("Received response from execution via trigger subject",
-						slog.String("vmid", vm.vmmID),
-						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
-						slog.String("function_run_time_nanosec", runtimeNs),
-						slog.Int("payload_size", len(resp.Data)),
-					)
-
-					runTimeNs64, err := strconv.ParseInt(runtimeNs, 10, 64)
-					if err != nil {
-						m.log.Warn("failed to log function runtime", slog.Any("err", err))
-					}
-
-					m.t.functionTriggers.Add(m.ctx, 1)
-					m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-					m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64)
-					m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-					m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-
-					if len(resp.Data) > 0 {
-						err = msg.Respond(resp.Data)
-						if err != nil {
-							m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
-								slog.String("vmid", vm.vmmID),
-								slog.String("trigger_subject", tsub),
-								slog.String("workload_type", *request.WorkloadType),
-								slog.Any("err", err),
-							)
-						}
-					}
-				}
-			})
+			_, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
 			if err != nil {
 				m.log.Error("Failed to create trigger subject subscription for deployed workload",
 					slog.String("vmid", vm.vmmID),
@@ -246,8 +195,8 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 					slog.String("workload_type", *request.WorkloadType),
 					slog.Any("err", err),
 				)
-				// TODO-- rollback the otherwise accepted deployment and return the error below...
-				// return err
+				_ = m.StopMachine(vm.vmmID)
+				return err
 			}
 
 			m.log.Info("Created trigger subject subscription for deployed workload",
@@ -391,6 +340,91 @@ func (m *MachineManager) cleanSockets() {
 	}
 }
 
+func (m *MachineManager) publishFunctionExecSucceeded(vm *runningFirecracker, tsub string, elapsedNanos int64) error {
+	functionExecPassed := struct {
+		Name      string `json:"workload_name"`
+		Subject   string `json:"trigger_subject"`
+		Elapsed   int64  `json:"elapsed_nanos"`
+		Namespace string `json:"namespace"`
+	}{
+		Name:      *vm.deployRequest.WorkloadName,
+		Subject:   tsub,
+		Elapsed:   elapsedNanos,
+		Namespace: vm.namespace,
+	}
+
+	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetSource(m.publicKey)
+	cloudevent.SetID(uuid.NewString())
+	cloudevent.SetTime(time.Now().UTC())
+	cloudevent.SetType(agentapi.FunctionExecutionSucceededType)
+	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
+	_ = cloudevent.SetData(functionExecPassed)
+
+	err := PublishCloudEvent(m.nc, vm.namespace, cloudevent, m.log)
+	if err != nil {
+		return err
+	}
+
+	emitLog := emittedLog{
+		Text:      fmt.Sprintf("Function %s execution succeeded (%dns)", functionExecPassed.Name, functionExecPassed.Elapsed),
+		Level:     slog.LevelDebug,
+		MachineId: vm.vmmID,
+	}
+	logBytes, _ := json.Marshal(emitLog)
+
+	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, *vm.deployRequest.WorkloadName, vm.vmmID)
+	err = m.nc.Publish(subject, logBytes)
+	if err != nil {
+		m.log.Error("Failed to publish function exec passed log", slog.Any("err", err))
+	}
+
+	return m.nc.Flush()
+}
+
+func (m *MachineManager) publishFunctionExecFailed(vm *runningFirecracker, workload string, tsub string, origErr error) error {
+
+	functionExecFailed := struct {
+		Name      string `json:"workload_name"`
+		Subject   string `json:"trigger_subject"`
+		Namespace string `json:"namespace"`
+		Error     string `json:"error"`
+	}{
+		Name:      workload,
+		Namespace: vm.namespace,
+		Subject:   tsub,
+		Error:     origErr.Error(),
+	}
+
+	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetSource(m.publicKey)
+	cloudevent.SetID(uuid.NewString())
+	cloudevent.SetTime(time.Now().UTC())
+	cloudevent.SetType(agentapi.FunctionExecutionFailedType)
+	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
+	_ = cloudevent.SetData(functionExecFailed)
+
+	err := PublishCloudEvent(m.nc, vm.namespace, cloudevent, m.log)
+	if err != nil {
+		return err
+	}
+
+	emitLog := emittedLog{
+		Text:      "Function execution failed",
+		Level:     slog.LevelError,
+		MachineId: vm.vmmID,
+	}
+	logBytes, _ := json.Marshal(emitLog)
+
+	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, *vm.deployRequest.WorkloadName, vm.vmmID)
+	err = m.nc.Publish(subject, logBytes)
+	if err != nil {
+		m.log.Error("Failed to publish function exec failed log", slog.Any("err", err))
+	}
+
+	return m.nc.Flush()
+}
+
 // publishMachineStopped writes a workload stopped event for the provided firecracker VM
 func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 	if vm.deployRequest == nil {
@@ -443,4 +477,61 @@ func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 
 func (m *MachineManager) stopping() bool {
 	return (atomic.LoadUint32(&m.closing) > 0)
+}
+
+func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
+	return func(msg *nats.Msg) {
+		intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
+		intmsg.Data = msg.Data
+		intmsg.Header.Add(nexTriggerSubject, msg.Subject)
+
+		resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
+		if err != nil {
+			m.log.Error("Failed to request agent execution via internal trigger subject",
+				slog.Any("err", err),
+				slog.String("trigger_subject", tsub),
+				slog.String("workload_type", *request.WorkloadType),
+				slog.String("vmid", vm.vmmID),
+			)
+
+			m.t.functionFailedTriggers.Add(m.ctx, 1)
+			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+			_ = m.publishFunctionExecFailed(vm, *request.WorkloadName, tsub, err)
+		} else if resp != nil {
+			runtimeNs := resp.Header.Get(nexRuntimeNs)
+			m.log.Debug("Received response from execution via trigger subject",
+				slog.String("vmid", vm.vmmID),
+				slog.String("trigger_subject", tsub),
+				slog.String("workload_type", *request.WorkloadType),
+				slog.String("function_run_time_nanosec", runtimeNs),
+				slog.Int("payload_size", len(resp.Data)),
+			)
+
+			runTimeNs64, err := strconv.ParseInt(runtimeNs, 10, 64)
+			if err != nil {
+				m.log.Warn("failed to log function runtime", slog.Any("err", err))
+			}
+			_ = m.publishFunctionExecSucceeded(vm, tsub, runTimeNs64)
+
+			m.t.functionTriggers.Add(m.ctx, 1)
+			m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64)
+			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+
+			if len(resp.Data) > 0 {
+				err = msg.Respond(resp.Data)
+				if err != nil {
+					m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
+						slog.String("vmid", vm.vmmID),
+						slog.String("trigger_subject", tsub),
+						slog.String("workload_type", *request.WorkloadType),
+						slog.Any("err", err),
+					)
+				}
+			}
+		}
+	}
 }
