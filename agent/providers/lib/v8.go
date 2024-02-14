@@ -346,6 +346,25 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 		return nil
 	}))
 
+	_ = kv.Set(hostServicesKVKeysFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		req, _ := json.Marshal(map[string]interface{}{})
+
+		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVKeysFunctionName), req, time.Millisecond*250)
+		if err != nil {
+			// TODO- log
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		val, err := v8.JSONParse(v.ctx, string(resp.Data))
+		if err != nil {
+			// TODO- iso.ThrowException(nil)
+			return nil
+		}
+
+		return val
+	}))
+
 	err := hostServices.Set(hostServicesKVObjectName, kv)
 	if err != nil {
 		return nil, err
