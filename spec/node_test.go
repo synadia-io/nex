@@ -490,29 +490,90 @@ var _ = Describe("nex node", func() {
 								var triggerSubject string
 								var err error
 
-								JustBeforeEach(func() {
-									triggerSubject = "helloworld"
-									deployRequest, err = newDeployRequest(*nodeID, "echofunction", "nex example echoservice", "../examples/v8/echofunction/src/echofunction.js", map[string]string{}, []string{triggerSubject}, log)
-									Expect(err).To(BeNil())
+								Describe("echoservice", func() {
+									Context("when the javascript is valid", func() {
+										JustBeforeEach(func() {
+											triggerSubject = "helloworld"
+											deployRequest, err = newDeployRequest(*nodeID, "echofunction", "nex example echoservice", "../examples/v8/echofunction/src/echofunction.js", map[string]string{}, []string{triggerSubject}, log)
+											Expect(err).To(BeNil())
 
-									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-									_, err = nodeClient.StartWorkload(deployRequest)
+											nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
+											_, err = nodeClient.StartWorkload(deployRequest)
+											Expect(err).To(BeNil())
 
-									time.Sleep(time.Millisecond * 2500)
+											time.Sleep(time.Millisecond * 2500)
+										})
+
+										It("should deploy the v8 workload", func(ctx SpecContext) {
+											Expect(err).To(BeNil())
+										})
+
+										It("should keep a reference to all running VMs", func(ctx SpecContext) {
+											Expect(len(managerProxy.VMs())).To(Equal(2))
+										})
+
+										It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
+											Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+										})
+
+										Describe("triggering the deployed function", func() {
+											var respmsg *nats.Msg
+
+											JustBeforeEach(func() {
+												respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello world"), time.Millisecond*5000)
+												Expect(err).To(BeNil())
+											})
+
+											It("should respond to the request by echoing the payload", func(ctx SpecContext) {
+												Expect(respmsg).NotTo(BeNil())
+												Expect(respmsg.Data).To(Equal([]byte(fmt.Sprintf("{\"triggered_on\":\"%s\",\"payload\":\"hello world\"}", triggerSubject))))
+											})
+										})
+									})
 								})
 
-								Context("when the javascript is valid", func() {
-									It("should deploy the v8 workload", func(ctx SpecContext) {
+								Describe("host services", func() {
+									JustBeforeEach(func() {
+										triggerSubject = "hellohostservices"
+										deployRequest, err = newDeployRequest(*nodeID, "echofunction", "nex host services example", "../examples/v8/echofunction/src/hostservices.js", map[string]string{}, []string{triggerSubject}, log)
 										Expect(err).To(BeNil())
+
+										nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
+										_, err = nodeClient.StartWorkload(deployRequest)
+										Expect(err).To(BeNil())
+
+										time.Sleep(time.Millisecond * 2500)
 									})
 
-									It("should keep a reference to all running VMs", func(ctx SpecContext) {
-										Expect(len(managerProxy.VMs())).To(Equal(2))
-									})
+									// Describe("key/value service", func() {
+									Describe("triggering the deployed function", func() {
+										var respmsg *nats.Msg
 
-									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+										JustBeforeEach(func() {
+											respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*5000)
+											Expect(err).To(BeNil())
+										})
+
+										It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
+											Expect(respmsg).NotTo(BeNil())
+
+											type hostServicesExampleResp struct {
+												Keys   []string `json:"keys"`
+												Hello2 string   `json:"hello2"`
+											}
+
+											var resp *hostServicesExampleResp
+											err = json.Unmarshal(respmsg.Data, &resp)
+											Expect(err).To(BeNil())
+
+											Expect(resp).ToNot(BeNil())
+
+											Expect(len(resp.Keys)).To(Equal(1))
+											Expect(resp.Keys[0]).To(Equal("hello2"))
+											Expect(resp.Hello2).To(Equal("hello!"))
+										})
 									})
+									// })
 								})
 							})
 

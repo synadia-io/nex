@@ -1,4 +1,7 @@
 (subject, payload) => {
   console.log(subject);
-  return payload;
+  return {
+    triggered_on: subject,
+    payload: payload
+  }
 };
