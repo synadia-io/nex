@@ -219,9 +219,9 @@ func (v *V8) initV8Context() error {
 	return nil
 }
 
-// agentint.{vmID}.rpc.{namespace}.{service}.{method}
+// agentint.{vmID}.rpc.{namespace}.{workload}.{service}.{method}
 func (v *V8) keyValueServiceSubject(method string) string {
-	return fmt.Sprintf("agentint.%s.rpc.%s.kv.%s", v.vmID, v.namespace, method)
+	return fmt.Sprintf("agentint.%s.rpc.%s.%s.kv.%s", v.vmID, v.namespace, v.name, method)
 }
 
 func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {

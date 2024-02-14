@@ -36,7 +36,7 @@ func (m *MessagingService) init() error {
 }
 
 func (m *MessagingService) HandleRPC(msg *nats.Msg) {
-	// agentint.{vmID}.rpc.{namespace}.{service}.{method}
+	// agentint.{vmID}.rpc.{namespace}.{workload}.{service}.{method}
 	tokens := strings.Split(msg.Subject, ".")
 	service := tokens[4]
 	method := tokens[5]
