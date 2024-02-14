@@ -337,12 +337,12 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
-			_ =_ = v.iso.ThrowException(val)
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		if !*kvresp.Success {
-			val, _ := v8.NewValue(v.iso, err.Error())
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to delete key: %s", key))
 			_ = v.iso.ThrowException(val)
 			return nil
 		}
