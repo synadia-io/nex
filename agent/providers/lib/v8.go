@@ -243,22 +243,23 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 
 		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVGetFunctionName), req, time.Millisecond*250)
 		if err != nil {
-			// TODO- log
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		var kvresp *agentapi.HostServicesKeyValueRequest
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
-			// TODO- log
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		val, err := v8.JSONParse(v.ctx, string(*kvresp.Value))
 		if err != nil {
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
@@ -277,7 +278,8 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 
 		raw, err := value.MarshalJSON()
 		if err != nil {
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
@@ -289,21 +291,22 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 
 		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVSetFunctionName), req, time.Millisecond*250)
 		if err != nil {
-			// TODO- log
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		var kvresp *agentapi.HostServicesKeyValueRequest
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
-			// TODO- log
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		if !*kvresp.Success {
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to set %d-byte value for key: %s", len(val), key))
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
@@ -325,21 +328,22 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 
 		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVDeleteFunctionName), req, time.Millisecond*250)
 		if err != nil {
-			// TODO- log
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		var kvresp *agentapi.HostServicesKeyValueRequest
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
-			// TODO- log
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ =_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		if !*kvresp.Success {
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
@@ -351,14 +355,15 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 
 		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVKeysFunctionName), req, time.Millisecond*250)
 		if err != nil {
-			// TODO- log
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
 		val, err := v8.JSONParse(v.ctx, string(resp.Data))
 		if err != nil {
-			// TODO- iso.ThrowException(nil)
+			val, _ := v8.NewValue(v.iso, err.Error())
+			_ = v.iso.ThrowException(val)
 			return nil
 		}
 
