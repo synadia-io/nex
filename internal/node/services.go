@@ -75,8 +75,8 @@ func (h *HostServices) init() error {
 		h.log.Debug("initialized object store host service")
 	}
 
-	// agentint.{vmID}.rpc.{namespace}.{service}.{method}
-	_, err = h.ncint.Subscribe("agentint.*.rpc.*.*.*", h.handleRPC)
+	// agentint.{vmID}.rpc.{namespace}.{workload}.{service}.{method}
+	_, err = h.ncint.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
 		return err
 	}
@@ -85,12 +85,13 @@ func (h *HostServices) init() error {
 }
 
 func (h *HostServices) handleRPC(msg *nats.Msg) {
-	// agentint.{vmID}.rpc.{namespace}.{service}.{method}
+	// agentint.{vmID}.rpc.{namespace}.{workload}.{service}.{method}
 	tokens := strings.Split(msg.Subject, ".")
 	vmID := tokens[1]
 	namespace := tokens[3]
-	service := tokens[4]
-	method := tokens[5]
+	workload := tokens[4]
+	service := tokens[5]
+	method := tokens[6]
 
 	_, ok := h.mgr.allVMs[vmID]
 	if !ok {
@@ -109,6 +110,7 @@ func (h *HostServices) handleRPC(msg *nats.Msg) {
 	h.log.Debug("Received host services RPC request",
 		slog.String("vmid", vmID),
 		slog.String("namespace", namespace),
+		slog.String("workload", workload),
 		slog.String("service", service),
 		slog.String("method", method),
 		slog.Int("payload_size", len(msg.Data)),

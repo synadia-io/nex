@@ -40,10 +40,10 @@ func (k *KeyValueService) init() error {
 }
 
 func (k *KeyValueService) HandleRPC(msg *nats.Msg) {
-	// agentint.{vmID}.rpc.{namespace}.{service}.{method}
+	// agentint.{vmID}.rpc.{namespace}.{workload}.{service}.{method}
 	tokens := strings.Split(msg.Subject, ".")
-	service := tokens[4]
-	method := tokens[5]
+	service := tokens[5]
+	method := tokens[6]
 
 	switch method {
 	case kvServiceMethodGet:
@@ -66,10 +66,10 @@ func (k *KeyValueService) HandleRPC(msg *nats.Msg) {
 
 func (k *KeyValueService) handleKeyValueGet(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
-	vmID := tokens[1]
 	namespace := tokens[3]
+	workload := tokens[4]
 
-	kvStore, err := k.resolveKeyValueStore(vmID, namespace) // FIXME-- should this be worload name + namespace
+	kvStore, err := k.resolveKeyValueStore(namespace, workload)
 	if err != nil {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
@@ -130,10 +130,10 @@ func (k *KeyValueService) handleKeyValueGet(msg *nats.Msg) {
 
 func (k *KeyValueService) handleKeyValueSet(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
-	vmID := tokens[1]
 	namespace := tokens[3]
+	workload := tokens[4]
 
-	kvStore, err := k.resolveKeyValueStore(vmID, namespace) // FIXME-- should this be worload name + namespace
+	kvStore, err := k.resolveKeyValueStore(namespace, workload)
 	if err != nil {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
@@ -207,10 +207,10 @@ func (k *KeyValueService) handleKeyValueSet(msg *nats.Msg) {
 
 func (k *KeyValueService) handleKeyValueDelete(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
-	vmID := tokens[1]
 	namespace := tokens[3]
+	workload := tokens[4]
 
-	kvStore, err := k.resolveKeyValueStore(vmID, namespace) // FIXME-- should this be worload name + namespace
+	kvStore, err := k.resolveKeyValueStore(namespace, workload)
 	if err != nil {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
@@ -269,10 +269,10 @@ func (k *KeyValueService) handleKeyValueDelete(msg *nats.Msg) {
 
 func (k *KeyValueService) handleKeyValueKeys(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
-	vmID := tokens[1]
 	namespace := tokens[3]
+	workload := tokens[4]
 
-	kvStore, err := k.resolveKeyValueStore(vmID, namespace) // FIXME-- should this be worload name + namespace
+	kvStore, err := k.resolveKeyValueStore(namespace, workload)
 	if err != nil {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
