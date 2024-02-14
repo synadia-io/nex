@@ -36,8 +36,8 @@ func (h *HTTPService) init() error {
 func (h *HTTPService) HandleRPC(msg *nats.Msg) {
 	// agentint.{vmID}.rpc.{namespace}.{workload}.{service}.{method}
 	tokens := strings.Split(msg.Subject, ".")
-	service := tokens[4]
-	method := tokens[5]
+	service := tokens[5]
+	method := tokens[6]
 
 	switch method {
 	default:
