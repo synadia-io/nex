@@ -3,5 +3,8 @@
   this.hostServices.kv.delete('hello');
 
   this.hostServices.kv.set('hello2', payload);
-  return this.hostServices.kv.get('hello2');
+  return {
+    keys: this.hostServices.kv.keys(),
+    hello2: this.hostServices.kv.get('hello2')
+  }
 };
