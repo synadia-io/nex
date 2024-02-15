@@ -146,7 +146,7 @@ func (m *MachineManager) Start() {
 				continue
 			}
 
-			vm, err := createAndStartVM(m.ctx, m.config, m.log)
+			vm, err := createAndStartVM(context.TODO(), m.config, m.log)
 			if err != nil {
 				m.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
 				continue
@@ -241,8 +241,11 @@ func (m *MachineManager) Stop() error {
 		m.log.Info("Virtual machine manager stopping")
 		close(m.warmVMs)
 
-		for _, vm := range m.allVMs {
-			_ = m.StopMachine(vm.vmmID)
+		for vmID := range m.allVMs {
+			err := m.StopMachine(vmID)
+			if err != nil {
+				m.log.Warn("Failed to stop VM", slog.String("vmid", vmID), slog.String("error", err.Error()))
+			}
 		}
 
 		m.cleanSockets()
@@ -258,12 +261,15 @@ func (m *MachineManager) StopMachine(vmID string) error {
 		return fmt.Errorf("failed to stop machine %s", vmID)
 	}
 
+	m.log.Debug("Attempting to stop virtual machine", slog.String("vmid", vmID))
+
 	if vm.deployRequest != nil {
 		// we do a request here to allow graceful shutdown of the workload being undeployed
 		subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
 		_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
 		if err != nil {
-			return err
+			m.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("vmid", vm.vmmID), slog.String("error", err.Error()))
+			// return err
 		}
 	}
 
