@@ -206,6 +206,7 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 			AllowMMDS: true,
 			// Use CNI to get dynamic IP
 			CNIConfiguration: &firecracker.CNIConfiguration{
+				BinPath:     config.CNI.BinPath,
 				IfName:      *config.CNI.InterfaceName,
 				NetworkName: *config.CNI.NetworkName,
 			},

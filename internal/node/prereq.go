@@ -5,7 +5,6 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,11 +44,11 @@ var (
 type initFunc func(*requirement, *NodeConfiguration) error
 
 type requirement struct {
-	directory  string
-	files      []fileSpec
-	descriptor string
-	satisfied  bool
-	initFuncs  []initFunc
+	directories []string
+	files       []*fileSpec
+	descriptor  string
+	satisfied   bool
+	initFuncs   []initFunc
 }
 type requirements []*requirement
 
@@ -64,8 +63,8 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 
 	required := &requirements{
 		{
-			directory: "/opt/cni/bin",
-			files: []fileSpec{
+			directories: config.CNI.BinPath,
+			files: []*fileSpec{
 				{name: "host-local", description: "host-local CNI plugin"},
 				{name: "ptp", description: "ptp CNI plugin"},
 				{name: "tc-redirect-tap", description: "tc-redirect-tap CNI plugin"},
@@ -75,8 +74,8 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 			initFuncs:  []initFunc{downloadCNIPlugins, downloadTCRedirectTap},
 		},
 		{
-			directory: "/usr/local/bin",
-			files: []fileSpec{
+			directories: config.BinPath,
+			files: []*fileSpec{
 				{name: "firecracker", description: "Firecracker VM binary"},
 			},
 			descriptor: "Required binaries",
@@ -85,8 +84,8 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 		},
 		{
 			//cniConfig := fmt.Sprintf("/etc/cni/conf.d/%s.conflist", config.CNI.NetworkName)
-			directory: "/etc/cni/conf.d",
-			files: []fileSpec{
+			directories: []string{"/etc/cni/conf.d"},
+			files: []*fileSpec{
 				{name: *config.CNI.NetworkName + ".conflist", description: "CNI Configuration"},
 			},
 			descriptor: "CNI configuration requirements",
@@ -94,8 +93,8 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 			initFuncs:  []initFunc{writeCniConf},
 		},
 		{
-			directory: "",
-			files: []fileSpec{
+			directories: []string{""},
+			files: []*fileSpec{
 				{name: config.KernelFilepath, description: "VMLinux Kernel"},
 				{name: config.RootFsFilepath, description: "Root Filesystem Template"},
 			},
@@ -107,28 +106,44 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 
 	// Verify all directories are present
 	for _, r := range *required {
-		sb.WriteString(fmt.Sprintf("Validating - %s [%s]\n", magenta(r.descriptor), cyan(r.directory)))
+		sb.WriteString(fmt.Sprintf("Validating - %s\n", magenta(r.descriptor)))
 
-		allDepsSatified := true
-		for _, f := range r.files {
-			path := func() string {
-				if r.directory == "" {
-					return f.name
-				} else {
-					return filepath.Join(r.directory, f.name)
+		depsFound := 0
+		for _, dir := range r.directories {
+			if dir != "" {
+				sb.WriteString(fmt.Sprintf("\t  🔎Searching - %s \n", cyan(dir)))
+			}
+
+			for _, f := range r.files {
+				path := func() string {
+					if dir == "" {
+						return f.name
+					} else {
+						return filepath.Join(dir, f.name)
+					}
+				}()
+
+				if _, err := os.Stat(path); err == nil {
+					depsFound += 1
+					f.satisfied = true
+					sb.WriteString(fmt.Sprintf("\t  ✅ Dependency Satisfied - %s [%s]\n", green(filepath.Join(dir, f.name)), cyan(f.description)))
 				}
-			}()
-			if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-				allDepsSatified = false
-				sb.WriteString(fmt.Sprintf("\t⛔ Missing Dependency - %s [%s]\n", red(filepath.Join(r.directory, f.name)), cyan(f.description)))
-			} else {
-				f.satisfied = true
-				sb.WriteString(fmt.Sprintf("\t✅ Dependency Satisfied - %s [%s]\n", green(filepath.Join(r.directory, f.name)), cyan(f.description)))
+			}
+
+			if depsFound == len(r.files) {
+				break
 			}
 		}
 
+		for _, f := range r.files {
+			if f.satisfied {
+				continue
+			}
+			sb.WriteString(fmt.Sprintf("\t⛔ Missing Dependency - %s\n", cyan(f.description)))
+		}
+
 		sb.WriteString(fmt.Sprintln())
-		r.satisfied = allDepsSatified
+		r.satisfied = depsFound == len(r.files)
 	}
 
 	if !readonly {
@@ -157,11 +172,16 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 		}
 		if config.ForceDepInstall || strings.ToUpper(string(input)) == "Y\n" {
 			var path string
+			dir := ""
+			if len(r.directories) > 0 {
+				// we install into the first directory if specified
+				dir = r.directories[0]
+			}
 			for _, f := range r.files {
-				if r.directory == "" {
+				if dir == "" {
 					path = filepath.Dir(f.name)
 				} else {
-					path = r.directory
+					path = dir
 				}
 				err = os.MkdirAll(path, 0755)
 				if err != nil {
@@ -184,7 +204,7 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 // func writeCniConf(fileName string, networkName string) error {
 func writeCniConf(r *requirement, c *NodeConfiguration) error {
 	for _, tF := range r.files {
-		f, err := os.Create(filepath.Join(r.directory, tF.name))
+		f, err := os.Create(filepath.Join(r.directories[0], tF.name))
 		if err != nil {
 			return err
 		}
@@ -300,7 +320,7 @@ func downloadCNIPlugins(r *requirement, c *NodeConfiguration) error {
 		f := strings.TrimPrefix(strings.TrimSpace(header.Name), "./")
 
 		if f == "ptp" || f == "host-local" {
-			outFile, err := os.Create(filepath.Join(r.directory, f))
+			outFile, err := os.Create(filepath.Join(r.directories[0], f))
 			if err != nil {
 				fmt.Println(err)
 				return err
@@ -330,7 +350,7 @@ func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
 
 	// TODO: add sha check
 
-	outFile, err := os.Create(filepath.Join(r.directory, "tc-redirect-tap"))
+	outFile, err := os.Create(filepath.Join(r.directories[0], "tc-redirect-tap"))
 	if err != nil {
 		fmt.Println(err)
 		return err
