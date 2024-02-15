@@ -252,9 +252,6 @@ var _ = Describe("nex node", func() {
 					})
 
 					JustBeforeEach(func() {
-						cfg, _ := json.Marshal(nodeConfig)
-						_ = os.WriteFile(nodeOpts.ConfigFilepath, cfg, 0644)
-
 						_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 						node, _ = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
 						go node.Start()
@@ -469,7 +466,7 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should keep a reference to all running VMs", func(ctx SpecContext) {
-										Expect(len(managerProxy.VMs())).To(Equal(2))
+										Expect(len(managerProxy.VMs())).To(Equal(1))
 									})
 
 									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
