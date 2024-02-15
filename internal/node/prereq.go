@@ -97,11 +97,19 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 			directory: "",
 			files: []fileSpec{
 				{name: config.KernelFilepath, description: "VMLinux Kernel"},
+			},
+			descriptor: "VMLinux Kernel",
+			satisfied:  false,
+			initFuncs:  []initFunc{downloadKernel},
+		},
+		{
+			directory: "",
+			files: []fileSpec{
 				{name: config.RootFsFilepath, description: "Root Filesystem Template"},
 			},
-			descriptor: "User provided files",
+			descriptor: "Root Filesystem Template",
 			satisfied:  false,
-			initFuncs:  []initFunc{downloadKernel, downloadRootFS},
+			initFuncs:  []initFunc{downloadRootFS},
 		},
 	}
 
