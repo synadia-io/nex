@@ -102,8 +102,8 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 			initFuncs:  []initFunc{downloadKernel},
 		},
 		{
-			directory: "",
-			files: []fileSpec{
+			directories: []string{""},
+			files: []*fileSpec{
 				{name: config.RootFsFilepath, description: "Root Filesystem Template"},
 			},
 			descriptor: "Root Filesystem Template",
