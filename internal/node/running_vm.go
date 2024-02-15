@@ -50,14 +50,25 @@ func (vm *runningFirecracker) shutdown() {
 			vm.log.Error("Failed to stop firecracker VM", slog.Any("err", err))
 		}
 
-		_ = os.Remove(vm.machine.Cfg.SocketPath)
-		_ = os.Remove(fmt.Sprintf("%s.log", vm.machine.Cfg.SocketPath))
-
-		rootFs := getRootFsPath(vm.vmmID)
-		err = os.Remove(rootFs)
+		err = os.Remove(getSocketPath(vm.vmmID))
 		if err != nil {
-			if !errors.Is(err, fs.ErrExist) {
-				vm.log.Warn("Failed to delete firecracker rootfs", slog.Any("err", err))
+			if !errors.Is(err, fs.ErrNotExist) {
+				vm.log.Error("Failed to remove VM socket", slog.Any("err", err))
+			}
+		}
+
+		err = os.Remove(getLogPath(vm.vmmID))
+		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				vm.log.Error("Failed to remove VM log", slog.Any("err", err))
+			}
+		}
+
+		rootFsPath := getRootFsPath(vm.vmmID)
+		err = os.Remove(rootFsPath)
+		if err != nil {
+			if !errors.Is(err, fs.ErrNotExist) {
+				vm.log.Warn("Failed to delete VM rootfs", slog.Any("err", err))
 			}
 		}
 	}
@@ -220,6 +231,19 @@ func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracke
 		MmdsVersion: firecracker.MMDSv2,
 		SocketPath:  socket,
 	}, nil
+}
+
+func getLogPath(vmmID string) string {
+	filename := strings.Join([]string{
+		".firecracker.sock",
+		strconv.Itoa(os.Getpid()),
+		fmt.Sprintf("%s.log", vmmID),
+	},
+		"-",
+	)
+	dir := os.TempDir()
+
+	return filepath.Join(dir, filename)
 }
 
 func getRootFsPath(vmmID string) string {
