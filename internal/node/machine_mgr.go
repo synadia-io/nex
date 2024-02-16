@@ -95,7 +95,8 @@ func NewMachineManager(
 		allVMs:  make(map[string]*runningFirecracker),
 		warmVMs: make(chan *runningFirecracker, config.MachinePoolSize),
 
-		vmsubz: make(map[string][]*nats.Subscription),
+		stopMutex: make(map[string]*sync.Mutex),
+		vmsubz:    make(map[string][]*nats.Subscription),
 	}
 
 	_, err := m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
