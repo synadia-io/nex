@@ -131,7 +131,7 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 		return
 	}
 
-	err = api.mgr.StopMachine(request.WorkloadId)
+	err = api.mgr.StopMachine(request.WorkloadId, true)
 	if err != nil {
 		api.log.Error("Failed to stop workload", slog.Any("err", err))
 		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
