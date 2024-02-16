@@ -19,6 +19,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -330,6 +331,137 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 	}
 }
 
+// Called when the node server gets a log entry via internal NATS. Used to
+// package and re-mit with additional metadata on $NEX.logs...
+func (m *MachineManager) handleAgentLog(msg *nats.Msg) {
+	tokens := strings.Split(msg.Subject, ".")
+	vmID := tokens[1]
+
+	vm, ok := m.allVMs[vmID]
+	if !ok {
+		m.log.Warn("Received a log message from an unknown VM.")
+		return
+	}
+
+	var logentry agentapi.LogEntry
+	err := json.Unmarshal(msg.Data, &logentry)
+	if err != nil {
+		m.log.Error("Failed to unmarshal log entry from agent", slog.Any("err", err))
+		return
+	}
+
+	m.log.Debug("Received agent log", slog.String("vmid", vmID), slog.String("log", logentry.Text))
+
+	bytes, err := json.Marshal(&emittedLog{
+		Text:      logentry.Text,
+		Level:     slog.Level(logentry.Level),
+		MachineId: vmID,
+	})
+	if err != nil {
+		m.log.Error("Failed to marshal our own log entry", slog.Any("err", err))
+		return
+	}
+
+	var workload *string
+	if vm.deployRequest != nil {
+		workload = vm.deployRequest.WorkloadName
+	}
+
+	subject := logPublishSubject(vm.namespace, m.publicKey, vmID, workload)
+	_ = m.nc.Publish(subject, bytes)
+}
+
+// Called when the node server gets an event from the nex agent inside firecracker. The data here is already a fully formed
+// cloud event, so all we need to do is unmarshal it, get some metadata, and then republish on $NEX.events...
+func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
+	// agentint.{vmid}.events.{type}
+	tokens := strings.Split(msg.Subject, ".")
+	vmID := tokens[1]
+
+	vm, ok := m.allVMs[vmID]
+	if !ok {
+		m.log.Warn("Received an event from a VM we don't know about. Rejecting.")
+		return
+	}
+
+	var evt cloudevents.Event
+	err := json.Unmarshal(msg.Data, &evt)
+	if err != nil {
+		m.log.Error("Failed to deserialize cloudevent from agent", slog.Any("err", err))
+		return
+	}
+
+	m.log.Info("Received agent event", slog.String("vmid", vmID), slog.String("type", evt.Type()))
+
+	err = PublishCloudEvent(m.nc, vm.namespace, evt, m.log)
+	if err != nil {
+		m.log.Error("Failed to publish cloudevent", slog.Any("err", err))
+		return
+	}
+
+	if evt.Type() == agentapi.WorkloadStoppedEventType {
+		_ = m.StopMachine(vmID)
+
+		if vm.isEssential() {
+			m.log.Debug("Essential workload stopped",
+				slog.String("vmid", vmID),
+				slog.String("workload", *vm.deployRequest.WorkloadName),
+				slog.String("workload_type", *vm.deployRequest.WorkloadType))
+
+			if vm.deployRequest.RetryCount == nil {
+				retryCount := uint(0)
+				vm.deployRequest.RetryCount = &retryCount
+			}
+
+			*vm.deployRequest.RetryCount += 1
+
+			retriedAt := time.Now().UTC()
+			vm.deployRequest.RetriedAt = &retriedAt
+
+			req, _ := json.Marshal(&controlapi.DeployRequest{
+				Argv:            vm.deployRequest.Argv,
+				Description:     vm.deployRequest.Description,
+				WorkloadType:    vm.deployRequest.WorkloadType,
+				Location:        vm.deployRequest.Location,
+				WorkloadJwt:     vm.deployRequest.WorkloadJwt,
+				Environment:     vm.deployRequest.EncryptedEnvironment,
+				Essential:       vm.deployRequest.Essential,
+				SenderPublicKey: vm.deployRequest.SenderPublicKey,
+				TargetNode:      vm.deployRequest.TargetNode,
+				TriggerSubjects: vm.deployRequest.TriggerSubjects,
+				JsDomain:        vm.deployRequest.JsDomain,
+			})
+
+			nodeID, _ := m.kp.PublicKey()
+			subject := fmt.Sprintf("%s.DEPLOY.%s.%s", controlapi.APIPrefix, vm.namespace, nodeID)
+			_, err = m.nc.Request(subject, req, time.Millisecond*2500)
+			if err != nil {
+				m.log.Error("Failed to redeploy essential workload", slog.Any("err", err))
+			}
+		}
+	}
+}
+
+// This handshake uses the request pattern to force a full round trip to ensure connectivity is working properly as
+// fire-and-forget publishes from inside the firecracker VM could potentially be lost
+func (m *MachineManager) handleHandshake(msg *nats.Msg) {
+	var shake agentapi.HandshakeRequest
+	err := json.Unmarshal(msg.Data, &shake)
+	if err != nil {
+		m.log.Error("Failed to handle agent handshake", slog.String("vmid", *shake.MachineID), slog.String("message", *shake.Message))
+		return
+	}
+
+	now := time.Now().UTC()
+	m.handshakes[*shake.MachineID] = now.Format(time.RFC3339)
+
+	m.log.Info("Received agent handshake", slog.String("vmid", *shake.MachineID), slog.String("message", *shake.Message))
+	err = msg.Respond([]byte("OK"))
+	if err != nil {
+		m.log.Error("Failed to reply to agent handshake", slog.Any("err", err))
+	}
+}
+
 func (m *MachineManager) resetCNI() error {
 	m.log.Info("Resetting network")
 
@@ -366,6 +498,63 @@ func (m *MachineManager) cleanSockets() {
 	for _, d := range dir {
 		if strings.Contains(d.Name(), fmt.Sprintf(".firecracker.sock-%d-", os.Getpid())) {
 			os.Remove(path.Join([]string{"tmp", d.Name()}...))
+		}
+	}
+}
+
+func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
+	return func(msg *nats.Msg) {
+		intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
+		intmsg.Data = msg.Data
+		intmsg.Header.Add(nexTriggerSubject, msg.Subject)
+
+		resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
+		if err != nil {
+			m.log.Error("Failed to request agent execution via internal trigger subject",
+				slog.Any("err", err),
+				slog.String("trigger_subject", tsub),
+				slog.String("workload_type", *request.WorkloadType),
+				slog.String("vmid", vm.vmmID),
+			)
+
+			m.t.functionFailedTriggers.Add(m.ctx, 1)
+			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+			_ = m.publishFunctionExecFailed(vm, *request.WorkloadName, tsub, err)
+		} else if resp != nil {
+			runtimeNs := resp.Header.Get(nexRuntimeNs)
+			m.log.Debug("Received response from execution via trigger subject",
+				slog.String("vmid", vm.vmmID),
+				slog.String("trigger_subject", tsub),
+				slog.String("workload_type", *request.WorkloadType),
+				slog.String("function_run_time_nanosec", runtimeNs),
+				slog.Int("payload_size", len(resp.Data)),
+			)
+
+			runTimeNs64, err := strconv.ParseInt(runtimeNs, 10, 64)
+			if err != nil {
+				m.log.Warn("failed to log function runtime", slog.Any("err", err))
+			}
+			_ = m.publishFunctionExecSucceeded(vm, tsub, runTimeNs64)
+
+			m.t.functionTriggers.Add(m.ctx, 1)
+			m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64)
+			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
+
+			if len(resp.Data) > 0 {
+				err = msg.Respond(resp.Data)
+				if err != nil {
+					m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
+						slog.String("vmid", vm.vmmID),
+						slog.String("trigger_subject", tsub),
+						slog.String("workload_type", *request.WorkloadType),
+						slog.Any("err", err),
+					)
+				}
+			}
 		}
 	}
 }
@@ -509,59 +698,12 @@ func (m *MachineManager) stopping() bool {
 	return (atomic.LoadUint32(&m.closing) > 0)
 }
 
-func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
-	return func(msg *nats.Msg) {
-		intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
-		intmsg.Data = msg.Data
-		intmsg.Header.Add(nexTriggerSubject, msg.Subject)
-
-		resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
-		if err != nil {
-			m.log.Error("Failed to request agent execution via internal trigger subject",
-				slog.Any("err", err),
-				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *request.WorkloadType),
-				slog.String("vmid", vm.vmmID),
-			)
-
-			m.t.functionFailedTriggers.Add(m.ctx, 1)
-			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-			_ = m.publishFunctionExecFailed(vm, *request.WorkloadName, tsub, err)
-		} else if resp != nil {
-			runtimeNs := resp.Header.Get(nexRuntimeNs)
-			m.log.Debug("Received response from execution via trigger subject",
-				slog.String("vmid", vm.vmmID),
-				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *request.WorkloadType),
-				slog.String("function_run_time_nanosec", runtimeNs),
-				slog.Int("payload_size", len(resp.Data)),
-			)
-
-			runTimeNs64, err := strconv.ParseInt(runtimeNs, 10, 64)
-			if err != nil {
-				m.log.Warn("failed to log function runtime", slog.Any("err", err))
-			}
-			_ = m.publishFunctionExecSucceeded(vm, tsub, runTimeNs64)
-
-			m.t.functionTriggers.Add(m.ctx, 1)
-			m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-			m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64)
-			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
-
-			if len(resp.Data) > 0 {
-				err = msg.Respond(resp.Data)
-				if err != nil {
-					m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
-						slog.String("vmid", vm.vmmID),
-						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
-						slog.Any("err", err),
-					)
-				}
-			}
-		}
+func logPublishSubject(namespace string, node string, vm string, workload *string) string {
+	// $NEX.logs.{namespace}.{node}.{vm}[.{workload name}]
+	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, namespace, node, vm)
+	if workload != nil {
+		subject = fmt.Sprintf("%s.%s", subject, *workload)
 	}
+
+	return subject
 }
