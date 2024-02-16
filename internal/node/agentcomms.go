@@ -82,7 +82,7 @@ func (mgr *MachineManager) handleAgentEvent(m *nats.Msg) {
 	}
 
 	if evt.Type() == agentapi.WorkloadStoppedEventType {
-		vm.shutdown()
+		_ = mgr.StopMachine(vmID)
 
 		if vm.isEssential() {
 			mgr.log.Debug("Essential workload stopped",
