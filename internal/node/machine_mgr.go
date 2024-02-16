@@ -211,7 +211,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 						slog.String("workload_type", *request.WorkloadType),
 						slog.Any("err", err),
 					)
-					_ = m.StopMachine(vm.vmmID)
+					_ = m.StopMachine(vm.vmmID, true)
 					return err
 				}
 
@@ -225,7 +225,7 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 			}
 		}
 	} else {
-		_ = m.StopMachine(vm.vmmID)
+		_ = m.StopMachine(vm.vmmID, false)
 		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	}
 
@@ -250,7 +250,7 @@ func (m *MachineManager) Stop() error {
 		close(m.warmVMs)
 
 		for vmID := range m.allVMs {
-			err := m.StopMachine(vmID)
+			err := m.StopMachine(vmID, true)
 			if err != nil {
 				m.log.Warn("Failed to stop VM", slog.String("vmid", vmID), slog.String("error", err.Error()))
 			}
@@ -262,8 +262,9 @@ func (m *MachineManager) Stop() error {
 	return nil
 }
 
-// Stops a single machine. Will return an error if called with a non-existent workload/vm ID
-func (m *MachineManager) StopMachine(vmID string) error {
+// Stops a single machine, optionally attempting to gracefully undeploy the running workload.
+// Will return an error if called with a non-existent workload/vm ID
+func (m *MachineManager) StopMachine(vmID string, undeploy bool) error {
 	vm, exists := m.allVMs[vmID]
 	if !exists {
 		return fmt.Errorf("failed to stop machine %s", vmID)
@@ -272,9 +273,9 @@ func (m *MachineManager) StopMachine(vmID string) error {
 	m.stopMutex[vmID].Lock()
 	defer m.stopMutex[vmID].Unlock()
 
-	m.log.Debug("Attempting to stop virtual machine", slog.String("vmid", vmID))
+	m.log.Debug("Attempting to stop virtual machine", slog.String("vmid", vmID), slog.Bool("undeploy", undeploy))
 
-	if vm.deployRequest != nil {
+	if vm.deployRequest != nil && undeploy {
 		// we do a request here to allow graceful shutdown of the workload being undeployed
 		subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
 		_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
@@ -411,8 +412,6 @@ func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
 	}
 
 	if evt.Type() == agentapi.WorkloadStoppedEventType {
-		_ = m.StopMachine(vmID)
-
 		evtData, err := evt.DataBytes()
 		if err != nil {
 			m.log.Error("Failed to read cloudevent data", slog.Any("err", err))
@@ -425,6 +424,8 @@ func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
 			m.log.Error("Failed to unmarshal workload status from cloudevent data", slog.Any("err", err))
 			return
 		}
+
+		_ = m.StopMachine(vmID, workloadStatus.Code != 0)
 
 		if vm.isEssential() && workloadStatus.Code != 0 {
 			m.log.Debug("Essential workload stopped with non-zero exit code",
