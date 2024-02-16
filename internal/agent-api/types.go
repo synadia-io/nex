@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 
@@ -62,8 +63,11 @@ type DeployRequest struct {
 	DecodedClaims   jwt.GenericClaims `json:"-"`
 	Description     *string           `json:"description"`
 	Environment     map[string]string `json:"environment"`
+	Essential       *bool             `json:"essential,omitempty"`
 	Hash            string            `json:"hash,omitempty"`
 	Namespace       *string           `json:"namespace,omitempty"`
+	RetriedAt       *time.Time        `json:"retried_at,omitempty"`
+	RetryCount      *uint             `json:"retry_count,omitempty"`
 	TotalBytes      int64             `json:"total_bytes,omitempty"`
 	TriggerSubjects []string          `json:"trigger_subjects"`
 	WorkloadName    *string           `json:"workload_name,omitempty"`
@@ -73,7 +77,20 @@ type DeployRequest struct {
 	Stdout      io.Writer `json:"-"`
 	TmpFilename *string   `json:"-"`
 
+	EncryptedEnvironment *string  `json:"-"`
+	JsDomain             *string  `json:"-"`
+	Location             *url.URL `json:"-"`
+	SenderPublicKey      *string  `json:"-"`
+	TargetNode           *string  `json:"-"`
+	WorkloadJwt          *string  `json:"-"`
+
 	Errors []error `json:"errors,omitempty"`
+}
+
+// Returns true if the run request supports essential flag
+func (request *DeployRequest) SupportsEssential() bool {
+	return strings.EqualFold(*request.WorkloadType, "elf") ||
+		strings.EqualFold(*request.WorkloadType, "oci")
 }
 
 // Returns true if the run request supports trigger subjects
@@ -88,6 +105,10 @@ func (r *DeployRequest) Validate() bool {
 
 	if r.WorkloadName == nil {
 		err = errors.Join(err, errors.New("workload name is required"))
+	}
+
+	if r.Essential != nil && *r.Essential && !r.SupportsEssential() {
+		err = errors.Join(err, errors.New("essential flag is not supported for workload type"))
 	}
 
 	if r.Hash == "" { // FIXME--- this should probably be checked against *string

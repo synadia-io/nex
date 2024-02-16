@@ -81,6 +81,7 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 	request, err := controlapi.NewDeployRequest(
 		controlapi.Location(RunOpts.WorkloadUrl.String()),
 		controlapi.Environment(RunOpts.Env),
+		controlapi.Essential(RunOpts.Essential),
 		controlapi.Issuer(issuerKp),
 		controlapi.SenderXKey(xkey),
 		controlapi.TargetNode(RunOpts.TargetNode),

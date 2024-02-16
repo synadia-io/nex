@@ -81,11 +81,13 @@ func init() {
 	run.Flag("type", "Type of workload").EnumVar(&RunOpts.WorkloadType, "elf", "v8", "wasm")
 	run.Flag("description", "Description of the workload").StringVar(&RunOpts.Description)
 	run.Flag("argv", "Arguments to pass to the workload, if applicable").StringVar(&RunOpts.Argv)
+	run.Flag("essential", "When true, workload is redeployed if it exits with a non-zero status").BoolVar(&RunOpts.Essential)
 	run.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 
 	yeet.Arg("file", "File to run").Required().ExistingFileVar(&DevRunOpts.Filename)
 	yeet.Arg("env", "Environment variables to pass to workload").StringMapVar(&RunOpts.Env)
 	yeet.Flag("argv", "Arguments to pass to the workload, if applicable").StringVar(&RunOpts.Argv)
+	yeet.Flag("essential", "When true, workload is redeployed if it exits with a non-zero status").BoolVar(&RunOpts.Essential)
 	yeet.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
 

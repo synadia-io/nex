@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
@@ -17,6 +18,7 @@ type DeployRequest struct {
 	Description  *string  `json:"description,omitempty"`
 	WorkloadType *string  `json:"type"`
 	Location     *url.URL `json:"location"`
+	Essential    *bool    `json:"essential,omitempty"`
 
 	// Contains claims for the workload: name, hash
 	WorkloadJwt *string `json:"workload_jwt"`
@@ -30,6 +32,9 @@ type DeployRequest struct {
 	SenderPublicKey *string  `json:"sender_public_key"`
 	TargetNode      *string  `json:"target_node"`
 	TriggerSubjects []string `json:"trigger_subjects,omitempty"`
+
+	RetryCount *uint      `json:"retry_count,omitempty"`
+	RetriedAt  *time.Time `json:"retried_at,omitempty"`
 
 	WorkloadEnvironment map[string]string `json:"-"`
 	DecodedClaims       jwt.GenericClaims `json:"-"`
@@ -68,6 +73,7 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		Location:        &reqOpts.location,
 		WorkloadJwt:     &workloadJwt,
 		Environment:     &encryptedEnv,
+		Essential:       &reqOpts.essential,
 		SenderPublicKey: &senderPublic,
 		TargetNode:      &reqOpts.targetNode,
 		TriggerSubjects: reqOpts.triggerSubjects,
@@ -77,9 +83,9 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 	return req, nil
 }
 
-// This will validate a request's workload JWT, decrypt the request environment. It will not
-// perform a comparison of the hash found in the claims with a recipient's expected hash
-func (request *DeployRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims, error) {
+// This will validate a request's workload JWT. It will not perform a
+// comparison of the hash found in the claims with a recipient's expected hash
+func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
 	claims, err := jwt.DecodeGeneric(*request.WorkloadJwt)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode workload JWT: %s", err)
@@ -88,11 +94,6 @@ func (request *DeployRequest) Validate(myKey nkeys.KeyPair) (*jwt.GenericClaims,
 	request.DecodedClaims = *claims
 	if !validWorkloadName.MatchString(claims.Subject) {
 		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements of all lowercase letters", claims.Subject)
-	}
-
-	err = request.DecryptRequestEnvironment(myKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt request environment: %s", err)
 	}
 
 	var vr jwt.ValidationResults
@@ -148,6 +149,7 @@ type requestOptions struct {
 	workloadDescription string
 	location            url.URL
 	env                 map[string]string
+	essential           bool
 	senderXkey          nkeys.KeyPair
 	claimsIssuer        nkeys.KeyPair
 	targetPublicXKey    string
@@ -224,6 +226,14 @@ func WorkloadDescription(name string) RequestOption {
 func Environment(env map[string]string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.env = env
+		return o
+	}
+}
+
+// Set the essential flag to be used by the workload
+func Essential(essential bool) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.essential = essential
 		return o
 	}
 }
