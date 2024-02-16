@@ -426,6 +426,8 @@ func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
 				WorkloadJwt:     vm.deployRequest.WorkloadJwt,
 				Environment:     vm.deployRequest.EncryptedEnvironment,
 				Essential:       vm.deployRequest.Essential,
+				RetriedAt:       vm.deployRequest.RetriedAt,
+				RetryCount:      vm.deployRequest.RetryCount,
 				SenderPublicKey: vm.deployRequest.SenderPublicKey,
 				TargetNode:      vm.deployRequest.TargetNode,
 				TriggerSubjects: vm.deployRequest.TriggerSubjects,
