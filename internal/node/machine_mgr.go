@@ -412,6 +412,8 @@ func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
 	}
 
 	if evt.Type() == agentapi.WorkloadStoppedEventType {
+		_ = m.StopMachine(vmID, false)
+
 		evtData, err := evt.DataBytes()
 		if err != nil {
 			m.log.Error("Failed to read cloudevent data", slog.Any("err", err))
@@ -424,8 +426,6 @@ func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
 			m.log.Error("Failed to unmarshal workload status from cloudevent data", slog.Any("err", err))
 			return
 		}
-
-		_ = m.StopMachine(vmID, workloadStatus.Code != 0)
 
 		if vm.isEssential() && workloadStatus.Code != 0 {
 			m.log.Debug("Essential workload stopped with non-zero exit code",
