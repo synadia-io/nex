@@ -11,6 +11,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -54,7 +55,9 @@ type MachineManager struct {
 	handshakeTimeout time.Duration // TODO: make configurable...
 
 	hostServices *HostServices
-	vmsubz       map[string][]*nats.Subscription
+
+	stopMutex map[string]*sync.Mutex
+	vmsubz    map[string][]*nats.Subscription
 
 	natsStoreDir string
 	publicKey    string
@@ -195,31 +198,35 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 		return err
 	}
 
-	if !deployResponse.Accepted {
-		_ = m.StopMachine(vm.vmmID)
-		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
-	} else if request.SupportsTriggerSubjects() {
-		for _, tsub := range request.TriggerSubjects {
-			sub, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
-			if err != nil {
-				m.log.Error("Failed to create trigger subject subscription for deployed workload",
+	if deployResponse.Accepted {
+		m.stopMutex[vm.vmmID] = &sync.Mutex{}
+
+		if request.SupportsTriggerSubjects() {
+			for _, tsub := range request.TriggerSubjects {
+				sub, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
+				if err != nil {
+					m.log.Error("Failed to create trigger subject subscription for deployed workload",
+						slog.String("vmid", vm.vmmID),
+						slog.String("trigger_subject", tsub),
+						slog.String("workload_type", *request.WorkloadType),
+						slog.Any("err", err),
+					)
+					_ = m.StopMachine(vm.vmmID)
+					return err
+				}
+
+				m.log.Info("Created trigger subject subscription for deployed workload",
 					slog.String("vmid", vm.vmmID),
 					slog.String("trigger_subject", tsub),
 					slog.String("workload_type", *request.WorkloadType),
-					slog.Any("err", err),
 				)
-				_ = m.StopMachine(vm.vmmID)
-				return err
+
+				m.vmsubz[vm.vmmID] = append(m.vmsubz[vm.vmmID], sub)
 			}
-
-			m.log.Info("Created trigger subject subscription for deployed workload",
-				slog.String("vmid", vm.vmmID),
-				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *request.WorkloadType),
-			)
-
-			m.vmsubz[vm.vmmID] = append(m.vmsubz[vm.vmmID], sub)
 		}
+	} else {
+		_ = m.StopMachine(vm.vmmID)
+		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	}
 
 	m.t.workloadCounter.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
@@ -262,6 +269,9 @@ func (m *MachineManager) StopMachine(vmID string) error {
 		return fmt.Errorf("failed to stop machine %s", vmID)
 	}
 
+	m.stopMutex[vmID].Lock()
+	defer m.stopMutex[vmID].Unlock()
+
 	m.log.Debug("Attempting to stop virtual machine", slog.String("vmid", vmID))
 
 	if vm.deployRequest != nil {
@@ -285,6 +295,7 @@ func (m *MachineManager) StopMachine(vmID string) error {
 
 	vm.shutdown()
 	delete(m.allVMs, vmID)
+	delete(m.stopMutex, vmID)
 	delete(m.vmsubz, vmID)
 
 	_ = m.publishMachineStopped(vm)
