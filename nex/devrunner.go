@@ -106,6 +106,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		controlapi.Argv(strings.Split(RunOpts.Argv, " ")),
 		controlapi.Location(workloadUrl),
 		controlapi.Environment(RunOpts.Env),
+		controlapi.Essential(RunOpts.Essential),
 		controlapi.Issuer(issuerKp),
 		controlapi.SenderXKey(publisherXKey),
 		controlapi.TargetNode(target.NodeId),

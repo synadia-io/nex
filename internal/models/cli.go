@@ -72,6 +72,7 @@ type RunOptions struct {
 	PublisherXkeyFile string
 	ClaimsIssuerFile  string
 	Env               map[string]string
+	Essential         bool
 	DevMode           bool
 	TriggerSubjects   []string
 }

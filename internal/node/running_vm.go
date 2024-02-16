@@ -38,6 +38,10 @@ type runningFirecracker struct {
 	workloadStarted time.Time
 }
 
+func (vm *runningFirecracker) isEssential() bool {
+	return vm.deployRequest != nil && vm.deployRequest.Essential != nil && *vm.deployRequest.Essential
+}
+
 func (vm *runningFirecracker) shutdown() {
 	if atomic.AddUint32(&vm.closing, 1) == 1 {
 		vm.log.Info("Machine stopping",

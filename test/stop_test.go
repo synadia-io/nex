@@ -30,7 +30,7 @@ func TestStopValidation(t *testing.T) {
 		TargetPublicXKey(recipientPk),
 	)
 
-	_, err := request.Validate(recipientKey) // need this to produce the `DecodedClaims` field
+	_, err := request.Validate() // need this to produce the `DecodedClaims` field
 	if err != nil {
 		t.Fatalf("Failed to validate request that should've passed: %s", err)
 	}

@@ -180,7 +180,14 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	decodedClaims, err := request.Validate(api.xk)
+	err = request.DecryptRequestEnvironment(api.xk)
+	if err != nil {
+		api.log.Error("Failed to decrypt environment for deploy request", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to decrypt environment for deploy request: %s", err))
+		return
+	}
+
+	decodedClaims, err := request.Validate()
 	if err != nil {
 		api.log.Error("Invalid deploy request", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid deploy request: %s", err))
@@ -215,16 +222,25 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		)
 
 	err = api.mgr.DeployWorkload(runningVM, &agentapi.DeployRequest{
-		Argv:            request.Argv,
-		DecodedClaims:   request.DecodedClaims,
-		Description:     request.Description,
-		Environment:     request.WorkloadEnvironment,
-		Hash:            *workloadHash,
-		Namespace:       &namespace,
-		TotalBytes:      int64(numBytes),
-		TriggerSubjects: request.TriggerSubjects,
-		WorkloadName:    &workloadName,
-		WorkloadType:    request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
+		Argv:                 request.Argv,
+		DecodedClaims:        request.DecodedClaims,
+		Description:          request.Description,
+		EncryptedEnvironment: request.Environment,
+		Environment:          request.WorkloadEnvironment,
+		Essential:            request.Essential,
+		Hash:                 *workloadHash,
+		JsDomain:             request.JsDomain,
+		Location:             request.Location,
+		Namespace:            &namespace,
+		RetryCount:           request.RetryCount,
+		RetriedAt:            request.RetriedAt,
+		SenderPublicKey:      request.SenderPublicKey,
+		TargetNode:           request.TargetNode,
+		TotalBytes:           int64(numBytes),
+		TriggerSubjects:      request.TriggerSubjects,
+		WorkloadName:         &workloadName,
+		WorkloadType:         request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
+		WorkloadJwt:          request.WorkloadJwt,
 	})
 
 	if err != nil {
@@ -232,6 +248,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deploy workload: %s", err))
 		return
 	}
+
 	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("vmid", runningVM.vmmID))
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{

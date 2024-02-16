@@ -10,6 +10,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // Called when the node server gets a log entry via internal NATS. Used to
@@ -82,6 +83,44 @@ func (mgr *MachineManager) handleAgentEvent(m *nats.Msg) {
 
 	if evt.Type() == agentapi.WorkloadStoppedEventType {
 		vm.shutdown()
+
+		if vm.isEssential() {
+			mgr.log.Debug("Essential workload stopped",
+				slog.String("vmid", vmID),
+				slog.String("workload", *vm.deployRequest.WorkloadName),
+				slog.String("workload_type", *vm.deployRequest.WorkloadType))
+
+			if vm.deployRequest.RetryCount == nil {
+				retryCount := uint(0)
+				vm.deployRequest.RetryCount = &retryCount
+			}
+
+			*vm.deployRequest.RetryCount += 1
+
+			retriedAt := time.Now().UTC()
+			vm.deployRequest.RetriedAt = &retriedAt
+
+			req, _ := json.Marshal(&controlapi.DeployRequest{
+				Argv:            vm.deployRequest.Argv,
+				Description:     vm.deployRequest.Description,
+				WorkloadType:    vm.deployRequest.WorkloadType,
+				Location:        vm.deployRequest.Location,
+				WorkloadJwt:     vm.deployRequest.WorkloadJwt,
+				Environment:     vm.deployRequest.EncryptedEnvironment,
+				Essential:       vm.deployRequest.Essential,
+				SenderPublicKey: vm.deployRequest.SenderPublicKey,
+				TargetNode:      vm.deployRequest.TargetNode,
+				TriggerSubjects: vm.deployRequest.TriggerSubjects,
+				JsDomain:        vm.deployRequest.JsDomain,
+			})
+
+			nodeID, _ := mgr.kp.PublicKey()
+			subject := fmt.Sprintf("%s.DEPLOY.%s.%s", controlapi.APIPrefix, vm.namespace, nodeID)
+			_, err = mgr.nc.Request(subject, req, time.Millisecond*2500)
+			if err != nil {
+				mgr.log.Error("Failed to redeploy essential workload", slog.Any("err", err))
+			}
+		}
 	}
 }
 

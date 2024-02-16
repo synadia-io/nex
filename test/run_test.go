@@ -36,7 +36,7 @@ func TestEncryption(t *testing.T) {
 		t.Fatalf("Expected a good luggage password, found %s", request.WorkloadEnvironment["TOP_SECRET_LUGGAGE"])
 	}
 
-	_, err = request.Validate(recipientKey)
+	_, err = request.Validate()
 	if err != nil {
 		t.Fatalf("Expected no error, but got one: %s", err)
 	}
