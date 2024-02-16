@@ -160,6 +160,7 @@ func (m *MachineManager) Start() {
 			go m.awaitHandshake(vm.vmmID)
 
 			m.allVMs[vm.vmmID] = vm
+			m.stopMutex[vm.vmmID] = &sync.Mutex{}
 			m.t.vmCounter.Add(m.ctx, 1)
 
 			m.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
@@ -200,8 +201,6 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 	}
 
 	if deployResponse.Accepted {
-		m.stopMutex[vm.vmmID] = &sync.Mutex{}
-
 		if request.SupportsTriggerSubjects() {
 			for _, tsub := range request.TriggerSubjects {
 				sub, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
