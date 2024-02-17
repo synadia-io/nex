@@ -270,8 +270,9 @@ func (m *MachineManager) StopMachine(vmID string, undeploy bool) error {
 		return fmt.Errorf("failed to stop machine %s", vmID)
 	}
 
-	m.stopMutex[vmID].Lock()
-	defer m.stopMutex[vmID].Unlock()
+	mutex := m.stopMutex[vmID]
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	m.log.Debug("Attempting to stop virtual machine", slog.String("vmid", vmID), slog.Bool("undeploy", undeploy))
 
