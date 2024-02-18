@@ -23,7 +23,10 @@ set -xe
 chmod +x /usr/local/bin/agent
 chmod +x /etc/init.d/agent
 
+apk add --no-cache iptables
+apk add --no-cache iptables-legacy
 apk add --no-cache openrc
+apk add --no-cache sudo
 apk add --no-cache util-linux
 
 ln -s agetty /etc/init.d/agetty.ttyS0
@@ -33,6 +36,9 @@ rc-update add agetty.ttyS0 default
 echo "root:root" | chpasswd
 
 addgroup -g 1000 -S nex && adduser -u 1000 -S nex -G nex
+
+echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel
+adduser nex wheel
 
 rc-update add devfs boot
 rc-update add procfs boot

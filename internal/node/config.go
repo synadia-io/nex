@@ -21,7 +21,7 @@ var (
 	defaultWorkloadTypes = []string{"elf", "v8", "wasm"}
 	defaultBinPath       = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
 	// check the default cni bin path first, otherwise look in the rest of the PATH
-	defaultCNIBinPath = append([]string{"/opt/cni/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
+	defaultCNIBinPath = []string{"/opt/cni/bin"}
 )
 
 // Node configuration is used to configure the node process as well

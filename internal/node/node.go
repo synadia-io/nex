@@ -51,7 +51,8 @@ type Node struct {
 	keypair   nkeys.KeyPair
 	publicKey string
 
-	nc *nats.Conn
+	dns *DNS
+	nc  *nats.Conn
 
 	natsint *server.Server
 	ncint   *nats.Conn
@@ -223,6 +224,15 @@ func (n *Node) init() error {
 			tracer = noop.NewTracerProvider().Tracer("nex")
 		}
 
+		// setup DNS nameserver
+		n.dns, err = NewDNS(n.log)
+		if err != nil {
+			n.log.Error("Failed to initialize DNS nameserver", slog.Any("err", err))
+			err = fmt.Errorf("failed to initialize DNS nameserver: %s", err)
+		} else {
+			n.log.Info("Initialized DNS nameserver")
+		}
+
 		// setup NATS connection
 		n.nc, err = models.GenerateConnectionFromOpts(n.opts)
 		if err != nil {
@@ -242,7 +252,7 @@ func (n *Node) init() error {
 		}
 
 		// init machine manager
-		n.manager, err = NewMachineManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		n.manager, err = NewMachineManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.dns, n.telemetry)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize machine manager: %s", err)
@@ -405,6 +415,7 @@ func (n *Node) shutdown() {
 		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
 		_ = n.telemetry.Shutdown()
+		_ = n.dns.Stop()
 
 		_ = os.Remove(defaultPidFilepath)
 		close(n.sigs)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"sync/atomic"
 	"syscall"
@@ -311,7 +312,13 @@ func (a *Agent) handleHealthz(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *Agent) init() error {
-	err := a.requestHandshake()
+	err := a.setNameservers()
+	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to set nameservers: %s", err))
+		return err
+	}
+
+	err = a.requestHandshake()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
 		return err
@@ -334,6 +341,32 @@ func (a *Agent) init() error {
 	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
 	go a.dispatchLogs()
+
+	return nil
+}
+
+func (a *Agent) setNameservers() error {
+	if a.md.Nameserver == nil {
+		return errors.New("no nameserver included in metadata")
+	}
+
+	a.LogDebug(fmt.Sprintf("Metadata included nameserver: %s", *a.md.Nameserver))
+
+	cmd := exec.Command("sudo", "iptables-legacy", "-v", "-t", "nat", "-A", "OUTPUT", "-p", "tcp", "--dport", "domain", "-j", "DNAT", "--to-destination", *a.md.Nameserver)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to update iptables for nameserver: %s", err))
+		// return err
+	}
+	a.LogDebug(string(out))
+
+	cmd = exec.Command("sudo", "iptables-legacy", "-v", "-t", "nat", "-A", "OUTPUT", "-p", "udp", "--dport", "domain", "-j", "DNAT", "--to-destination", *a.md.Nameserver)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to update iptables for nameserver: %s", err))
+		// return err
+	}
+	a.LogDebug(string(out))
 
 	return nil
 }

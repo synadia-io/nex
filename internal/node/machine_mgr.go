@@ -43,6 +43,7 @@ const (
 type MachineManager struct {
 	closing    uint32
 	config     *NodeConfiguration
+	dns        *DNS
 	kp         nkeys.KeyPair
 	log        *slog.Logger
 	nc         *nats.Conn
@@ -76,6 +77,7 @@ func NewMachineManager(
 	nc, ncint *nats.Conn,
 	config *NodeConfiguration,
 	log *slog.Logger,
+	dns *DNS,
 	telemetry *Telemetry,
 ) (*MachineManager, error) {
 	// Validate the node config
@@ -87,6 +89,7 @@ func NewMachineManager(
 		config:           config,
 		cancel:           cancel,
 		ctx:              ctx,
+		dns:              dns,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
 		kp:               nodeKeypair,
@@ -212,6 +215,10 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 	}
 
 	if deployResponse.Accepted {
+		for _, dnsName := range request.DNSNames() {
+			m.dns.Add(dnsName, vm.ip.String())
+		}
+
 		if request.SupportsTriggerSubjects() {
 			for _, tsub := range request.TriggerSubjects {
 				sub, err := m.nc.Subscribe(tsub, m.generateTriggerHandler(vm, tsub, request))
@@ -296,13 +303,19 @@ func (m *MachineManager) StopMachine(vmID string, undeploy bool) error {
 		m.log.Debug(fmt.Sprintf("drained subscription to subject %s associated with vm %s", sub.Subject, vmID))
 	}
 
-	if vm.deployRequest != nil && undeploy {
-		// we do a request here to allow graceful shutdown of the workload being undeployed
-		subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
-		_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
-		if err != nil {
-			m.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("vmid", vm.vmmID), slog.String("error", err.Error()))
-			// return err
+	if vm.deployRequest != nil {
+		if undeploy {
+			// we do a request here to allow graceful shutdown of the workload being undeployed
+			subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
+			_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
+			if err != nil {
+				m.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("vmid", vm.vmmID), slog.String("error", err.Error()))
+				// return err
+			}
+		}
+
+		for _, dnsName := range vm.deployRequest.DNSNames() {
+			m.dns.Remove(dnsName)
 		}
 	}
 
@@ -522,8 +535,12 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 }
 
 func (m *MachineManager) setMetadata(vm *runningFirecracker) error {
+	udpAddr := strings.Split(*m.dns.udpAddr, ":")
+	nameserver := fmt.Sprintf("%s:%s", vm.machine.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.Gateway, udpAddr[len(udpAddr)-1])
+
 	return vm.setMetadata(&agentapi.MachineMetadata{
 		Message:      agentapi.StringOrNil("Host-supplied metadata"),
+		Nameserver:   &nameserver,
 		NodeNatsHost: vm.config.InternalNodeHost,
 		NodeNatsPort: vm.config.InternalNodePort,
 		VmID:         &vm.vmmID,
