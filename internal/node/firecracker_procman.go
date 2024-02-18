@@ -21,6 +21,7 @@ type FirecrackerProcessManager struct {
 	closing   uint32
 	config    *NodeConfiguration
 	ctx       context.Context
+	dns       *DNS
 	log       *slog.Logger
 	stopMutex map[string]*sync.Mutex
 	t         *Telemetry
@@ -35,11 +36,13 @@ type FirecrackerProcessManager struct {
 func NewFirecrackerProcessManager(
 	log *slog.Logger,
 	config *NodeConfiguration,
+	dns *DNS,
 	telemetry *Telemetry,
 	ctx context.Context,
 ) (*FirecrackerProcessManager, error) {
 	return &FirecrackerProcessManager{
 		config: config,
+		dns:    dns,
 		t:      telemetry,
 		log:    log,
 		ctx:    ctx,
@@ -244,9 +247,13 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 	}
 }
 
-func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
+func (m *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
+	udpAddr := strings.Split(*m.dns.udpAddr, ":")
+	nameserver := fmt.Sprintf("%s:%s", vm.machine.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.Gateway, udpAddr[len(udpAddr)-1])
+
 	return vm.setMetadata(&agentapi.MachineMetadata{
 		Message:      agentapi.StringOrNil("Host-supplied metadata"),
+		Nameserver:   &nameserver,
 		NodeNatsHost: vm.config.InternalNodeHost,
 		NodeNatsPort: vm.config.InternalNodePort,
 		VmID:         &vm.vmmID,

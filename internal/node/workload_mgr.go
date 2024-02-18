@@ -38,6 +38,7 @@ const (
 type WorkloadManager struct {
 	closing    uint32
 	config     *NodeConfiguration
+	dns        *DNS
 	kp         nkeys.KeyPair
 	log        *slog.Logger
 	nc         *nats.Conn
@@ -79,6 +80,7 @@ func NewWorkloadManager(
 	nc, ncint *nats.Conn,
 	config *NodeConfiguration,
 	log *slog.Logger,
+	dns *DNS,
 	telemetry *Telemetry,
 ) (*WorkloadManager, error) {
 	// Validate the node config
@@ -90,6 +92,7 @@ func NewWorkloadManager(
 		config:           config,
 		cancel:           cancel,
 		ctx:              ctx,
+		dns:              dns,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
 		kp:               nodeKeypair,
@@ -116,7 +119,7 @@ func NewWorkloadManager(
 		w.log.Warn("⚠️ Make sure this is the behavior you wanted and you are in an appropriate environment")
 		w.procMan, err = NewSpawningProcessManager(w.log, w.config, w.t, w.ctx)
 	} else {
-		w.procMan, err = NewFirecrackerProcessManager(w.log, w.config, w.t, w.ctx)
+		w.procMan, err = NewFirecrackerProcessManager(w.log, w.config, w.dns, w.t, w.ctx)
 	}
 
 	if err != nil {
@@ -174,6 +177,10 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 	}
 
 	if deployResponse.Accepted {
+		for _, dnsName := range request.DNSNames() {
+			w.dns.Add(dnsName, "") // FIXME-- read IP if the process manager supports it... vm.ip.String())
+		}
+
 		// move the client from active to pending
 		w.activeAgents[workloadID] = agentClient
 		delete(w.pendingAgents, workloadID)
@@ -288,14 +295,20 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	}
 
 	if deployRequest != nil && undeploy {
-		agentClient := w.activeAgents[id]
-		defer func() {
-			_ = agentClient.Drain()
-		}()
+		if undeploy {
+			agentClient := w.activeAgents[id]
+			defer func() {
+				_ = agentClient.Drain()
+			}()
 
-		err := agentClient.Undeploy()
-		if err != nil {
-			w.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("workload_id", id), slog.String("error", err.Error()))
+			err := agentClient.Undeploy()
+			if err != nil {
+				w.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("workload_id", id), slog.String("error", err.Error()))
+			}
+		}
+
+		for _, dnsName := range deployRequest.DNSNames() {
+			w.dns.Remove(dnsName)
 		}
 	}
 

@@ -3,6 +3,7 @@ package agentapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"strings"
@@ -84,6 +85,21 @@ type DeployRequest struct {
 	Errors []error `json:"errors,omitempty"`
 }
 
+// Returns an array of DNS names to associate with the running workload
+func (request *DeployRequest) DNSNames() []string {
+	dnsNames := make([]string, 0)
+
+	var dnsName strings.Builder
+	if request.Namespace != nil && *request.Namespace != "default" {
+		_, _ = dnsName.WriteString(fmt.Sprintf("%s.", *request.Namespace))
+	}
+	_, _ = dnsName.WriteString(*request.WorkloadName)
+	dnsNames = append(dnsNames, dnsName.String()) // FIXME-- read this from the deploy request instead...
+
+	return dnsNames
+}
+
+// Returns true if the deploy request represents an essential workload
 func (request *DeployRequest) IsEssential() bool {
 	return request.Essential != nil && *request.Essential
 }
@@ -164,10 +180,12 @@ type HostServicesMessagingResponse struct {
 }
 
 type MachineMetadata struct {
-	VmID         *string `json:"vmid"`
+	Gateway      *string `json:"gateway"`
+	Message      *string `json:"message"`
+	Nameserver   *string `json:"nameserver"`
 	NodeNatsHost *string `json:"node_nats_host"`
 	NodeNatsPort *int    `json:"node_nats_port"`
-	Message      *string `json:"message"`
+	VmID         *string `json:"vmid"`
 
 	Errors []error `json:"errors,omitempty"`
 }
