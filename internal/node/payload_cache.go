@@ -3,13 +3,9 @@ package nexnode
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"io"
 	"log/slog"
-	"os"
-	"path"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
@@ -56,25 +52,11 @@ func (m *MachineManager) CacheWorkload(request *controlapi.DeployRequest) (uint6
 		return 0, nil, err
 	}
 
-	filename := path.Join(os.TempDir(), uuid.NewString())
-	err = store.GetFile(key, filename)
+	workload, err := store.GetBytes(key)
 	if err != nil {
 		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
 		return 0, nil, err
 	}
-
-	f, err := os.Open(filename)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	workload, err := io.ReadAll(f)
-	if err != nil {
-		m.log.Error("Couldn't read the file we just wrote", slog.Any("err", err))
-		return 0, nil, err
-	}
-
-	os.Remove(filename)
 
 	jsInternal, err := m.ncInternal.JetStream()
 	if err != nil {
