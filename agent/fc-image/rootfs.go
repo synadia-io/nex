@@ -12,6 +12,8 @@ import (
 	"dagger.io/dagger"
 )
 
+const defaultRootFsSize = 1024 * 1024 * 150 // 150 MiB
+
 func main() {
 	if os.Getuid() != 0 {
 		fmt.Println("Please run as root")
@@ -72,7 +74,7 @@ func main() {
 		return
 	}
 
-	err = fs.Truncate(1 * 1024 * 1024 * 100)
+	err = fs.Truncate(defaultRootFsSize)
 	if err != nil {
 		fmt.Println(err)
 		return
