@@ -31,6 +31,7 @@ func TestWasmExecution(t *testing.T) {
 		VmID:        "bob",
 
 		NATSConn: nil, // FIXME
+		Logger:   nil, // FIXME
 	}
 	params.DeployRequest.WorkloadType = &typ
 	wasm, err := lib.InitNexExecutionProviderWasm(params)

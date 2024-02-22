@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/synadia-io/nex/internal/agentlogger"
 	"io"
 	"os"
 
@@ -28,6 +29,8 @@ type Wasm struct {
 	exit chan int
 
 	nc *nats.Conn // agent NATS connection
+
+	logger *agentlogger.AgentLogger
 }
 
 func (e *Wasm) Deploy() error {
@@ -35,7 +38,7 @@ func (e *Wasm) Deploy() error {
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
 		val, err := e.Execute(msg.Header.Get("x-nex-trigger-subject"), msg.Data)
 		if err != nil {
-			// TODO-- propagate this error to agent logs
+			e.logger.LogMessage(agentlogger.LogLevelError, fmt.Sprintf("failed to execute function on trigger subject %s: %s", subject, err.Error()))
 			return
 		}
 
@@ -146,7 +149,8 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 		run:  params.Run,
 		exit: params.Exit,
 
-		nc: params.NATSConn,
+		nc:     params.NATSConn,
+		logger: params.Logger,
 	}, nil
 }
 

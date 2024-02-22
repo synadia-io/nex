@@ -2,6 +2,7 @@ package nexagent
 
 import (
 	"fmt"
+	"github.com/synadia-io/nex/internal/agentlogger"
 	"os"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -15,51 +16,50 @@ type logEmitter struct {
 	name   string
 	stderr bool
 
-	logs chan *agentapi.LogEntry
+	logger *agentlogger.AgentLogger
 }
 
 // Write arbitrary bytes to the underlying log emitter
 func (l *logEmitter) Write(bytes []byte) (int, error) {
-	var lvl agentapi.LogLevel
+	var lvl agentlogger.LogLevel
 	if l.stderr {
-		lvl = agentapi.LogLevelError
+		lvl = agentlogger.LogLevelError
 	} else {
-		lvl = agentapi.LogLevelInfo
+		lvl = agentlogger.LogLevelInfo
 	}
 
-	l.logs <- &agentapi.LogEntry{
+	l.logger.LogEntry(&agentlogger.LogEntry{
 		Level:  lvl,
 		Source: l.name,
 		Text:   string(bytes),
-	}
+	})
 
 	// FIXME-- this never returns an error
 	return len(bytes), nil
 }
 
 func (a *Agent) LogDebug(msg string) {
-	a.submitLog(msg, agentapi.LogLevelDebug)
+	a.logger.LogMessage(agentlogger.LogLevelDebug, msg)
 	fmt.Fprintln(os.Stdout, msg)
 }
 
 func (a *Agent) LogError(msg string) {
-	a.submitLog(msg, agentapi.LogLevelError)
+	a.logger.LogMessage(agentlogger.LogLevelError, msg)
 	fmt.Fprintln(os.Stderr, msg)
 }
 
 func (a *Agent) LogInfo(msg string) {
-	a.submitLog(msg, agentapi.LogLevelInfo)
+	a.logger.LogMessage(agentlogger.LogLevelInfo, msg)
 	fmt.Fprintln(os.Stdout, msg)
 }
 
 // FIXME-- revisit error handling
 func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes int64) {
-	a.agentLogs <- &agentapi.LogEntry{
+	a.logger.LogEntry(&agentlogger.LogEntry{
 		Source: NexEventSourceNexAgent,
-		Level:  agentapi.LogLevelInfo,
+		Level:  agentlogger.LogLevelInfo,
 		Text:   fmt.Sprintf("Workload %s deployed", workloadName),
-	}
-
+	})
 	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStartedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName})
 	a.eventLogs <- &evt
 }
@@ -67,9 +67,9 @@ func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes in
 // PublishWorkloadExited publishes a workload failed or stopped message
 // FIXME-- revisit error handling
 func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bool, code int) {
-	level := agentapi.LogLevelInfo
+	level := agentlogger.LogLevelInfo
 	if err {
-		level = agentapi.LogLevelError
+		level = agentlogger.LogLevelError
 	}
 
 	// FIXME-- this hack is here to get things working... refactor me
@@ -78,11 +78,11 @@ func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bo
 		txt = fmt.Sprintf("Workload %s failed to deploy", workloadName)
 	}
 
-	a.agentLogs <- &agentapi.LogEntry{
+	a.logger.LogEntry(&agentlogger.LogEntry{
 		Source: NexEventSourceNexAgent,
-		Level:  agentapi.LogLevel(level),
+		Level:  agentlogger.LogLevel(level),
 		Text:   txt,
-	}
+	})
 
 	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStoppedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
 	a.eventLogs <- &evt
