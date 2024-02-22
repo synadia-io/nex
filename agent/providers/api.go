@@ -2,7 +2,6 @@ package providers
 
 import (
 	"errors"
-
 	"github.com/synadia-io/nex/agent/providers/lib"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/synadia-io/nex/internal/agentlogger"
 	"net/http"
 	"os"
 	"path"
@@ -27,7 +28,7 @@ const workloadExecutionSleepTimeoutMillis = 1000
 // and the nex node by way of a configured internal NATS server. Agent instances provide
 // logging and event emission facilities, and deployment and execution of workloads
 type Agent struct {
-	agentLogs chan *agentapi.LogEntry
+	logger    *agentlogger.AgentLogger
 	eventLogs chan *cloudevents.Event
 
 	cancelF context.CancelFunc
@@ -86,8 +87,14 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		return nil, err
 	}
 
+	logger, err := agentlogger.NewAgentLogger(ctx, nc, metadata)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize agent logger: %s", err)
+		return nil, err
+	}
+
 	return &Agent{
-		agentLogs:   make(chan *agentapi.LogEntry, 64),
+		logger:      logger,
 		eventLogs:   make(chan *cloudevents.Event, 64),
 		cancelF:     cancelF,
 		ctx:         ctx,
@@ -203,26 +210,6 @@ func (a *Agent) dispatchEvents() {
 	}
 }
 
-// This is run inside a goroutine to pull log entries off the channel and publish to the
-// node host via internal NATS
-func (a *Agent) dispatchLogs() {
-	for !a.shuttingDown() {
-		entry := <-a.agentLogs
-		bytes, err := json.Marshal(entry)
-		if err != nil {
-			continue
-		}
-
-		subject := fmt.Sprintf("agentint.%s.logs", *a.md.VmID)
-		err = a.nc.Publish(subject, bytes)
-		if err != nil {
-			continue
-		}
-
-		a.nc.Flush()
-	}
-}
-
 // Pull a deploy request off the wire, get the payload from the shared
 // bucket, write it to tmp, initialize the execution provider per the
 // request, and then validate and deploy a workload
@@ -326,7 +313,7 @@ func (a *Agent) init() error {
 
 	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
-	go a.dispatchLogs()
+	go a.logger.Run()
 
 	return nil
 }
@@ -344,8 +331,8 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 
 	params := &agentapi.ExecutionProviderParams{
 		DeployRequest: *req,
-		Stderr:        &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
-		Stdout:        &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
+		Stderr:        &logEmitter{stderr: true, name: *req.WorkloadName, logger: a.logger},
+		Stdout:        &logEmitter{stderr: false, name: *req.WorkloadName, logger: a.logger},
 		TmpFilename:   &tmpFile,
 		VmID:          *a.md.VmID,
 
@@ -354,6 +341,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 		Exit: make(chan int),
 
 		NATSConn:        a.nc,
+		Logger:          a.logger,
 		TriggerSubjects: req.TriggerSubjects,
 	}
 
@@ -405,14 +393,6 @@ func (a *Agent) startDiagnosticEndpoint() {
 	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
 	http.HandleFunc("/healthz", a.handleHealthz)
 	_ = http.ListenAndServe(":9999", nil)
-}
-
-func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
-	a.agentLogs <- &agentapi.LogEntry{
-		Source: NexEventSourceNexAgent,
-		Level:  lvl,
-		Text:   msg,
-	}
 }
 
 // workAck ACKs the provided NATS message by responding with the

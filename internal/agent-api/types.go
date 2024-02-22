@@ -3,6 +3,7 @@ package agentapi
 import (
 	"encoding/json"
 	"errors"
+	"github.com/synadia-io/nex/internal/agentlogger"
 	"io"
 	"strings"
 	"time"
@@ -54,6 +55,8 @@ type ExecutionProviderParams struct {
 
 	// NATS connection which be injected into the execution provider
 	NATSConn *nats.Conn `json:"-"`
+	// Agent Logger which will be injected into the execution provider
+	Logger *agentlogger.AgentLogger `json:"-"`
 }
 
 // DeployRequest processed by the agent
@@ -154,11 +157,3 @@ func (m *MachineMetadata) Validate() bool {
 
 	return err == nil
 }
-
-type LogEntry struct {
-	Source string   `json:"source,omitempty"`
-	Level  LogLevel `json:"level,omitempty"`
-	Text   string   `json:"text,omitempty"`
-}
-
-type LogLevel int32

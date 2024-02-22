@@ -3,6 +3,7 @@ package nexnode
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/synadia-io/nex/internal/agentlogger"
 	"log/slog"
 	"strings"
 	"time"
@@ -24,7 +25,7 @@ func (mgr *MachineManager) handleAgentLog(m *nats.Msg) {
 		return
 	}
 
-	var logentry agentapi.LogEntry
+	var logentry agentlogger.LogEntry
 	err := json.Unmarshal(m.Data, &logentry)
 	if err != nil {
 		mgr.log.Error("Failed to unmarshal log entry from agent", slog.Any("err", err))
