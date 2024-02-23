@@ -152,6 +152,16 @@ type HostServicesKeyValueRequest struct {
 	Success  *bool `json:"success,omitempty"`
 }
 
+type HostServicesMessagingRequest struct {
+	Subject *string          `json:"key"`
+	Payload *json.RawMessage `json:"payload,omitempty"`
+}
+
+type HostServicesMessagingResponse struct {
+	Errors  []string `json:"errors,omitempty"`
+	Success bool     `json:"success,omitempty"`
+}
+
 type MachineMetadata struct {
 	VmID         *string `json:"vmid"`
 	NodeNatsHost *string `json:"node_nats_host"`
