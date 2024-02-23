@@ -29,6 +29,7 @@ type runningFirecracker struct {
 	vmmID     string
 
 	closing         uint32
+	config          *NodeConfiguration
 	deployRequest   *agentapi.DeployRequest
 	ip              net.IP
 	log             *slog.Logger
@@ -40,6 +41,16 @@ type runningFirecracker struct {
 
 func (vm *runningFirecracker) isEssential() bool {
 	return vm.deployRequest != nil && vm.deployRequest.Essential != nil && *vm.deployRequest.Essential
+}
+
+func (vm *runningFirecracker) setMetadata(metadata *agentapi.MachineMetadata) error {
+	err := vm.machine.SetMetadata(vm.vmmCtx, metadata)
+	if err != nil {
+		vm.vmmCancel()
+		return fmt.Errorf("failed to set machine metadata: %s", err)
+	}
+
+	return nil
 }
 
 func (vm *runningFirecracker) shutdown() {
@@ -137,22 +148,9 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 		return nil, fmt.Errorf("failed creating machine: %s", err)
 	}
 
-	md := agentapi.MachineMetadata{
-		VmID:         &vmmID,
-		NodeNatsHost: config.InternalNodeHost,
-		NodeNatsPort: config.InternalNodePort,
-		Message:      agentapi.StringOrNil("Host-supplied metadata"),
-	}
-
 	if err := m.Start(vmmCtx); err != nil {
 		vmmCancel()
 		return nil, fmt.Errorf("failed to start machine: %v", err)
-	}
-
-	err = m.SetMetadata(vmmCtx, md)
-	if err != nil {
-		vmmCancel()
-		return nil, fmt.Errorf("failed to set machine metadata: %s", err)
 	}
 
 	gw := m.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.Gateway
@@ -166,11 +164,12 @@ func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.
 		slog.Any("gateway", gw),
 		slog.String("netmask", mask.String()),
 		slog.String("hosttap", hosttap),
-		slog.String("nats_host", *md.NodeNatsHost),
-		slog.Int("nats_port", *md.NodeNatsPort),
+		slog.String("nats_host", *config.InternalNodeHost),
+		slog.Int("nats_port", *config.InternalNodePort),
 	)
 
 	return &runningFirecracker{
+		config:         config,
 		ip:             ip,
 		log:            log,
 		machine:        m,
