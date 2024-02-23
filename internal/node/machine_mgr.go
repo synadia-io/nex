@@ -157,6 +157,12 @@ func (m *MachineManager) Start() {
 				continue
 			}
 
+			err = m.setMetadata(vm)
+			if err != nil {
+				m.log.Warn("Failed to set metadata on VM for warming pool.", slog.Any("err", err))
+				continue
+			}
+
 			go m.awaitHandshake(vm.vmmID)
 
 			m.allVMs[vm.vmmID] = vm
@@ -276,6 +282,15 @@ func (m *MachineManager) StopMachine(vmID string, undeploy bool) error {
 
 	m.log.Debug("Attempting to stop virtual machine", slog.String("vmid", vmID), slog.Bool("undeploy", undeploy))
 
+	for _, sub := range m.vmsubz[vmID] {
+		err := sub.Drain()
+		if err != nil {
+			m.log.Warn(fmt.Sprintf("failed to drain subscription to subject %s associated with vm %s: %s", sub.Subject, vmID, err.Error()))
+		}
+
+		m.log.Debug(fmt.Sprintf("drained subscription to subject %s associated with vm %s", sub.Subject, vmID))
+	}
+
 	if vm.deployRequest != nil && undeploy {
 		// we do a request here to allow graceful shutdown of the workload being undeployed
 		subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
@@ -284,15 +299,6 @@ func (m *MachineManager) StopMachine(vmID string, undeploy bool) error {
 			m.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("vmid", vm.vmmID), slog.String("error", err.Error()))
 			// return err
 		}
-	}
-
-	for _, sub := range m.vmsubz[vmID] {
-		err := sub.Drain()
-		if err != nil {
-			m.log.Warn(fmt.Sprintf("failed to drain subscription to subject %s associated with vm %s: %s", sub.Subject, vmID, err.Error()))
-		}
-
-		m.log.Debug(fmt.Sprintf("drained subscription to subject %s associated with vm %s", sub.Subject, vmID))
 	}
 
 	vm.shutdown()
@@ -335,8 +341,6 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 		if time.Now().UTC().After(timeoutAt) {
 			m.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("vmid", vmid))
 			return
-			// _ = m.Stop()
-			// FIXME!!! os.Exit(1) // FIXME
 		}
 
 		_, handshakeOk = m.handshakes[vmid]
@@ -474,21 +478,31 @@ func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
 // This handshake uses the request pattern to force a full round trip to ensure connectivity is working properly as
 // fire-and-forget publishes from inside the firecracker VM could potentially be lost
 func (m *MachineManager) handleHandshake(msg *nats.Msg) {
-	var shake agentapi.HandshakeRequest
-	err := json.Unmarshal(msg.Data, &shake)
+	var req agentapi.HandshakeRequest
+	err := json.Unmarshal(msg.Data, &req)
 	if err != nil {
-		m.log.Error("Failed to handle agent handshake", slog.String("vmid", *shake.MachineID), slog.String("message", *shake.Message))
+		m.log.Error("Failed to handle agent handshake", slog.String("vmid", *req.MachineID), slog.String("message", *req.Message))
+		return
+	}
+
+	m.log.Info("Received agent handshake", slog.String("vmid", *req.MachineID), slog.String("message", *req.Message))
+
+	_, ok := m.allVMs[*req.MachineID]
+	if !ok {
+		m.log.Warn("Received agent handshake attempt from a VM we don't know about.")
+		return
+	}
+
+	resp, _ := json.Marshal(&agentapi.HandshakeResponse{})
+
+	err = msg.Respond(resp)
+	if err != nil {
+		m.log.Error("Failed to reply to agent handshake", slog.Any("err", err))
 		return
 	}
 
 	now := time.Now().UTC()
-	m.handshakes[*shake.MachineID] = now.Format(time.RFC3339)
-
-	m.log.Info("Received agent handshake", slog.String("vmid", *shake.MachineID), slog.String("message", *shake.Message))
-	err = msg.Respond([]byte("OK"))
-	if err != nil {
-		m.log.Error("Failed to reply to agent handshake", slog.Any("err", err))
-	}
+	m.handshakes[*req.MachineID] = now.Format(time.RFC3339)
 }
 
 func (m *MachineManager) resetCNI() error {
@@ -721,6 +735,15 @@ func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 	}
 
 	return nil
+}
+
+func (m *MachineManager) setMetadata(vm *runningFirecracker) error {
+	return vm.setMetadata(&agentapi.MachineMetadata{
+		Message:      agentapi.StringOrNil("Host-supplied metadata"),
+		NodeNatsHost: vm.config.InternalNodeHost,
+		NodeNatsPort: vm.config.InternalNodePort,
+		VmID:         &vm.vmmID,
+	})
 }
 
 func (m *MachineManager) stopping() bool {

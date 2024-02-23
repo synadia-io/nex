@@ -136,7 +136,7 @@ func (a *Agent) Start() {
 
 // Request a handshake with the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
-func (a *Agent) RequestHandshake() error {
+func (a *Agent) requestHandshake() error {
 	msg := agentapi.HandshakeRequest{
 		MachineID: a.md.VmID,
 		StartTime: a.started,
@@ -144,9 +144,16 @@ func (a *Agent) RequestHandshake() error {
 	}
 	raw, _ := json.Marshal(msg)
 
-	_, err := a.nc.Request(agentapi.NexAgentSubjectHandshake, raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+	resp, err := a.nc.Request(agentapi.NexAgentSubjectHandshake, raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
 		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
+		return err
+	}
+
+	var handshakeResponse *agentapi.HandshakeResponse
+	err = json.Unmarshal(resp.Data, &handshakeResponse)
+	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to parse handshake response: %s", err))
 		return err
 	}
 
@@ -304,7 +311,7 @@ func (a *Agent) handleHealthz(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *Agent) init() error {
-	err := a.RequestHandshake()
+	err := a.requestHandshake()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
 		return err

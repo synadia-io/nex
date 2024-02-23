@@ -141,6 +141,9 @@ type HandshakeRequest struct {
 	Message   *string   `json:"message,omitempty"`
 }
 
+type HandshakeResponse struct {
+}
+
 type HostServicesKeyValueRequest struct {
 	Key   *string          `json:"key"`
 	Value *json.RawMessage `json:"value,omitempty"`
