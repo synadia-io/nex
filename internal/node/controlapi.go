@@ -272,7 +272,7 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 		NodeId:          api.nodeId,
 		Version:         Version(),
 		Uptime:          myUptime(now.Sub(api.start)),
-		RunningMachines: len(api.mgr.allVMs),
+		RunningMachines: len(api.mgr.allVMs) - len(api.mgr.warmVMs),
 		Tags:            api.config.Tags,
 	}, nil)
 
