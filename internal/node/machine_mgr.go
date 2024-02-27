@@ -615,20 +615,17 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 			m.t.functionRunTimeNano.Add(m.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
 
-			if len(resp.Data) > 0 {
-				err = msg.Respond(resp.Data)
-				//_ = tracerProvider.ForceFlush(ctx)
-				if err != nil {
-					parentSpan.SetStatus(codes.Error, "Failed to respond to trigger subject")
-					parentSpan.RecordError(err)
-					m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
-						slog.String("vmid", vm.vmmID),
-						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
-						slog.Any("err", err),
-					)
-				}
-
+			err = msg.Respond(resp.Data)
+			//_ = tracerProvider.ForceFlush(ctx)
+			if err != nil {
+				parentSpan.SetStatus(codes.Error, "Failed to respond to trigger subject")
+				parentSpan.RecordError(err)
+				m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
+					slog.String("vmid", vm.vmmID),
+					slog.String("trigger_subject", tsub),
+					slog.String("workload_type", *request.WorkloadType),
+					slog.Any("err", err),
+				)
 			}
 		}
 	}
