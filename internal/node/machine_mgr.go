@@ -549,7 +549,7 @@ func (m *MachineManager) cleanSockets() {
 
 func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
-		ctx := context.Background()
+		ctx := m.ctx
 
 		ctx, parentSpan := tracer.Start(
 			ctx,
