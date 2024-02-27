@@ -1,0 +1,8 @@
+datasources:
+- name: Tempo
+  type: tempo
+  access: proxy
+  url: http://tempo:7999
+  version: 1
+  editable: false
+  uid: tempo

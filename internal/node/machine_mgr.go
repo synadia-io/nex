@@ -22,7 +22,9 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -547,12 +549,36 @@ func (m *MachineManager) cleanSockets() {
 
 func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
+		ctx := context.Background()
+
+		ctx, parentSpan := tracer.Start(
+			ctx,
+			"workload-trigger",
+			trace.WithNewRoot(),
+			trace.WithSpanKind(trace.SpanKindServer),
+			trace.WithAttributes(
+				attribute.String("name", *request.WorkloadName),
+				attribute.String("namespace", vm.namespace),
+				attribute.String("trigger-subject", msg.Subject),
+			))
+		defer parentSpan.End()
+
 		intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
+		// TODO: inject tracer context into message header
 		intmsg.Data = msg.Data
 		intmsg.Header.Add(nexTriggerSubject, msg.Subject)
 
+		_, childSpan := tracer.Start(
+			ctx,
+			"internal request",
+		)
 		resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
+		childSpan.End()
+
+		parentSpan.AddEvent("Completed internal request")
 		if err != nil {
+			parentSpan.SetStatus(codes.Error, "Internal trigger request failed")
+			parentSpan.RecordError(err)
 			m.log.Error("Failed to request agent execution via internal trigger subject",
 				slog.Any("err", err),
 				slog.String("trigger_subject", tsub),
@@ -565,6 +591,7 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 			m.t.functionFailedTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *vm.deployRequest.WorkloadName)))
 			_ = m.publishFunctionExecFailed(vm, *request.WorkloadName, tsub, err)
 		} else if resp != nil {
+			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
 			runtimeNs := resp.Header.Get(nexRuntimeNs)
 			m.log.Debug("Received response from execution via trigger subject",
 				slog.String("vmid", vm.vmmID),
@@ -579,6 +606,7 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 				m.log.Warn("failed to log function runtime", slog.Any("err", err))
 			}
 			_ = m.publishFunctionExecSucceeded(vm, tsub, runTimeNs64)
+			parentSpan.AddEvent("published success event")
 
 			m.t.functionTriggers.Add(m.ctx, 1)
 			m.t.functionTriggers.Add(m.ctx, 1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
@@ -589,7 +617,10 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 
 			if len(resp.Data) > 0 {
 				err = msg.Respond(resp.Data)
+				//_ = tracerProvider.ForceFlush(ctx)
 				if err != nil {
+					parentSpan.SetStatus(codes.Error, "Failed to respond to trigger subject")
+					parentSpan.RecordError(err)
 					m.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
 						slog.String("vmid", vm.vmmID),
 						slog.String("trigger_subject", tsub),
