@@ -547,46 +547,133 @@ var _ = Describe("nex node", func() {
 								})
 
 								Describe("host services", func() {
-									Context("when the javascript is valid", func() {
-										JustBeforeEach(func() {
-											triggerSubject = "hellohostservices"
-											deployRequest, err = newDeployRequest(*nodeID, "hostservices", "nex host services example", "../examples/v8/echofunction/src/hostservices.js", map[string]string{}, []string{triggerSubject}, log)
-											Expect(err).To(BeNil())
-
-											nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-											_, err = nodeClient.StartWorkload(deployRequest)
-											Expect(err).To(BeNil())
-
-											time.Sleep(time.Millisecond * 1000)
-										})
-
-										Describe("triggering the deployed function", func() {
-											var respmsg *nats.Msg
-
+									Context("key value service", func() {
+										Context("when the javascript is valid", func() {
 											JustBeforeEach(func() {
-												respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*15000)
+												triggerSubject = "hellokvservice"
+												deployRequest, err = newDeployRequest(*nodeID, "kvhostservice", "nex key value service example", "../examples/v8/echofunction/src/kv.js", map[string]string{}, []string{triggerSubject}, log)
 												Expect(err).To(BeNil())
+
+												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
+												_, err = nodeClient.StartWorkload(deployRequest)
+												Expect(err).To(BeNil())
+
+												time.Sleep(time.Millisecond * 1000)
 											})
 
-											It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
-												Expect(respmsg).NotTo(BeNil())
+											Describe("triggering the deployed function", func() {
+												var respmsg *nats.Msg
 
-												type hostServicesExampleResp struct {
-													Keys   []string `json:"keys"`
-													Hello2 string   `json:"hello2"`
-												}
+												JustBeforeEach(func() {
+													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*15000)
+													Expect(err).To(BeNil())
+												})
 
-												var resp *hostServicesExampleResp
-												err = json.Unmarshal(respmsg.Data, &resp)
-												Expect(err).To(BeNil())
+												It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
+													Expect(respmsg).NotTo(BeNil())
 
-												Expect(resp).ToNot(BeNil())
+													type hostServicesExampleResp struct {
+														Keys   []string `json:"keys"`
+														Hello2 string   `json:"hello2"`
+													}
 
-												Expect(len(resp.Keys)).To(Equal(1))
-												Expect(resp.Keys[0]).To(Equal("hello2"))
-												Expect(resp.Hello2).To(Equal("hello!"))
+													var resp *hostServicesExampleResp
+													err = json.Unmarshal(respmsg.Data, &resp)
+													Expect(err).To(BeNil())
+
+													Expect(resp).ToNot(BeNil())
+
+													Expect(len(resp.Keys)).To(Equal(1))
+													Expect(resp.Keys[0]).To(Equal("hello2"))
+													Expect(resp.Hello2).To(Equal("hello!"))
+												})
 											})
 										})
+									})
+
+									Context("messaging service", func() {
+										Context("when the javascript is valid", func() {
+											JustBeforeEach(func() {
+												triggerSubject = "hellomessagingservice"
+												deployRequest, err = newDeployRequest(*nodeID, "messaginghostservice", "nex messaging service example", "../examples/v8/echofunction/src/messaging.js", map[string]string{}, []string{triggerSubject}, log)
+												Expect(err).To(BeNil())
+
+												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
+												_, err = nodeClient.StartWorkload(deployRequest)
+												Expect(err).To(BeNil())
+
+												time.Sleep(time.Millisecond * 1000)
+											})
+
+											Describe("triggering the deployed function", func() {
+												var respmsg *nats.Msg
+												var sub *nats.Subscription
+
+												BeforeEach(func() {
+													sub, _ = _fixtures.natsConn.Subscribe("hello.world.request", func(msg *nats.Msg) {
+														resp := fmt.Sprintf("resp: %s", string(msg.Data))
+														_ = msg.Respond([]byte(resp))
+													})
+
+													sub, _ = _fixtures.natsConn.Subscribe("hello.world.request.many", func(msg *nats.Msg) {
+														resp := fmt.Sprintf("resp #1: %s", string(msg.Data))
+														_ = msg.Respond([]byte(resp))
+
+														resp = fmt.Sprintf("resp #2: %s", string(msg.Data))
+														_ = msg.Respond([]byte(resp))
+													})
+												})
+
+												AfterEach(func() {
+													_ = sub.Unsubscribe()
+													sub = nil
+												})
+
+												JustBeforeEach(func() {
+													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("asdfghjkl;'"), time.Millisecond*7500)
+													Expect(err).To(BeNil())
+												})
+
+												It("should respond to the request with the hello.world.request response value", func(ctx SpecContext) {
+													Expect(respmsg).NotTo(BeNil())
+
+													type hostServicesExampleResp struct {
+														HelloWorldRequest     string   `json:"hello.world.request"`
+														HelloWorldRequestMany []string `json:"hello.world.request.many"`
+													}
+
+													var resp *hostServicesExampleResp
+													err = json.Unmarshal(respmsg.Data, &resp)
+													Expect(err).To(BeNil())
+
+													Expect(resp).ToNot(BeNil())
+
+													Expect(resp.HelloWorldRequest).ToNot(BeNil())
+													Expect(resp.HelloWorldRequest).To(Equal("resp: asdfghjkl;'"))
+												})
+
+												It("should respond to the request with the hello.world.request.many response values", func(ctx SpecContext) {
+													Expect(respmsg).NotTo(BeNil())
+
+													type hostServicesExampleResp struct {
+														HelloWorldRequest     string   `json:"hello.world.request"`
+														HelloWorldRequestMany []string `json:"hello.world.request.many"`
+													}
+
+													var resp *hostServicesExampleResp
+													err = json.Unmarshal(respmsg.Data, &resp)
+													Expect(err).To(BeNil())
+
+													Expect(resp).ToNot(BeNil())
+
+													Expect(resp.HelloWorldRequestMany).ToNot(BeNil())
+													Expect(len(resp.HelloWorldRequestMany)).To(Equal(2))
+													Expect(resp.HelloWorldRequestMany[0]).To(Equal("resp #1: asdfghjkl;'"))
+													Expect(resp.HelloWorldRequestMany[1]).To(Equal("resp #2: asdfghjkl;'"))
+												})
+											})
+										})
+
 									})
 								})
 							})

@@ -628,6 +628,7 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 						slog.Any("err", err),
 					)
 				}
+
 			}
 		}
 	}

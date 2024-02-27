@@ -47,13 +47,13 @@ func (k *KeyValueService) HandleRPC(msg *nats.Msg) {
 
 	switch method {
 	case kvServiceMethodGet:
-		k.handleKeyValueGet(msg)
+		k.handleGet(msg)
 	case kvServiceMethodSet:
-		k.handleKeyValueSet(msg)
+		k.handleSet(msg)
 	case kvServiceMethodDelete:
-		k.handleKeyValueDelete(msg)
+		k.handleDelete(msg)
 	case kvServiceMethodKeys:
-		k.handleKeyValueKeys(msg)
+		k.handleKeys(msg)
 	default:
 		k.log.Warn("Received invalid host services RPC request",
 			slog.String("service", service),
@@ -64,7 +64,7 @@ func (k *KeyValueService) HandleRPC(msg *nats.Msg) {
 	}
 }
 
-func (k *KeyValueService) handleKeyValueGet(msg *nats.Msg) {
+func (k *KeyValueService) handleGet(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
 	namespace := tokens[3]
 	workload := tokens[4]
@@ -128,7 +128,7 @@ func (k *KeyValueService) handleKeyValueGet(msg *nats.Msg) {
 	}
 }
 
-func (k *KeyValueService) handleKeyValueSet(msg *nats.Msg) {
+func (k *KeyValueService) handleSet(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
 	namespace := tokens[3]
 	workload := tokens[4]
@@ -205,7 +205,7 @@ func (k *KeyValueService) handleKeyValueSet(msg *nats.Msg) {
 	}
 }
 
-func (k *KeyValueService) handleKeyValueDelete(msg *nats.Msg) {
+func (k *KeyValueService) handleDelete(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
 	namespace := tokens[3]
 	workload := tokens[4]
@@ -267,7 +267,7 @@ func (k *KeyValueService) handleKeyValueDelete(msg *nats.Msg) {
 	}
 }
 
-func (k *KeyValueService) handleKeyValueKeys(msg *nats.Msg) {
+func (k *KeyValueService) handleKeys(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
 	namespace := tokens[3]
 	workload := tokens[4]
