@@ -21,9 +21,11 @@ import (
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -566,14 +568,24 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 		intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
 		// TODO: inject tracer context into message header
 		intmsg.Data = msg.Data
+
 		intmsg.Header.Add(nexTriggerSubject, msg.Subject)
 
-		_, childSpan := tracer.Start(
+		cctx, childSpan := tracer.Start(
 			ctx,
 			"internal request",
+			trace.WithSpanKind(trace.SpanKindClient),
 		)
+
+		otel.GetTextMapPropagator().Inject(cctx, propagation.HeaderCarrier(msg.Header))
+
+		// TODO: make the agent's exec handler extract and forward the otel context
+		// so it continues in the host services like kv, obj, msg, etc
 		resp, err := m.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
 		childSpan.End()
+
+		//for reference - this is what agent exec would also do
+		//ctx = otel.GetTextMapPropagator().Extract(cctx, propagation.HeaderCarrier(msg.Header))
 
 		parentSpan.AddEvent("Completed internal request")
 		if err != nil {

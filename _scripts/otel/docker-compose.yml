@@ -42,5 +42,5 @@ services:
       volumes:
         - ./tempo.yaml:/etc/tempo/config.yaml
       ports:
-        - 4318 # This port is used for sending traces from otel-collector to tempo
+        - 4319 # This port is used for sending traces from otel-collector to tempo
         - 7999:7999 # tempo      

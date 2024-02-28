@@ -15,7 +15,7 @@ processors:
 exporters:
   debug:
   otlphttp/traces:
-    endpoint: http://tempo:4318
+    endpoint: http://tempo:4319
   prometheusremotewrite:
     endpoint: "http://prometheus:9090/api/v1/write"
     tls:
