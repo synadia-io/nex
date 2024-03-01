@@ -551,10 +551,9 @@ func (m *MachineManager) cleanSockets() {
 
 func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
 	return func(msg *nats.Msg) {
-		ctx := m.ctx
 
 		ctx, parentSpan := tracer.Start(
-			ctx,
+			m.ctx,
 			"workload-trigger",
 			trace.WithNewRoot(),
 			trace.WithSpanKind(trace.SpanKindServer),
@@ -563,6 +562,7 @@ func (m *MachineManager) generateTriggerHandler(vm *runningFirecracker, tsub str
 				attribute.String("namespace", vm.namespace),
 				attribute.String("trigger-subject", msg.Subject),
 			))
+
 		defer parentSpan.End()
 
 		intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", vm.vmmID))
