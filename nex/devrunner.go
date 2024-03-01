@@ -28,7 +28,9 @@ const (
 	defaultWorkloadType = agentapi.NexExecutionProviderELF
 	fileExtensionJS     = "js"
 	fileExtensionWasm   = "wasm"
+
 	objectStoreName     = "NEXCLIFILES"
+	objectStoreMaxBytes = 100 * 1024 * 1024 // 100 MB
 )
 
 func init() {
@@ -141,6 +143,7 @@ func uploadWorkload(nc *nats.Conn, filename string) (string, string, string, err
 		bucket, err = js.CreateObjectStore(&nats.ObjectStoreConfig{
 			Bucket:      objectStoreName,
 			Description: "Ad hoc object storage for NEX CLI developer mode uploads",
+			MaxBytes:    objectStoreMaxBytes,
 		})
 		if err != nil {
 			return "", "", "", err
