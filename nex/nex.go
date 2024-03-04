@@ -139,7 +139,7 @@ func main() {
 	if Opts.LogJSON {
 		logger = slog.New(slog.NewJSONHandler(os.Stdout, &opts))
 	} else {
-		logger = slog.New(slog.NewTextHandler(os.Stdout, &opts))
+		logger = slog.Default()
 	}
 
 	switch cmd {

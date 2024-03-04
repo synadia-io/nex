@@ -27,7 +27,7 @@ var (
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
-	BinPath            []string          `json:"bin_path"`
+	BinPath             []string          `json:"bin_path"`
 	CNI                 CNIDefinition     `json:"cni"`
 	DefaultResourceDir  string            `json:"default_resource_dir"`
 	ForceDepInstall     bool              `json:"-"`
@@ -45,6 +45,7 @@ type NodeConfiguration struct {
 	Tags                map[string]string `json:"tags,omitempty"`
 	ValidIssuers        []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes       []string          `json:"workload_types,omitempty"`
+	OtlpExporterUrl     *string           `json:"otlp_exporter_url,omitempty"`
 
 	Errors []error `json:"errors,omitempty"`
 }
