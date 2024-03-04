@@ -8,16 +8,39 @@ services:
       - ./prometheus:/etc/prometheus
     command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml
   grafana:
-    image: grafana/grafana:7.5.7
+    image: grafana/grafana:10.0.10
     environment:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     ports:
-      - 3000:3000
+      - 5050:3000 # 3000 is used everywhere, 5050 is less likely to conflict
     restart: unless-stopped
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/provisioning/dashboards/nex.json:/var/lib/grafana/dashboards/nex.json
-
+    depends_on:
+      - tempo
+      - prometheus
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.95.0
+    command:
+      - '--config=/etc/otelcol/config.yaml'
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml
+    ports:
+      - 4317:4317
+      - 4318:4318
+    depends_on:
+      - prometheus
+      - tempo
+  tempo:
+      image: grafana/tempo:2.3.1
+      command:
+        - '-config.file=/etc/tempo/config.yaml'
+      volumes:
+        - ./tempo.yaml:/etc/tempo/config.yaml
+      ports:
+        - 4319 # This port is used for sending traces from otel-collector to tempo
+        - 7999:7999 # tempo      

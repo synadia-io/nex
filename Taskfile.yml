@@ -40,6 +40,16 @@ tasks:
     cmds:
       - go build -tags netgo,withui -ldflags '-extldflags "-static"'
 
+  rootfs:
+    dir: agent/fc-image
+    sources:
+      - "*.go"
+    cmds:
+      - sudo /usr/local/go/bin/go run . ../cmd/nex-agent/nex-agent
+      - gunzip rootfs.ext4.gz
+    deps:
+      [agent]
+
   echo-service:
     dir: examples/echoservice
     sources:
