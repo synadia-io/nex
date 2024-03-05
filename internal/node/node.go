@@ -27,7 +27,7 @@ import (
 const defaultNatsStoreDir = "pnats"
 const defaultPidFilepath = "/var/run/nex.pid"
 
-const runloopSleepInterval = 250 * time.Millisecond
+const runloopSleepInterval = 100 * time.Millisecond
 const runloopTickInterval = 2500 * time.Millisecond
 
 // Nex node process
