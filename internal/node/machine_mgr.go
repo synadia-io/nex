@@ -348,7 +348,6 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 			if len(m.handshakes) == 0 {
 				m.log.Error("First handshake failed, shutting down to avoid inconsistent behavior")
 				m.cancel()
-				os.Exit(1)
 			}
 			return
 		}
