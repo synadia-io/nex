@@ -18,7 +18,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-  
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -347,7 +347,7 @@ func (m *MachineManager) awaitHandshake(vmid string) {
 			m.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("vmid", vmid))
 			if len(m.handshakes) == 0 {
 				m.log.Error("First handshake failed, shutting down to avoid inconsistent behavior")
-				_ = m.Stop()
+				m.cancel()
 				os.Exit(1)
 			}
 			return
