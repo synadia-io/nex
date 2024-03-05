@@ -120,7 +120,7 @@ func (n *Node) Start() {
 			n.log.Debug("received signal: %s", sig)
 			n.shutdown()
 		case <-n.ctx.Done():
-			close(n.sigs)
+			n.shutdown()
 		default:
 			time.Sleep(runloopSleepInterval)
 		}
@@ -242,7 +242,7 @@ func (n *Node) init() error {
 		}
 
 		// init machine manager
-		n.manager, err = NewMachineManager(n.ctx, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		n.manager, err = NewMachineManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize machine manager: %s", err)
@@ -407,6 +407,7 @@ func (n *Node) shutdown() {
 		_ = n.telemetry.Shutdown()
 
 		_ = os.Remove(defaultPidFilepath)
+		close(n.sigs)
 	}
 }
 
