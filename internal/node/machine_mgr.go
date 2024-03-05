@@ -47,6 +47,7 @@ type MachineManager struct {
 	log        *slog.Logger
 	nc         *nats.Conn
 	ncInternal *nats.Conn
+	cancel     context.CancelFunc
 	ctx        context.Context
 	t          *Telemetry
 
@@ -69,6 +70,7 @@ type MachineManager struct {
 // and private communications between the host and running Nex agents.
 func NewMachineManager(
 	ctx context.Context,
+	cancel context.CancelFunc,
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
 	nc, ncint *nats.Conn,
@@ -83,6 +85,7 @@ func NewMachineManager(
 
 	m := &MachineManager{
 		config:           config,
+		cancel:           cancel,
 		ctx:              ctx,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
