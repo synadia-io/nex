@@ -209,6 +209,13 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	}
 
 	runningVM := <-api.mgr.warmVMs
+	if _, ok := api.mgr.handshakes[runningVM.vmmID]; !ok {
+		api.log.Error("Attempted to deploy workload into bad VM (no handshake)",
+			slog.String("vmmid", runningVM.vmmID),
+		)
+		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, VM from pool did not initialize properly")
+		return
+	}
 	workloadName := request.DecodedClaims.Subject
 
 	api.log.
