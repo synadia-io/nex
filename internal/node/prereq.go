@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/fatih/color"
@@ -17,28 +18,61 @@ import (
 	_ "embed"
 )
 
-const (
-	vmLinuxKernelURL    string = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/x86_64/vmlinux-5.10.186"
-	vmLinuxKernelSHA256 string = "d48d320e320a8cf970184e79e66a833b044a049a4c2c645b9a1abefdb2fe7b31"
+func init() {
+	switch runtime.GOARCH {
+	case "amd64":
+		vmLinuxKernelURL = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/x86_64/vmlinux-5.10.186"
+		vmLinuxKernelSHA256 = "d48d320e320a8cf970184e79e66a833b044a049a4c2c645b9a1abefdb2fe7b31"
 
-	cniPluginsTarballURL    string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz"
-	cniPluginsTarballSHA256 string = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz.sha256"
-	// TODO: once awslabs fixes their release action, this URL needs to be changed
-	tcRedirectCNIPluginURL    string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64"
-	tcRedirectCNIPluginSHA256 string = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64.sha256"
+		cniPluginsTarballURL = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz"
+		cniPluginsTarballSHA256 = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-amd64-v1.3.0.tgz.sha256"
+		// TODO: once awslabs fixes their release action, this URL needs to be changed
+		tcRedirectCNIPluginURL = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64"
+		tcRedirectCNIPluginSHA256 = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-amd64.sha256"
 
-	firecrackerTarballURL    string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
-	firecrackerTarballSHA256 string = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
+		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
+		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
 
-	rootfsGzipURL    string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
-	rootfsGzipSHA256 string = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
-)
+		rootfsGzipURL = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
+		rootfsGzipSHA256 = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
+	case "arm64":
+		vmLinuxKernelURL = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/aarch64/vmlinux-5.10.186"
+		vmLinuxKernelSHA256 = ""
+
+		cniPluginsTarballURL = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz"
+		cniPluginsTarballSHA256 = "https://github.com/containernetworking/plugins/releases/download/v1.3.0/cni-plugins-linux-arm64-v1.3.0.tgz.sha256"
+
+		tcRedirectCNIPluginURL = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-arm64"
+		tcRedirectCNIPluginSHA256 = "https://github.com/jordan-rash/tc-redirect-tap/releases/download/v0.0.1/tc-redirect-tap-arm64.sha256"
+
+		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz"
+		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz.sha256.txt"
+
+		rootfsGzipURL = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
+		rootfsGzipSHA256 = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
+	}
+}
 
 var (
 	cyan    = color.New(color.FgCyan).SprintFunc()
 	red     = color.New(color.FgRed).SprintFunc()
 	magenta = color.New(color.FgMagenta).SprintFunc()
 	green   = color.New(color.FgHiGreen).SprintFunc()
+
+	vmLinuxKernelURL    string
+	vmLinuxKernelSHA256 string
+
+	cniPluginsTarballURL    string
+	cniPluginsTarballSHA256 string
+
+	tcRedirectCNIPluginURL    string
+	tcRedirectCNIPluginSHA256 string
+
+	firecrackerTarballURL    string
+	firecrackerTarballSHA256 string
+
+	rootfsGzipURL    string
+	rootfsGzipSHA256 string
 )
 
 type initFunc func(*requirement, *NodeConfiguration) error
@@ -240,6 +274,7 @@ func writeCniConf(r *requirement, c *NodeConfiguration) error {
 }
 
 func downloadKernel(r *requirement, _ *NodeConfiguration) error {
+	_ = vmLinuxKernelSHA256 // TODO: implement sha verification
 	for _, f := range r.files {
 		// TODO: this is a hack for now
 		if f.description != "VMLinux Kernel" {
@@ -271,6 +306,7 @@ func downloadKernel(r *requirement, _ *NodeConfiguration) error {
 }
 
 func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
+	_ = firecrackerTarballSHA256
 	// TODO: firecracker repo made the sha difficult to use
 	rawData, err := decompressTarFromURL(firecrackerTarballURL, "")
 	if err != nil {
@@ -286,7 +322,7 @@ func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
 			return err
 		}
 
-		if header.Name == "release-v1.5.0-x86_64/firecracker-v1.5.0-x86_64" {
+		if header.Name == "release-v1.5.0-x86_64/firecracker-v1.5.0-x86_64" || header.Name == "release-v1.5.0-aarch64/firecracker-v1.5.0-aarch64" {
 			outFile, err := os.Create("/usr/local/bin/firecracker")
 			if err != nil {
 				fmt.Println(err)
@@ -350,6 +386,7 @@ func downloadCNIPlugins(r *requirement, c *NodeConfiguration) error {
 }
 
 func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
+	_ = tcRedirectCNIPluginSHA256
 	respBin, err := http.Get(tcRedirectCNIPluginURL)
 	if err != nil {
 		return err
@@ -377,6 +414,7 @@ func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
 }
 
 func downloadRootFS(r *requirement, _ *NodeConfiguration) error {
+	_ = rootfsGzipSHA256
 	for _, f := range r.files {
 		// TODO: this is a hack for now
 		if f.description != "Root Filesystem Template" {
@@ -407,7 +445,7 @@ func downloadRootFS(r *requirement, _ *NodeConfiguration) error {
 	return nil
 }
 
-func decompressTarFromURL(url string, urlSha string) (*tar.Reader, error) {
+func decompressTarFromURL(url string, _ string) (*tar.Reader, error) {
 	respTar, err := http.Get(url)
 	if err != nil {
 		return nil, err
