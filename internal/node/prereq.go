@@ -274,6 +274,7 @@ func writeCniConf(r *requirement, c *NodeConfiguration) error {
 }
 
 func downloadKernel(r *requirement, _ *NodeConfiguration) error {
+	_ = vmLinuxKernelSHA256 // TODO: implement sha verification
 	for _, f := range r.files {
 		// TODO: this is a hack for now
 		if f.description != "VMLinux Kernel" {
@@ -305,6 +306,7 @@ func downloadKernel(r *requirement, _ *NodeConfiguration) error {
 }
 
 func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
+	_ = firecrackerTarballSHA256
 	// TODO: firecracker repo made the sha difficult to use
 	rawData, err := decompressTarFromURL(firecrackerTarballURL, "")
 	if err != nil {
@@ -384,6 +386,7 @@ func downloadCNIPlugins(r *requirement, c *NodeConfiguration) error {
 }
 
 func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
+	_ = tcRedirectCNIPluginSHA256
 	respBin, err := http.Get(tcRedirectCNIPluginURL)
 	if err != nil {
 		return err
@@ -411,6 +414,7 @@ func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
 }
 
 func downloadRootFS(r *requirement, _ *NodeConfiguration) error {
+	_ = rootfsGzipSHA256
 	for _, f := range r.files {
 		// TODO: this is a hack for now
 		if f.description != "Root Filesystem Template" {
@@ -441,7 +445,7 @@ func downloadRootFS(r *requirement, _ *NodeConfiguration) error {
 	return nil
 }
 
-func decompressTarFromURL(url string, urlSha string) (*tar.Reader, error) {
+func decompressTarFromURL(url string, _ string) (*tar.Reader, error) {
 	respTar, err := http.Get(url)
 	if err != nil {
 		return nil, err
