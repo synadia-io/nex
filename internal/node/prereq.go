@@ -19,6 +19,39 @@ import (
 )
 
 func init() {
+	rootFSVersion := func() string {
+		if VERSION == "development" {
+			res, err := http.Get("https://api.github.com/repos/synadia-io/nex/releases/latest")
+			if err != nil {
+				fmt.Printf("error making http request: %s\n", err)
+				return ""
+			}
+			defer res.Body.Close()
+
+			b, err := io.ReadAll(res.Body)
+			if err != nil {
+				fmt.Printf("error reading body: %s\n", err)
+				return ""
+			}
+
+			payload := make(map[string]interface{})
+			err = json.Unmarshal(b, &payload)
+			if err != nil {
+				fmt.Printf("error parsing json: %s\n", err)
+				return ""
+			}
+
+			latestTag, ok := payload["tag_name"].(string)
+			if !ok {
+				fmt.Println("error parsing tag_name")
+				return ""
+			}
+			return latestTag
+		} else {
+			return VERSION
+		}
+	}()
+
 	switch runtime.GOARCH {
 	case "amd64":
 		vmLinuxKernelURL = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/x86_64/vmlinux-5.10.186"
@@ -33,8 +66,8 @@ func init() {
 		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
 		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
 
-		rootfsGzipURL = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
-		rootfsGzipSHA256 = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
+		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.ext4.gz", rootFSVersion)
+		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.ext4.gz.sha256", rootFSVersion)
 	case "arm64":
 		vmLinuxKernelURL = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/aarch64/vmlinux-5.10.186"
 		vmLinuxKernelSHA256 = ""
@@ -48,8 +81,8 @@ func init() {
 		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz"
 		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz.sha256.txt"
 
-		rootfsGzipURL = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz"
-		rootfsGzipSHA256 = "https://synadia-nex.s3.us-east-2.amazonaws.com/rootfs.ext4.gz.sha256"
+		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs_arm64.ext4.gz", rootFSVersion)
+		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs_arm64.ext4.gz.sha256", rootFSVersion)
 	}
 }
 
