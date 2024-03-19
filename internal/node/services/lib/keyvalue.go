@@ -311,7 +311,8 @@ func (k *KeyValueService) resolveKeyValueStore(namespace, workload string) (nats
 	kvStore, err := js.KeyValue(kvStoreName)
 	if err != nil {
 		if errors.Is(err, nats.ErrBucketNotFound) {
-			kvStore, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: kvStoreName})
+			// TODO: make this configurable after kubecon
+			kvStore, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: kvStoreName, MaxBytes: 1048576})
 			if err != nil {
 				return nil, err
 			}
