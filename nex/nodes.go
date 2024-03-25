@@ -101,10 +101,14 @@ func renderNodeList(nodes []controlapi.PingResponse) {
 	}
 
 	table := newTableWriter("NATS Execution Nodes")
-	table.AddHeaders("ID", "Version", "Uptime", "Workloads")
+	table.AddHeaders("ID", "Hostname", "Version", "Uptime", "Workloads")
 
 	for _, node := range nodes {
-		table.AddRow(node.NodeId, node.Version, node.Uptime, node.RunningMachines)
+		hostName, ok := node.Tags["hostname"]
+		if !ok {
+			hostName = ""
+		}
+		table.AddRow(node.NodeId, hostName, node.Version, node.Uptime, node.RunningMachines)
 	}
 
 	fmt.Println(table.Render())
