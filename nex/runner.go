@@ -13,7 +13,7 @@ import (
 
 // Issues a request to stop a running workload
 func StopWorkload(ctx context.Context, logger *slog.Logger) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts)
+	nc, err := models.GenerateConnectionFromOpts(Opts, "cli")
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func StopWorkload(ctx context.Context, logger *slog.Logger) error {
 
 // Submits a run request for the given workload to the specified node
 func RunWorkload(ctx context.Context, logger *slog.Logger) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts)
+	nc, err := models.GenerateConnectionFromOpts(Opts, "cli")
 	if err != nil {
 		return err
 	}

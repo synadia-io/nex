@@ -223,8 +223,13 @@ func (n *Node) init() error {
 			tracer = noop.NewTracerProvider().Tracer("nex")
 		}
 
+		nodeHostname, ok := n.config.Tags["hostname"]
+		if !ok {
+			nodeHostname = ""
+		}
+
 		// setup NATS connection
-		n.nc, err = models.GenerateConnectionFromOpts(n.opts)
+		n.nc, err = models.GenerateConnectionFromOpts(n.opts, nodeHostname)
 		if err != nil {
 			n.log.Error("Failed to connect to NATS server", slog.Any("err", err))
 			err = fmt.Errorf("failed to connect to NATS server: %s", err)

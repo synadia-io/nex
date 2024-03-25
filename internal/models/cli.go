@@ -147,7 +147,7 @@ type TokenBucket struct {
 	Size *int64 `json:"size"`
 }
 
-func GenerateConnectionFromOpts(opts *Options) (*nats.Conn, error) {
+func GenerateConnectionFromOpts(opts *Options, connectionName string) (*nats.Conn, error) {
 	ctxOpts := []natscontext.Option{
 		natscontext.WithServerURL(opts.Servers),
 		natscontext.WithCreds(opts.Creds),
@@ -181,7 +181,20 @@ func GenerateConnectionFromOpts(opts *Options) (*nats.Conn, error) {
 		return nil, err
 	}
 
-	conn, err := opts.Configuration.Connect()
+	connName := func() string {
+		if connectionName != "" {
+			return "nex-" + connectionName
+		}
+
+		hostName, err := os.Hostname()
+		if err == nil {
+			return "nex-" + hostName
+		}
+
+		return "nex"
+	}()
+
+	conn, err := opts.Configuration.Connect(nats.Name(connName))
 	if err != nil {
 		return nil, err
 	}
