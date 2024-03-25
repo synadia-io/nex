@@ -15,7 +15,7 @@ import (
 
 // Uses a control API client to request a node list from a NATS environment
 func ListNodes(ctx context.Context) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts, "cli")
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func ListNodes(ctx context.Context) error {
 
 // Uses a control API client to retrieve info on a single node
 func NodeInfo(ctx context.Context, nodeid string) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts, "cli")
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}

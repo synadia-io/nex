@@ -14,7 +14,7 @@ import (
 )
 
 func WatchEvents(ctx context.Context, logger *slog.Logger) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts, "cli")
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func WatchEvents(ctx context.Context, logger *slog.Logger) error {
 }
 
 func WatchLogs(ctx context.Context, logger *slog.Logger) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts, "cli")
+	nc, err := models.GenerateConnectionFromOpts(Opts)
 	if err != nil {
 		return err
 	}
