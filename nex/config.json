@@ -1,0 +1,15 @@
+{
+    "default_resource_dir":"/tmp/wd",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "tags": {
+        "simple": "true"
+    }
+}
