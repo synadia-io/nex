@@ -181,7 +181,14 @@ func GenerateConnectionFromOpts(opts *Options) (*nats.Conn, error) {
 		return nil, err
 	}
 
-	conn, err := opts.Configuration.Connect()
+	conn, err := opts.Configuration.Connect(nats.Name(
+		func() string {
+			if opts.ConnectionName == "" {
+				return "nex"
+			}
+			return opts.ConnectionName
+		}(),
+	))
 	if err != nil {
 		return nil, err
 	}
