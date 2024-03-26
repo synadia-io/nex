@@ -71,6 +71,12 @@ func init() {
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").UnNegatableBoolVar(&Opts.LogJSON)
 	ncli.Flag("context", "Configuration context").Envar("NATS_CONTEXT").PlaceHolder("NAME").StringVar(&Opts.ConfigurationContext)
 	ncli.Flag("no-context", "Disable NATS context discovery").UnNegatableBoolVar(&Opts.SkipContexts)
+	ncli.Flag("conn-name", "Name of NATS connection").Default(func() string {
+		if VERSION != "development" {
+			return "nex-" + VERSION
+		}
+		return "nex"
+	}()).StringVar(&Opts.ConnectionName)
 
 	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
 	run.Arg("id", "Public key of the target node to run the workload").Required().StringVar(&RunOpts.TargetNode)
