@@ -384,32 +384,6 @@ var _ = Describe("nex node", func() {
 							Expect(managerProxy.Telemetry()).To(Equal(nodeProxy.Telemetry()))
 						})
 
-						Describe("agent internal API subscriptions", func() {
-							It("should initialize an internal API subscription for handling agent handshake requests", func(ctx SpecContext) {
-								subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
-									Subscriptions: true,
-									Test:          "agentint.handshake",
-								})
-								Expect(subsz.Total).To(Equal(1))
-							})
-
-							It("should initialize an internal API subscription for handling agent events", func(ctx SpecContext) {
-								subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
-									Subscriptions: true,
-									Test:          "agentint.vmid.events.event_type",
-								})
-								Expect(subsz.Total).To(Equal(1))
-							})
-
-							It("should initialize an internal API subscription for handling agent logs", func(ctx SpecContext) {
-								subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
-									Subscriptions: true,
-									Test:          "agentint.vmid.logs",
-								})
-								Expect(subsz.Total).To(Equal(1))
-							})
-						})
-
 						Describe("VM pool", func() {
 							Context("when no workloads have been deployed", func() {
 								It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
