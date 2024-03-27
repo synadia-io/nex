@@ -112,8 +112,10 @@ func DefaultNodeConfiguration() NodeConfiguration {
 
 	tags := make(map[string]string)
 	rng := fname.NewGenerator()
-	nodeName, _ := rng.Generate()
-	tags["node_name"] = nodeName
+	nodeName, err := rng.Generate()
+	if err == nil {
+		tags["node_name"] = nodeName
+	}
 
 	return NodeConfiguration{
 		BinPath: defaultBinPath,
