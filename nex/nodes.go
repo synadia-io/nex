@@ -105,14 +105,10 @@ func renderNodeList(nodes []controlapi.PingResponse) {
 	table := newTableWriter("NATS Execution Nodes")
 	table.AddHeaders("ID", "Name", "Version", "Uptime", "Workloads")
 
-	var err error
 	for _, node := range nodes {
 		nodeName, ok := node.Tags["node_name"]
 		if !ok {
-			nodeName, err = fname.NewGenerator().Generate()
-			if err != nil {
-				nodeName = fmt.Sprintf("nex_node-%d", time.Now().Unix())
-			}
+			nodeName = "no-name-provided"
 		}
 		table.AddRow(node.NodeId, nodeName, node.Version, node.Uptime, node.RunningMachines)
 	}
