@@ -263,9 +263,8 @@ func (m *MachineManager) StopMachine(vmID string, undeploy bool) error {
 	}
 
 	if vm.deployRequest != nil && undeploy {
-		// we do a request here to allow graceful shutdown of the workload being undeployed
-		subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
-		_, err := m.node.ncint.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
+		agentClient := m.agentClients[vmID]
+		err := agentClient.Undeploy()
 		if err != nil {
 			m.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("vmid", vm.vmmID), slog.String("error", err.Error()))
 			// return err
@@ -316,55 +315,6 @@ func (m *MachineManager) agentHandshakeSucceeded(agentId string) {
 	now := time.Now().UTC()
 	m.handshakes[agentId] = now.Format(time.RFC3339)
 }
-
-// func (m *MachineManager) awaitHandshake(vmid string) {
-// 	timeoutAt := time.Now().UTC().Add(m.handshakeTimeout)
-
-// 	handshakeOk := false
-// 	for !handshakeOk && !m.stopping() {
-// 		if time.Now().UTC().After(timeoutAt) {
-// 			m.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("vmid", vmid))
-// 			if len(m.handshakes) == 0 {
-// 				m.log.Error("First handshake failed, shutting down to avoid inconsistent behavior")
-// 				m.node.cancelF()
-// 			}
-// 			return
-// 		}
-
-// 		_, handshakeOk = m.handshakes[vmid]
-// 		time.Sleep(time.Millisecond * agentapi.DefaultRunloopSleepTimeoutMillis)
-// 	}
-// }
-
-// // This handshake uses the request pattern to force a full round trip to ensure connectivity is working properly as
-// // fire-and-forget publishes from inside the firecracker VM could potentially be lost
-// func (m *MachineManager) handleHandshake(msg *nats.Msg) {
-// 	var req agentapi.HandshakeRequest
-// 	err := json.Unmarshal(msg.Data, &req)
-// 	if err != nil {
-// 		m.log.Error("Failed to handle agent handshake", slog.String("vmid", *req.MachineID), slog.String("message", *req.Message))
-// 		return
-// 	}
-
-// 	m.log.Info("Received agent handshake", slog.String("vmid", *req.MachineID), slog.String("message", *req.Message))
-
-// 	_, ok := m.allVMs[*req.MachineID]
-// 	if !ok {
-// 		m.log.Warn("Received agent handshake attempt from a VM we don't know about.")
-// 		return
-// 	}
-
-// 	resp, _ := json.Marshal(&agentapi.HandshakeResponse{})
-
-// 	err = msg.Respond(resp)
-// 	if err != nil {
-// 		m.log.Error("Failed to reply to agent handshake", slog.Any("err", err))
-// 		return
-// 	}
-
-// 	now := time.Now().UTC()
-// 	m.handshakes[*req.MachineID] = now.Format(time.RFC3339)
-// }
 
 func (m *MachineManager) resetCNI() error {
 	m.log.Info("Resetting network")
