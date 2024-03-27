@@ -29,10 +29,6 @@ builds:
       - -extldflags "-static"
     tags:
       - netgo
-      - withui
-    hooks:
-      pre:
-        - go run ./ui/web/build/main.go ./ui/web
   -
     id: "agent"
     main: "./agent/cmd/nex-agent"
