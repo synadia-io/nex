@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/nats-io/natscli/columns"
+	"github.com/splode/fname"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"github.com/synadia-io/nex/internal/models"
 )
@@ -101,14 +103,18 @@ func renderNodeList(nodes []controlapi.PingResponse) {
 	}
 
 	table := newTableWriter("NATS Execution Nodes")
-	table.AddHeaders("ID", "Hostname", "Version", "Uptime", "Workloads")
+	table.AddHeaders("ID", "Name", "Version", "Uptime", "Workloads")
 
+	var err error
 	for _, node := range nodes {
-		hostName, ok := node.Tags["hostname"]
+		nodeName, ok := node.Tags["node_name"]
 		if !ok {
-			hostName = ""
+			nodeName, err = fname.NewGenerator().Generate()
+			if err != nil {
+				nodeName = fmt.Sprintf("nex_node-%d", time.Now().Unix())
+			}
 		}
-		table.AddRow(node.NodeId, hostName, node.Version, node.Uptime, node.RunningMachines)
+		table.AddRow(node.NodeId, nodeName, node.Version, node.Uptime, node.RunningMachines)
 	}
 
 	fmt.Println(table.Render())
