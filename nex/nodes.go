@@ -7,10 +7,8 @@ import (
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/nats-io/natscli/columns"
-	"github.com/splode/fname"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"github.com/synadia-io/nex/internal/models"
 )
