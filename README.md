@@ -58,7 +58,7 @@ Nex is made up of the following components
 * [fc-image](./agent/fc-image/) - Tools for building the rootfs (ext4) file system for use in firecracker VMs
 * [node](./internal/node) - Service running on a NEX node. Exposes a control API, starts/stops firecracker processes, communicates with the agent inside each process.
 * [nex](./nex) - CLI for communicating with NEX nodes
-* [ui](./ui) - User interface for viewing the status of NEX nodes in a web browser
+* [tui](./nex/tui) - Interactive user interface for viewing the status of NEX nodes in a terminal
 
 ## Contributing
 For information on how to contribute to Nex, please read our [contributing](./CONTRIBUTING.md) guide.
