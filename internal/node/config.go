@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/splode/fname"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -109,6 +110,13 @@ func DefaultNodeConfiguration() NodeConfiguration {
 	defaultVcpuCount := defaultNodeVcpuCount
 	defaultMemSizeMib := defaultNodeMemSizeMib
 
+	tags := make(map[string]string)
+	rng := fname.NewGenerator()
+	nodeName, err := rng.Generate()
+	if err == nil {
+		tags["node_name"] = nodeName
+	}
+
 	return NodeConfiguration{
 		BinPath: defaultBinPath,
 		CNI: CNIDefinition{
@@ -125,7 +133,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 			VcpuCount:  &defaultVcpuCount,
 			MemSizeMib: &defaultMemSizeMib,
 		},
-		Tags:          make(map[string]string),
+		Tags:          tags,
 		RateLimiters:  nil,
 		WorkloadTypes: defaultWorkloadTypes,
 	}
