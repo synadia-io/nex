@@ -242,7 +242,7 @@ func (n *Node) init() error {
 		}
 
 		// init machine manager
-		n.manager, err = NewMachineManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		n.manager, err = NewMachineManager(n)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
 			err = fmt.Errorf("failed to initialize machine manager: %s", err)
@@ -251,7 +251,7 @@ func (n *Node) init() error {
 		go n.manager.Start()
 
 		// init API listener
-		n.api = NewApiListener(n.log, n.manager, n.config)
+		n.api = NewApiListener(n.log, n.manager, n)
 		err = n.api.Start()
 		if err != nil {
 			n.log.Error("Failed to start API listener", slog.Any("err", err))

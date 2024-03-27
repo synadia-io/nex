@@ -19,15 +19,16 @@ import (
 
 // The API listener is the command and control interface for the node server
 type ApiListener struct {
-	mgr    *MachineManager
-	log    *slog.Logger
-	nodeId string
-	start  time.Time
-	xk     nkeys.KeyPair
-	config *NodeConfiguration
+	node  *Node
+	mgr   *MachineManager
+	log   *slog.Logger
+	start time.Time
+	xk    nkeys.KeyPair
 }
 
-func NewApiListener(log *slog.Logger, mgr *MachineManager, config *NodeConfiguration) *ApiListener {
+func NewApiListener(log *slog.Logger, mgr *MachineManager, node *Node) *ApiListener {
+	config := node.config
+
 	efftags := config.Tags
 	efftags[controlapi.TagOS] = runtime.GOOS
 	efftags[controlapi.TagArch] = runtime.GOARCH
@@ -47,47 +48,46 @@ func NewApiListener(log *slog.Logger, mgr *MachineManager, config *NodeConfigura
 	log.Info("Use this key as the recipient for encrypted run requests", slog.String("public_xkey", xkPub))
 
 	return &ApiListener{
-		mgr:    mgr,
-		log:    log,
-		nodeId: mgr.publicKey,
-		xk:     kp,
-		start:  time.Now().UTC(),
-		config: config,
+		mgr:   mgr,
+		log:   log,
+		xk:    kp,
+		start: time.Now().UTC(),
+		node:  node,
 	}
 }
 
 func (api *ApiListener) PublicKey() string {
-	return api.mgr.publicKey
+	return api.node.publicKey
 }
 
 func (api *ApiListener) Start() error {
-	_, err := api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
+	_, err := api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
 	if err != nil {
-		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.nodeId))
+		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".PING."+api.nodeId, api.handlePing)
+	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING."+api.PublicKey(), api.handlePing)
 	if err != nil {
-		api.log.Error("Failed to subscribe to node-specific ping subject", slog.Any("err", err), slog.String("id", api.nodeId))
+		api.log.Error("Failed to subscribe to node-specific ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 
 	// Namespaced subscriptions, the * below is for the namespace
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.nodeId, api.handleInfo)
+	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.PublicKey(), api.handleInfo)
 	if err != nil {
-		api.log.Error("Failed to subscribe to info subject", slog.Any("err", err), slog.String("id", api.nodeId))
+		api.log.Error("Failed to subscribe to info subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".DEPLOY.*."+api.nodeId, api.handleDeploy)
+	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".DEPLOY.*."+api.PublicKey(), api.handleDeploy)
 	if err != nil {
-		api.log.Error("Failed to subscribe to run subject", slog.Any("err", err), slog.String("id", api.nodeId))
+		api.log.Error("Failed to subscribe to run subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 
-	_, err = api.mgr.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.nodeId, api.handleStop)
+	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.PublicKey(), api.handleStop)
 	if err != nil {
-		api.log.Error("Failed to subscribe to stop subject", slog.Any("err", err), slog.String("id", api.nodeId))
+		api.log.Error("Failed to subscribe to stop subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 
-	api.log.Info("NATS execution engine awaiting commands", slog.String("id", api.nodeId), slog.String("version", VERSION))
+	api.log.Info("NATS execution engine awaiting commands", slog.String("id", api.PublicKey()), slog.String("version", VERSION))
 	return nil
 }
 
@@ -167,7 +167,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if !slices.Contains(api.config.WorkloadTypes, *request.WorkloadType) {
+	if !slices.Contains(api.node.config.WorkloadTypes, *request.WorkloadType) {
 		api.log.Error("This node does not support the given workload type", slog.String("workload_type", *request.WorkloadType))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", *request.WorkloadType))
 		return
@@ -195,7 +195,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	}
 
 	request.DecodedClaims = *decodedClaims
-	if !validateIssuer(request.DecodedClaims.Issuer, api.mgr.config.ValidIssuers) {
+	if !validateIssuer(request.DecodedClaims.Issuer, api.node.config.ValidIssuers) {
 		err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
 		api.log.Error("Workload validation failed", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
@@ -220,7 +220,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 	api.log.
 		Info("Submitting workload to VM",
-			slog.String("vmid", runningVM.vmmID),
+			slog.String("agentId", runningVM.vmmID),
 			slog.String("namespace", namespace),
 			slog.String("workload", workloadName),
 			slog.Uint64("workload_size", numBytes),
@@ -251,7 +251,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	})
 
 	if err != nil {
-		api.log.Error("Failed to deploy workload in VM", slog.Any("err", err))
+		api.log.Error("Failed to deploy workload in VM", slog.Any("err", err), slog.String("agentId", runningVM.vmmID))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deploy workload: %s", err))
 		return
 	}
@@ -276,11 +276,11 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 func (api *ApiListener) handlePing(m *nats.Msg) {
 	now := time.Now().UTC()
 	res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
-		NodeId:          api.nodeId,
+		NodeId:          api.PublicKey(),
 		Version:         Version(),
 		Uptime:          myUptime(now.Sub(api.start)),
 		RunningMachines: len(api.mgr.allVMs) - len(api.mgr.warmVMs),
-		Tags:            api.config.Tags,
+		Tags:            api.node.config.Tags,
 	}, nil)
 
 	raw, err := json.Marshal(res)
@@ -306,8 +306,8 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 		Version:                VERSION,
 		PublicXKey:             pubX,
 		Uptime:                 myUptime(now.Sub(api.start)),
-		Tags:                   api.config.Tags,
-		SupportedWorkloadTypes: api.config.WorkloadTypes,
+		Tags:                   api.node.config.Tags,
+		SupportedWorkloadTypes: api.node.config.WorkloadTypes,
 		Machines:               summarizeMachines(&api.mgr.allVMs, namespace),
 		Memory:                 stats,
 	}, nil)
