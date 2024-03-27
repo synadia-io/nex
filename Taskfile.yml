@@ -38,7 +38,7 @@ tasks:
     sources:
       - "*.go"
     cmds:
-      - go build -tags netgo,withui -ldflags '-extldflags "-static"'
+      - go build -tags netgo -ldflags '-extldflags "-static"'
 
   rootfs:
     dir: agent/fc-image
@@ -63,12 +63,5 @@ tasks:
       - sudo go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
       - go test -tags netgo -ldflags '-extldflags "-static"'-v -race ./test
 
-  ui:
-    dir: ui/web
-    cmds:
-      - curl -fsSL https://get.pnpm.io/install.sh | sh -
-      - pnpm install
-      - pnpm build
-
   build:
-    deps: [agent, ui, nex, echo-service]
+    deps: [agent, nex, echo-service]
