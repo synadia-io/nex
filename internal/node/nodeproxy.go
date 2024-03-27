@@ -61,15 +61,15 @@ func (m *MachineManagerProxy) Log() *slog.Logger {
 }
 
 func (m *MachineManagerProxy) NodeConfiguration() *NodeConfiguration {
-	return m.m.node.config
+	return m.m.config
 }
 
 func (m *MachineManagerProxy) InternalNATSConn() *nats.Conn {
-	return m.m.node.ncint
+	return m.m.ncInternal
 }
 
 func (m *MachineManagerProxy) Telemetry() *Telemetry {
-	return m.m.node.telemetry
+	return m.m.t
 }
 
 func (m *MachineManagerProxy) VMs() map[string]*runningFirecracker {

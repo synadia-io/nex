@@ -28,14 +28,14 @@ func (m *MachineManager) publishFunctionExecSucceeded(vm *runningFirecracker, ts
 	}
 
 	cloudevent := cloudevents.NewEvent()
-	cloudevent.SetSource(m.node.publicKey)
+	cloudevent.SetSource(m.publicKey)
 	cloudevent.SetID(uuid.NewString())
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(agentapi.FunctionExecutionSucceededType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecPassed)
 
-	err := PublishCloudEvent(m.node.nc, vm.namespace, cloudevent, m.log)
+	err := PublishCloudEvent(m.nc, vm.namespace, cloudevent, m.log)
 	if err != nil {
 		return err
 	}
@@ -47,13 +47,13 @@ func (m *MachineManager) publishFunctionExecSucceeded(vm *runningFirecracker, ts
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.node.publicKey, *vm.deployRequest.WorkloadName, vm.vmmID)
-	err = m.node.nc.Publish(subject, logBytes)
+	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, *vm.deployRequest.WorkloadName, vm.vmmID)
+	err = m.nc.Publish(subject, logBytes)
 	if err != nil {
 		m.log.Error("Failed to publish function exec passed log", slog.Any("err", err))
 	}
 
-	return m.node.nc.Flush()
+	return m.nc.Flush()
 }
 
 func (m *MachineManager) publishFunctionExecFailed(vm *runningFirecracker, workload string, tsub string, origErr error) error {
@@ -71,14 +71,14 @@ func (m *MachineManager) publishFunctionExecFailed(vm *runningFirecracker, workl
 	}
 
 	cloudevent := cloudevents.NewEvent()
-	cloudevent.SetSource(m.node.publicKey)
+	cloudevent.SetSource(m.publicKey)
 	cloudevent.SetID(uuid.NewString())
 	cloudevent.SetTime(time.Now().UTC())
 	cloudevent.SetType(agentapi.FunctionExecutionFailedType)
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecFailed)
 
-	err := PublishCloudEvent(m.node.nc, vm.namespace, cloudevent, m.log)
+	err := PublishCloudEvent(m.nc, vm.namespace, cloudevent, m.log)
 	if err != nil {
 		return err
 	}
@@ -90,13 +90,13 @@ func (m *MachineManager) publishFunctionExecFailed(vm *runningFirecracker, workl
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.node.publicKey, *vm.deployRequest.WorkloadName, vm.vmmID)
-	err = m.node.nc.Publish(subject, logBytes)
+	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, *vm.deployRequest.WorkloadName, vm.vmmID)
+	err = m.nc.Publish(subject, logBytes)
 	if err != nil {
 		m.log.Error("Failed to publish function exec failed log", slog.Any("err", err))
 	}
 
-	return m.node.nc.Flush()
+	return m.nc.Flush()
 }
 
 // publishMachineStopped writes a workload stopped event for the provided firecracker VM
@@ -118,14 +118,14 @@ func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 		}
 
 		cloudevent := cloudevents.NewEvent()
-		cloudevent.SetSource(m.node.publicKey)
+		cloudevent.SetSource(m.publicKey)
 		cloudevent.SetID(uuid.NewString())
 		cloudevent.SetTime(time.Now().UTC())
 		cloudevent.SetType(agentapi.WorkloadStoppedEventType)
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 		_ = cloudevent.SetData(workloadStopped)
 
-		err := PublishCloudEvent(m.node.nc, vm.namespace, cloudevent, m.log)
+		err := PublishCloudEvent(m.nc, vm.namespace, cloudevent, m.log)
 		if err != nil {
 			return err
 		}
@@ -137,13 +137,13 @@ func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 		}
 		logBytes, _ := json.Marshal(emitLog)
 
-		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.node.publicKey, workloadName, vm.vmmID)
-		err = m.node.nc.Publish(subject, logBytes)
+		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, vm.namespace, m.publicKey, workloadName, vm.vmmID)
+		err = m.nc.Publish(subject, logBytes)
 		if err != nil {
 			m.log.Error("Failed to publish machine stopped event", slog.Any("err", err))
 		}
 
-		return m.node.nc.Flush()
+		return m.nc.Flush()
 	}
 
 	return nil
@@ -211,8 +211,8 @@ func (m *MachineManager) agentLog(agentId string, entry agentapi.LogEntry) {
 		workload = vm.deployRequest.WorkloadName
 	}
 
-	subject := logPublishSubject(vm.namespace, m.node.publicKey, agentId, workload)
-	_ = m.node.nc.Publish(subject, bytes)
+	subject := logPublishSubject(vm.namespace, m.publicKey, agentId, workload)
+	_ = m.nc.Publish(subject, bytes)
 
 }
 func (m *MachineManager) agentEvent(agentId string, evt cloudevents.Event) {
@@ -222,7 +222,7 @@ func (m *MachineManager) agentEvent(agentId string, evt cloudevents.Event) {
 		return
 	}
 
-	err := PublishCloudEvent(m.node.nc, vm.namespace, evt, m.log)
+	err := PublishCloudEvent(m.nc, vm.namespace, evt, m.log)
 	if err != nil {
 		m.log.Error("Failed to publish cloudevent", slog.Any("err", err))
 		return
@@ -279,7 +279,7 @@ func (m *MachineManager) agentEvent(agentId string, evt cloudevents.Event) {
 
 			nodeID, _ := m.kp.PublicKey()
 			subject := fmt.Sprintf("%s.DEPLOY.%s.%s", controlapi.APIPrefix, vm.namespace, nodeID)
-			_, err = m.node.nc.Request(subject, req, time.Millisecond*2500)
+			_, err = m.nc.Request(subject, req, time.Millisecond*2500)
 			if err != nil {
 				m.log.Error("Failed to redeploy essential workload", slog.Any("err", err))
 			}

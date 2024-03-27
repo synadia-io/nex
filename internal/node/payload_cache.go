@@ -15,14 +15,14 @@ func (m *MachineManager) CacheWorkload(request *controlapi.DeployRequest) (uint6
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 
-	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.node.nc.Opts.Url))
+	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.nc.Opts.Url))
 
 	opts := []nats.JSOpt{}
 	if request.JsDomain != nil {
 		opts = append(opts, nats.APIPrefix(*request.JsDomain))
 	}
 
-	js, err := m.node.nc.JetStream(opts...)
+	js, err := m.nc.JetStream(opts...)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -45,7 +45,7 @@ func (m *MachineManager) CacheWorkload(request *controlapi.DeployRequest) (uint6
 		return 0, nil, err
 	}
 
-	jsInternal, err := m.node.ncint.JetStream()
+	jsInternal, err := m.ncInternal.JetStream()
 	if err != nil {
 		m.log.Error("Failed to acquire JetStream context for internal object store.", slog.Any("err", err))
 		panic(err)
