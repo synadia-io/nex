@@ -64,4 +64,4 @@ tasks:
       - go test -tags netgo -ldflags '-extldflags "-static"'-v -race ./test
 
   build:
-    deps: [agent, ui, nex, echo-service]
+    deps: [agent, nex, echo-service]
