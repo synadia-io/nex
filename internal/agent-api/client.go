@@ -122,19 +122,10 @@ func (a *AgentClient) Undeploy() error {
 }
 
 func (a *AgentClient) awaitHandshake(agentId string) {
-	// timeoutAt := time.Now().UTC().Add(a.handshakeTimeout)
-
 	<-time.After(a.handshakeTimeout)
 	if !a.handshakeReceived.Load() {
 		a.handshakeTimedOut(agentId)
 	}
-
-	// for !a.handshakeReceived.Load() {
-	// 	if time.Now().UTC().After(timeoutAt) {
-	// 		go a.handshakeTimedOut(agentId)
-	// 	}
-	// 	time.Sleep(time.Millisecond * DefaultRunloopSleepTimeoutMillis)
-	// }
 }
 
 func (a *AgentClient) handleHandshake(msg *nats.Msg) {
