@@ -84,6 +84,10 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
+	if workloadType == "v8" && len(RunOpts.TriggerSubjects) == 0 {
+		return errors.New("cannot start a function-type workload without specifying at least one trigger subject")
+	}
+
 	if DevRunOpts.AutoStop {
 		for _, machine := range info.Machines {
 			if machine.Workload.Name == workloadName {

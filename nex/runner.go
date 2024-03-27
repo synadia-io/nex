@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -76,6 +77,10 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 	xkey, err := nkeys.FromCurveSeed(xkeyRaw)
 	if err != nil {
 		return err
+	}
+
+	if RunOpts.WorkloadType == "v8" && len(RunOpts.TriggerSubjects) == 0 {
+		return errors.New("cannot start a function-type workload without specifying at least one trigger subject")
 	}
 
 	request, err := controlapi.NewDeployRequest(
