@@ -11,23 +11,10 @@ import (
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
-type payloadCache struct {
-	rootDir string
-	log     *slog.Logger
-	nc      *nats.Conn
-}
-
-func NewPayloadCache(nc *nats.Conn, log *slog.Logger, dir string) *payloadCache {
-	return &payloadCache{
-		rootDir: dir,
-		log:     log,
-		nc:      nc,
-	}
-}
-
 func (m *MachineManager) CacheWorkload(request *controlapi.DeployRequest) (uint64, *string, error) {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
+
 	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.nc.Opts.Url))
 
 	opts := []nats.JSOpt{}

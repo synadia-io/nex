@@ -2,8 +2,6 @@ package nexnode
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -51,8 +49,9 @@ type MachineManager struct {
 	ctx        context.Context
 	t          *Telemetry
 
-	allVMs  map[string]*runningFirecracker
-	warmVMs chan *runningFirecracker
+	allVMs       map[string]*runningFirecracker
+	agentClients map[string]*agentapi.AgentClient
+	warmVMs      chan *runningFirecracker
 
 	handshakes       map[string]string
 	handshakeTimeout time.Duration // TODO: make configurable...
@@ -68,16 +67,14 @@ type MachineManager struct {
 
 // Initialize a new machine manager instance to manage firecracker VMs
 // and private communications between the host and running Nex agents.
-func NewMachineManager(
-	ctx context.Context,
+func NewMachineManager(ctx context.Context,
 	cancel context.CancelFunc,
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
 	nc, ncint *nats.Conn,
 	config *NodeConfiguration,
 	log *slog.Logger,
-	telemetry *Telemetry,
-) (*MachineManager, error) {
+	telemetry *Telemetry) (*MachineManager, error) {
 	// Validate the node config
 	if !config.Validate() {
 		return nil, fmt.Errorf("failed to create new machine manager; invalid node config; %v", config.Errors)
@@ -97,30 +94,16 @@ func NewMachineManager(
 		publicKey:        publicKey,
 		t:                telemetry,
 
-		allVMs:  make(map[string]*runningFirecracker),
-		warmVMs: make(chan *runningFirecracker, config.MachinePoolSize),
+		allVMs:       make(map[string]*runningFirecracker),
+		agentClients: make(map[string]*agentapi.AgentClient),
+		warmVMs:      make(chan *runningFirecracker, config.MachinePoolSize),
 
 		stopMutex: make(map[string]*sync.Mutex),
 		vmsubz:    make(map[string][]*nats.Subscription),
 	}
 
-	_, err := m.ncInternal.Subscribe("agentint.handshake", m.handleHandshake)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.ncInternal.Subscribe("agentint.*.events.*", m.handleAgentEvent)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = m.ncInternal.Subscribe("agentint.*.logs", m.handleAgentLog)
-	if err != nil {
-		return nil, err
-	}
-
-	m.hostServices = NewHostServices(m, m.nc, m.ncInternal, m.log)
-	err = m.hostServices.init()
+	m.hostServices = NewHostServices(m, nc, ncint, m.log)
+	err := m.hostServices.init()
 	if err != nil {
 		m.log.Warn("Failed to initialize host services.", slog.Any("err", err))
 		return nil, err
@@ -168,7 +151,20 @@ func (m *MachineManager) Start() {
 				continue
 			}
 
-			go m.awaitHandshake(vm.vmmID)
+			agentClient := agentapi.NewAgentClient(m.ncInternal,
+				2*time.Second,
+				m.agentHandshakeTimedOut,
+				m.agentHandshakeSucceeded,
+				m.agentEvent,
+				m.agentLog,
+				m.log,
+			)
+			m.agentClients[vm.vmmID] = agentClient
+			err = agentClient.Start(vm.vmmID)
+			if err != nil {
+				m.log.Error("Failed to start agent client", slog.Any("err", err))
+				continue
+			}
 
 			m.allVMs[vm.vmmID] = vm
 			m.stopMutex[vm.vmmID] = &sync.Mutex{}
@@ -181,10 +177,6 @@ func (m *MachineManager) Start() {
 }
 
 func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentapi.DeployRequest) error {
-	bytes, err := json.Marshal(request)
-	if err != nil {
-		return err
-	}
 
 	status := m.ncInternal.Status()
 	m.log.Debug("NATS internal connection status",
@@ -195,20 +187,10 @@ func (m *MachineManager) DeployWorkload(vm *runningFirecracker, request *agentap
 	vm.namespace = *request.Namespace
 	vm.workloadStarted = time.Now().UTC()
 
-	subject := fmt.Sprintf("agentint.%s.deploy", vm.vmmID)
-	resp, err := m.ncInternal.Request(subject, bytes, 1*time.Second)
+	agentClient := m.agentClients[vm.vmmID]
+	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
-		if errors.Is(err, os.ErrDeadlineExceeded) {
-			return errors.New("timed out waiting for acknowledgement of workload deployment")
-		} else {
-			return fmt.Errorf("failed to submit request for workload deployment: %s", err)
-		}
-	}
-
-	var deployResponse agentapi.DeployResponse
-	err = json.Unmarshal(resp.Data, &deployResponse)
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to submit request for workload deployment: %s", err)
 	}
 
 	if deployResponse.Accepted {
@@ -297,9 +279,8 @@ func (m *MachineManager) StopMachine(vmID string, undeploy bool) error {
 	}
 
 	if vm.deployRequest != nil && undeploy {
-		// we do a request here to allow graceful shutdown of the workload being undeployed
-		subject := fmt.Sprintf("agentint.%s.undeploy", vm.vmmID)
-		_, err := m.ncInternal.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
+		agentClient := m.agentClients[vmID]
+		err := agentClient.Undeploy()
 		if err != nil {
 			m.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("vmid", vm.vmmID), slog.String("error", err.Error()))
 			// return err
@@ -338,53 +319,17 @@ func (m *MachineManager) LookupMachine(vmId string) *runningFirecracker {
 	return vm
 }
 
-func (m *MachineManager) awaitHandshake(vmid string) {
-	timeoutAt := time.Now().UTC().Add(m.handshakeTimeout)
-
-	handshakeOk := false
-	for !handshakeOk && !m.stopping() {
-		if time.Now().UTC().After(timeoutAt) {
-			m.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("vmid", vmid))
-			if len(m.handshakes) == 0 {
-				m.log.Error("First handshake failed, shutting down to avoid inconsistent behavior")
-				m.cancel()
-			}
-			return
-		}
-
-		_, handshakeOk = m.handshakes[vmid]
-		time.Sleep(time.Millisecond * agentapi.DefaultRunloopSleepTimeoutMillis)
+func (m *MachineManager) agentHandshakeTimedOut(agentId string) {
+	m.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("agentId", agentId))
+	if len(m.handshakes) == 0 {
+		m.log.Error("First handshake failed, shutting down to avoid inconsistent behavior")
+		m.cancel()
 	}
 }
 
-// This handshake uses the request pattern to force a full round trip to ensure connectivity is working properly as
-// fire-and-forget publishes from inside the firecracker VM could potentially be lost
-func (m *MachineManager) handleHandshake(msg *nats.Msg) {
-	var req agentapi.HandshakeRequest
-	err := json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		m.log.Error("Failed to handle agent handshake", slog.String("vmid", *req.MachineID), slog.String("message", *req.Message))
-		return
-	}
-
-	m.log.Info("Received agent handshake", slog.String("vmid", *req.MachineID), slog.String("message", *req.Message))
-
-	_, ok := m.allVMs[*req.MachineID]
-	if !ok {
-		m.log.Warn("Received agent handshake attempt from a VM we don't know about.")
-		return
-	}
-
-	resp, _ := json.Marshal(&agentapi.HandshakeResponse{})
-
-	err = msg.Respond(resp)
-	if err != nil {
-		m.log.Error("Failed to reply to agent handshake", slog.Any("err", err))
-		return
-	}
-
+func (m *MachineManager) agentHandshakeSucceeded(agentId string) {
 	now := time.Now().UTC()
-	m.handshakes[*req.MachineID] = now.Format(time.RFC3339)
+	m.handshakes[agentId] = now.Format(time.RFC3339)
 }
 
 func (m *MachineManager) resetCNI() error {

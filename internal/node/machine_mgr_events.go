@@ -10,7 +10,6 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
-	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
@@ -150,31 +149,57 @@ func (m *MachineManager) publishMachineStopped(vm *runningFirecracker) error {
 	return nil
 }
 
-// Called when the node server gets a log entry via internal NATS. Used to
-// package and re-mit with additional metadata on $NEX.logs...
-func (m *MachineManager) handleAgentLog(msg *nats.Msg) {
-	tokens := strings.Split(msg.Subject, ".")
-	vmID := tokens[1]
+// // Called when the node server gets a log entry via internal NATS. Used to
+// // package and re-mit with additional metadata on $NEX.logs...
+// func (m *MachineManager) handleAgentLog(msg *nats.Msg) {
+// 	tokens := strings.Split(msg.Subject, ".")
+// 	vmID := tokens[1]
 
-	vm, ok := m.allVMs[vmID]
+// 	vm, ok := m.allVMs[vmID]
+// 	if !ok {
+// 		m.log.Warn("Received a log message from an unknown VM.")
+// 		return
+// 	}
+
+// 	var logentry agentapi.LogEntry
+// 	err := json.Unmarshal(msg.Data, &logentry)
+// 	if err != nil {
+// 		m.log.Error("Failed to unmarshal log entry from agent", slog.Any("err", err))
+// 		return
+// 	}
+
+// 	m.log.Debug("Received agent log", slog.String("vmid", vmID), slog.String("log", logentry.Text))
+
+// 	bytes, err := json.Marshal(&emittedLog{
+// 		Text:      logentry.Text,
+// 		Level:     slog.Level(logentry.Level),
+// 		MachineId: vmID,
+// 	})
+// 	if err != nil {
+// 		m.log.Error("Failed to marshal our own log entry", slog.Any("err", err))
+// 		return
+// 	}
+
+// 	var workload *string
+// 	if vm.deployRequest != nil {
+// 		workload = vm.deployRequest.WorkloadName
+// 	}
+
+// 	subject := logPublishSubject(vm.namespace, m.node.publicKey, vmID, workload)
+// 	_ = m.nc.Publish(subject, bytes)
+// }
+
+func (m *MachineManager) agentLog(agentId string, entry agentapi.LogEntry) {
+	vm, ok := m.allVMs[agentId]
 	if !ok {
 		m.log.Warn("Received a log message from an unknown VM.")
 		return
 	}
 
-	var logentry agentapi.LogEntry
-	err := json.Unmarshal(msg.Data, &logentry)
-	if err != nil {
-		m.log.Error("Failed to unmarshal log entry from agent", slog.Any("err", err))
-		return
-	}
-
-	m.log.Debug("Received agent log", slog.String("vmid", vmID), slog.String("log", logentry.Text))
-
 	bytes, err := json.Marshal(&emittedLog{
-		Text:      logentry.Text,
-		Level:     slog.Level(logentry.Level),
-		MachineId: vmID,
+		Text:      entry.Text,
+		Level:     slog.Level(entry.Level),
+		MachineId: agentId,
 	})
 	if err != nil {
 		m.log.Error("Failed to marshal our own log entry", slog.Any("err", err))
@@ -186,40 +211,25 @@ func (m *MachineManager) handleAgentLog(msg *nats.Msg) {
 		workload = vm.deployRequest.WorkloadName
 	}
 
-	subject := logPublishSubject(vm.namespace, m.publicKey, vmID, workload)
+	subject := logPublishSubject(vm.namespace, m.publicKey, agentId, workload)
 	_ = m.nc.Publish(subject, bytes)
+
 }
-
-// Called when the node server gets an event from the nex agent inside firecracker. The data here is already a fully formed
-// cloud event, so all we need to do is unmarshal it, get some metadata, and then republish on $NEX.events...
-func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
-	// agentint.{vmid}.events.{type}
-	tokens := strings.Split(msg.Subject, ".")
-	vmID := tokens[1]
-
-	vm, ok := m.allVMs[vmID]
+func (m *MachineManager) agentEvent(agentId string, evt cloudevents.Event) {
+	vm, ok := m.allVMs[agentId]
 	if !ok {
 		m.log.Warn("Received an event from a VM we don't know about. Rejecting.")
 		return
 	}
 
-	var evt cloudevents.Event
-	err := json.Unmarshal(msg.Data, &evt)
-	if err != nil {
-		m.log.Error("Failed to deserialize cloudevent from agent", slog.Any("err", err))
-		return
-	}
-
-	m.log.Info("Received agent event", slog.String("vmid", vmID), slog.String("type", evt.Type()))
-
-	err = PublishCloudEvent(m.nc, vm.namespace, evt, m.log)
+	err := PublishCloudEvent(m.nc, vm.namespace, evt, m.log)
 	if err != nil {
 		m.log.Error("Failed to publish cloudevent", slog.Any("err", err))
 		return
 	}
 
 	if evt.Type() == agentapi.WorkloadStoppedEventType {
-		_ = m.StopMachine(vmID, false)
+		_ = m.StopMachine(agentId, false)
 
 		evtData, err := evt.DataBytes()
 		if err != nil {
@@ -236,7 +246,7 @@ func (m *MachineManager) handleAgentEvent(msg *nats.Msg) {
 
 		if vm.isEssential() && workloadStatus.Code != 0 {
 			m.log.Debug("Essential workload stopped with non-zero exit code",
-				slog.String("vmid", vmID),
+				slog.String("vmid", agentId),
 				slog.String("namespace", *vm.deployRequest.Namespace),
 				slog.String("workload", *vm.deployRequest.WorkloadName),
 				slog.String("workload_type", *vm.deployRequest.WorkloadType))

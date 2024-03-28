@@ -235,7 +235,7 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 
 		if !config.ForceDepInstall {
 			if readonly {
-				return fmt.Errorf("configuration prerequisites not met")
+				return fmt.Errorf("configuration prerequisites not met: %s", r.descriptor)
 			}
 
 			fmt.Printf("⛔ You are missing required dependencies for [%s], do you want to install? [y/N] ", red(r.descriptor))

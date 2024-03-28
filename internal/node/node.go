@@ -251,7 +251,7 @@ func (n *Node) init() error {
 		go n.manager.Start()
 
 		// init API listener
-		n.api = NewApiListener(n.log, n.manager, n.config)
+		n.api = NewApiListener(n.log, n.manager, n)
 		err = n.api.Start()
 		if err != nil {
 			n.log.Error("Failed to start API listener", slog.Any("err", err))
