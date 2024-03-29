@@ -39,10 +39,6 @@ type runningFirecracker struct {
 	workloadStarted time.Time
 }
 
-func (vm *runningFirecracker) isEssential() bool {
-	return vm.deployRequest != nil && vm.deployRequest.Essential != nil && *vm.deployRequest.Essential
-}
-
 func (vm *runningFirecracker) setMetadata(metadata *agentapi.MachineMetadata) error {
 	err := vm.machine.SetMetadata(vm.vmmCtx, metadata)
 	if err != nil {

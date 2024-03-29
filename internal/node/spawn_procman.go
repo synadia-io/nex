@@ -3,7 +3,6 @@ package nexnode
 import (
 	"context"
 	"log/slog"
-	"sync"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -13,13 +12,13 @@ type SpawningProcessManager struct {
 
 	procNotifier ProcessSubscriber
 
-	ctx       context.Context
-	stopMutex map[string]*sync.Mutex
-	t         *Telemetry
+	ctx context.Context
+	//stopMutex map[string]*sync.Mutex
+	t *Telemetry
 
 	deployRequests map[string]*agentapi.DeployRequest
 
-	closing uint32
+	//closing uint32
 
 	log *slog.Logger
 }
@@ -64,8 +63,8 @@ func (s *SpawningProcessManager) Stop() error {
 }
 
 func (s *SpawningProcessManager) Start(procNotifier ProcessSubscriber) error {
-	// s.procNotifier = procNotifier
-	// s.log.Info("Spawning (no sandbox) process manager starting")
+	s.procNotifier = procNotifier
+	s.log.Info("Spawning (no sandbox) process manager starting")
 
 	// // TODO
 

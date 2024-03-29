@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -120,7 +121,12 @@ func NewWorkloadManager(ctx context.Context,
 func (w *WorkloadManager) Start() {
 	w.log.Info("Workload manager starting")
 
-	w.procMan.Start(w)
+	err := w.procMan.Start(w)
+	if err != nil {
+		w.log.Error("Process manager failed to start", slog.Any("error", err))
+		// If we can't start the procman, then that's basically fatal
+		os.Exit(1)
+	}
 }
 
 // Called by the process manager when a new agent process is ready to receive deployment instructions
