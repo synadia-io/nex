@@ -9,6 +9,7 @@ import (
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
 	"github.com/synadia-io/nex/internal/models"
+	nextui "github.com/synadia-io/nex/nex/tui"
 )
 
 var (
@@ -30,6 +31,7 @@ var (
 	_    = ncli.HelpFlag.Short('h')
 	_    = ncli.WithCheats().CheatCommand.Hidden()
 
+	tui   = ncli.Command("tui", "Start the Nex TUI").Alias("ui")
 	nodes = ncli.Command("node", "Interact with execution engine nodes")
 	run   = ncli.Command("run", "Run a workload on a target node")
 	yeet  = ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
@@ -106,7 +108,6 @@ func init() {
 	logs.Flag("workload_name", "Name of the workload to filter on").Default("*").StringVar(&WatchOpts.WorkloadName)
 	logs.Flag("workload_id", "ID of the workload machine to filter on").Default("*").StringVar(&WatchOpts.WorkloadId)
 	logs.Flag("level", "Log level filter").Default("debug").StringVar(&WatchOpts.LogLevel)
-
 }
 
 func main() {
@@ -149,6 +150,11 @@ func main() {
 	}
 
 	switch cmd {
+	case tui.FullCommand():
+		err := nextui.StartTUI()
+		if err != nil {
+			fmt.Printf("Failed to start TUI: %s\n", err)
+		}
 	case nodesLs.FullCommand():
 		err := ListNodes(ctx)
 		if err != nil {
