@@ -100,7 +100,7 @@ func (request *DeployRequest) SupportsTriggerSubjects() bool {
 		len(request.TriggerSubjects) > 0
 }
 
-func (r *DeployRequest) Validate() bool {
+func (r *DeployRequest) Validate() error {
 	var err error
 
 	if r.WorkloadName == nil {
@@ -127,7 +127,7 @@ func (r *DeployRequest) Validate() bool {
 		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
 	}
 
-	return err == nil
+	return err
 }
 
 type DeployResponse struct {

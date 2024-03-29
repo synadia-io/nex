@@ -295,7 +295,7 @@ var _ = Describe("nex node", func() {
 					})
 
 					It("should initialize a machine manager to manage firecracker VMs and communicate with running agents", func(ctx SpecContext) {
-						Expect(nodeProxy.MachineManager()).ToNot(BeNil())
+						Expect(nodeProxy.WorkloadManager()).ToNot(BeNil())
 					})
 
 					It("should initialize an API listener", func(ctx SpecContext) {
@@ -353,7 +353,7 @@ var _ = Describe("nex node", func() {
 					})
 
 					Describe("machine manager", func() {
-						var manager *nexnode.MachineManager
+						var manager *nexnode.WorkloadManager
 						var managerProxy *nexnode.MachineManagerProxy
 
 						AfterEach(func() {
@@ -362,7 +362,7 @@ var _ = Describe("nex node", func() {
 						})
 
 						JustBeforeEach(func() {
-							manager = nodeProxy.MachineManager()
+							manager = nodeProxy.WorkloadManager()
 							managerProxy = nexnode.NewMachineManagerProxyWith(manager)
 
 							time.Sleep(time.Millisecond * 1000) // allow enough time for the pool to warm up...

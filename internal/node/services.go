@@ -21,7 +21,7 @@ const hostServiceObjectStore = "objectstore"
 // via the internal NATS connection
 type HostServices struct {
 	log   *slog.Logger
-	mgr   *MachineManager
+	mgr   *WorkloadManager
 	nc    *nats.Conn
 	ncint *nats.Conn
 
@@ -31,7 +31,7 @@ type HostServices struct {
 	object    services.HostService
 }
 
-func NewHostServices(mgr *MachineManager, nc, ncint *nats.Conn, log *slog.Logger) *HostServices {
+func NewHostServices(mgr *WorkloadManager, nc, ncint *nats.Conn, log *slog.Logger) *HostServices {
 	return &HostServices{
 		log:   log,
 		mgr:   mgr,
@@ -93,11 +93,11 @@ func (h *HostServices) handleRPC(msg *nats.Msg) {
 	service := tokens[5]
 	method := tokens[6]
 
-	_, ok := h.mgr.allVMs[vmID]
-	if !ok {
-		h.log.Warn("Received a host services RPC request from an unknown VM.")
+	deployRequest, _ := h.mgr.LookupWorkload(vmID)
+	if deployRequest == nil {
+		h.log.Warn("Received a host services RPC request from an unknown process.")
 		resp, _ := json.Marshal(map[string]interface{}{
-			"error": "unknown vm",
+			"error": "unknown process",
 		})
 
 		err := msg.Respond(resp)

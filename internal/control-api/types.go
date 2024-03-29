@@ -52,10 +52,11 @@ type InfoResponse struct {
 }
 
 type MachineSummary struct {
-	Id       string          `json:"id"`
-	Healthy  bool            `json:"healthy"`
-	Uptime   string          `json:"uptime"`
-	Workload WorkloadSummary `json:"workload,omitempty"`
+	Id        string          `json:"id"`
+	Healthy   bool            `json:"healthy"`
+	Uptime    string          `json:"uptime"`
+	Namespace string          `json:"namespace,omitempty"`
+	Workload  WorkloadSummary `json:"workload,omitempty"`
 }
 
 type WorkloadSummary struct {

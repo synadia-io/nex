@@ -1,6 +1,7 @@
 package agentapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,11 +13,18 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type HandshakeCallback func(string)
 type EventCallback func(string, cloudevents.Event)
 type LogCallback func(string, LogEntry)
+
+const (
+	nexTriggerSubject = "x-nex-trigger-subject"
+)
 
 type AgentClient struct {
 	nc                *nats.Conn
@@ -54,11 +62,14 @@ func NewAgentClient(nc *nats.Conn,
 	}
 }
 
+// Returns the ID of this agent client, which corresponds to a workload process identifier
 func (a *AgentClient) Id() string {
 	return a.agentId
 }
 
 func (a *AgentClient) Start(agentId string) error {
+	a.log.Info("Agent client starting", slog.String("workloadId", agentId))
+
 	a.agentId = agentId
 	_, err := a.nc.Subscribe("agentint.handshake", a.handleHandshake)
 	if err != nil {
@@ -78,6 +89,31 @@ func (a *AgentClient) Start(agentId string) error {
 	go a.awaitHandshake(agentId)
 
 	return nil
+}
+
+func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
+
+	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentId))
+	// TODO: inject tracer context into message header
+	intmsg.Data = data
+
+	intmsg.Header.Add(nexTriggerSubject, subject)
+
+	cctx, childSpan := tracer.Start(
+		ctx,
+		"internal request",
+		trace.WithSpanKind(trace.SpanKindClient),
+	)
+
+	otel.GetTextMapPropagator().Inject(cctx, propagation.HeaderCarrier(intmsg.Header))
+
+	// TODO: make the agent's exec handler extract and forward the otel context
+	// so it continues in the host services like kv, obj, msg, etc
+	resp, err := a.nc.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
+	childSpan.End()
+
+	return resp, err
+
 }
 
 func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, error) {

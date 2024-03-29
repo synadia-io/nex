@@ -24,7 +24,7 @@ func (n *NodeProxy) APIListener() *ApiListener {
 	return n.n.api
 }
 
-func (n *NodeProxy) MachineManager() *MachineManager {
+func (n *NodeProxy) WorkloadManager() *WorkloadManager {
 	return n.n.manager
 }
 
@@ -49,10 +49,10 @@ func (n *NodeProxy) Telemetry() *Telemetry {
 }
 
 type MachineManagerProxy struct {
-	m *MachineManager
+	m *WorkloadManager
 }
 
-func NewMachineManagerProxyWith(manager *MachineManager) *MachineManagerProxy {
+func NewMachineManagerProxyWith(manager *WorkloadManager) *MachineManagerProxy {
 	return &MachineManagerProxy{m: manager}
 }
 
@@ -73,11 +73,14 @@ func (m *MachineManagerProxy) Telemetry() *Telemetry {
 }
 
 func (m *MachineManagerProxy) VMs() map[string]*runningFirecracker {
-	return m.m.allVMs
+	// TODO: refactor or remove this proxy
+	return make(map[string]*runningFirecracker)
+	// return m.m.allVMs
 }
 
 func (m *MachineManagerProxy) PoolVMs() chan *runningFirecracker {
-	return m.m.warmVMs
+	return make(chan *runningFirecracker)
+	//return m.m.warmVMs
 }
 
 type VMProxy struct {

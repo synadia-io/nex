@@ -11,7 +11,7 @@ import (
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
-func (m *MachineManager) CacheWorkload(request *controlapi.DeployRequest) (uint64, *string, error) {
+func (m *WorkloadManager) CacheWorkload(request *controlapi.DeployRequest) (uint64, *string, error) {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 

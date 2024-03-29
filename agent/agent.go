@@ -247,8 +247,9 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if !request.Validate() {
-		_ = a.workAck(m, false, fmt.Sprintf("%v", request.Errors)) // FIXME-- this message can be formatted prettier
+	err = request.Validate()
+	if err != nil {
+		_ = a.workAck(m, false, fmt.Sprintf("%v", err)) // FIXME-- this message can be formatted prettier
 		return
 	}
 
