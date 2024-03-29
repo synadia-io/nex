@@ -3,6 +3,7 @@ package home
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
@@ -23,12 +24,17 @@ type HomeModel struct {
 	width  int
 	height int
 
-	selectedNode string
+	selectedNode     string
+	selectedWorkload workload
+
+	msg string
 
 	nodeList     list.Model
 	workloadList list.Model
 	nodeData     viewport.Model
 	workloadData viewport.Model
+
+	selectedList int
 
 	keyMap keyMap
 
@@ -44,7 +50,7 @@ func NewHomeModel() HomeModel {
 	n, _ := nodeList.Items()[0].(nexNode)
 	nodeData.SetContent(fmt.Sprint(n))
 
-	workloadList := list.New(n.workloads, delegate, 0, 0)
+	workloadList := list.New(n.workloads, workloadDelegate{}, 0, 0)
 
 	nodeList.SetShowTitle(false)
 	nodeList.SetShowHelp(false)
@@ -57,7 +63,9 @@ func NewHomeModel() HomeModel {
 		nodeList:     nodeList,
 		nodeData:     nodeData,
 		workloadList: workloadList,
+		workloadData: viewport.New(0, 0),
 		selectedNode: selectedNode,
+		selectedList: 0,
 		help:         h,
 	}
 }
@@ -76,6 +84,12 @@ func (m HomeModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	if m.selectedList == 0 {
+		m.nodeList, cmd = m.nodeList.Update(message)
+	} else if m.selectedList == 1 {
+		m.workloadList, cmd = m.workloadList.Update(message)
+	}
+
 	switch msg := message.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height, _ = term.GetSize(int(os.Stdout.Fd()))
@@ -83,24 +97,37 @@ func (m HomeModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.workloadList.SetSize(int(float32(m.width)*0.4), int(float32(m.height)*0.4))
 		m.nodeData.Width = int(float32(m.width) * 0.4)
 		m.nodeData.Height = int(float32(m.height) * 0.4)
+		m.workloadData.Width = int(float32(m.width) * 0.4)
+		m.workloadData.Height = int(float32(m.height) * 0.4)
 		//m.workloadList.SetSize(int(float32(m.width)*0.4), int(float32(m.height)*0.4))
 	case tea.KeyMsg:
 		// Don't match any of the keys below if we're actively filtering.
-		// if m.nodeList.FilterState() == list.Filtering {
-		// 	break
-		// }
+		if m.nodeList.FilterState() == list.Filtering {
+			break
+		}
 		switch keypress := msg.String(); keypress {
-		//case key.Matches(msg, m.keyMap.Select):
-		case "enter":
-			m.selectedNode = m.nodeList.SelectedItem().(nexNode).publicKey
-			n, _ := m.nodeList.SelectedItem().(nexNode)
-			m.nodeData.SetContent(fmt.Sprint(n))
-			m.workloadList.SetItems(n.workloads)
+		case "j", "k", "up", "down":
+			if m.selectedList == 0 {
+				m.selectedNode = m.nodeList.SelectedItem().(nexNode).publicKey
+				n, _ := m.nodeList.SelectedItem().(nexNode)
+				m.nodeData.SetContent(fmt.Sprint(n))
+				m.workloadList.SetItems(n.workloads)
+			}
+			if m.selectedList == 1 {
+				m.selectedWorkload = m.workloadList.SelectedItem().(workload)
+				m.workloadData.SetContent(fmt.Sprintf("Here is some fun info about %s", m.selectedWorkload.Title()))
+			}
+			return m, nil
+		case "tab":
+			if m.selectedList == 0 {
+				m.selectedList = 1
+			} else {
+				m.selectedList = 0
+			}
 			return m, nil
 		}
-	}
 
-	m.nodeList, cmd = m.nodeList.Update(message)
+	}
 
 	cmds = append(cmds, cmd)
 	return m, tea.Batch(cmds...)
@@ -114,6 +141,7 @@ func (m HomeModel) View() string {
 	s := format.DocStyle.MaxHeight(m.height).MaxWidth(m.width).Padding(1, 2, 1, 2)
 	ss := borderStyle.Width(int(float32(m.width) * 0.4)).Height(int(float32(m.height) * 0.4))
 	return s.Render(
+		strconv.Itoa(m.selectedList),
 		lipgloss.JoinVertical(lipgloss.Top,
 			lipgloss.JoinHorizontal(
 				lipgloss.Top,

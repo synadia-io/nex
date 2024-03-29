@@ -50,7 +50,7 @@ var Keys = keyMap{
 		key.WithHelp("→/l", "move right"),
 	),
 	Select: key.NewBinding(
-		key.WithKeys("enter"),
+		key.WithKeys("enter", "E"),
 		key.WithHelp("enter", "select"),
 	),
 

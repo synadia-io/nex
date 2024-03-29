@@ -2,10 +2,18 @@ package home
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	workloadStyle         = lipgloss.NewStyle()
+	selectedWorkloadStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF06B7"))
 )
 
 type nexNode struct {
@@ -81,4 +89,27 @@ func tagsString(t map[string]any) string {
 	}
 
 	return ret.String()
+}
+
+type workloadDelegate struct{}
+
+func (d workloadDelegate) Height() int                             { return 1 }
+func (d workloadDelegate) Spacing() int                            { return 0 }
+func (d workloadDelegate) Update(_ tea.Msg, _ *list.Model) tea.Cmd { return nil }
+func (d workloadDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
+	i, ok := listItem.(workload)
+	if !ok {
+		return
+	}
+
+	str := string("  " + i)
+
+	fn := workloadStyle.Render
+	if index == m.Index() {
+		fn = func(s ...string) string {
+			return selectedWorkloadStyle.Render("> " + strings.TrimSpace(strings.Join(s, " ")))
+		}
+	}
+
+	fmt.Fprint(w, fn(str))
 }
