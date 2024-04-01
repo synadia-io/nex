@@ -11,6 +11,7 @@ var (
 )
 
 func (m model) View() string {
+	nctx := "NATS Context: " + m.nContext
 	switch m.state {
 	case natsContextView:
 		return borderStyle.Height(m.height - 2).Width(m.width - 2).Render(m.natsContextView.View())
@@ -19,6 +20,6 @@ func (m model) View() string {
 	case deployView:
 		return borderStyle.Height(m.height - 2).Width(m.width - 2).Render(m.deployView.View())
 	default:
-		return borderStyle.Height(m.height - 2).Width(m.width - 2).Render(m.homeView.View())
+		return borderStyle.Height(m.height - 2).Width(m.width - 2).Render(lipgloss.JoinVertical(lipgloss.Top, nctx, m.homeView.View()))
 	}
 }

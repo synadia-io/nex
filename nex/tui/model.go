@@ -2,6 +2,7 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/nats-io/nats.go"
 )
 
 type viewState int
@@ -16,6 +17,9 @@ const (
 type model struct {
 	width  int
 	height int
+
+	nContext string
+	nc       *nats.Conn
 
 	state viewState
 

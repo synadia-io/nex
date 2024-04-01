@@ -151,7 +151,7 @@ func main() {
 
 	switch cmd {
 	case tui.FullCommand():
-		err := nextui.StartTUI()
+		err := nextui.StartTUI(Opts.ConfigurationContext)
 		if err != nil {
 			fmt.Printf("Failed to start TUI: %s\n", err)
 		}

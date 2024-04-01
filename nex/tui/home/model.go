@@ -2,14 +2,17 @@ package home
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
-	"strconv"
+	"time"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/nats-io/nats.go"
+	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"github.com/synadia-io/nex/nex/tui/format"
 	"golang.org/x/term"
 )
@@ -29,6 +32,8 @@ type HomeModel struct {
 
 	msg string
 
+	nc *nats.Conn
+
 	nodeList     list.Model
 	workloadList list.Model
 	nodeData     viewport.Model
@@ -41,32 +46,58 @@ type HomeModel struct {
 	help help.Model
 }
 
-func NewHomeModel() HomeModel {
-	delegate := list.NewDefaultDelegate()
-	nodeList := list.New(nodes, delegate, 0, 0)
-	selectedNode := nodeList.Items()[0].(nexNode).publicKey
+func NewHomeModel(h, w int, nc *nats.Conn) HomeModel {
+	nodeList := list.New([]list.Item{}, nexNodeDelegate{}, int(float32(w)*0.4), int(float32(h)*0.4))
+	selectedNode := ""
+	nodeData := viewport.New(int(float32(w)*0.4), int(float32(h)*0.4))
 
-	nodeData := viewport.New(0, 0)
-	n, _ := nodeList.Items()[0].(nexNode)
-	nodeData.SetContent(fmt.Sprint(n))
+	if nc != nil {
+		nodes := []list.Item{}
+		api := controlapi.NewApiClient(nc, time.Second, slog.Default())
+		ns, _ := api.ListNodes()
+		for _, n := range ns {
+			nn := nexNode{
+				name: func() string {
+					if name, ok := n.Tags["node_name"]; !ok {
+						return "derp"
+					} else {
+						return name
+					}
+				}(),
+				publicKey: n.NodeId,
+				version:   n.Version,
+				tags:      n.Tags,
+				workloads: []list.Item{},
+			}
+			nodes = append(nodes, nn)
+		}
+		nodeList.SetItems(nodes)
+		if len(nodes) > 0 {
+			selectedNode = nodeList.Items()[0].(nexNode).publicKey
+			n, _ := nodeList.Items()[0].(nexNode)
+			nodeData.SetContent(fmt.Sprint(n))
+		}
+	}
 
-	workloadList := list.New(n.workloads, workloadDelegate{}, 0, 0)
+	workloadList := list.New([]list.Item{}, workloadDelegate{}, int(float32(w)*0.4), int(float32(h)*0.4))
 
 	nodeList.SetShowTitle(false)
 	nodeList.SetShowHelp(false)
 	workloadList.SetShowTitle(false)
 	workloadList.SetShowHelp(false)
 
-	h := help.New()
-	h.ShowAll = false
 	return HomeModel{
+		width:  w,
+		height: h,
+
+		nc:           nc,
 		nodeList:     nodeList,
 		nodeData:     nodeData,
 		workloadList: workloadList,
-		workloadData: viewport.New(0, 0),
+		workloadData: viewport.New(int(float32(w)*0.4), int(float32(h)*0.4)),
 		selectedNode: selectedNode,
 		selectedList: 0,
-		help:         h,
+		help:         help.New(),
 	}
 }
 
@@ -99,7 +130,6 @@ func (m HomeModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		m.nodeData.Height = int(float32(m.height) * 0.4)
 		m.workloadData.Width = int(float32(m.width) * 0.4)
 		m.workloadData.Height = int(float32(m.height) * 0.4)
-		//m.workloadList.SetSize(int(float32(m.width)*0.4), int(float32(m.height)*0.4))
 	case tea.KeyMsg:
 		// Don't match any of the keys below if we're actively filtering.
 		if m.nodeList.FilterState() == list.Filtering {
@@ -119,7 +149,7 @@ func (m HomeModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "tab":
-			if m.selectedList == 0 {
+			if m.selectedList == 0 && len(m.workloadList.Items()) > 0 {
 				m.selectedList = 1
 			} else {
 				m.selectedList = 0
@@ -141,7 +171,6 @@ func (m HomeModel) View() string {
 	s := format.DocStyle.MaxHeight(m.height).MaxWidth(m.width).Padding(1, 2, 1, 2)
 	ss := borderStyle.Width(int(float32(m.width) * 0.4)).Height(int(float32(m.height) * 0.4))
 	return s.Render(
-		strconv.Itoa(m.selectedList),
 		lipgloss.JoinVertical(lipgloss.Top,
 			lipgloss.JoinHorizontal(
 				lipgloss.Top,
