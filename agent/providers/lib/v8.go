@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -16,6 +19,16 @@ import (
 
 const (
 	hostServicesObjectName = "hostServices"
+
+	hostServicesHTTPObjectName         = "http"
+	hostServicesHTTPGetFunctionName    = "get"
+	hostServicesHTTPPostFunctionName   = "post"
+	hostServicesHTTPPutFunctionName    = "put"
+	hostServicesHTTPPatchFunctionName  = "patch"
+	hostServicesHTTPDeleteFunctionName = "delete"
+	hostServicesHTTPHeadFunctionName   = "head"
+
+	hostServicesHTTPRequestTimeout = time.Millisecond * 3000
 
 	hostServicesKVObjectName         = "kv"
 	hostServicesKVGetFunctionName    = "get"
@@ -250,6 +263,11 @@ func (v *V8) newV8Context() (*v8.Context, error) {
 	return v8.NewContext(v.iso, global), nil
 }
 
+// agentint.{vmID}.rpc.{namespace}.{workload}.http.{method}
+func (v *V8) httpServiceSubject(method string) string {
+	return fmt.Sprintf("agentint.%s.rpc.%s.%s.http.%s", v.vmID, v.namespace, v.name, method)
+}
+
 // agentint.{vmID}.rpc.{namespace}.{workload}.kv.{method}
 func (v *V8) keyValueServiceSubject(method string) string {
 	return fmt.Sprintf("agentint.%s.rpc.%s.%s.kv.%s", v.vmID, v.namespace, v.name, method)
@@ -263,7 +281,12 @@ func (v *V8) messagingServiceSubject(method string) string {
 func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 	hostServices := v8.NewObjectTemplate(v.iso)
 
-	err := hostServices.Set(hostServicesKVObjectName, v.newKeyValueObjectTemplate())
+	err := hostServices.Set(hostServicesHTTPObjectName, v.newHTTPObjectTemplate())
+	if err != nil {
+		return nil, err
+	}
+
+	err = hostServices.Set(hostServicesKVObjectName, v.newKeyValueObjectTemplate())
 	if err != nil {
 		return nil, err
 	}
@@ -274,6 +297,522 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 	}
 
 	return hostServices, nil
+}
+
+func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
+	http := v8.NewObjectTemplate(v.iso)
+
+	_ = http.Set(hostServicesHTTPGetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "url is required")
+			return v.iso.ThrowException(val)
+		}
+
+		_url, err := url.Parse(args[0].String())
+		if err != nil {
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to parse url: %s", err.Error())))
+
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
+			Method: hostServicesHTTPGetFunctionName,
+			URL:    _url.String(),
+		})
+
+		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPGetFunctionName), req, hostServicesHTTPRequestTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var httpresp *agentapi.HostServicesHTTPResponse
+		err = json.Unmarshal(resp.Data, &httpresp)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		if httpresp.Error != nil {
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to complete HTTP request: %s", *httpresp.Error))
+			return v.iso.ThrowException(val)
+		}
+
+		respobj := v8.NewObjectTemplate(v.iso)
+		_ = respobj.Set("status", int32(httpresp.Status))
+
+		if httpresp.Headers != nil {
+			var headers map[string][]string
+			err = json.Unmarshal(*httpresp.Headers, &headers)
+			if err != nil {
+				_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to unmarshal response headers for http GET request: %s", err.Error())))
+
+				val, _ := v8.NewValue(v.iso, err.Error())
+				return v.iso.ThrowException(val)
+			}
+
+			hdrsobj := v8.NewObjectTemplate(v.iso)
+			for hdr, hdrval := range headers {
+				hdrstr := strings.Join(hdrval, ", ")
+				_hdrval, _ := v8.NewValue(v.iso, strings.TrimRightFunc(hdrstr, unicode.IsSpace))
+				_ = hdrsobj.Set(hdr, _hdrval)
+			}
+
+			_ = respobj.Set("headers", hdrsobj)
+		}
+
+		if len(httpresp.Body) > 0 {
+			_ = respobj.Set("response", httpresp.Body)
+		} else {
+			_ = respobj.Set("response", nil)
+		}
+
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response (%d status) for http GET request", len(httpresp.Body), httpresp.Status)))
+
+		val, err := respobj.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val.Value
+	}))
+
+	_ = http.Set(hostServicesHTTPPostFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "url is required")
+			return v.iso.ThrowException(val)
+		}
+
+		_url, err := url.Parse(args[0].String())
+		if err != nil {
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to parse url: %s", err.Error())))
+
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var data string
+		if len(args) > 1 {
+			payload := args[1]
+			if payload.IsObject() || payload.IsArray() {
+				payloadJSON, _ := payload.MarshalJSON()
+				data = string(payloadJSON)
+			} else {
+				data = payload.String()
+			}
+		}
+
+		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
+			Method: hostServicesHTTPPostFunctionName,
+			URL:    _url.String(),
+			Body:   &data,
+		})
+
+		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPostFunctionName), req, hostServicesHTTPRequestTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var httpresp *agentapi.HostServicesHTTPResponse
+		err = json.Unmarshal(resp.Data, &httpresp)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		if httpresp.Error != nil {
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to complete HTTP request: %s", *httpresp.Error))
+			return v.iso.ThrowException(val)
+		}
+
+		respobj := v8.NewObjectTemplate(v.iso)
+		_ = respobj.Set("status", int32(httpresp.Status))
+
+		if httpresp.Headers != nil {
+			var headers map[string][]string
+			err = json.Unmarshal(*httpresp.Headers, &headers)
+			if err != nil {
+				_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to unmarshal response headers for http POST request: %s", err.Error())))
+
+				val, _ := v8.NewValue(v.iso, err.Error())
+				return v.iso.ThrowException(val)
+			}
+
+			hdrsobj := v8.NewObjectTemplate(v.iso)
+			for hdr, hdrval := range headers {
+				hdrstr := strings.Join(hdrval, ", ")
+				_hdrval, _ := v8.NewValue(v.iso, strings.TrimRightFunc(hdrstr, unicode.IsSpace))
+				_ = hdrsobj.Set(hdr, _hdrval)
+			}
+
+			_ = respobj.Set("headers", hdrsobj)
+		}
+
+		if len(httpresp.Body) > 0 {
+			_ = respobj.Set("response", httpresp.Body)
+		} else {
+			_ = respobj.Set("response", nil)
+		}
+
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response (%d status) for http POST request", len(httpresp.Body), httpresp.Status)))
+
+		val, err := respobj.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val.Value
+	}))
+
+	_ = http.Set(hostServicesHTTPPutFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "url is required")
+			return v.iso.ThrowException(val)
+		}
+
+		_url, err := url.Parse(args[0].String())
+		if err != nil {
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to parse url: %s", err.Error())))
+
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var data string
+		if len(args) > 1 {
+			payload := args[1]
+			if payload.IsObject() || payload.IsArray() {
+				payloadJSON, _ := payload.MarshalJSON()
+				data = string(payloadJSON)
+			} else {
+				data = payload.String()
+			}
+		}
+
+		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
+			Method: hostServicesHTTPPutFunctionName,
+			URL:    _url.String(),
+			Body:   &data,
+		})
+
+		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPutFunctionName), req, hostServicesHTTPRequestTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var httpresp *agentapi.HostServicesHTTPResponse
+		err = json.Unmarshal(resp.Data, &httpresp)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		if httpresp.Error != nil {
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to complete HTTP request: %s", *httpresp.Error))
+			return v.iso.ThrowException(val)
+		}
+
+		respobj := v8.NewObjectTemplate(v.iso)
+		_ = respobj.Set("status", int32(httpresp.Status))
+
+		if httpresp.Headers != nil {
+			var headers map[string][]string
+			err = json.Unmarshal(*httpresp.Headers, &headers)
+			if err != nil {
+				_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to unmarshal response headers for http PUT request: %s", err.Error())))
+
+				val, _ := v8.NewValue(v.iso, err.Error())
+				return v.iso.ThrowException(val)
+			}
+
+			hdrsobj := v8.NewObjectTemplate(v.iso)
+			for hdr, hdrval := range headers {
+				hdrstr := strings.Join(hdrval, ", ")
+				_hdrval, _ := v8.NewValue(v.iso, strings.TrimRightFunc(hdrstr, unicode.IsSpace))
+				_ = hdrsobj.Set(hdr, _hdrval)
+			}
+
+			_ = respobj.Set("headers", hdrsobj)
+		}
+
+		if len(httpresp.Body) > 0 {
+			_ = respobj.Set("response", httpresp.Body)
+		} else {
+			_ = respobj.Set("response", nil)
+		}
+
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response (%d status) for http PUT request", len(httpresp.Body), httpresp.Status)))
+
+		val, err := respobj.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val.Value
+	}))
+
+	_ = http.Set(hostServicesHTTPPatchFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "url is required")
+			return v.iso.ThrowException(val)
+		}
+
+		_url, err := url.Parse(args[0].String())
+		if err != nil {
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to parse url: %s", err.Error())))
+
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var data string
+		if len(args) > 1 {
+			payload := args[1]
+			if payload.IsObject() || payload.IsArray() {
+				payloadJSON, _ := payload.MarshalJSON()
+				data = string(payloadJSON)
+			} else {
+				data = payload.String()
+			}
+		}
+
+		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
+			Method: hostServicesHTTPPatchFunctionName,
+			URL:    _url.String(),
+			Body:   &data,
+		})
+
+		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPatchFunctionName), req, hostServicesHTTPRequestTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var httpresp *agentapi.HostServicesHTTPResponse
+		err = json.Unmarshal(resp.Data, &httpresp)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		if httpresp.Error != nil {
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to complete HTTP request: %s", *httpresp.Error))
+			return v.iso.ThrowException(val)
+		}
+
+		respobj := v8.NewObjectTemplate(v.iso)
+		_ = respobj.Set("status", int32(httpresp.Status))
+
+		if httpresp.Headers != nil {
+			var headers map[string][]string
+			err = json.Unmarshal(*httpresp.Headers, &headers)
+			if err != nil {
+				_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to unmarshal response headers for http PATCH request: %s", err.Error())))
+
+				val, _ := v8.NewValue(v.iso, err.Error())
+				return v.iso.ThrowException(val)
+			}
+
+			hdrsobj := v8.NewObjectTemplate(v.iso)
+			for hdr, hdrval := range headers {
+				hdrstr := strings.Join(hdrval, ", ")
+				_hdrval, _ := v8.NewValue(v.iso, strings.TrimRightFunc(hdrstr, unicode.IsSpace))
+				_ = hdrsobj.Set(hdr, _hdrval)
+			}
+
+			_ = respobj.Set("headers", hdrsobj)
+		}
+
+		if len(httpresp.Body) > 0 {
+			_ = respobj.Set("response", httpresp.Body)
+		} else {
+			_ = respobj.Set("response", nil)
+		}
+
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response (%d status) for http PATCH request", len(httpresp.Body), httpresp.Status)))
+
+		val, err := respobj.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val.Value
+	}))
+
+	_ = http.Set(hostServicesHTTPDeleteFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "url is required")
+			return v.iso.ThrowException(val)
+		}
+
+		_url, err := url.Parse(args[0].String())
+		if err != nil {
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to parse url: %s", err.Error())))
+
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var data string
+		if len(args) > 1 {
+			payload := args[1]
+			if payload.IsObject() || payload.IsArray() {
+				payloadJSON, _ := payload.MarshalJSON()
+				data = string(payloadJSON)
+			} else {
+				data = payload.String()
+			}
+		}
+
+		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
+			Method: hostServicesHTTPDeleteFunctionName,
+			URL:    _url.String(),
+			Body:   &data, // this should not be present for DELETE requests, but it is not explicitly forbidden. so we'll allow it
+		})
+
+		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPDeleteFunctionName), req, hostServicesHTTPRequestTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var httpresp *agentapi.HostServicesHTTPResponse
+		err = json.Unmarshal(resp.Data, &httpresp)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		if httpresp.Error != nil {
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to complete HTTP request: %s", *httpresp.Error))
+			return v.iso.ThrowException(val)
+		}
+
+		respobj := v8.NewObjectTemplate(v.iso)
+		_ = respobj.Set("status", int32(httpresp.Status))
+
+		if httpresp.Headers != nil {
+			var headers map[string][]string
+			err = json.Unmarshal(*httpresp.Headers, &headers)
+			if err != nil {
+				_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to unmarshal response headers for http DELETE request: %s", err.Error())))
+
+				val, _ := v8.NewValue(v.iso, err.Error())
+				return v.iso.ThrowException(val)
+			}
+
+			hdrsobj := v8.NewObjectTemplate(v.iso)
+			for hdr, hdrval := range headers {
+				hdrstr := strings.Join(hdrval, ", ")
+				_hdrval, _ := v8.NewValue(v.iso, strings.TrimRightFunc(hdrstr, unicode.IsSpace))
+				_ = hdrsobj.Set(hdr, _hdrval)
+			}
+
+			_ = respobj.Set("headers", hdrsobj)
+		}
+
+		if len(httpresp.Body) > 0 {
+			_ = respobj.Set("response", httpresp.Body)
+		} else {
+			_ = respobj.Set("response", nil)
+		}
+
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response (%d status) for http DELETE request", len(httpresp.Body), httpresp.Status)))
+
+		val, err := respobj.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val.Value
+	}))
+
+	_ = http.Set(hostServicesHTTPHeadFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "url is required")
+			return v.iso.ThrowException(val)
+		}
+
+		_url, err := url.Parse(args[0].String())
+		if err != nil {
+			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to parse url: %s", err.Error())))
+
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
+			Method: hostServicesHTTPHeadFunctionName,
+			URL:    _url.String(),
+		})
+
+		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPHeadFunctionName), req, hostServicesHTTPRequestTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var httpresp *agentapi.HostServicesHTTPResponse
+		err = json.Unmarshal(resp.Data, &httpresp)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		if httpresp.Error != nil {
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to complete HTTP request: %s", *httpresp.Error))
+			return v.iso.ThrowException(val)
+		}
+
+		respobj := v8.NewObjectTemplate(v.iso)
+		_ = respobj.Set("status", int32(httpresp.Status))
+
+		if httpresp.Headers != nil {
+			var headers map[string][]string
+			err = json.Unmarshal(*httpresp.Headers, &headers)
+			if err != nil {
+				_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to unmarshal response headers for http HEAD request: %s", err.Error())))
+
+				val, _ := v8.NewValue(v.iso, err.Error())
+				return v.iso.ThrowException(val)
+			}
+
+			hdrsobj := v8.NewObjectTemplate(v.iso)
+			for hdr, hdrval := range headers {
+				hdrstr := strings.Join(hdrval, ", ")
+				_hdrval, _ := v8.NewValue(v.iso, strings.TrimRightFunc(hdrstr, unicode.IsSpace))
+				_ = hdrsobj.Set(hdr, _hdrval)
+			}
+
+			_ = respobj.Set("headers", hdrsobj)
+		}
+
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("received response (%d status) for http HEAD request", httpresp.Status)))
+
+		val, err := respobj.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val.Value
+	}))
+
+	return http
 }
 
 func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
