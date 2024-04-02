@@ -18,7 +18,7 @@ import (
 const MmdsAddress = "169.254.169.254"
 
 const nexEnvSandbox = "NEX_SANDBOX"
-const nexEnvVmID = "NEX_VMID"
+const nexEnvWorkloadID = "NEX_WORKLOADID"
 const nexEnvNodeNatsHost = "NEX_NODENATSHOST"
 const nexEnvNodeNatsPort = "NEX_NODENATSPORT"
 
@@ -68,7 +68,7 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 }
 
 func GetMachineDataFromEnv() (*agentapi.MachineMetadata, error) {
-	vmid := os.Getenv(nexEnvVmID)
+	vmid := os.Getenv(nexEnvWorkloadID)
 	host := os.Getenv(nexEnvNodeNatsHost)
 	port := os.Getenv(nexEnvNodeNatsPort)
 	msg := "Metadata obtained from no-sandbox environment"
