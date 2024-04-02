@@ -15,12 +15,13 @@ type keyMap struct {
 
 	EnterNatsContext key.Binding
 	EnterDeployView  key.Binding
+	Refresh          key.Binding
 }
 
 // ShortHelp returns keybindings to be shown in the mini help view. It's part
 // of the key.Map interface.
 func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.EnterNatsContext, k.EnterDeployView, k.Quit}
+	return []key.Binding{k.EnterNatsContext, k.EnterDeployView, k.Refresh, k.Quit}
 }
 
 // FullHelp returns keybindings for the expanded help view. It's part of the
@@ -69,5 +70,9 @@ var Keys = keyMap{
 	EnterDeployView: key.NewBinding(
 		key.WithKeys("d"),
 		key.WithHelp("d", "deploy workload"),
+	),
+	Refresh: key.NewBinding(
+		key.WithKeys("R"),
+		key.WithHelp("R", "refresh data"),
 	),
 }

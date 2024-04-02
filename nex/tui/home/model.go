@@ -27,7 +27,7 @@ type HomeModel struct {
 	width  int
 	height int
 
-	selectedNode     string
+	selectedNode     nexNode
 	selectedWorkload workload
 
 	msg string
@@ -47,19 +47,27 @@ type HomeModel struct {
 }
 
 func NewHomeModel(h, w int, nc *nats.Conn) HomeModel {
+	var selectedNode nexNode
+
 	nodeList := list.New([]list.Item{}, nexNodeDelegate{}, int(float32(w)*0.4), int(float32(h)*0.4))
-	selectedNode := ""
+	workloadList := list.New([]list.Item{}, workloadDelegate{}, int(float32(w)*0.4), int(float32(h)*0.4))
 	nodeData := viewport.New(int(float32(w)*0.4), int(float32(h)*0.4))
 
 	if nc != nil {
-		nodes := []list.Item{}
 		api := controlapi.NewApiClient(nc, time.Second, slog.Default())
+		nodes := []list.Item{}
 		ns, _ := api.ListNodes()
 		for _, n := range ns {
+			workloads := []list.Item{}
+			info, _ := api.NodeInfo(n.NodeId)
+			for _, w := range info.Machines {
+				workloads = append(workloads, workload(w))
+			}
+
 			nn := nexNode{
 				name: func() string {
 					if name, ok := n.Tags["node_name"]; !ok {
-						return "derp"
+						return "no-name-provided"
 					} else {
 						return name
 					}
@@ -67,19 +75,21 @@ func NewHomeModel(h, w int, nc *nats.Conn) HomeModel {
 				publicKey: n.NodeId,
 				version:   n.Version,
 				tags:      n.Tags,
-				workloads: []list.Item{},
+				memory:    *info.Memory,
+				uptime:    info.Uptime,
+				xkey:      info.PublicXKey,
+				workloads: workloads,
 			}
+
 			nodes = append(nodes, nn)
 		}
 		nodeList.SetItems(nodes)
 		if len(nodes) > 0 {
-			selectedNode = nodeList.Items()[0].(nexNode).publicKey
-			n, _ := nodeList.Items()[0].(nexNode)
-			nodeData.SetContent(fmt.Sprint(n))
+			selectedNode, _ = nodeList.Items()[0].(nexNode)
+			nodeData.SetContent(fmt.Sprint(selectedNode))
+			workloadList.SetItems(selectedNode.workloads)
 		}
 	}
-
-	workloadList := list.New([]list.Item{}, workloadDelegate{}, int(float32(w)*0.4), int(float32(h)*0.4))
 
 	nodeList.SetShowTitle(false)
 	nodeList.SetShowHelp(false)
@@ -138,16 +148,17 @@ func (m HomeModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		switch keypress := msg.String(); keypress {
 		case "j", "k", "up", "down":
 			if m.selectedList == 0 {
-				m.selectedNode = m.nodeList.SelectedItem().(nexNode).publicKey
-				n, _ := m.nodeList.SelectedItem().(nexNode)
-				m.nodeData.SetContent(fmt.Sprint(n))
-				m.workloadList.SetItems(n.workloads)
+				m.selectedNode = m.nodeList.SelectedItem().(nexNode)
+				m.nodeData.SetContent(fmt.Sprint(m.selectedNode))
+
 			}
 			if m.selectedList == 1 {
 				m.selectedWorkload = m.workloadList.SelectedItem().(workload)
-				m.workloadData.SetContent(fmt.Sprintf("Here is some fun info about %s", m.selectedWorkload.Title()))
+				m.workloadData.SetContent(fmt.Sprint(m.selectedWorkload))
 			}
 			return m, nil
+		case "R":
+			return m.refreshNodeData(), nil
 		case "tab":
 			if m.selectedList == 0 && len(m.workloadList.Items()) > 0 {
 				m.selectedList = 1
@@ -211,4 +222,44 @@ func (m HomeModel) helpView() string {
 
 func (m HomeModel) isInitialized() bool {
 	return m.height != 0 && m.width != 0
+}
+
+func (m HomeModel) refreshNodeData() tea.Model {
+	if m.nc != nil {
+		api := controlapi.NewApiClient(m.nc, time.Second, slog.Default())
+		nodes := []list.Item{}
+		ns, _ := api.ListNodes()
+		for _, n := range ns {
+			workloads := []list.Item{}
+			info, _ := api.NodeInfo(n.NodeId)
+			for _, w := range info.Machines {
+				workloads = append(workloads, workload(w))
+			}
+
+			nn := nexNode{
+				name: func() string {
+					if name, ok := n.Tags["node_name"]; !ok {
+						return "no-name-provided"
+					} else {
+						return name
+					}
+				}(),
+				publicKey: n.NodeId,
+				version:   n.Version,
+				tags:      n.Tags,
+				memory:    *info.Memory,
+				uptime:    info.Uptime,
+				xkey:      info.PublicXKey,
+				workloads: workloads,
+			}
+
+			nodes = append(nodes, nn)
+		}
+		m.nodeList.SetItems(nodes)
+		if len(nodes) > 0 {
+			m.nodeData.SetContent(fmt.Sprint(m.selectedNode))
+			m.workloadList.SetItems(m.selectedNode.workloads)
+		}
+	}
+	return m
 }
