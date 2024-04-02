@@ -67,7 +67,7 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	return nil, fmt.Errorf("failed to obtain metadata after %dms", metadataPollingTimeoutMillis)
 }
 
-func GetMachineDataFromEnv() (*agentapi.MachineMetadata, error) {
+func GetMachineMetadataFromEnv() (*agentapi.MachineMetadata, error) {
 	vmid := os.Getenv(nexEnvWorkloadID)
 	host := os.Getenv(nexEnvNodeNatsHost)
 	port := os.Getenv(nexEnvNodeNatsPort)

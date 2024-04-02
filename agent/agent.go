@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -61,8 +62,8 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	var metadata *agentapi.MachineMetadata
 	var err error
 
-	if os.Getenv(nexEnvSandbox) == "false" {
-		metadata, err = GetMachineDataFromEnv()
+	if strings.ToLower(os.Getenv(nexEnvSandbox)) == "false" {
+		metadata, err = GetMachineMetadataFromEnv()
 	} else {
 		metadata, err = GetMachineMetadata()
 	}
