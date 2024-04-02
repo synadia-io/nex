@@ -19,8 +19,8 @@ const MmdsAddress = "169.254.169.254"
 
 const nexEnvSandbox = "NEX_SANDBOX"
 const nexEnvWorkloadID = "NEX_WORKLOADID"
-const nexEnvNodeNatsHost = "NEX_NODENATSHOST"
-const nexEnvNodeNatsPort = "NEX_NODENATSPORT"
+const nexEnvNodeNatsHost = "NEX_NODE_NATS_HOST"
+const nexEnvNodeNatsPort = "NEX_NODE_NATS_PORT"
 
 const metadataClientTimeoutMillis = 50
 const metadataPollingTimeoutMillis = 5000
