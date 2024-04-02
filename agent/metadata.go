@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -14,6 +16,11 @@ import (
 // MmdsAddress is the address used by the agent to query firecracker MMDS
 // (see https://github.com/firecracker-microvm/firecracker/blob/main/docs/mmds/mmds-user-guide.md#version-2)
 const MmdsAddress = "169.254.169.254"
+
+const nexEnvSandbox = "NEX_SANDBOX"
+const nexEnvVmID = "NEX_VMID"
+const nexEnvNodeNatsHost = "NEX_NODENATSHOST"
+const nexEnvNodeNatsPort = "NEX_NODENATSPORT"
 
 const metadataClientTimeoutMillis = 50
 const metadataPollingTimeoutMillis = 5000
@@ -45,7 +52,7 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	timeoutAt := time.Now().UTC().Add(metadataPollingTimeoutMillis * time.Millisecond)
 
 	for {
-		metadata, err := performMetadataQuery(url, req, client)
+		metadata, err := performMetadataQuery(req, client)
 		if err != nil {
 			if time.Now().UTC().After(timeoutAt) {
 				break
@@ -60,7 +67,25 @@ func GetMachineMetadata() (*agentapi.MachineMetadata, error) {
 	return nil, fmt.Errorf("failed to obtain metadata after %dms", metadataPollingTimeoutMillis)
 }
 
-func performMetadataQuery(url string, req *http.Request, client *http.Client) (*agentapi.MachineMetadata, error) {
+func GetMachineDataFromEnv() (*agentapi.MachineMetadata, error) {
+	vmid := os.Getenv(nexEnvVmID)
+	host := os.Getenv(nexEnvNodeNatsHost)
+	port := os.Getenv(nexEnvNodeNatsPort)
+	msg := "Metadata obtained from no-sandbox environment"
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return nil, err
+	}
+
+	return &agentapi.MachineMetadata{
+		VmID:         &vmid,
+		NodeNatsHost: &host,
+		NodeNatsPort: &p,
+		Message:      &msg,
+	}, nil
+}
+
+func performMetadataQuery(req *http.Request, client *http.Client) (*agentapi.MachineMetadata, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

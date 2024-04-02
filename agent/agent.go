@@ -58,14 +58,21 @@ func HaltVM(err error) {
 
 // Initialize a new agent to facilitate communications with the host
 func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
-	metadata, err := GetMachineMetadata()
+	var metadata *agentapi.MachineMetadata
+	var err error
+
+	if os.Getenv(nexEnvSandbox) == "false" {
+		metadata, err = GetMachineDataFromEnv()
+	} else {
+		metadata, err = GetMachineMetadata()
+	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get mmds data: %s", err)
+		fmt.Fprintf(os.Stderr, "failed to get machine metadata: %s", err)
 		return nil, err
 	}
 
 	if !metadata.Validate() {
-		return nil, fmt.Errorf("invalid metadata retrieved from mmds; %v", metadata.Errors)
+		return nil, fmt.Errorf("invalid metadata: %v", metadata.Errors)
 	}
 
 	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsHost, *metadata.NodeNatsPort))
@@ -105,8 +112,6 @@ func (a *Agent) FullVersion() string {
 // Start the agent
 // NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() {
-	// n.log.Info("starting agent")
-
 	err := a.init()
 	if err != nil {
 		panic(err)
@@ -129,8 +134,6 @@ func (a *Agent) Start() {
 			time.Sleep(runloopSleepInterval)
 		}
 	}
-
-	// a.log.Info("exiting agent")
 	a.cancelF()
 }
 
