@@ -148,7 +148,7 @@ func (a *Agent) requestHandshake() error {
 	}
 	raw, _ := json.Marshal(msg)
 
-	resp, err := a.nc.Request(agentapi.NexAgentSubjectHandshake, raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+	resp, err := a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
 		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
 		return err

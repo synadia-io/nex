@@ -37,6 +37,8 @@ type AgentClient struct {
 	handshakeSucceeded HandshakeCallback
 	eventReceived      EventCallback
 	logReceived        LogCallback
+
+	subz []*nats.Subscription
 }
 
 func NewAgentClient(
@@ -57,6 +59,7 @@ func NewAgentClient(
 		log:                log,
 		logReceived:        onLog,
 		nc:                 nc,
+		subz:               make([]*nats.Subscription, 0),
 	}
 }
 
@@ -69,20 +72,26 @@ func (a *AgentClient) Start(agentID string) error {
 	a.log.Info("Agent client starting", slog.String("workload_id", agentID))
 	a.agentID = agentID
 
-	_, err := a.nc.Subscribe("agentint.handshake", a.handleHandshake)
-	if err != nil {
-		return err
-	}
+	var sub *nats.Subscription
+	var err error
 
-	_, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.events.*", agentID), a.handleAgentEvent)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.handshake", agentID), a.handleHandshake)
 	if err != nil {
 		return err
 	}
+	a.subz = append(a.subz, sub)
 
-	_, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.logs", agentID), a.handleAgentLog)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.events.*", agentID), a.handleAgentEvent)
 	if err != nil {
 		return err
 	}
+	a.subz = append(a.subz, sub)
+
+	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.logs", agentID), a.handleAgentLog)
+	if err != nil {
+		return err
+	}
+	a.subz = append(a.subz, sub)
 
 	go a.awaitHandshake(agentID)
 
@@ -117,6 +126,22 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		return nil, err
 	}
 	return &deployResponse, nil
+}
+
+// Stop the agent client instance and cleanup by draining subscriptions
+// and releasing other associated resources
+func (a *AgentClient) Drain() error {
+	for _, sub := range a.subz {
+		err := sub.Drain()
+		if err != nil {
+			a.log.Warn(fmt.Sprintf("failed to drain subscription to subject %s associated with agent client %s: %s", sub.Subject, a.agentID, err.Error()))
+			// no-op for now, try the next one... perhaps we should return the error here in the future?
+		}
+
+		a.log.Debug(fmt.Sprintf("drained subscription to subject %s associated with agent client %s", sub.Subject, a.agentID))
+	}
+
+	return nil
 }
 
 func (a *AgentClient) Undeploy() error {

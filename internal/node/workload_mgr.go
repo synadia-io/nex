@@ -269,7 +269,7 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	deployRequest, err := w.procMan.Lookup(id)
 	if err != nil {
 		w.log.Warn("request to undeploy workload failed", slog.String("workload_id", id), slog.String("error", err.Error()))
-		return nil
+		return err
 	}
 
 	mutex := w.stopMutex[id]
@@ -289,6 +289,7 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 
 	if deployRequest != nil && undeploy {
 		agentClient := w.activeAgents[id]
+		defer agentClient.Drain()
 
 		err := agentClient.Undeploy()
 		if err != nil {

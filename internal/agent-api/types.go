@@ -12,9 +12,6 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-// Agent handshake subject
-const NexAgentSubjectHandshake = "agentint.handshake"
-
 // Executable Linkable Format execution provider
 const NexExecutionProviderELF = "elf"
 
