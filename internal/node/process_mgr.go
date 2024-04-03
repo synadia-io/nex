@@ -1,8 +1,6 @@
 package nexnode
 
 import (
-	"net"
-
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -11,45 +9,39 @@ import (
 // (e.g. firecracker) is employed. Note that agent processes are created asynchronously -before- any
 // workloads are deployed to them, so a workload manager can never explicitly tell a process manager
 // to create an individual process
-type ProcessManager interface { // FIXME-- rename to AgentManager?
+type ProcessManager interface {
 	// Returns a list of agent processes in an implementation-agnostic format
-	// FIXME-- rename to ListRunning()?
-	ListProcesses() ([]AgentInfo, error)
+	ListProcesses() ([]ProcessInfo, error)
 
-	// Returns a list of pooled agent processes in an implementation-agnostic format
-	// FIXME-- rename to ListWarm()?
-	ListPool() ([]AgentInfo, error)
-
-	// Lookup a deploy request by agent id. Returns nil when attempting to lookup an "unprepared" workload
-	Lookup(agentID string) (*agentapi.DeployRequest, error)
+	// Lookup a deploy request by id. Returns nil when attempting to lookup an "unprepared" workload
+	Lookup(id string) (*agentapi.DeployRequest, error)
 
 	// Associate a deploy request with the given workload id, and perform any
 	// just in time initialization of resources if necessary
-	PrepareWorkload(agentID string, request *agentapi.DeployRequest) error
+	PrepareWorkload(id string, request *agentapi.DeployRequest) error
 
 	// Start the process manager and allocate a pool of agents based on an implementation-specific
-	// strategy, delegating callbacks to the given process subscriber
-	Start(delegate AgentDelegate) error
+	// strategy, delegating callbacks to the given delegate
+	Start(delegate ProcessDelegate) error
 
 	// Stop the process manager and gracefully shutdown all agents in the pool
 	Stop() error
 
 	// Terminate a running agent process with the given ID
-	StopProcess(agentID string) error
+	StopProcess(id string) error
 }
 
-// An agent delegate is any struct that wishes to be notified when the configured agent process
+// An process delegate is any struct that wishes to be notified when the configured agent process
 // manager has successfully started an agent
-type AgentDelegate interface {
-	// Indicates that an agent with the given id has been started and is ready to be "prepared" for workload deployment
-	OnAgentStarted(agentID string)
+type ProcessDelegate interface {
+	// Indicates that an agent process with the given id has been started and is ready to be "prepared" for workload deployment
+	OnProcessStarted(id string)
 }
 
 // Information about an agent process without regard to the implementation of the agent process manager
-type AgentInfo struct {
+type ProcessInfo struct {
 	DeployRequest *agentapi.DeployRequest
 	ID            string
-	IP            *net.IP
 	Name          string
 	Namespace     string
 }

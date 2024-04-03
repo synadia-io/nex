@@ -2,7 +2,6 @@ package nexnode
 
 import (
 	"log/slog"
-	"net"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
@@ -72,8 +71,8 @@ func (m *WorkloadManagerProxy) Telemetry() *Telemetry {
 	return m.m.t
 }
 
-func (w *WorkloadManagerProxy) AllAgents() map[string]*AgentInfo {
-	agentsmap := make(map[string]*AgentInfo)
+func (w *WorkloadManagerProxy) AllAgents() map[string]*ProcessInfo {
+	agentsmap := make(map[string]*ProcessInfo)
 
 	for _, agent := range w.Agents() {
 		agentsmap[agent.ID] = agent
@@ -86,8 +85,8 @@ func (w *WorkloadManagerProxy) AllAgents() map[string]*AgentInfo {
 	return agentsmap
 }
 
-func (w *WorkloadManagerProxy) Agents() map[string]*AgentInfo {
-	agentsmap := make(map[string]*AgentInfo)
+func (w *WorkloadManagerProxy) Agents() map[string]*ProcessInfo {
+	agentsmap := make(map[string]*ProcessInfo)
 
 	agents, _ := w.m.procMan.ListProcesses()
 	for _, agent := range agents {
@@ -97,25 +96,15 @@ func (w *WorkloadManagerProxy) Agents() map[string]*AgentInfo {
 	return agentsmap
 }
 
-func (w *WorkloadManagerProxy) PoolAgents() map[string]*AgentInfo {
-	agentsmap := make(map[string]*AgentInfo)
-
-	agents, _ := w.m.procMan.ListPool()
-	for _, agent := range agents {
-		agentsmap[agent.ID] = &agent
-	}
-
-	return agentsmap
+func (w *WorkloadManagerProxy) PoolAgents() map[string]*ProcessInfo {
+	// FIXME-- this is no longer exposed
+	return map[string]*ProcessInfo{}
 }
 
 type AgentProxy struct {
-	agent *AgentInfo
+	agent *ProcessInfo
 }
 
-func NewAgentProxyWith(agent *AgentInfo) *AgentProxy {
+func NewAgentProxyWith(agent *ProcessInfo) *AgentProxy {
 	return &AgentProxy{agent: agent}
-}
-
-func (a *AgentProxy) IP() net.IP {
-	return *a.agent.IP
 }

@@ -153,8 +153,8 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 		return nil, fmt.Errorf("failed to deploy workload: %s", err)
 	}
 
-	agentID := agentClient.ID()
-	err = w.procMan.PrepareWorkload(agentID, request)
+	workloadID := agentClient.ID()
+	err = w.procMan.PrepareWorkload(workloadID, request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare agent process for workload deployment: %s", err)
 	}
@@ -162,7 +162,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 	status := w.ncInternal.Status()
 
 	w.log.Debug("Workload manager deploying workload",
-		slog.String("workload_id", agentID),
+		slog.String("workload_id", workloadID),
 		slog.String("conn_status", status.String()))
 
 	deployResponse, err := agentClient.DeployWorkload(request)
@@ -172,34 +172,34 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 
 	if deployResponse.Accepted {
 		// move the client from active to pending
-		w.activeAgents[agentID] = agentClient // FIXME-- this line and the next will race on shutdown
-		delete(w.pendingAgents, agentID)
+		w.activeAgents[workloadID] = agentClient // FIXME-- this line and the next will race on shutdown
+		delete(w.pendingAgents, workloadID)
 
 		if request.SupportsTriggerSubjects() {
 			for _, tsub := range request.TriggerSubjects {
-				sub, err := w.nc.Subscribe(tsub, w.generateTriggerHandler(agentID, tsub, request))
+				sub, err := w.nc.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
 				if err != nil {
 					w.log.Error("Failed to create trigger subject subscription for deployed workload",
-						slog.String("workload_id", agentID),
+						slog.String("workload_id", workloadID),
 						slog.String("trigger_subject", tsub),
 						slog.String("workload_type", *request.WorkloadType),
 						slog.Any("err", err),
 					)
-					_ = w.StopWorkload(agentID, true)
+					_ = w.StopWorkload(workloadID, true)
 					return nil, err
 				}
 
 				w.log.Info("Created trigger subject subscription for deployed workload",
-					slog.String("workload_id", agentID),
+					slog.String("workload_id", workloadID),
 					slog.String("trigger_subject", tsub),
 					slog.String("workload_type", *request.WorkloadType),
 				)
 
-				w.subz[agentID] = append(w.subz[agentID], sub)
+				w.subz[workloadID] = append(w.subz[workloadID], sub)
 			}
 		}
 	} else {
-		_ = w.StopWorkload(agentID, false)
+		_ = w.StopWorkload(workloadID, false)
 		return nil, fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	}
 
@@ -208,7 +208,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 	w.t.deployedByteCounter.Add(w.ctx, request.TotalBytes)
 	w.t.deployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 
-	return &agentID, nil
+	return &workloadID, nil
 }
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
@@ -309,7 +309,7 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 
 // Called by the agent process manager when an agent has been warmed and is ready
 // to receive workload deployment instructions
-func (w *WorkloadManager) OnAgentStarted(agentID string) {
+func (w *WorkloadManager) OnProcessStarted(id string) {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
@@ -323,22 +323,22 @@ func (w *WorkloadManager) OnAgentStarted(agentID string) {
 		w.agentLog,
 	)
 
-	err := agentClient.Start(agentID)
+	err := agentClient.Start(id)
 	if err != nil {
 		w.log.Error("Failed to start agent client", slog.Any("err", err))
 		return
 	}
 
-	w.pendingAgents[agentID] = agentClient
-	w.stopMutex[agentID] = &sync.Mutex{}
+	w.pendingAgents[id] = agentClient
+	w.stopMutex[id] = &sync.Mutex{}
 }
 
-func (w *WorkloadManager) agentHandshakeTimedOut(agentID string) {
+func (w *WorkloadManager) agentHandshakeTimedOut(id string) {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
-	w.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("workload_id", agentID))
-	delete(w.pendingAgents, agentID)
+	w.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("workload_id", id))
+	delete(w.pendingAgents, id)
 
 	if len(w.handshakes) == 0 {
 		w.log.Error("First handshake failed, shutting down to avoid inconsistent behavior")
@@ -346,14 +346,14 @@ func (w *WorkloadManager) agentHandshakeTimedOut(agentID string) {
 	}
 }
 
-func (w *WorkloadManager) agentHandshakeSucceeded(agentID string) {
+func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
 	now := time.Now().UTC()
-	w.handshakes[agentID] = now.Format(time.RFC3339)
+	w.handshakes[workloadID] = now.Format(time.RFC3339)
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
-func (w *WorkloadManager) generateTriggerHandler(agentID string, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
-	agentClient, ok := w.activeAgents[agentID]
+func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
+	agentClient, ok := w.activeAgents[workloadID]
 	if !ok {
 		w.log.Error("Attempted to generate trigger handler for non-existent agent client")
 		return nil
@@ -386,18 +386,18 @@ func (w *WorkloadManager) generateTriggerHandler(agentID string, tsub string, re
 				slog.Any("err", err),
 				slog.String("trigger_subject", tsub),
 				slog.String("workload_type", *request.WorkloadType),
-				slog.String("workload_id", agentID),
+				slog.String("workload_id", workloadID),
 			)
 
 			w.t.functionFailedTriggers.Add(w.ctx, 1)
 			w.t.functionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 			w.t.functionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
-			_ = w.publishFunctionExecFailed(agentID, *request.WorkloadName, tsub, err)
+			_ = w.publishFunctionExecFailed(workloadID, *request.WorkloadName, tsub, err)
 		} else if resp != nil {
 			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
 			runtimeNs := resp.Header.Get(nexRuntimeNs)
 			w.log.Debug("Received response from execution via trigger subject",
-				slog.String("workload_id", agentID),
+				slog.String("workload_id", workloadID),
 				slog.String("trigger_subject", tsub),
 				slog.String("workload_type", *request.WorkloadType),
 				slog.String("function_run_time_nanosec", runtimeNs),
@@ -408,7 +408,7 @@ func (w *WorkloadManager) generateTriggerHandler(agentID string, tsub string, re
 			if err != nil {
 				w.log.Warn("failed to log function runtime", slog.Any("err", err))
 			}
-			_ = w.publishFunctionExecSucceeded(agentID, tsub, runTimeNs64)
+			_ = w.publishFunctionExecSucceeded(workloadID, tsub, runTimeNs64)
 			parentSpan.AddEvent("published success event")
 
 			w.t.functionTriggers.Add(w.ctx, 1)
@@ -424,7 +424,7 @@ func (w *WorkloadManager) generateTriggerHandler(agentID string, tsub string, re
 				parentSpan.SetStatus(codes.Error, "Failed to respond to trigger subject")
 				parentSpan.RecordError(err)
 				w.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
-					slog.String("workload_id", agentID),
+					slog.String("workload_id", workloadID),
 					slog.String("trigger_subject", tsub),
 					slog.String("workload_type", *request.WorkloadType),
 					slog.Any("err", err),

@@ -14,7 +14,7 @@ type SpawningProcessManager struct {
 	//stopMutex map[string]*sync.Mutex
 	t *Telemetry
 
-	delegate       AgentDelegate
+	delegate       ProcessDelegate
 	deployRequests map[string]*agentapi.DeployRequest
 
 	log *slog.Logger
@@ -37,21 +37,14 @@ func NewSpawningProcessManager(
 	}, nil
 }
 
-func (s *SpawningProcessManager) ListProcesses() ([]AgentInfo, error) {
+func (s *SpawningProcessManager) ListProcesses() ([]ProcessInfo, error) {
 	//pinfos := make([]ProcessInfo, 0)
 
 	panic("Not implemented")
 	// TODO
 }
 
-func (s *SpawningProcessManager) ListPool() ([]AgentInfo, error) {
-	//pinfos := make([]ProcessInfo, 0)
-
-	panic("Not implemented")
-	// TODO
-}
-
-func (s *SpawningProcessManager) PrepareWorkload(agentID string, deployRequest *agentapi.DeployRequest) error {
+func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.DeployRequest) error {
 	panic("Not implemented")
 }
 
@@ -66,7 +59,7 @@ func (s *SpawningProcessManager) Stop() error {
 	panic("Not implemented")
 }
 
-func (s *SpawningProcessManager) Start(delegate AgentDelegate) error {
+func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 	s.delegate = delegate
 	s.log.Info("Spawning (no sandbox) process manager starting")
 
@@ -76,13 +69,13 @@ func (s *SpawningProcessManager) Start(delegate AgentDelegate) error {
 	panic("Not implemented")
 }
 
-func (s *SpawningProcessManager) StopProcess(agentID string) error {
+func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 	// TODO
 
 	panic("Not implemented")
 }
 
-func (s *SpawningProcessManager) Lookup(agentID string) (*agentapi.DeployRequest, error) {
+func (s *SpawningProcessManager) Lookup(workloadID string) (*agentapi.DeployRequest, error) {
 	// TODO
 
 	panic("Not implemented")
