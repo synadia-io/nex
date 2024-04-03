@@ -241,20 +241,7 @@ func (n *Node) init() error {
 			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 		}
 
-		// determine which process manager to load based on sandbox config value
-		var procMan ProcessManager
-		if n.config.NoSandbox {
-			n.log.Warn("⚠️ Sandboxing has been disabled! Workloads should be considered unsafe!")
-			n.log.Warn("⚠️ Make sure this is the behavior you wanted and you are in an appropriate environment")
-			procMan, err = NewSpawningProcessManager(n.log, n.config, n.telemetry, n.ctx)
-		} else {
-			procMan, err = NewFirecrackerProcessManager(n.log, n.config, n.telemetry, n.ctx)
-		}
-		if err != nil {
-			n.log.Error("Failed to create process manager", slog.Any("error", err))
-		}
-
-		n.manager, err = NewWorkloadManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry, procMan)
+		n.manager, err = NewWorkloadManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
 		}

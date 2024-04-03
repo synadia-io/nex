@@ -8,17 +8,14 @@ import (
 )
 
 type SpawningProcessManager struct {
+	//closing uint32
 	config *NodeConfiguration
-
-	procNotifier ProcessSubscriber
-
-	ctx context.Context
+	ctx    context.Context
 	//stopMutex map[string]*sync.Mutex
 	t *Telemetry
 
+	delegate       AgentDelegate
 	deployRequests map[string]*agentapi.DeployRequest
-
-	//closing uint32
 
 	log *slog.Logger
 }
@@ -40,14 +37,21 @@ func NewSpawningProcessManager(
 	}, nil
 }
 
-func (s *SpawningProcessManager) ListProcesses() ([]ProcessInfo, error) {
+func (s *SpawningProcessManager) ListProcesses() ([]AgentInfo, error) {
 	//pinfos := make([]ProcessInfo, 0)
 
 	panic("Not implemented")
 	// TODO
 }
 
-func (s *SpawningProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.DeployRequest) error {
+func (s *SpawningProcessManager) ListPool() ([]AgentInfo, error) {
+	//pinfos := make([]ProcessInfo, 0)
+
+	panic("Not implemented")
+	// TODO
+}
+
+func (s *SpawningProcessManager) PrepareWorkload(agentID string, deployRequest *agentapi.DeployRequest) error {
 	panic("Not implemented")
 }
 
@@ -62,8 +66,8 @@ func (s *SpawningProcessManager) Stop() error {
 	panic("Not implemented")
 }
 
-func (s *SpawningProcessManager) Start(procNotifier ProcessSubscriber) error {
-	s.procNotifier = procNotifier
+func (s *SpawningProcessManager) Start(delegate AgentDelegate) error {
+	s.delegate = delegate
 	s.log.Info("Spawning (no sandbox) process manager starting")
 
 	// // TODO
@@ -72,13 +76,13 @@ func (s *SpawningProcessManager) Start(procNotifier ProcessSubscriber) error {
 	panic("Not implemented")
 }
 
-func (s *SpawningProcessManager) StopProcess(workloadId string) error {
+func (s *SpawningProcessManager) StopProcess(agentID string) error {
 	// TODO
 
 	panic("Not implemented")
 }
 
-func (s *SpawningProcessManager) Lookup(workloadId string) (*agentapi.DeployRequest, error) {
+func (s *SpawningProcessManager) Lookup(agentID string) (*agentapi.DeployRequest, error) {
 	// TODO
 
 	panic("Not implemented")

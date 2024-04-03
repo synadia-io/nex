@@ -87,6 +87,10 @@ type DeployRequest struct {
 	Errors []error `json:"errors,omitempty"`
 }
 
+func (request *DeployRequest) IsEssential() bool {
+	return request.Essential != nil && *request.Essential
+}
+
 // Returns true if the run request supports essential flag
 func (request *DeployRequest) SupportsEssential() bool {
 	return strings.EqualFold(*request.WorkloadType, "elf") ||

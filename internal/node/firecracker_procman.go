@@ -18,21 +18,18 @@ import (
 )
 
 type FirecrackerProcessManager struct {
-	allVMs  map[string]*runningFirecracker
-	warmVMs chan *runningFirecracker
-	config  *NodeConfiguration
-
-	procNotifier ProcessSubscriber
-
+	closing   uint32
+	config    *NodeConfiguration
 	ctx       context.Context
+	log       *slog.Logger
 	stopMutex map[string]*sync.Mutex
 	t         *Telemetry
 
+	allVMs  map[string]*runningFirecracker
+	warmVMs chan *runningFirecracker
+
+	delegate       AgentDelegate
 	deployRequests map[string]*agentapi.DeployRequest
-
-	closing uint32
-
-	log *slog.Logger
 }
 
 func NewFirecrackerProcessManager(
@@ -41,7 +38,6 @@ func NewFirecrackerProcessManager(
 	telemetry *Telemetry,
 	ctx context.Context,
 ) (*FirecrackerProcessManager, error) {
-
 	return &FirecrackerProcessManager{
 		config: config,
 		t:      telemetry,
@@ -55,25 +51,15 @@ func NewFirecrackerProcessManager(
 	}, nil
 }
 
-func (f *FirecrackerProcessManager) ListProcesses() ([]ProcessInfo, error) {
-	pinfos := make([]ProcessInfo, 0)
-
-	for workloadId, vm := range f.allVMs {
-		// Ignore "pending" processes that don't have workloads on them yet
-		if vm.deployRequest != nil {
-			pinfo := ProcessInfo{
-				ID:              workloadId,
-				Name:            *vm.deployRequest.WorkloadName,
-				Namespace:       *vm.deployRequest.Namespace,
-				OriginalRequest: vm.deployRequest,
-			}
-			pinfos = append(pinfos, pinfo)
-		}
-	}
-
-	return pinfos, nil
+func (f *FirecrackerProcessManager) ListProcesses() ([]AgentInfo, error) {
+	return f.listAgents(false)
 }
 
+func (f *FirecrackerProcessManager) ListPool() ([]AgentInfo, error) {
+	return f.listAgents(true)
+}
+
+// Preparing a workload reads from the warmVMs channel
 func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.DeployRequest) error {
 	vm := <-f.warmVMs
 	if vm == nil {
@@ -102,7 +88,7 @@ func (f *FirecrackerProcessManager) Stop() error {
 		for vmID := range f.allVMs {
 			err := f.StopProcess(vmID)
 			if err != nil {
-				f.log.Warn("Failed to stop firecracker process", slog.String("workloadId", vmID), slog.String("error", err.Error()))
+				f.log.Warn("Failed to stop firecracker process", slog.String("workload_id", vmID), slog.String("error", err.Error()))
 			}
 		}
 
@@ -112,9 +98,9 @@ func (f *FirecrackerProcessManager) Stop() error {
 	return nil
 }
 
-func (f *FirecrackerProcessManager) Start(procNotifier ProcessSubscriber) error {
-	f.procNotifier = procNotifier
+func (f *FirecrackerProcessManager) Start(delegate AgentDelegate) error {
 	f.log.Info("Firecracker VM process manager starting")
+	f.delegate = delegate
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -155,7 +141,7 @@ func (f *FirecrackerProcessManager) Start(procNotifier ProcessSubscriber) error 
 			f.stopMutex[vm.vmmID] = &sync.Mutex{}
 			f.t.vmCounter.Add(f.ctx, 1)
 
-			go f.procNotifier.OnProcessReady(vm.vmmID)
+			go f.delegate.OnAgentStarted(vm.vmmID)
 
 			f.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 			f.warmVMs <- vm // If the pool is full, this line will block until a slot is available.
@@ -165,24 +151,23 @@ func (f *FirecrackerProcessManager) Start(procNotifier ProcessSubscriber) error 
 	return nil
 }
 
-func (f *FirecrackerProcessManager) StopProcess(workloadId string) error {
-	vm, exists := f.allVMs[workloadId]
+func (f *FirecrackerProcessManager) StopProcess(agentID string) error {
+	vm, exists := f.allVMs[agentID]
 	if !exists {
-		return fmt.Errorf("failed to stop machine %s", workloadId)
+		return fmt.Errorf("failed to stop machine %s", agentID)
 	}
 
-	delete(f.deployRequests, workloadId)
+	delete(f.deployRequests, agentID)
 
-	mutex := f.stopMutex[workloadId]
+	mutex := f.stopMutex[agentID]
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	f.log.Debug("Attempting to stop virtual machine", slog.String("workloadId", workloadId))
+	f.log.Debug("Attempting to stop virtual machine", slog.String("workload_id", agentID))
 
 	vm.shutdown()
-
-	delete(f.allVMs, workloadId)
-	delete(f.stopMutex, workloadId)
+	delete(f.allVMs, agentID)
+	delete(f.stopMutex, agentID)
 
 	if vm.deployRequest != nil {
 		f.t.workloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
@@ -200,11 +185,12 @@ func (f *FirecrackerProcessManager) StopProcess(workloadId string) error {
 	return nil
 }
 
-func (f *FirecrackerProcessManager) Lookup(workloadId string) (*agentapi.DeployRequest, error) {
-	if request, ok := f.deployRequests[workloadId]; ok {
+func (f *FirecrackerProcessManager) Lookup(agentID string) (*agentapi.DeployRequest, error) {
+	if request, ok := f.deployRequests[agentID]; ok {
 		return request, nil
 	}
-	return nil, fmt.Errorf("no such workload: %s", workloadId)
+
+	return nil, fmt.Errorf("no such agent: %s", agentID)
 }
 
 func (f *FirecrackerProcessManager) resetCNI() error {
@@ -245,6 +231,36 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 			os.Remove(path.Join([]string{"tmp", d.Name()}...))
 		}
 	}
+}
+
+// Return a list of managed agents; returns pooled agents when pending is true
+func (f *FirecrackerProcessManager) listAgents(pending bool) ([]AgentInfo, error) {
+	pinfos := make([]AgentInfo, 0)
+
+	for agentID, vm := range f.allVMs {
+		filter := !(vm.deployRequest != nil) // by default, filter "pending" agents, e.g., warm agents that do not yet have a deployed workload
+		if pending {
+			// only return pooled agents, e.g., agents that do not yet have a deployed workload
+			filter = !(vm.deployRequest == nil)
+		}
+
+		if !filter {
+			pinfo := AgentInfo{
+				ID:            agentID,
+				IP:            &vm.ip,
+				DeployRequest: vm.deployRequest,
+			}
+
+			if vm.deployRequest != nil {
+				pinfo.Name = *vm.deployRequest.WorkloadName
+				pinfo.Namespace = *vm.deployRequest.Namespace
+			}
+
+			pinfos = append(pinfos, pinfo)
+		}
+	}
+
+	return pinfos, nil
 }
 
 func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
