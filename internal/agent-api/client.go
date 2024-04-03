@@ -29,7 +29,7 @@ const (
 type AgentClient struct {
 	nc                *nats.Conn
 	log               *slog.Logger
-	workloadID        string
+	agentID           string
 	handshakeTimeout  time.Duration
 	handshakeReceived *atomic.Bool
 
@@ -62,29 +62,29 @@ func NewAgentClient(
 
 // Returns the ID of this agent client, which corresponds to a workload process identifier
 func (a *AgentClient) ID() string {
-	return a.workloadID
+	return a.agentID
 }
 
-func (a *AgentClient) Start(workloadID string) error {
-	a.log.Info("Agent client starting", slog.String("workloadId", workloadID))
-	a.workloadID = workloadID
+func (a *AgentClient) Start(agentID string) error {
+	a.log.Info("Agent client starting", slog.String("workloadId", agentID))
+	a.agentID = agentID
 
 	_, err := a.nc.Subscribe("agentint.handshake", a.handleHandshake)
 	if err != nil {
 		return err
 	}
 
-	_, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.events.*", workloadID), a.handleAgentEvent)
+	_, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.events.*", agentID), a.handleAgentEvent)
 	if err != nil {
 		return err
 	}
 
-	_, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.logs", workloadID), a.handleAgentLog)
+	_, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.logs", agentID), a.handleAgentLog)
 	if err != nil {
 		return err
 	}
 
-	go a.awaitHandshake(workloadID)
+	go a.awaitHandshake(agentID)
 
 	return nil
 }
@@ -97,10 +97,10 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 
 	status := a.nc.Status()
 	a.log.Debug("NATS internal connection status",
-		slog.String("workload_id", a.workloadID),
+		slog.String("workload_id", a.agentID),
 		slog.String("status", status.String()))
 
-	subject := fmt.Sprintf("agentint.%s.deploy", a.workloadID)
+	subject := fmt.Sprintf("agentint.%s.deploy", a.agentID)
 	resp, err := a.nc.Request(subject, bytes, 1*time.Second)
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
@@ -120,17 +120,17 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 }
 
 func (a *AgentClient) Undeploy() error {
-	subject := fmt.Sprintf("agentint.%s.undeploy", a.workloadID)
+	subject := fmt.Sprintf("agentint.%s.undeploy", a.agentID)
 	_, err := a.nc.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
 	if err != nil {
-		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("workload_id", a.workloadID), slog.String("error", err.Error()))
+		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("workload_id", a.agentID), slog.String("error", err.Error()))
 		return err
 	}
 	return nil
 }
 
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
-	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.workloadID))
+	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
 	// TODO: inject tracer context into message header
 	intmsg.Header.Add(nexTriggerSubject, subject)
 	intmsg.Data = data
@@ -151,10 +151,10 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 	return resp, err
 }
 
-func (a *AgentClient) awaitHandshake(workloadID string) {
+func (a *AgentClient) awaitHandshake(agentID string) {
 	<-time.After(a.handshakeTimeout)
 	if !a.handshakeReceived.Load() {
-		a.handshakeTimedOut(workloadID)
+		a.handshakeTimedOut(agentID)
 	}
 }
 
@@ -181,9 +181,9 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 }
 
 func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
-	// agentint.{workloadID}.events.{type}
+	// agentint.{agentID}.events.{type}
 	tokens := strings.Split(msg.Subject, ".")
-	workloadID := tokens[1]
+	agentID := tokens[1]
 
 	var evt cloudevents.Event
 	err := json.Unmarshal(msg.Data, &evt)
@@ -192,13 +192,13 @@ func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Info("Received agent event", slog.String("workload_id", workloadID), slog.String("type", evt.Type()))
-	a.eventReceived(workloadID, evt)
+	a.log.Info("Received agent event", slog.String("workload_id", agentID), slog.String("type", evt.Type()))
+	a.eventReceived(agentID, evt)
 }
 
 func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 	tokens := strings.Split(msg.Subject, ".")
-	workloadID := tokens[1]
+	agentID := tokens[1]
 
 	var logentry LogEntry
 	err := json.Unmarshal(msg.Data, &logentry)
@@ -207,6 +207,6 @@ func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Debug("Received agent log", slog.String("workload_id", workloadID), slog.String("log", logentry.Text))
-	a.logReceived(workloadID, logentry)
+	a.log.Debug("Received agent log", slog.String("workload_id", agentID), slog.String("log", logentry.Text))
+	a.logReceived(agentID, logentry)
 }
