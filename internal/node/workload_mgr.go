@@ -148,6 +148,9 @@ func (w *WorkloadManager) Start() {
 // Deploy a workload as specified by the given deploy request to an available
 // agent in the configured pool
 func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*string, error) {
+	w.poolMutex.Lock()
+	defer w.poolMutex.Unlock()
+
 	agentClient, err := w.selectRandomAgent()
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy workload: %s", err)
@@ -172,7 +175,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 
 	if deployResponse.Accepted {
 		// move the client from active to pending
-		w.activeAgents[workloadID] = agentClient // FIXME-- this line and the next will race on shutdown
+		w.activeAgents[workloadID] = agentClient
 		delete(w.pendingAgents, workloadID)
 
 		if request.SupportsTriggerSubjects() {
@@ -436,9 +439,6 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 
 // Picks a pending agent from the pool that will receive the next deployment
 func (w *WorkloadManager) selectRandomAgent() (*agentapi.AgentClient, error) {
-	w.poolMutex.Lock()
-	defer w.poolMutex.Unlock()
-
 	if len(w.pendingAgents) == 0 {
 		return nil, errors.New("no available agent client in pool")
 	}
