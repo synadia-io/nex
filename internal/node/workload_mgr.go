@@ -289,7 +289,9 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 
 	if deployRequest != nil && undeploy {
 		agentClient := w.activeAgents[id]
-		defer agentClient.Drain()
+		defer func() {
+			_ = agentClient.Drain()
+		}()
 
 		err := agentClient.Undeploy()
 		if err != nil {
