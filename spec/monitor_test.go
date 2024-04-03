@@ -100,7 +100,7 @@ var _ = Describe("log monitor", func() {
 		ch, err = client.MonitorLogs("*", "*", "*", "*", 0)
 		Expect(err).To(BeNil())
 
-		raw = RawLog{Text: "hey from test", Level: slog.LevelDebug, MachineId: "vm1234"}
+		raw = RawLog{Text: "hey from test", Level: slog.LevelDebug, ID: "vm1234"}
 		bytes, _ := json.Marshal(raw)
 
 		_ = nc.Publish("$NEX.logs.default.Nxxxx.echoservice.vm1234", bytes)
@@ -120,7 +120,7 @@ var _ = Describe("log monitor", func() {
 	})
 
 	It("includes the machine id", func(ctx SpecContext) {
-		Expect(subject.MachineId).To(Equal("vm1234"))
+		Expect(subject.ID).To(Equal("vm1234"))
 	})
 
 	It("wraps the raw on the wire log", func(ctx SpecContext) {

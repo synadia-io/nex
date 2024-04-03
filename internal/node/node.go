@@ -33,7 +33,7 @@ const runloopTickInterval = 2500 * time.Millisecond
 // Nex node process
 type Node struct {
 	api     *ApiListener
-	manager *MachineManager
+	manager *WorkloadManager
 
 	cancelF context.CancelFunc
 	closing uint32
@@ -233,19 +233,17 @@ func (n *Node) init() error {
 		}
 
 		// init internal NATS server
-		err = n.initInternalNATS()
+		err = n.startInternalNATS()
 		if err != nil {
-			n.log.Error("Failed to initialize internal NATS server", slog.Any("err", err))
-			err = fmt.Errorf("failed to initialize internal NATS server: %s", err)
+			n.log.Error("Failed to start internal NATS server", slog.Any("err", err))
+			err = fmt.Errorf("failed to start internal NATS server: %s", err)
 		} else {
 			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 		}
 
-		// init machine manager
-		n.manager, err = NewMachineManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		n.manager, err = NewWorkloadManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
-			err = fmt.Errorf("failed to initialize machine manager: %s", err)
 		}
 
 		go n.manager.Start()
@@ -255,7 +253,6 @@ func (n *Node) init() error {
 		err = n.api.Start()
 		if err != nil {
 			n.log.Error("Failed to start API listener", slog.Any("err", err))
-			err = fmt.Errorf("failed to start node API: %s", err)
 		}
 
 		n.installSignalHandlers()
@@ -264,7 +261,7 @@ func (n *Node) init() error {
 	return err
 }
 
-func (n *Node) initInternalNATS() error {
+func (n *Node) startInternalNATS() error {
 	var err error
 
 	n.natsint, err = server.NewServer(&server.Options{

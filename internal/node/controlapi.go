@@ -20,13 +20,13 @@ import (
 // The API listener is the command and control interface for the node server
 type ApiListener struct {
 	node  *Node
-	mgr   *MachineManager
+	mgr   *WorkloadManager
 	log   *slog.Logger
 	start time.Time
 	xk    nkeys.KeyPair
 }
 
-func NewApiListener(log *slog.Logger, mgr *MachineManager, node *Node) *ApiListener {
+func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiListener {
 	config := node.config
 
 	efftags := config.Tags
@@ -107,16 +107,23 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 		return
 	}
 
-	vm := api.mgr.LookupMachine(request.WorkloadId)
-	if vm == nil {
-		api.log.Error("Stop request: no such workload", slog.String("vmid", request.WorkloadId))
+	deployRequest, _ := api.mgr.LookupWorkload(request.WorkloadId)
+	if deployRequest == nil {
+		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadId))
 		respondFail(controlapi.StopResponseType, m, "No such workload")
 		return
 	}
 
-	if vm.namespace != namespace {
+	err = request.Validate(&deployRequest.DecodedClaims)
+	if err != nil {
+		api.log.Error("Failed to validate stop request", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
+		return
+	}
+
+	if *deployRequest.Namespace != namespace {
 		api.log.Error("Namespace mismatch on workload stop request",
-			slog.String("namespace", vm.namespace),
+			slog.String("namespace", *deployRequest.Namespace),
 			slog.String("targetnamespace", namespace),
 		)
 
@@ -124,24 +131,17 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 		return
 	}
 
-	err = request.Validate(&vm.deployRequest.DecodedClaims)
-	if err != nil {
-		api.log.Error("Failed to validate stop request", slog.Any("err", err))
-		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
-		return
-	}
-
-	err = api.mgr.StopMachine(request.WorkloadId, true)
+	err = api.mgr.StopWorkload(request.WorkloadId, true)
 	if err != nil {
 		api.log.Error("Failed to stop workload", slog.Any("err", err))
 		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
 	}
 
 	res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
-		Stopped:   true,
-		Name:      vm.deployRequest.DecodedClaims.Subject,
-		Issuer:    vm.deployRequest.DecodedClaims.Issuer,
-		MachineId: vm.vmmID,
+		Stopped: true,
+		Name:    deployRequest.DecodedClaims.Subject,
+		Issuer:  deployRequest.DecodedClaims.Issuer,
+		ID:      request.WorkloadId,
 	}, nil)
 	raw, err := json.Marshal(res)
 	if err != nil {
@@ -208,27 +208,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	runningVM := <-api.mgr.warmVMs
-	if _, ok := api.mgr.handshakes[runningVM.vmmID]; !ok {
-		api.log.Error("Attempted to deploy workload into bad VM (no handshake)",
-			slog.String("vmmid", runningVM.vmmID),
-		)
-		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, VM from pool did not initialize properly")
-		return
-	}
-	workloadName := request.DecodedClaims.Subject
-
-	api.log.
-		Info("Submitting workload to VM",
-			slog.String("agentId", runningVM.vmmID),
-			slog.String("namespace", namespace),
-			slog.String("workload", workloadName),
-			slog.Uint64("workload_size", numBytes),
-			slog.String("workload_sha256", *workloadHash),
-			slog.String("type", *request.WorkloadType),
-		)
-
-	err = api.mgr.DeployWorkload(runningVM, &agentapi.DeployRequest{
+	deployRequest := &agentapi.DeployRequest{
 		Argv:                 request.Argv,
 		DecodedClaims:        request.DecodedClaims,
 		Description:          request.Description,
@@ -245,24 +225,51 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		TargetNode:           request.TargetNode,
 		TotalBytes:           int64(numBytes),
 		TriggerSubjects:      request.TriggerSubjects,
-		WorkloadName:         &workloadName,
+		WorkloadName:         &request.DecodedClaims.Subject,
 		WorkloadType:         request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
 		WorkloadJwt:          request.WorkloadJwt,
-	})
+	}
+
+	api.log.
+		Info("Submitting workload to agent",
+			slog.String("namespace", namespace),
+			slog.String("workload", *deployRequest.WorkloadName),
+			slog.Uint64("workload_size", numBytes),
+			slog.String("workload_sha256", *workloadHash),
+			slog.String("type", *request.WorkloadType),
+		)
+
+	workloadID, err := api.mgr.DeployWorkload(deployRequest)
+	if err != nil {
+		api.log.Error("Failed to deploy workload",
+			slog.String("error", err.Error()),
+		)
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to deploy workload: %s", err))
+		return
+	}
+
+	if _, ok := api.mgr.handshakes[*workloadID]; !ok {
+		api.log.Error("Attempted to deploy workload into bad process (no handshake)",
+			slog.String("workload_id", *workloadID),
+		)
+		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, agent pool did not initialize properly")
+		return
+	}
+	workloadName := request.DecodedClaims.Subject
 
 	if err != nil {
-		api.log.Error("Failed to deploy workload in VM", slog.Any("err", err), slog.String("agentId", runningVM.vmmID))
+		api.log.Error("Failed to deploy workload to agent", slog.Any("err", err), slog.String("workload_id", *workloadID))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deploy workload: %s", err))
 		return
 	}
 
-	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("vmid", runningVM.vmmID))
+	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("workload_id", *workloadID))
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
-		Started:   true,
-		Name:      workloadName,
-		Issuer:    runningVM.deployRequest.DecodedClaims.Issuer,
-		MachineId: runningVM.vmmID,
+		Started: true,
+		Name:    workloadName,
+		Issuer:  request.DecodedClaims.Issuer,
+		ID:      *workloadID, // FIXME-- rename to match
 	}, nil)
 
 	raw, err := json.Marshal(res)
@@ -275,11 +282,17 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 func (api *ApiListener) handlePing(m *nats.Msg) {
 	now := time.Now().UTC()
+	machines, err := api.mgr.RunningWorkloads()
+	if err != nil {
+		api.log.Error("Failed to query running machines", slog.Any("error", err))
+		respondFail(controlapi.PingResponseType, m, "Failed to query running machines on node")
+		return
+	}
 	res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
 		NodeId:          api.PublicKey(),
 		Version:         Version(),
 		Uptime:          myUptime(now.Sub(api.start)),
-		RunningMachines: len(api.mgr.allVMs) - len(api.mgr.warmVMs),
+		RunningMachines: len(machines),
 		Tags:            api.node.config.Tags,
 	}, nil)
 
@@ -299,6 +312,13 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 		return
 	}
 
+	machines, err := api.mgr.RunningWorkloads()
+	if err != nil {
+		api.log.Error("Failed to query running machines", slog.Any("error", err))
+		respondFail(controlapi.PingResponseType, m, "Failed to query running machines on node")
+		return
+	}
+
 	pubX, _ := api.xk.PublicKey()
 	now := time.Now().UTC()
 	stats, _ := ReadMemoryStats()
@@ -308,7 +328,7 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 		Uptime:                 myUptime(now.Sub(api.start)),
 		Tags:                   api.node.config.Tags,
 		SupportedWorkloadTypes: api.node.config.WorkloadTypes,
-		Machines:               summarizeMachines(&api.mgr.allVMs, namespace),
+		Machines:               summarizeMachines(machines, namespace),
 		Memory:                 stats,
 	}, nil)
 
@@ -320,39 +340,49 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 	}
 }
 
-func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []controlapi.MachineSummary {
+func summarizeMachines(workloads []controlapi.MachineSummary, namespace string) []controlapi.MachineSummary {
 	machines := make([]controlapi.MachineSummary, 0)
-	now := time.Now().UTC()
-	for _, v := range *vms {
-		if v.namespace == namespace {
-			var desc string
-			if v.deployRequest.Description != nil {
-				desc = *v.deployRequest.Description // FIXME-- audit controlapi.WorkloadSummary
-			}
-
-			var workloadType string
-			if v.deployRequest.WorkloadType != nil {
-				workloadType = *v.deployRequest.WorkloadType
-			}
-
-			machine := controlapi.MachineSummary{
-				Id:      v.vmmID,
-				Healthy: true, // TODO cache last health status
-				Uptime:  myUptime(now.Sub(v.machineStarted)),
-				Workload: controlapi.WorkloadSummary{
-					Name:         v.deployRequest.DecodedClaims.Subject,
-					Description:  desc,
-					Runtime:      myUptime(now.Sub(v.workloadStarted)),
-					WorkloadType: workloadType,
-					//Hash:         v.deployedWorkload.DecodedClaims.Data["hash"].(string),
-				},
-			}
-
-			machines = append(machines, machine)
+	for _, w := range workloads {
+		if w.Namespace == namespace {
+			machines = append(machines, w)
 		}
 	}
 	return machines
 }
+
+// func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []controlapi.MachineSummary {
+// 	machines := make([]controlapi.MachineSummary, 0)
+// 	now := time.Now().UTC()
+// 	for _, v := range *vms {
+// 		if v.namespace == namespace {
+// 			var desc string
+// 			if v.deployRequest.Description != nil {
+// 				desc = *v.deployRequest.Description // FIXME-- audit controlapi.WorkloadSummary
+// 			}
+
+// 			var workloadType string
+// 			if v.deployRequest.WorkloadType != nil {
+// 				workloadType = *v.deployRequest.WorkloadType
+// 			}
+
+// 			machine := controlapi.MachineSummary{
+// 				Id:      v.vmmID,
+// 				Healthy: true, // TODO cache last health status
+// 				Uptime:  myUptime(now.Sub(v.machineStarted)),
+// 				Workload: controlapi.WorkloadSummary{
+// 					Name:         v.deployRequest.DecodedClaims.Subject,
+// 					Description:  desc,
+// 					Runtime:      myUptime(now.Sub(v.workloadStarted)),
+// 					WorkloadType: workloadType,
+// 					//Hash:         v.deployedWorkload.DecodedClaims.Data["hash"].(string),
+// 				},
+// 			}
+
+// 			machines = append(machines, machine)
+// 		}
+// 	}
+// 	return machines
+// }
 
 func validateIssuer(issuer string, validIssuers []string) bool {
 	if len(validIssuers) == 0 {

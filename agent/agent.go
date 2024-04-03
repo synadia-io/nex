@@ -142,13 +142,13 @@ func (a *Agent) Start() {
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) requestHandshake() error {
 	msg := agentapi.HandshakeRequest{
-		MachineID: a.md.VmID,
+		ID:        a.md.VmID,
 		StartTime: a.started,
 		Message:   a.md.Message,
 	}
 	raw, _ := json.Marshal(msg)
 
-	resp, err := a.nc.Request(agentapi.NexAgentSubjectHandshake, raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+	resp, err := a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
 		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
 		return err
@@ -247,8 +247,9 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if !request.Validate() {
-		_ = a.workAck(m, false, fmt.Sprintf("%v", request.Errors)) // FIXME-- this message can be formatted prettier
+	err = request.Validate()
+	if err != nil {
+		_ = a.workAck(m, false, fmt.Sprintf("%v", err)) // FIXME-- this message can be formatted prettier
 		return
 	}
 

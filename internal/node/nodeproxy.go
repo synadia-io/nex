@@ -2,7 +2,6 @@ package nexnode
 
 import (
 	"log/slog"
-	"net"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
@@ -24,7 +23,7 @@ func (n *NodeProxy) APIListener() *ApiListener {
 	return n.n.api
 }
 
-func (n *NodeProxy) MachineManager() *MachineManager {
+func (n *NodeProxy) WorkloadManager() *WorkloadManager {
 	return n.n.manager
 }
 
@@ -48,46 +47,64 @@ func (n *NodeProxy) Telemetry() *Telemetry {
 	return n.n.telemetry
 }
 
-type MachineManagerProxy struct {
-	m *MachineManager
+type WorkloadManagerProxy struct {
+	m *WorkloadManager
 }
 
-func NewMachineManagerProxyWith(manager *MachineManager) *MachineManagerProxy {
-	return &MachineManagerProxy{m: manager}
+func NewWorkloadManagerProxyWith(manager *WorkloadManager) *WorkloadManagerProxy {
+	return &WorkloadManagerProxy{m: manager}
 }
 
-func (m *MachineManagerProxy) Log() *slog.Logger {
+func (m *WorkloadManagerProxy) Log() *slog.Logger {
 	return m.m.log
 }
 
-func (m *MachineManagerProxy) NodeConfiguration() *NodeConfiguration {
+func (m *WorkloadManagerProxy) NodeConfiguration() *NodeConfiguration {
 	return m.m.config
 }
 
-func (m *MachineManagerProxy) InternalNATSConn() *nats.Conn {
+func (m *WorkloadManagerProxy) InternalNATSConn() *nats.Conn {
 	return m.m.ncInternal
 }
 
-func (m *MachineManagerProxy) Telemetry() *Telemetry {
+func (m *WorkloadManagerProxy) Telemetry() *Telemetry {
 	return m.m.t
 }
 
-func (m *MachineManagerProxy) VMs() map[string]*runningFirecracker {
-	return m.m.allVMs
+func (w *WorkloadManagerProxy) AllAgents() map[string]*ProcessInfo {
+	agentsmap := make(map[string]*ProcessInfo)
+
+	for _, agent := range w.Agents() {
+		agentsmap[agent.ID] = agent
+	}
+
+	for _, agent := range w.PoolAgents() {
+		agentsmap[agent.ID] = agent
+	}
+
+	return agentsmap
 }
 
-func (m *MachineManagerProxy) PoolVMs() chan *runningFirecracker {
-	return m.m.warmVMs
+func (w *WorkloadManagerProxy) Agents() map[string]*ProcessInfo {
+	agentsmap := make(map[string]*ProcessInfo)
+
+	agents, _ := w.m.procMan.ListProcesses()
+	for _, agent := range agents {
+		agentsmap[agent.ID] = &agent
+	}
+
+	return agentsmap
 }
 
-type VMProxy struct {
-	vm *runningFirecracker
+func (w *WorkloadManagerProxy) PoolAgents() map[string]*ProcessInfo {
+	// FIXME-- this is no longer exposed
+	return map[string]*ProcessInfo{}
 }
 
-func NewVMProxyWith(vm *runningFirecracker) *VMProxy {
-	return &VMProxy{vm: vm}
+type AgentProxy struct {
+	agent *ProcessInfo
 }
 
-func (v *VMProxy) IP() net.IP {
-	return v.vm.ip
+func NewAgentProxyWith(agent *ProcessInfo) *AgentProxy {
+	return &AgentProxy{agent: agent}
 }

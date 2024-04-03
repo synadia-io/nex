@@ -31,6 +31,7 @@ type NodeConfiguration struct {
 	BinPath             []string          `json:"bin_path"`
 	CNI                 CNIDefinition     `json:"cni"`
 	DefaultResourceDir  string            `json:"default_resource_dir"`
+	NoSandbox           bool              `json:"no_sandbox,omitempty"`
 	ForceDepInstall     bool              `json:"-"`
 	InternalNodeHost    *string           `json:"internal_node_host,omitempty"`
 	InternalNodePort    *int              `json:"internal_node_port"`

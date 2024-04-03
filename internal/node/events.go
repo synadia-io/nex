@@ -10,9 +10,9 @@ import (
 
 // FIXME-- move this to types repo-- audit other places where it is redeclared (nex-cli)
 type emittedLog struct {
-	Text      string     `json:"text"`
-	Level     slog.Level `json:"level"`
-	MachineId string     `json:"machine_id"`
+	Text  string     `json:"text"`
+	Level slog.Level `json:"level"`
+	ID    string     `json:"id"`
 }
 
 // publish the given $NEX event to an arbitrary namespace using the given NATS connection

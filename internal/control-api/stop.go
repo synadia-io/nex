@@ -14,10 +14,10 @@ type StopRequest struct {
 }
 
 type StopResponse struct {
-	Stopped   bool   `json:"stopped"`
-	MachineId string `json:"machine_id"`
-	Issuer    string `json:"issuer"`
-	Name      string `json:"name"`
+	Stopped bool   `json:"stopped"`
+	ID      string `json:"id"`
+	Issuer  string `json:"issuer"`
+	Name    string `json:"name"`
 }
 
 func NewStopRequest(workloadId string, name string, targetNode string, issuer nkeys.KeyPair) (*StopRequest, error) {

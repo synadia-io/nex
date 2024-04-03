@@ -12,9 +12,6 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-// Agent handshake subject
-const NexAgentSubjectHandshake = "agentint.handshake"
-
 // Executable Linkable Format execution provider
 const NexExecutionProviderELF = "elf"
 
@@ -87,6 +84,10 @@ type DeployRequest struct {
 	Errors []error `json:"errors,omitempty"`
 }
 
+func (request *DeployRequest) IsEssential() bool {
+	return request.Essential != nil && *request.Essential
+}
+
 // Returns true if the run request supports essential flag
 func (request *DeployRequest) SupportsEssential() bool {
 	return strings.EqualFold(*request.WorkloadType, "elf") ||
@@ -100,7 +101,7 @@ func (request *DeployRequest) SupportsTriggerSubjects() bool {
 		len(request.TriggerSubjects) > 0
 }
 
-func (r *DeployRequest) Validate() bool {
+func (r *DeployRequest) Validate() error {
 	var err error
 
 	if r.WorkloadName == nil {
@@ -127,7 +128,7 @@ func (r *DeployRequest) Validate() bool {
 		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
 	}
 
-	return err == nil
+	return err
 }
 
 type DeployResponse struct {
@@ -136,7 +137,7 @@ type DeployResponse struct {
 }
 
 type HandshakeRequest struct {
-	MachineID *string   `json:"machine_id"`
+	ID        *string   `json:"id"`
 	StartTime time.Time `json:"start_time"`
 	Message   *string   `json:"message,omitempty"`
 }
