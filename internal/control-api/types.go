@@ -21,10 +21,10 @@ const (
 )
 
 type RunResponse struct {
-	Started   bool   `json:"started"`
-	MachineId string `json:"machine_id"`
-	Issuer    string `json:"issuer"`
-	Name      string `json:"name"`
+	Started bool   `json:"started"`
+	ID      string `json:"id"`
+	Issuer  string `json:"issuer"`
+	Name    string `json:"name"`
 }
 
 type PingResponse struct {
@@ -83,9 +83,9 @@ type EmittedLog struct {
 }
 
 type RawLog struct {
-	Text      string     `json:"text"`
-	Level     slog.Level `json:"level"`
-	MachineId string     `json:"machine_id"`
+	Text  string     `json:"text"`
+	Level slog.Level `json:"level"`
+	ID    string     `json:"id"`
 }
 
 // Note this a wrapper to add context to a cloud event

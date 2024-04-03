@@ -142,7 +142,7 @@ func (a *Agent) Start() {
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) requestHandshake() error {
 	msg := agentapi.HandshakeRequest{
-		MachineID: a.md.VmID,
+		ID:        a.md.VmID,
 		StartTime: a.started,
 		Message:   a.md.Message,
 	}

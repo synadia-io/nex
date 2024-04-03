@@ -138,10 +138,10 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 	}
 
 	res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
-		Stopped:   true,
-		Name:      deployRequest.DecodedClaims.Subject,
-		Issuer:    deployRequest.DecodedClaims.Issuer,
-		MachineId: request.WorkloadId,
+		Stopped: true,
+		Name:    deployRequest.DecodedClaims.Subject,
+		Issuer:  deployRequest.DecodedClaims.Issuer,
+		ID:      request.WorkloadId,
 	}, nil)
 	raw, err := json.Marshal(res)
 	if err != nil {
@@ -266,10 +266,10 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("workload_id", *workloadID))
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
-		Started:   true,
-		Name:      workloadName,
-		Issuer:    request.DecodedClaims.Issuer,
-		MachineId: *workloadID, // FIXME-- rename to match
+		Started: true,
+		Name:    workloadName,
+		Issuer:  request.DecodedClaims.Issuer,
+		ID:      *workloadID, // FIXME-- rename to match
 	}, nil)
 
 	raw, err := json.Marshal(res)

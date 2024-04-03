@@ -140,7 +140,7 @@ type DeployResponse struct {
 }
 
 type HandshakeRequest struct {
-	MachineID *string   `json:"machine_id"`
+	ID        *string   `json:"id"`
 	StartTime time.Time `json:"start_time"`
 	Message   *string   `json:"message,omitempty"`
 }

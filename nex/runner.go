@@ -113,7 +113,7 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 
 func renderRunResponse(targetNode string, resp *controlapi.RunResponse) {
 	if resp.Started {
-		fmt.Printf("🚀 Workload '%s' accepted. You can now refer to this workload with ID: %s on node %s", resp.Name, resp.MachineId, targetNode)
+		fmt.Printf("🚀 Workload '%s' accepted. You can now refer to this workload with ID: %s on node %s", resp.Name, resp.ID, targetNode)
 	} else {
 		fmt.Println("⛔ Workload rejected")
 	}

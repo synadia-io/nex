@@ -162,11 +162,11 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 	var req *HandshakeRequest
 	err := json.Unmarshal(msg.Data, &req)
 	if err != nil {
-		a.log.Error("Failed to handle agent handshake", slog.String("workload_id", *req.MachineID), slog.String("message", *req.Message))
+		a.log.Error("Failed to handle agent handshake", slog.String("workload_id", *req.ID), slog.String("message", *req.Message))
 		return
 	}
 
-	a.log.Info("Received agent handshake", slog.String("workload_id", *req.MachineID), slog.String("message", *req.Message))
+	a.log.Info("Received agent handshake", slog.String("workload_id", *req.ID), slog.String("message", *req.Message))
 
 	resp, _ := json.Marshal(&HandshakeResponse{})
 
@@ -177,7 +177,7 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 	}
 
 	a.handshakeReceived.Store(true)
-	a.handshakeSucceeded(*req.MachineID)
+	a.handshakeSucceeded(*req.ID)
 }
 
 func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {

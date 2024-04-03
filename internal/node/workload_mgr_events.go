@@ -96,9 +96,9 @@ func (w *WorkloadManager) agentLog(workloadId string, entry agentapi.LogEntry) {
 	}
 
 	bytes, err := json.Marshal(&emittedLog{
-		Text:      entry.Text,
-		Level:     slog.Level(entry.Level),
-		MachineId: workloadId,
+		Text:  entry.Text,
+		Level: slog.Level(entry.Level),
+		ID:    workloadId,
 	})
 	if err != nil {
 		w.log.Error("Failed to marshal our own log entry", slog.Any("err", err))
@@ -142,9 +142,9 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload 
 	}
 
 	emitLog := emittedLog{
-		Text:      "Function execution failed",
-		Level:     slog.LevelError,
-		MachineId: workloadId,
+		Text:  "Function execution failed",
+		Level: slog.LevelError,
+		ID:    workloadId,
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
@@ -190,9 +190,9 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub s
 	}
 
 	emitLog := emittedLog{
-		Text:      fmt.Sprintf("Function %s execution succeeded (%dns)", functionExecPassed.Name, functionExecPassed.Elapsed),
-		Level:     slog.LevelDebug,
-		MachineId: workloadId,
+		Text:  fmt.Sprintf("Function %s execution succeeded (%dns)", functionExecPassed.Name, functionExecPassed.Elapsed),
+		Level: slog.LevelDebug,
+		ID:    workloadId,
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
@@ -243,9 +243,9 @@ func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
 		}
 
 		emitLog := emittedLog{
-			Text:      "Workload stopped",
-			Level:     slog.LevelDebug,
-			MachineId: workloadId,
+			Text:  "Workload stopped",
+			Level: slog.LevelDebug,
+			ID:    workloadId,
 		}
 		logBytes, _ := json.Marshal(emitLog)
 
