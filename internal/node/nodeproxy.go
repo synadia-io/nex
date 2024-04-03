@@ -48,49 +48,74 @@ func (n *NodeProxy) Telemetry() *Telemetry {
 	return n.n.telemetry
 }
 
-type MachineManagerProxy struct {
+type WorkloadManagerProxy struct {
 	m *WorkloadManager
 }
 
-func NewMachineManagerProxyWith(manager *WorkloadManager) *MachineManagerProxy {
-	return &MachineManagerProxy{m: manager}
+func NewWorkloadManagerProxyWith(manager *WorkloadManager) *WorkloadManagerProxy {
+	return &WorkloadManagerProxy{m: manager}
 }
 
-func (m *MachineManagerProxy) Log() *slog.Logger {
+func (m *WorkloadManagerProxy) Log() *slog.Logger {
 	return m.m.log
 }
 
-func (m *MachineManagerProxy) NodeConfiguration() *NodeConfiguration {
+func (m *WorkloadManagerProxy) NodeConfiguration() *NodeConfiguration {
 	return m.m.config
 }
 
-func (m *MachineManagerProxy) InternalNATSConn() *nats.Conn {
+func (m *WorkloadManagerProxy) InternalNATSConn() *nats.Conn {
 	return m.m.ncInternal
 }
 
-func (m *MachineManagerProxy) Telemetry() *Telemetry {
+func (m *WorkloadManagerProxy) Telemetry() *Telemetry {
 	return m.m.t
 }
 
-func (m *MachineManagerProxy) VMs() map[string]*runningFirecracker {
-	// TODO: refactor or remove this proxy
-	return make(map[string]*runningFirecracker)
-	// return m.m.allVMs
+func (w *WorkloadManagerProxy) AllAgents() map[string]*AgentInfo {
+	agentsmap := make(map[string]*AgentInfo)
+
+	for _, agent := range w.Agents() {
+		agentsmap[agent.ID] = agent
+	}
+
+	for _, agent := range w.PoolAgents() {
+		agentsmap[agent.ID] = agent
+	}
+
+	return agentsmap
 }
 
-func (m *MachineManagerProxy) PoolVMs() chan *runningFirecracker {
-	return make(chan *runningFirecracker)
-	//return m.m.warmVMs
+func (w *WorkloadManagerProxy) Agents() map[string]*AgentInfo {
+	agentsmap := make(map[string]*AgentInfo)
+
+	agents, _ := w.m.procMan.ListProcesses()
+	for _, agent := range agents {
+		agentsmap[agent.ID] = &agent
+	}
+
+	return agentsmap
 }
 
-type VMProxy struct {
-	vm *runningFirecracker
+func (w *WorkloadManagerProxy) PoolAgents() map[string]*AgentInfo {
+	agentsmap := make(map[string]*AgentInfo)
+
+	agents, _ := w.m.procMan.ListPool()
+	for _, agent := range agents {
+		agentsmap[agent.ID] = &agent
+	}
+
+	return agentsmap
 }
 
-func NewVMProxyWith(vm *runningFirecracker) *VMProxy {
-	return &VMProxy{vm: vm}
+type AgentProxy struct {
+	agent *AgentInfo
 }
 
-func (v *VMProxy) IP() net.IP {
-	return v.vm.ip
+func NewAgentProxyWith(agent *AgentInfo) *AgentProxy {
+	return &AgentProxy{agent: agent}
+}
+
+func (a *AgentProxy) IP() net.IP {
+	return *a.agent.IP
 }

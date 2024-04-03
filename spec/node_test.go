@@ -354,7 +354,7 @@ var _ = Describe("nex node", func() {
 
 					Describe("machine manager", func() {
 						var manager *nexnode.WorkloadManager
-						var managerProxy *nexnode.MachineManagerProxy
+						var managerProxy *nexnode.WorkloadManagerProxy
 
 						AfterEach(func() {
 							manager = nil
@@ -363,7 +363,7 @@ var _ = Describe("nex node", func() {
 
 						JustBeforeEach(func() {
 							manager = nodeProxy.WorkloadManager()
-							managerProxy = nexnode.NewMachineManagerProxyWith(manager)
+							managerProxy = nexnode.NewWorkloadManagerProxyWith(manager)
 
 							time.Sleep(time.Millisecond * 1000) // allow enough time for the pool to warm up...
 						})
@@ -394,23 +394,23 @@ var _ = Describe("nex node", func() {
 									Expect(subsz.Subs[0].Msgs).To(Equal(int64(nodeProxy.NodeConfiguration().MachinePoolSize)))
 								})
 
-								It("should keep a reference to all running VMs", func(ctx SpecContext) {
-									Expect(len(managerProxy.VMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+								It("should keep a reference to all running agent processes", func(ctx SpecContext) {
+									Expect(len(managerProxy.AllAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 								})
 
-								It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-									Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+								It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
+									Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 								})
 
-								It("should assign 192.168.127.2 to the first warm VM in the pool", func(ctx SpecContext) {
-									var vmID string
-									for k := range managerProxy.VMs() {
-										vmID = k
+								It("should assign 192.168.127.2 to the first warm agent in the pool", func(ctx SpecContext) {
+									var agentID string
+									for k := range managerProxy.PoolAgents() {
+										agentID = k
 										break
 									}
 
-									vm := nexnode.NewVMProxyWith(managerProxy.VMs()[vmID])
-									Expect(vm.IP().String()).To(Equal("192.168.127.2"))
+									agent := nexnode.NewAgentProxyWith(managerProxy.PoolAgents()[agentID])
+									Expect(agent.IP().String()).To(Equal("192.168.127.2"))
 								})
 							})
 
@@ -443,12 +443,12 @@ var _ = Describe("nex node", func() {
 										Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
 									})
 
-									It("should keep a reference to all running VMs", func(ctx SpecContext) {
-										Expect(len(managerProxy.VMs())).To(Equal(1))
+									It("should keep a reference to all running agent processes", func(ctx SpecContext) {
+										Expect(len(managerProxy.AllAgents())).To(Equal(1))
 									})
 
-									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+									It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
+										Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 
@@ -457,18 +457,20 @@ var _ = Describe("nex node", func() {
 										cmd := exec.Command("go", "build", "-tags", "netgo", "-ldflags", "-extldflags -static", "../examples/echoservice")
 										_ = cmd.Start()
 										_ = cmd.Wait()
+
+										time.Sleep(time.Millisecond * 1000)
 									})
 
 									It("should deploy the ELF workload", func(ctx SpecContext) {
 										Expect(err).To(BeNil())
 									})
 
-									It("should keep a reference to all running VMs", func(ctx SpecContext) {
-										Expect(len(managerProxy.VMs())).To(Equal(2))
+									It("should keep a reference to all running agent processes", func(ctx SpecContext) {
+										Expect(len(managerProxy.AllAgents())).To(Equal(2))
 									})
 
-									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+									It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
+										Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 							})
@@ -496,12 +498,12 @@ var _ = Describe("nex node", func() {
 											Expect(err).To(BeNil())
 										})
 
-										It("should keep a reference to all running VMs", func(ctx SpecContext) {
-											Expect(len(managerProxy.VMs())).To(Equal(2))
+										It("should keep a reference to all running agent processes", func(ctx SpecContext) {
+											Expect(len(managerProxy.AllAgents())).To(Equal(2))
 										})
 
-										It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-											Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+										It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
+											Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 										})
 
 										Describe("triggering the deployed function", func() {
@@ -673,12 +675,12 @@ var _ = Describe("nex node", func() {
 										Expect(err).To(BeNil())
 									})
 
-									It("should keep a reference to all running VMs", func(ctx SpecContext) {
-										Expect(len(managerProxy.VMs())).To(Equal(2))
+									It("should keep a reference to all running agent processes", func(ctx SpecContext) {
+										Expect(len(managerProxy.AllAgents())).To(Equal(2))
 									})
 
-									It("should maintain the configured number of warm VMs in the pool", func(ctx SpecContext) {
-										Expect(len(managerProxy.PoolVMs())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
+									It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
+										Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
 									})
 								})
 							})
