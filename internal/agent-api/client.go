@@ -66,7 +66,7 @@ func (a *AgentClient) ID() string {
 }
 
 func (a *AgentClient) Start(agentID string) error {
-	a.log.Info("Agent client starting", slog.String("workloadId", agentID))
+	a.log.Info("Agent client starting", slog.String("workload_id", agentID))
 	a.agentID = agentID
 
 	_, err := a.nc.Subscribe("agentint.handshake", a.handleHandshake)

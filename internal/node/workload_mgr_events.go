@@ -112,7 +112,7 @@ func (w *WorkloadManager) agentLog(workloadId string, entry agentapi.LogEntry) {
 func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload string, tsub string, origErr error) error {
 	deployRequest, err := w.procMan.Lookup(workloadId)
 	if err != nil {
-		w.log.Warn("Tried to publish function exec failed event for non-existent workload", slog.String("workloadId", workloadId))
+		w.log.Warn("Tried to publish function exec failed event for non-existent workload", slog.String("workload_id", workloadId))
 		return nil
 	}
 
@@ -160,7 +160,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload 
 func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub string, elapsedNanos int64) error {
 	deployRequest, err := w.procMan.Lookup(workloadId)
 	if err != nil {
-		w.log.Warn("Tried to publish function exec succeeded event for non-existent workload", slog.String("workloadId", workloadId))
+		w.log.Warn("Tried to publish function exec succeeded event for non-existent workload", slog.String("workload_id", workloadId))
 		return nil
 	}
 
@@ -209,11 +209,11 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub s
 func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
 	deployRequest, err := w.procMan.Lookup(workloadId)
 	if err != nil {
-		w.log.Error("Failed to look up workload", slog.String("workloadId", workloadId), slog.Any("error", err))
+		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadId), slog.Any("error", err))
 		return errors.New("workload stopped event was not published")
 	}
 	if deployRequest == nil {
-		w.log.Warn("Tried to publish stopped event for non-existent workload", slog.String("workloadId", workloadId))
+		w.log.Warn("Tried to publish stopped event for non-existent workload", slog.String("workload_id", workloadId))
 		return errors.New("workload stopped event was not published")
 	}
 
