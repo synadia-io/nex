@@ -69,7 +69,7 @@ func (a *AgentClient) ID() string {
 }
 
 func (a *AgentClient) Start(agentID string) error {
-	a.log.Info("Agent client starting", slog.String("workload_id", agentID))
+	a.log.Info("Agent client starting", slog.String("agent_id", agentID))
 	a.agentID = agentID
 
 	var sub *nats.Subscription
@@ -106,7 +106,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 
 	status := a.nc.Status()
 	a.log.Debug("NATS internal connection status",
-		slog.String("workload_id", a.agentID),
+		slog.String("agent_id", a.agentID),
 		slog.String("status", status.String()))
 
 	subject := fmt.Sprintf("agentint.%s.deploy", a.agentID)
@@ -134,11 +134,19 @@ func (a *AgentClient) Drain() error {
 	for _, sub := range a.subz {
 		err := sub.Drain()
 		if err != nil {
-			a.log.Warn(fmt.Sprintf("failed to drain subscription to subject %s associated with agent client %s: %s", sub.Subject, a.agentID, err.Error()))
+			a.log.Warn("failed to drain subscription associated with agent client",
+				slog.String("subject", sub.Subject),
+				slog.String("agent_id", a.agentID),
+				slog.String("error", err.Error()),
+			)
+
 			// no-op for now, try the next one... perhaps we should return the error here in the future?
 		}
 
-		a.log.Debug(fmt.Sprintf("drained subscription to subject %s associated with agent client %s", sub.Subject, a.agentID))
+		a.log.Debug("drained subscription associated with agent client",
+			slog.String("subject", sub.Subject),
+			slog.String("agent_id", a.agentID),
+		)
 	}
 
 	return nil
@@ -148,7 +156,7 @@ func (a *AgentClient) Undeploy() error {
 	subject := fmt.Sprintf("agentint.%s.undeploy", a.agentID)
 	_, err := a.nc.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
 	if err != nil {
-		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("workload_id", a.agentID), slog.String("error", err.Error()))
+		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("agent_id", a.agentID), slog.String("error", err.Error()))
 		return err
 	}
 	return nil
@@ -187,11 +195,11 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 	var req *HandshakeRequest
 	err := json.Unmarshal(msg.Data, &req)
 	if err != nil {
-		a.log.Error("Failed to handle agent handshake", slog.String("workload_id", *req.ID), slog.String("message", *req.Message))
+		a.log.Error("Failed to handle agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
 		return
 	}
 
-	a.log.Info("Received agent handshake", slog.String("workload_id", *req.ID), slog.String("message", *req.Message))
+	a.log.Info("Received agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
 
 	resp, _ := json.Marshal(&HandshakeResponse{})
 
@@ -217,7 +225,7 @@ func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Info("Received agent event", slog.String("workload_id", agentID), slog.String("type", evt.Type()))
+	a.log.Info("Received agent event", slog.String("agent_id", agentID), slog.String("type", evt.Type()))
 	a.eventReceived(agentID, evt)
 }
 
@@ -232,6 +240,6 @@ func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Debug("Received agent log", slog.String("workload_id", agentID), slog.String("log", logentry.Text))
+	a.log.Debug("Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
 	a.logReceived(agentID, logentry)
 }
