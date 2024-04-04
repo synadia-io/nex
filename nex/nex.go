@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
 	shandler "github.com/jordan-rash/slog-handler"
