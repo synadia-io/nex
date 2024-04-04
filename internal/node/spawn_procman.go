@@ -177,7 +177,10 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 
 	s.log.Debug("Attempting to stop process", slog.String("workload_id", workloadID))
 
-	s.kill(proc)
+	err := s.kill(proc)
+	if err != nil {
+		return err
+	}
 
 	delete(s.liveProcs, workloadID)
 	delete(s.stopMutexes, workloadID)
