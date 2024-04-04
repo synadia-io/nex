@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
@@ -45,19 +46,22 @@ type Agent struct {
 	sandboxed bool
 }
 
-// HaltVM stops the firecracker VM
+// HaltVM stops the firecracker VM (or the agent if it is not sandboxed)
 func HaltVM(err error) {
+	code := 0
 	if err != nil {
-		// On the off chance the agent's log is captured from the vm
-		fmt.Fprintf(os.Stderr, "Terminating Firecracker VM due to fatal error: %s. Sandboxed: %v\n", err, isSandboxed())
+		fmt.Fprintf(os.Stderr, "Terminating process due to fatal error: %s. Sandboxed: %v\n", err, isSandboxed())
+		code = 1
 	}
 
-	// if isSandboxed() {
-	// 	err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
-	// 	if err != nil {
-	// 		fmt.Fprintf(os.Stderr, "Failed to halt: %s", err)
-	// 	}
-	// }
+	if isSandboxed() {
+		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to halt: %s", err)
+		}
+	} else {
+		os.Exit(code)
+	}
 }
 
 // Initialize a new agent to facilitate communications with the host
