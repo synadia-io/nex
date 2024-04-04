@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
 	"sync/atomic"
@@ -19,7 +20,7 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-const defaultAgentHandshakeTimeoutMillis = 250
+const defaultAgentHandshakeTimeoutMillis = 500
 const runloopSleepInterval = 250 * time.Millisecond
 const runloopTickInterval = 2500 * time.Millisecond
 const workloadExecutionSleepTimeoutMillis = 1000
@@ -34,7 +35,6 @@ type Agent struct {
 	cancelF context.CancelFunc
 	closing uint32
 	ctx     context.Context
-	sigs    chan os.Signal
 
 	provider providers.ExecutionProvider
 
@@ -136,12 +136,8 @@ func (a *Agent) Start() {
 		select {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
-		case sig := <-a.sigs:
-			// a.log.Debug("received signal: %s", sig)
-			fmt.Printf("received signal: %s", sig)
-			a.shutdown()
 		case <-a.ctx.Done():
-			close(a.sigs)
+			// NO-OP
 		default:
 			time.Sleep(runloopSleepInterval)
 		}
@@ -186,7 +182,8 @@ func (a *Agent) Version() string {
 // temporary file and make it executable; this method returns the full
 // path to the cached artifact if successful
 func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
-	tempFile := path.Join(os.TempDir(), "workload") // FIXME-- randomly generate a filename
+	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
+	tempFile := path.Join(os.TempDir(), fileName)
 
 	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
 	if err != nil {
@@ -348,6 +345,7 @@ func (a *Agent) init() error {
 		return err
 	}
 
+	go a.setupSignalHandlers()
 	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
 	go a.dispatchLogs()
@@ -410,8 +408,34 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 	return params, nil
 }
 
+func (a *Agent) setupSignalHandlers() {
+	go func() {
+		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+		for {
+			switch s := <-c; {
+			case s == syscall.SIGTERM || s == os.Interrupt || s == syscall.SIGQUIT:
+				fmt.Fprintf(os.Stdout, "Caught signal [%s], requesting clean shutdown", s.String())
+				a.shutdown()
+				os.Exit(0)
+
+			default:
+				os.Exit(0)
+			}
+		}
+	}()
+}
+
 func (a *Agent) shutdown() {
 	if atomic.AddUint32(&a.closing, 1) == 1 {
+		if a.provider != nil {
+			err := a.provider.Undeploy()
+			if err != nil {
+				fmt.Printf("failed to undeploy workload: %s", err)
+			}
+		}
 		_ = a.nc.Drain()
 		for !a.nc.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
@@ -419,6 +443,7 @@ func (a *Agent) shutdown() {
 
 		HaltVM(nil)
 	}
+
 }
 
 func (a *Agent) shuttingDown() bool {

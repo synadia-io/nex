@@ -79,6 +79,10 @@ func (e *ELF) Deploy() error {
 	return nil
 }
 
+func (e *ELF) removeWorkload() {
+	_ = os.Remove(e.tmpFilename)
+}
+
 func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
 	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
 }
@@ -86,6 +90,7 @@ func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
 // Undeploy the ELF binary
 func (e *ELF) Undeploy() error {
 	err := e.cmd.Process.Signal(os.Kill)
+	e.removeWorkload()
 	if err != nil {
 		e.fail <- true
 		return err
