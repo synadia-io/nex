@@ -201,7 +201,8 @@ func (f *FirecrackerProcessManager) Lookup(workloadID string) (*agentapi.DeployR
 		return request, nil
 	}
 
-	return nil, fmt.Errorf("no such agent: %s", workloadID)
+	// Per contract, a non-prepared workload returns nil, not error
+	return nil, nil
 }
 
 func (f *FirecrackerProcessManager) resetCNI() error {

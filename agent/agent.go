@@ -10,7 +10,6 @@ import (
 	"path"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
@@ -42,19 +41,23 @@ type Agent struct {
 	md          *agentapi.MachineMetadata
 	nc          *nats.Conn
 	started     time.Time
+
+	sandboxed bool
 }
 
 // HaltVM stops the firecracker VM
 func HaltVM(err error) {
 	if err != nil {
 		// On the off chance the agent's log is captured from the vm
-		fmt.Fprintf(os.Stderr, "Terminating Firecracker VM due to fatal error: %s\n", err)
+		fmt.Fprintf(os.Stderr, "Terminating Firecracker VM due to fatal error: %s. Sandboxed: %v\n", err, isSandboxed())
 	}
 
-	err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to reboot: %s", err)
-	}
+	// if isSandboxed() {
+	// 	err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+	// 	if err != nil {
+	// 		fmt.Fprintf(os.Stderr, "Failed to halt: %s", err)
+	// 	}
+	// }
 }
 
 // Initialize a new agent to facilitate communications with the host
@@ -68,11 +71,12 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		metadata, err = GetMachineMetadata()
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get machine metadata: %s", err)
-		return nil, err
+		fmt.Fprintf(os.Stderr, "failed to get machien metadata: %s\n", err)
+		return nil, fmt.Errorf("failed to get machine metadata: %s", err)
 	}
 
 	if !metadata.Validate() {
+		fmt.Fprintf(os.Stderr, "invalid metadata: %v\n", metadata.Errors)
 		return nil, fmt.Errorf("invalid metadata: %v", metadata.Errors)
 	}
 
@@ -95,10 +99,12 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	}
 
 	return &Agent{
-		agentLogs:   make(chan *agentapi.LogEntry, 64),
-		eventLogs:   make(chan *cloudevents.Event, 64),
+		agentLogs: make(chan *agentapi.LogEntry, 64),
+		eventLogs: make(chan *cloudevents.Event, 64),
+		// sandbox defaults to true, only way to override that is with an explicit 'false'
 		cancelF:     cancelF,
 		ctx:         ctx,
+		sandboxed:   isSandboxed(),
 		cacheBucket: bucket,
 		md:          metadata,
 		nc:          nc,
@@ -115,6 +121,7 @@ func (a *Agent) FullVersion() string {
 func (a *Agent) Start() {
 	err := a.init()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize agent: %s\n", err)
 		panic(err)
 	}
 
@@ -141,6 +148,7 @@ func (a *Agent) Start() {
 // Request a handshake with the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) requestHandshake() error {
+	a.LogInfo("Requesting handshake from host")
 	msg := agentapi.HandshakeRequest{
 		ID:        a.md.VmID,
 		StartTime: a.started,
@@ -447,4 +455,8 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	}
 
 	return nil
+}
+
+func isSandboxed() bool {
+	return strings.ToLower(os.Getenv("NEX_SANDBOX")) != "false"
 }
