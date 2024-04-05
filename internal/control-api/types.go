@@ -18,6 +18,7 @@ const (
 	TagOS            = "nex.os"
 	TagArch          = "nex.arch"
 	TagCPUs          = "nex.cpucount"
+	TagUnsafe        = "nex.unsafe"
 )
 
 type RunResponse struct {

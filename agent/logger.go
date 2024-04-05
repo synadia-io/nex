@@ -38,18 +38,24 @@ func (l *logEmitter) Write(bytes []byte) (int, error) {
 }
 
 func (a *Agent) LogDebug(msg string) {
-	a.submitLog(msg, agentapi.LogLevelDebug)
 	fmt.Fprintln(os.Stdout, msg)
+	if a.sandboxed {
+		a.submitLog(msg, agentapi.LogLevelDebug)
+	}
 }
 
 func (a *Agent) LogError(msg string) {
-	a.submitLog(msg, agentapi.LogLevelError)
 	fmt.Fprintln(os.Stderr, msg)
+	if a.sandboxed {
+		a.submitLog(msg, agentapi.LogLevelError)
+	}
 }
 
 func (a *Agent) LogInfo(msg string) {
-	a.submitLog(msg, agentapi.LogLevelInfo)
 	fmt.Fprintln(os.Stdout, msg)
+	if a.sandboxed {
+		a.submitLog(msg, agentapi.LogLevelInfo)
+	}
 }
 
 // FIXME-- revisit error handling

@@ -112,8 +112,8 @@ func NewWorkloadManager(
 
 	// determine which agent process manager to load based on sandbox config value
 	if w.config.NoSandbox {
-		w.log.Warn("⚠️ Sandboxing has been disabled! Workloads should be considered unsafe!")
-		w.log.Warn("⚠️ Make sure this is the behavior you wanted and you are in an appropriate environment")
+		w.log.Warn("⚠️  Sandboxing has been disabled! Workloads are spawned directly by agents")
+		w.log.Warn("⚠️  Do not run untrusted workloads in this mode!")
 		w.procMan, err = NewSpawningProcessManager(w.log, w.config, w.t, w.ctx)
 	} else {
 		w.procMan, err = NewFirecrackerProcessManager(w.log, w.config, w.t, w.ctx)
@@ -316,6 +316,7 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 // Called by the agent process manager when an agent has been warmed and is ready
 // to receive workload deployment instructions
 func (w *WorkloadManager) OnProcessStarted(id string) {
+	w.log.Debug("Process started", slog.String("workload_id", id))
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 

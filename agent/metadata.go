@@ -74,6 +74,7 @@ func GetMachineMetadataFromEnv() (*agentapi.MachineMetadata, error) {
 	msg := "Metadata obtained from no-sandbox environment"
 	p, err := strconv.Atoi(port)
 	if err != nil {
+		fmt.Println("Bad port number for internat NATS server")
 		return nil, err
 	}
 

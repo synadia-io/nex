@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"path"
 	"strings"
 	"sync/atomic"
@@ -19,7 +20,7 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-const defaultAgentHandshakeTimeoutMillis = 250
+const defaultAgentHandshakeTimeoutMillis = 500
 const runloopSleepInterval = 250 * time.Millisecond
 const runloopTickInterval = 2500 * time.Millisecond
 const workloadExecutionSleepTimeoutMillis = 1000
@@ -34,7 +35,6 @@ type Agent struct {
 	cancelF context.CancelFunc
 	closing uint32
 	ctx     context.Context
-	sigs    chan os.Signal
 
 	provider providers.ExecutionProvider
 
@@ -42,18 +42,25 @@ type Agent struct {
 	md          *agentapi.MachineMetadata
 	nc          *nats.Conn
 	started     time.Time
+
+	sandboxed bool
 }
 
-// HaltVM stops the firecracker VM
+// HaltVM stops the firecracker VM (or the agent if it is not sandboxed)
 func HaltVM(err error) {
+	code := 0
 	if err != nil {
-		// On the off chance the agent's log is captured from the vm
-		fmt.Fprintf(os.Stderr, "Terminating Firecracker VM due to fatal error: %s\n", err)
+		fmt.Fprintf(os.Stderr, "Terminating process due to fatal error: %s. Sandboxed: %v\n", err, isSandboxed())
+		code = 1
 	}
 
-	err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to reboot: %s", err)
+	if isSandboxed() {
+		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to halt: %s", err)
+		}
+	} else {
+		os.Exit(code)
 	}
 }
 
@@ -68,11 +75,12 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		metadata, err = GetMachineMetadata()
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get machine metadata: %s", err)
-		return nil, err
+		fmt.Fprintf(os.Stderr, "failed to get machien metadata: %s\n", err)
+		return nil, fmt.Errorf("failed to get machine metadata: %s", err)
 	}
 
 	if !metadata.Validate() {
+		fmt.Fprintf(os.Stderr, "invalid metadata: %v\n", metadata.Errors)
 		return nil, fmt.Errorf("invalid metadata: %v", metadata.Errors)
 	}
 
@@ -95,10 +103,12 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	}
 
 	return &Agent{
-		agentLogs:   make(chan *agentapi.LogEntry, 64),
-		eventLogs:   make(chan *cloudevents.Event, 64),
+		agentLogs: make(chan *agentapi.LogEntry, 64),
+		eventLogs: make(chan *cloudevents.Event, 64),
+		// sandbox defaults to true, only way to override that is with an explicit 'false'
 		cancelF:     cancelF,
 		ctx:         ctx,
+		sandboxed:   isSandboxed(),
 		cacheBucket: bucket,
 		md:          metadata,
 		nc:          nc,
@@ -115,6 +125,7 @@ func (a *Agent) FullVersion() string {
 func (a *Agent) Start() {
 	err := a.init()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to initialize agent: %s\n", err)
 		panic(err)
 	}
 
@@ -125,12 +136,8 @@ func (a *Agent) Start() {
 		select {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
-		case sig := <-a.sigs:
-			// a.log.Debug("received signal: %s", sig)
-			fmt.Printf("received signal: %s", sig)
-			a.shutdown()
 		case <-a.ctx.Done():
-			close(a.sigs)
+			// NO-OP
 		default:
 			time.Sleep(runloopSleepInterval)
 		}
@@ -141,6 +148,7 @@ func (a *Agent) Start() {
 // Request a handshake with the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) requestHandshake() error {
+	a.LogInfo("Requesting handshake from host")
 	msg := agentapi.HandshakeRequest{
 		ID:        a.md.VmID,
 		StartTime: a.started,
@@ -174,7 +182,8 @@ func (a *Agent) Version() string {
 // temporary file and make it executable; this method returns the full
 // path to the cached artifact if successful
 func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
-	tempFile := path.Join(os.TempDir(), "workload") // FIXME-- randomly generate a filename
+	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
+	tempFile := path.Join(os.TempDir(), fileName)
 
 	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
 	if err != nil {
@@ -336,6 +345,7 @@ func (a *Agent) init() error {
 		return err
 	}
 
+	go a.setupSignalHandlers()
 	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
 	go a.dispatchLogs()
@@ -398,8 +408,34 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 	return params, nil
 }
 
+func (a *Agent) setupSignalHandlers() {
+	go func() {
+		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+		c := make(chan os.Signal, 1)
+		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+
+		for {
+			switch s := <-c; {
+			case s == syscall.SIGTERM || s == os.Interrupt || s == syscall.SIGQUIT:
+				fmt.Fprintf(os.Stdout, "Caught signal [%s], requesting clean shutdown", s.String())
+				a.shutdown()
+				os.Exit(0)
+
+			default:
+				os.Exit(0)
+			}
+		}
+	}()
+}
+
 func (a *Agent) shutdown() {
 	if atomic.AddUint32(&a.closing, 1) == 1 {
+		if a.provider != nil {
+			err := a.provider.Undeploy()
+			if err != nil {
+				fmt.Printf("failed to undeploy workload: %s", err)
+			}
+		}
 		_ = a.nc.Drain()
 		for !a.nc.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
@@ -407,6 +443,7 @@ func (a *Agent) shutdown() {
 
 		HaltVM(nil)
 	}
+
 }
 
 func (a *Agent) shuttingDown() bool {
@@ -447,4 +484,8 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	}
 
 	return nil
+}
+
+func isSandboxed() bool {
+	return strings.ToLower(os.Getenv("NEX_SANDBOX")) != "false"
 }

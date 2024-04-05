@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -22,9 +23,10 @@ type ELF struct {
 	totalBytes  int64
 	vmID        string
 
-	fail chan bool
-	run  chan bool
-	exit chan int
+	fail     chan bool
+	run      chan bool
+	exit     chan int
+	undeploy sync.Once
 
 	cmd *exec.Cmd
 
@@ -79,17 +81,24 @@ func (e *ELF) Deploy() error {
 	return nil
 }
 
+func (e *ELF) removeWorkload() {
+	_ = os.Remove(e.tmpFilename)
+}
+
 func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
 	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
 }
 
 // Undeploy the ELF binary
 func (e *ELF) Undeploy() error {
-	err := e.cmd.Process.Signal(os.Kill)
-	if err != nil {
-		e.fail <- true
-		return err
-	}
+	e.undeploy.Do(func() {
+		err := e.cmd.Process.Signal(os.Kill)
+		e.removeWorkload()
+		if err != nil {
+			fmt.Println("Couldn't terminate elf binary process")
+			e.fail <- true
+		}
+	})
 
 	return nil
 }
