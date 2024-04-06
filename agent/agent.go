@@ -35,6 +35,7 @@ type Agent struct {
 	cancelF context.CancelFunc
 	closing uint32
 	ctx     context.Context
+	sigs    chan os.Signal
 
 	provider providers.ExecutionProvider
 
@@ -136,8 +137,10 @@ func (a *Agent) Start() {
 		select {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
+		case <-a.sigs:
+			a.shutdown()
 		case <-a.ctx.Done():
-			// NO-OP
+			a.shutdown()
 		default:
 			time.Sleep(runloopSleepInterval)
 		}
@@ -325,6 +328,8 @@ func (a *Agent) handleHealthz(w http.ResponseWriter, req *http.Request) {
 }
 
 func (a *Agent) init() error {
+	a.installSignalHandlers()
+
 	err := a.requestHandshake()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
@@ -345,12 +350,17 @@ func (a *Agent) init() error {
 		return err
 	}
 
-	go a.setupSignalHandlers()
 	go a.startDiagnosticEndpoint()
 	go a.dispatchEvents()
 	go a.dispatchLogs()
 
 	return nil
+}
+
+func (a *Agent) installSignalHandlers() {
+	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+	a.sigs = make(chan os.Signal, 1)
+	signal.Notify(a.sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 }
 
 // newExecutionProviderParams initializes new execution provider params
@@ -408,26 +418,6 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 	return params, nil
 }
 
-func (a *Agent) setupSignalHandlers() {
-	go func() {
-		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
-		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-
-		for {
-			switch s := <-c; {
-			case s == syscall.SIGTERM || s == os.Interrupt || s == syscall.SIGQUIT:
-				fmt.Fprintf(os.Stdout, "Caught signal [%s], requesting clean shutdown", s.String())
-				a.shutdown()
-				os.Exit(0)
-
-			default:
-				os.Exit(0)
-			}
-		}
-	}()
-}
-
 func (a *Agent) shutdown() {
 	if atomic.AddUint32(&a.closing, 1) == 1 {
 		if a.provider != nil {
@@ -436,6 +426,7 @@ func (a *Agent) shutdown() {
 				fmt.Printf("failed to undeploy workload: %s", err)
 			}
 		}
+
 		_ = a.nc.Drain()
 		for !a.nc.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
@@ -443,7 +434,6 @@ func (a *Agent) shutdown() {
 
 		HaltVM(nil)
 	}
-
 }
 
 func (a *Agent) shuttingDown() bool {
