@@ -5,6 +5,9 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/node/observability"
+	"github.com/synadia-io/nex/internal/node/processmanager"
 )
 
 // Use this proxy object with extreme care, as it exposes
@@ -31,7 +34,7 @@ func (n *NodeProxy) Log() *slog.Logger {
 	return n.n.log
 }
 
-func (n *NodeProxy) NodeConfiguration() *NodeConfiguration {
+func (n *NodeProxy) NodeConfiguration() *models.NodeConfiguration {
 	return n.n.config
 }
 
@@ -43,7 +46,7 @@ func (n *NodeProxy) InternalNATSConn() *nats.Conn {
 	return n.n.ncint
 }
 
-func (n *NodeProxy) Telemetry() *Telemetry {
+func (n *NodeProxy) Telemetry() *observability.Telemetry {
 	return n.n.telemetry
 }
 
@@ -59,7 +62,7 @@ func (m *WorkloadManagerProxy) Log() *slog.Logger {
 	return m.m.log
 }
 
-func (m *WorkloadManagerProxy) NodeConfiguration() *NodeConfiguration {
+func (m *WorkloadManagerProxy) NodeConfiguration() *models.NodeConfiguration {
 	return m.m.config
 }
 
@@ -67,12 +70,12 @@ func (m *WorkloadManagerProxy) InternalNATSConn() *nats.Conn {
 	return m.m.ncInternal
 }
 
-func (m *WorkloadManagerProxy) Telemetry() *Telemetry {
+func (m *WorkloadManagerProxy) Telemetry() *observability.Telemetry {
 	return m.m.t
 }
 
-func (w *WorkloadManagerProxy) AllAgents() map[string]*ProcessInfo {
-	agentsmap := make(map[string]*ProcessInfo)
+func (w *WorkloadManagerProxy) AllAgents() map[string]*processmanager.ProcessInfo {
+	agentsmap := make(map[string]*processmanager.ProcessInfo)
 
 	for _, agent := range w.Agents() {
 		agentsmap[agent.ID] = agent
@@ -85,8 +88,8 @@ func (w *WorkloadManagerProxy) AllAgents() map[string]*ProcessInfo {
 	return agentsmap
 }
 
-func (w *WorkloadManagerProxy) Agents() map[string]*ProcessInfo {
-	agentsmap := make(map[string]*ProcessInfo)
+func (w *WorkloadManagerProxy) Agents() map[string]*processmanager.ProcessInfo {
+	agentsmap := make(map[string]*processmanager.ProcessInfo)
 
 	agents, _ := w.m.procMan.ListProcesses()
 	for _, agent := range agents {
@@ -96,15 +99,15 @@ func (w *WorkloadManagerProxy) Agents() map[string]*ProcessInfo {
 	return agentsmap
 }
 
-func (w *WorkloadManagerProxy) PoolAgents() map[string]*ProcessInfo {
+func (w *WorkloadManagerProxy) PoolAgents() map[string]*processmanager.ProcessInfo {
 	// FIXME-- this is no longer exposed
-	return map[string]*ProcessInfo{}
+	return map[string]*processmanager.ProcessInfo{}
 }
 
 type AgentProxy struct {
-	agent *ProcessInfo
+	agent *processmanager.ProcessInfo
 }
 
-func NewAgentProxyWith(agent *ProcessInfo) *AgentProxy {
+func NewAgentProxyWith(agent *processmanager.ProcessInfo) *AgentProxy {
 	return &AgentProxy{agent: agent}
 }

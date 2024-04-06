@@ -9,6 +9,12 @@ import (
 	nexnode "github.com/synadia-io/nex/internal/node"
 )
 
+const contextKeyBuildData = "build_data"
+
+const buildDataKeyCommit = "commit"
+const buildDataKeyBuildDate = "build_data"
+const buildDataKeyVersion = "version"
+
 func setConditionalCommands() {
 	nodeUp = nodes.Command("up", "Starts a Nex node")
 	nodeUp.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
@@ -22,7 +28,7 @@ func setConditionalCommands() {
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(newContext(ctx))
 	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
 	if err != nil {
 		return err
@@ -33,6 +39,16 @@ func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
 }
 
 func RunNodePreflight(ctx context.Context, logger *slog.Logger) error {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(newContext(ctx))
 	return nexnode.CmdPreflight(Opts, NodeOpts, ctx, cancel, logger)
+}
+
+func newContext(ctx context.Context) context.Context {
+	initData := map[string]string{
+		"version":    VERSION,
+		"commit":     COMMIT,
+		"build_date": BUILDDATE,
+	}
+
+	return context.WithValue(ctx, contextKeyBuildData, initData)
 }

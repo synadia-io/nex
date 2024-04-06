@@ -1,4 +1,4 @@
-package nexnode
+package observability
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 const defaultServiceName = "nex-node"
@@ -36,19 +37,19 @@ type Telemetry struct {
 	serviceName string
 	nodePubKey  string
 
-	allocatedMemoryCounter metric.Int64UpDownCounter
-	allocatedVCPUCounter   metric.Int64UpDownCounter
-	deployedByteCounter    metric.Int64UpDownCounter
+	AllocatedMemoryCounter metric.Int64UpDownCounter
+	AllocatedVCPUCounter   metric.Int64UpDownCounter
+	DeployedByteCounter    metric.Int64UpDownCounter
 
-	vmCounter       metric.Int64UpDownCounter
-	workloadCounter metric.Int64UpDownCounter
+	VmCounter       metric.Int64UpDownCounter
+	WorkloadCounter metric.Int64UpDownCounter
 
-	functionTriggers       metric.Int64Counter
-	functionFailedTriggers metric.Int64Counter
-	functionRunTimeNano    metric.Int64Counter
+	FunctionTriggers       metric.Int64Counter
+	FunctionFailedTriggers metric.Int64Counter
+	FunctionRunTimeNano    metric.Int64Counter
 }
 
-func NewTelemetry(ctx context.Context, log *slog.Logger, config *NodeConfiguration, nodePubKey string) (*Telemetry, error) {
+func NewTelemetry(ctx context.Context, log *slog.Logger, config *models.NodeConfiguration, nodePubKey string) (*Telemetry, error) {
 	t := &Telemetry{
 		ctx:             ctx,
 		log:             log,
@@ -76,35 +77,35 @@ func (t *Telemetry) init() error {
 		err = errors.Join(err, e)
 	}
 
-	t.vmCounter, e = t.meter.
+	t.VmCounter, e = t.meter.
 		Int64UpDownCounter("nex-vm-count",
 			metric.WithDescription("Number of VMs started"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
 	}
-	t.workloadCounter, e = t.meter.
+	t.WorkloadCounter, e = t.meter.
 		Int64UpDownCounter("nex-workload-count",
 			metric.WithDescription("Number of workloads deployed"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
 	}
-	t.deployedByteCounter, e = t.meter.
+	t.DeployedByteCounter, e = t.meter.
 		Int64UpDownCounter("nex-deployed-bytes-count",
 			metric.WithDescription("Total number of bytes deployed"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
 	}
-	t.allocatedMemoryCounter, e = t.meter.
+	t.AllocatedMemoryCounter, e = t.meter.
 		Int64UpDownCounter("nex-total-memory-allocation-mib-count",
 			metric.WithDescription("Total allocated memory based on firecracker config"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
 	}
-	t.allocatedVCPUCounter, e = t.meter.
+	t.AllocatedVCPUCounter, e = t.meter.
 		Int64UpDownCounter("nex-total-vcpu-allocation-count",
 			metric.WithDescription("Total allocated VCPU based on firecracker config"),
 		)
@@ -112,21 +113,21 @@ func (t *Telemetry) init() error {
 		err = errors.Join(err, e)
 	}
 
-	t.functionTriggers, e = t.meter.
+	t.FunctionTriggers, e = t.meter.
 		Int64Counter("nex-function-trigger",
 			metric.WithDescription("Total number of times a function was triggered"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
 	}
-	t.functionFailedTriggers, e = t.meter.
+	t.FunctionFailedTriggers, e = t.meter.
 		Int64Counter("nex-function-failed-trigger",
 			metric.WithDescription("Total number of times a function failed to triggered"),
 		)
 	if e != nil {
 		err = errors.Join(err, e)
 	}
-	t.functionRunTimeNano, e = t.meter.
+	t.FunctionRunTimeNano, e = t.meter.
 		Int64Counter("nex-function-runtime-nanosec",
 			metric.WithDescription("Total run time in nanoseconds for function"),
 		)
@@ -148,11 +149,22 @@ func (t *Telemetry) initMeterProvider() error {
 	if t.metricsEnabled {
 		t.log.Debug("Metrics enabled")
 
+		var version *string
+		if buildData, ok := t.ctx.Value("build_data").(map[string]interface{}); ok {
+			if _version, _ok := buildData["version"].(string); _ok {
+				version = &_version
+			}
+		}
+
+		if version == nil {
+			return errors.New("failed to initialize meter provider; no version resolved in context")
+		}
+
 		resource, err := resource.Merge(resource.Default(),
 			resource.NewWithAttributes(
 				semconv.SchemaURL,
 				semconv.ServiceName(t.serviceName),
-				semconv.ServiceVersion(VERSION),
+				semconv.ServiceVersion(*version),
 				attribute.String("node_pub_key", t.nodePubKey),
 			))
 

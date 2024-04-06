@@ -1,8 +1,28 @@
-package nexnode
+package processmanager
 
 import (
+	"context"
+	"log/slog"
+
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/node/observability"
 )
+
+// Information about an agent process without regard to the implementation of the agent process manager
+type ProcessInfo struct {
+	DeployRequest *agentapi.DeployRequest
+	ID            string
+	Name          string
+	Namespace     string
+}
+
+// A process delegate is any struct that wishes to be notified when the configured agent process
+// manager has successfully started an agent
+type ProcessDelegate interface {
+	// Indicates that an agent process with the given id has been started and is ready to be "prepared" for workload deployment
+	OnProcessStarted(id string)
+}
 
 // A process manager is responsible for stopping and starting a Nex Agent. It is entirely up to
 // the implementation of the process manager as to whether or to what degree any kind of sandboxing
@@ -31,17 +51,18 @@ type ProcessManager interface {
 	StopProcess(id string) error
 }
 
-// An process delegate is any struct that wishes to be notified when the configured agent process
-// manager has successfully started an agent
-type ProcessDelegate interface {
-	// Indicates that an agent process with the given id has been started and is ready to be "prepared" for workload deployment
-	OnProcessStarted(id string)
-}
+// Initialie an appropriate agent process manager instance based on the sandbox config value
+func NewProcessManager(
+	log *slog.Logger,
+	config *models.NodeConfiguration,
+	telemetry *observability.Telemetry,
+	ctx context.Context,
+) (ProcessManager, error) {
+	if config.NoSandbox {
+		log.Warn("⚠️  Sandboxing has been disabled! Workloads are spawned directly by agents")
+		log.Warn("⚠️  Do not run untrusted workloads in this mode!")
+		return NewSpawningProcessManager(log, config, telemetry, ctx)
+	}
 
-// Information about an agent process without regard to the implementation of the agent process manager
-type ProcessInfo struct {
-	DeployRequest *agentapi.DeployRequest
-	ID            string
-	Name          string
-	Namespace     string
+	return NewFirecrackerProcessManager(log, config, telemetry, ctx)
 }

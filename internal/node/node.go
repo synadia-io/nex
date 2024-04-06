@@ -21,7 +21,7 @@ import (
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
 	"github.com/synadia-io/nex/internal/models"
-	"go.opentelemetry.io/otel/trace/noop"
+	"github.com/synadia-io/nex/internal/node/observability"
 )
 
 const defaultNatsStoreDir = "pnats"
@@ -42,7 +42,7 @@ type Node struct {
 
 	log *slog.Logger
 
-	config   *NodeConfiguration
+	config   *models.NodeConfiguration
 	opts     *models.Options
 	nodeOpts *models.NodeOptions
 
@@ -57,7 +57,7 @@ type Node struct {
 	ncint   *nats.Conn
 
 	startedAt time.Time
-	telemetry *Telemetry
+	telemetry *observability.Telemetry
 }
 
 func NewNode(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Context, cancelF context.CancelFunc, log *slog.Logger) (*Node, error) {
@@ -200,27 +200,17 @@ func (n *Node) init() error {
 			n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
 		}
 
-		n.telemetry, err = NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
+		n.telemetry, err = observability.NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
 		if err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
 		} else {
 			n.log.Info("Initialized telemetry")
 		}
 
-		if n.config.OtlpExporterUrl != nil {
-			err = InitializeTraceProvider(*n.config.OtlpExporterUrl)
-			if err != nil {
-				n.log.Error("Failed to initialize OTLP trace exporter", slog.Any("err", err),
-					slog.String("url", *n.config.OtlpExporterUrl),
-				)
-				tracer = noop.NewTracerProvider().Tracer("nex")
-			} else {
-				n.log.Info("Initialized OTLP exporter",
-					slog.String("url", *n.config.OtlpExporterUrl),
-				)
-			}
-		} else {
-			tracer = noop.NewTracerProvider().Tracer("nex")
+		err = observability.InitializeTraceProvider(n.config, n.log)
+		if err != nil {
+			n.log.Error("Failed to initialize OTLP trace exporter", slog.Any("err", err))
+			err = fmt.Errorf("failed to initialize OTLP trace exporter: %s", err)
 		}
 
 		// setup NATS connection

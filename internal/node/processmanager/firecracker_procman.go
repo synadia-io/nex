@@ -1,4 +1,4 @@
-package nexnode
+package processmanager
 
 import (
 	"context"
@@ -13,17 +13,22 @@ import (
 	"time"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/node/observability"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
+const runloopSleepInterval = 100 * time.Millisecond
+const runloopTickInterval = 2500 * time.Millisecond
+
 type FirecrackerProcessManager struct {
 	closing   uint32
-	config    *NodeConfiguration
+	config    *models.NodeConfiguration
 	ctx       context.Context
 	log       *slog.Logger
 	stopMutex map[string]*sync.Mutex
-	t         *Telemetry
+	t         *observability.Telemetry
 
 	allVMs  map[string]*runningFirecracker
 	warmVMs chan *runningFirecracker
@@ -34,8 +39,8 @@ type FirecrackerProcessManager struct {
 
 func NewFirecrackerProcessManager(
 	log *slog.Logger,
-	config *NodeConfiguration,
-	telemetry *Telemetry,
+	config *models.NodeConfiguration,
+	telemetry *observability.Telemetry,
 	ctx context.Context,
 ) (*FirecrackerProcessManager, error) {
 	return &FirecrackerProcessManager{
@@ -83,10 +88,10 @@ func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployReq
 
 	f.deployRequests[vm.vmmID] = deployRequest
 
-	f.t.allocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount)
-	f.t.allocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	f.t.allocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib)
-	f.t.allocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	f.t.AllocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount)
+	f.t.AllocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	f.t.AllocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib)
+	f.t.AllocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }
@@ -150,7 +155,9 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 
 			f.allVMs[vm.vmmID] = vm
 			f.stopMutex[vm.vmmID] = &sync.Mutex{}
-			f.t.vmCounter.Add(f.ctx, 1)
+
+			// FIXME-- make vmCounter acessible
+			// f.t.vmCounter.Add(f.ctx, 1)
 
 			go f.delegate.OnProcessStarted(vm.vmmID)
 
@@ -181,17 +188,17 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	delete(f.stopMutex, workloadID)
 
 	if vm.deployRequest != nil {
-		f.t.workloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
-		f.t.workloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-		f.t.deployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1)
-		f.t.deployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
+		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		f.t.DeployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1)
+		f.t.DeployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	}
 
-	f.t.vmCounter.Add(f.ctx, -1)
-	f.t.allocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
-	f.t.allocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-	f.t.allocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
-	f.t.allocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	f.t.VmCounter.Add(f.ctx, -1)
+	f.t.AllocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1)
+	f.t.AllocatedVCPUCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.VcpuCount*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	f.t.AllocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1)
+	f.t.AllocatedMemoryCounter.Add(f.ctx, *vm.machine.Cfg.MachineCfg.MemSizeMib*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 
 	return nil
 }

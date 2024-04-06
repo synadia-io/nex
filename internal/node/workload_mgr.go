@@ -14,6 +14,9 @@ import (
 	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	controlapi "github.com/synadia-io/nex/internal/control-api"
+	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/node/observability"
+	"github.com/synadia-io/nex/internal/node/processmanager"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -37,16 +40,16 @@ const (
 // with them via the internal NATS server
 type WorkloadManager struct {
 	closing    uint32
-	config     *NodeConfiguration
+	config     *models.NodeConfiguration
 	kp         nkeys.KeyPair
 	log        *slog.Logger
 	nc         *nats.Conn
 	ncInternal *nats.Conn
 	cancel     context.CancelFunc
 	ctx        context.Context
-	t          *Telemetry
+	t          *observability.Telemetry
 
-	procMan ProcessManager
+	procMan processmanager.ProcessManager
 
 	// Any agent client in this map is one that has successfully acknowledged a deployment
 	activeAgents map[string]*agentapi.AgentClient
@@ -77,9 +80,9 @@ func NewWorkloadManager(
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
 	nc, ncint *nats.Conn,
-	config *NodeConfiguration,
+	config *models.NodeConfiguration,
 	log *slog.Logger,
-	telemetry *Telemetry,
+	telemetry *observability.Telemetry,
 ) (*WorkloadManager, error) {
 	// Validate the node config
 	if !config.Validate() {
@@ -110,13 +113,10 @@ func NewWorkloadManager(
 
 	var err error
 
-	// determine which agent process manager to load based on sandbox config value
-	if w.config.NoSandbox {
-		w.log.Warn("⚠️  Sandboxing has been disabled! Workloads are spawned directly by agents")
-		w.log.Warn("⚠️  Do not run untrusted workloads in this mode!")
-		w.procMan, err = NewSpawningProcessManager(w.log, w.config, w.t, w.ctx)
-	} else {
-		w.procMan, err = NewFirecrackerProcessManager(w.log, w.config, w.t, w.ctx)
+	w.procMan, err = processmanager.NewProcessManager(w.log, w.config, w.t, w.ctx)
+	if err != nil {
+		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
+		return nil, err
 	}
 
 	if err != nil {
@@ -206,10 +206,10 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 		return nil, fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	}
 
-	w.t.workloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_type", *request.WorkloadType)))
-	w.t.workloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)), metric.WithAttributes(attribute.String("workload_type", *request.WorkloadType)))
-	w.t.deployedByteCounter.Add(w.ctx, request.TotalBytes)
-	w.t.deployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_type", *request.WorkloadType)))
+	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)), metric.WithAttributes(attribute.String("workload_type", *request.WorkloadType)))
+	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes)
+	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 
 	return &workloadID, nil
 }
@@ -367,7 +367,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 	}
 
 	return func(msg *nats.Msg) {
-		ctx, parentSpan := tracer.Start(
+		ctx, parentSpan := observability.GetTracer().Start(
 			w.ctx,
 			"workload-trigger",
 			trace.WithNewRoot(),
@@ -380,7 +380,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 
 		defer parentSpan.End()
 
-		resp, err := agentClient.RunTrigger(ctx, tracer, msg.Subject, msg.Data)
+		resp, err := agentClient.RunTrigger(ctx, observability.GetTracer(), msg.Subject, msg.Data)
 
 		//for reference - this is what agent exec would do
 		//ctx = otel.GetTextMapPropagator().Extract(cctx, propagation.HeaderCarrier(msg.Header))
@@ -396,9 +396,9 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 				slog.String("workload_id", workloadID),
 			)
 
-			w.t.functionFailedTriggers.Add(w.ctx, 1)
-			w.t.functionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
-			w.t.functionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
+			w.t.FunctionFailedTriggers.Add(w.ctx, 1)
+			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
 			_ = w.publishFunctionExecFailed(workloadID, *request.WorkloadName, tsub, err)
 		} else if resp != nil {
 			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
@@ -418,12 +418,12 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			_ = w.publishFunctionExecSucceeded(workloadID, tsub, runTimeNs64)
 			parentSpan.AddEvent("published success event")
 
-			w.t.functionTriggers.Add(w.ctx, 1)
-			w.t.functionTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
-			w.t.functionTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
-			w.t.functionRunTimeNano.Add(w.ctx, runTimeNs64)
-			w.t.functionRunTimeNano.Add(w.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
-			w.t.functionRunTimeNano.Add(w.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
+			w.t.FunctionTriggers.Add(w.ctx, 1)
+			w.t.FunctionTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+			w.t.FunctionTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
+			w.t.FunctionRunTimeNano.Add(w.ctx, runTimeNs64)
+			w.t.FunctionRunTimeNano.Add(w.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+			w.t.FunctionRunTimeNano.Add(w.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
 
 			err = msg.Respond(resp.Data)
 
