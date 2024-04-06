@@ -1,4 +1,4 @@
-package nexnode
+package processmanager
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 
 	"github.com/rs/xid"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/node/observability"
 )
 
 const (
@@ -23,10 +25,10 @@ const (
 // spawned as children of the nex node
 type SpawningProcessManager struct {
 	closing     uint32
-	config      *NodeConfiguration
+	config      *models.NodeConfiguration
 	ctx         context.Context
 	stopMutexes map[string]*sync.Mutex
-	t           *Telemetry
+	t           *observability.Telemetry
 
 	liveProcs map[string]*spawnedProcess
 	warmProcs chan *spawnedProcess
@@ -53,11 +55,10 @@ type spawnedProcess struct {
 
 func NewSpawningProcessManager(
 	log *slog.Logger,
-	config *NodeConfiguration,
-	telemetry *Telemetry,
+	config *models.NodeConfiguration,
+	telemetry *observability.Telemetry,
 	ctx context.Context,
 ) (*SpawningProcessManager, error) {
-
 	return &SpawningProcessManager{
 		config: config,
 		t:      telemetry,

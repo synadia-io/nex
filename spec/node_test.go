@@ -45,7 +45,7 @@ var _ = Describe("nex node", func() {
 	var opts *models.Options
 	var nodeOpts *models.NodeOptions
 
-	var nodeConfig nexnode.NodeConfiguration
+	var nodeConfig models.NodeConfiguration
 
 	var validResourceDir string // prevent downloading kernel and rootfs template multiple times
 	var validResourceDirOnce sync.Once
@@ -114,7 +114,7 @@ var _ = Describe("nex node", func() {
 
 		Context("when the specified node configuration file exists", func() {
 			BeforeEach(func() {
-				nodeConfig = nexnode.DefaultNodeConfiguration()
+				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 
@@ -207,7 +207,7 @@ var _ = Describe("nex node", func() {
 
 		Context("when the specified node configuration file exists", func() {
 			BeforeEach(func() {
-				nodeConfig = nexnode.DefaultNodeConfiguration()
+				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 

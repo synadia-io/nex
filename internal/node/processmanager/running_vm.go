@@ -1,4 +1,4 @@
-package nexnode
+package processmanager
 
 import (
 	"context"
@@ -20,6 +20,7 @@ import (
 	"github.com/rs/xid"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	nexmodels "github.com/synadia-io/nex/internal/models"
 )
 
 // Represents an instance of a single firecracker VM containing the nex agent.
@@ -29,7 +30,7 @@ type runningFirecracker struct {
 	vmmID     string
 
 	closing         uint32
-	config          *NodeConfiguration
+	config          *nexmodels.NodeConfiguration
 	deployRequest   *agentapi.DeployRequest
 	ip              net.IP
 	log             *slog.Logger
@@ -86,7 +87,7 @@ func (vm *runningFirecracker) shutdown() {
 }
 
 // Create a VMM with a given set of options and start the VM
-func createAndStartVM(ctx context.Context, config *NodeConfiguration, log *slog.Logger) (*runningFirecracker, error) {
+func createAndStartVM(ctx context.Context, config *nexmodels.NodeConfiguration, log *slog.Logger) (*runningFirecracker, error) {
 	vmmID := xid.New().String()
 
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
@@ -185,7 +186,7 @@ func copy(src string, dst string) error {
 	return err
 }
 
-func generateFirecrackerConfig(id string, config *NodeConfiguration) (firecracker.Config, error) {
+func generateFirecrackerConfig(id string, config *nexmodels.NodeConfiguration) (firecracker.Config, error) {
 	socket := getSocketPath(id)
 	rootPath := getRootFsPath(id)
 

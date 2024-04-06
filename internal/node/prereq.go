@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/synadia-io/nex/internal/models"
 
 	_ "embed"
 )
@@ -108,7 +109,7 @@ var (
 	rootfsGzipSHA256 string
 )
 
-type initFunc func(*requirement, *NodeConfiguration) error
+type initFunc func(*requirement, *models.NodeConfiguration) error
 
 type requirement struct {
 	directories []string
@@ -125,7 +126,7 @@ type fileSpec struct {
 	satisfied   bool
 }
 
-func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
+func CheckPrerequisites(config *models.NodeConfiguration, readonly bool) error {
 	var sb strings.Builder
 
 	required := &requirements{
@@ -277,7 +278,7 @@ func CheckPrerequisites(config *NodeConfiguration, readonly bool) error {
 }
 
 // func writeCniConf(fileName string, networkName string) error {
-func writeCniConf(r *requirement, c *NodeConfiguration) error {
+func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
 	for _, tF := range r.files {
 		f, err := os.Create(filepath.Join(r.directories[0], tF.name))
 		if err != nil {
@@ -306,7 +307,7 @@ func writeCniConf(r *requirement, c *NodeConfiguration) error {
 	return nil
 }
 
-func downloadKernel(r *requirement, _ *NodeConfiguration) error {
+func downloadKernel(r *requirement, _ *models.NodeConfiguration) error {
 	_ = vmLinuxKernelSHA256 // TODO: implement sha verification
 	for _, f := range r.files {
 		// TODO: this is a hack for now
@@ -338,7 +339,7 @@ func downloadKernel(r *requirement, _ *NodeConfiguration) error {
 	return nil
 }
 
-func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
+func downloadFirecracker(_ *requirement, _ *models.NodeConfiguration) error {
 	_ = firecrackerTarballSHA256
 	// TODO: firecracker repo made the sha difficult to use
 	rawData, err := decompressTarFromURL(firecrackerTarballURL, "")
@@ -379,7 +380,7 @@ func downloadFirecracker(_ *requirement, _ *NodeConfiguration) error {
 	return nil
 }
 
-func downloadCNIPlugins(r *requirement, c *NodeConfiguration) error {
+func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
 	rawData, err := decompressTarFromURL(cniPluginsTarballURL, cniPluginsTarballSHA256)
 	if err != nil {
 		return err
@@ -418,7 +419,7 @@ func downloadCNIPlugins(r *requirement, c *NodeConfiguration) error {
 	return nil
 }
 
-func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
+func downloadTCRedirectTap(r *requirement, _ *models.NodeConfiguration) error {
 	_ = tcRedirectCNIPluginSHA256
 	respBin, err := http.Get(tcRedirectCNIPluginURL)
 	if err != nil {
@@ -446,7 +447,7 @@ func downloadTCRedirectTap(r *requirement, _ *NodeConfiguration) error {
 	return nil
 }
 
-func downloadRootFS(r *requirement, _ *NodeConfiguration) error {
+func downloadRootFS(r *requirement, _ *models.NodeConfiguration) error {
 	_ = rootfsGzipSHA256
 	for _, f := range r.files {
 		// TODO: this is a hack for now
