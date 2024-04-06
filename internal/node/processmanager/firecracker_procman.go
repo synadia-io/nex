@@ -20,7 +20,6 @@ import (
 )
 
 const runloopSleepInterval = 100 * time.Millisecond
-const runloopTickInterval = 2500 * time.Millisecond
 
 type FirecrackerProcessManager struct {
 	closing   uint32

@@ -9,12 +9,6 @@ import (
 	nexnode "github.com/synadia-io/nex/internal/node"
 )
 
-const contextKeyBuildData = "build_data"
-
-const buildDataKeyCommit = "commit"
-const buildDataKeyBuildDate = "build_data"
-const buildDataKeyVersion = "version"
-
 func setConditionalCommands() {
 	nodeUp = nodes.Command("up", "Starts a Nex node")
 	nodeUp.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
@@ -50,5 +44,5 @@ func newContext(ctx context.Context) context.Context {
 		"build_date": BUILDDATE,
 	}
 
-	return context.WithValue(ctx, contextKeyBuildData, initData)
+	return context.WithValue(ctx, "build_data", initData) //nolint:all
 }
