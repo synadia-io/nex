@@ -161,8 +161,14 @@ func (a *Agent) requestHandshake() error {
 
 	resp, err := a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
-		return err
+		if errors.Is(err, nats.ErrNoResponders) {
+			resp, err = a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+		}
+
+		if err != nil {
+			a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
+			return err
+		}
 	}
 
 	var handshakeResponse *agentapi.HandshakeResponse
