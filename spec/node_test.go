@@ -393,13 +393,16 @@ var _ = Describe("nex node", func() {
 
 						Describe("VM pool", func() {
 							Context("when no workloads have been deployed", func() {
-								// It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
-								// 	subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
-								// 		Subscriptions: true,
-								// 		Test:          "agentint.*.handshake",
-								// 	})
-								// 	Expect(subsz.Subs[0].Msgs).To(Equal(int64(nodeProxy.NodeConfiguration().MachinePoolSize)))
-								// })
+								It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
+									workloads, _ := nodeProxy.WorkloadManager().RunningWorkloads()
+									for _, workload := range workloads {
+										subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
+											Subscriptions: true,
+											Test:          fmt.Sprintf("agentint.%s.handshake", workload.Id),
+										})
+										Expect(subsz.Subs[0].Msgs).To(Equal(int64(nodeProxy.NodeConfiguration().MachinePoolSize)))
+									}
+								})
 
 								// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
 								// 	Expect(len(managerProxy.AllAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
