@@ -400,7 +400,7 @@ var _ = Describe("nex node", func() {
 											Subscriptions: true,
 											Test:          fmt.Sprintf("agentint.%s.handshake", workload.Id),
 										})
-										Expect(subsz.Subs[0].Msgs).To(Equal(int64(nodeProxy.NodeConfiguration().MachinePoolSize)))
+										Expect(subsz.Subs[0].Msgs).To(Equal(1))
 									}
 								})
 
