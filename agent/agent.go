@@ -162,6 +162,7 @@ func (a *Agent) requestHandshake() error {
 	resp, err := a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
 		if errors.Is(err, nats.ErrNoResponders) {
+			time.Sleep(time.Millisecond * 50)
 			resp, err = a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 		}
 
