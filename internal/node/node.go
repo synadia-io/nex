@@ -265,13 +265,7 @@ func (n *Node) startInternalNATS() error {
 		return err
 	}
 
-	// this is a non-blocking call
 	n.natsint.Start()
-	if n.config.NoSandbox {
-		// on some systems with many cores, the first pool agent can start before internal NATS is listening
-		// so the agent will get "no responders"
-		time.Sleep(500 * time.Millisecond)
-	}
 
 	clientUrl, err := url.Parse(n.natsint.ClientURL())
 	if err != nil {
