@@ -14,7 +14,6 @@ require (
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0
 	github.com/google/uuid v1.5.0
 	github.com/jedib0t/go-pretty/v6 v6.4.9
-	github.com/kthomas/go-httpclient v0.0.0-20240402071627-6ac9677e40f5
 	github.com/nats-io/jsm.go v0.1.1-0.20231031093634-09b45b142881
 	github.com/nats-io/jwt/v2 v2.5.3
 	github.com/nats-io/nats-server/v2 v2.10.5
@@ -28,6 +27,7 @@ require (
 	github.com/rs/xid v1.5.0
 	github.com/splode/fname v0.4.1
 	github.com/tetratelabs/wazero v1.6.0
+	github.com/vincent-petithory/dataurl v1.0.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.24.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.24.0
@@ -107,7 +107,6 @@ require (
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.6 // indirect
-	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	go.mongodb.org/mongo-driver v1.10.0 // indirect

@@ -7,9 +7,9 @@ import (
 	"net/url"
 	"strings"
 
-	httpclient "github.com/kthomas/go-httpclient"
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/node/services/util"
 )
 
 const httpServiceMethodGet = "get"
@@ -105,7 +105,7 @@ func (h *HTTPService) handleGet(msg *nats.Msg) {
 		return
 	}
 
-	client := httpclient.New(url.Scheme, url.Host, "").
+	client := util.NewHTTPClient(url.Scheme, url.Host, "").
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
@@ -186,7 +186,7 @@ func (h *HTTPService) handlePost(msg *nats.Msg) {
 		return
 	}
 
-	client := httpclient.New(url.Scheme, url.Host, "").
+	client := util.NewHTTPClient(url.Scheme, url.Host, "").
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
@@ -267,7 +267,7 @@ func (h *HTTPService) handlePut(msg *nats.Msg) {
 		return
 	}
 
-	client := httpclient.New(url.Scheme, url.Host, "").
+	client := util.NewHTTPClient(url.Scheme, url.Host, "").
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
@@ -348,7 +348,7 @@ func (h *HTTPService) handlePatch(msg *nats.Msg) {
 		return
 	}
 
-	client := httpclient.New(url.Scheme, url.Host, "").
+	client := util.NewHTTPClient(url.Scheme, url.Host, "").
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
@@ -429,7 +429,7 @@ func (h *HTTPService) handleDelete(msg *nats.Msg) {
 		return
 	}
 
-	client := httpclient.New(url.Scheme, url.Host, "").
+	client := util.NewHTTPClient(url.Scheme, url.Host, "").
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
@@ -510,7 +510,7 @@ func (h *HTTPService) handleHead(msg *nats.Msg) {
 		return
 	}
 
-	client := httpclient.New(url.Scheme, url.Host, "").
+	client := util.NewHTTPClient(url.Scheme, url.Host, "").
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
