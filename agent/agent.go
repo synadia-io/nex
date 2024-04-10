@@ -293,12 +293,14 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	}
 	a.provider = provider
 
-	err = a.provider.Validate()
-	if err != nil {
-		msg := fmt.Sprintf("Failed to validate workload: %s", err)
-		a.LogError(msg)
-		_ = a.workAck(m, false, msg)
-		return
+	if a.sandboxed {
+		err = a.provider.Validate()
+		if err != nil {
+			msg := fmt.Sprintf("Failed to validate workload: %s", err)
+			a.LogError(msg)
+			_ = a.workAck(m, false, msg)
+			return
+		}
 	}
 
 	err = a.provider.Deploy()
