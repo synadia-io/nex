@@ -293,7 +293,11 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	}
 	a.provider = provider
 
-	if a.sandboxed {
+	shouldValidate := true
+	if !a.sandboxed && strings.EqualFold(*request.WorkloadType, agentapi.NexExecutionProviderELF) {
+		shouldValidate = false
+	}
+	if shouldValidate {
 		err = a.provider.Validate()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to validate workload: %s", err)
