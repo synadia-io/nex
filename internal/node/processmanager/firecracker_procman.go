@@ -155,8 +155,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 			f.allVMs[vm.vmmID] = vm
 			f.stopMutex[vm.vmmID] = &sync.Mutex{}
 
-			// FIXME-- make vmCounter acessible
-			// f.t.vmCounter.Add(f.ctx, 1)
+			f.t.VmCounter.Add(f.ctx, 1)
 
 			go f.delegate.OnProcessStarted(vm.vmmID)
 

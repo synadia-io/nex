@@ -79,6 +79,11 @@ var _ = Describe("nex node", func() {
 			_, err := os.Stat("../agent/cmd/nex-agent/nex-agent")
 			Expect(err).To(BeNil())
 
+			agentPath, err := filepath.Abs("../agent/cmd/nex-agent")
+			Expect(err).To(BeNil())
+
+			os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), agentPath))
+
 			snapshotAgentRootFSPath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-rootfs.ext4", _fixtures.seededRand.Int()))
 			cmd := exec.Command("go", "run", "../agent/fc-image", "../agent/cmd/nex-agent/nex-agent")
 			_, err = cmd.CombinedOutput()
@@ -192,10 +197,11 @@ var _ = Describe("nex node", func() {
 		})
 	})
 
-	Describe("up", func() {
+	DescribeTableSubtree("up", func(sandbox bool) {
 		Context("when the specified configuration file does not exist", func() {
 			BeforeEach(func() {
 				nodeOpts.ConfigFilepath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-conf.json", _fixtures.seededRand.Int()))
+				nodeConfig.NoSandbox = !sandbox
 			})
 
 			It("should return an error", func(ctx SpecContext) {
@@ -209,6 +215,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+				nodeConfig.NoSandbox = !sandbox
 			})
 
 			JustBeforeEach(func() {
@@ -386,13 +393,16 @@ var _ = Describe("nex node", func() {
 
 						Describe("VM pool", func() {
 							Context("when no workloads have been deployed", func() {
-								// It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
-								// 	subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
-								// 		Subscriptions: true,
-								// 		Test:          "agentint.*.handshake",
-								// 	})
-								// 	Expect(subsz.Subs[0].Msgs).To(Equal(int64(nodeProxy.NodeConfiguration().MachinePoolSize)))
-								// })
+								It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
+									workloads, _ := nodeProxy.WorkloadManager().RunningWorkloads()
+									for _, workload := range workloads {
+										subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
+											Subscriptions: true,
+											Test:          fmt.Sprintf("agentint.%s.handshake", workload.Id),
+										})
+										Expect(subsz.Subs[0].Msgs).To(Equal(1))
+									}
+								})
 
 								// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
 								// 	Expect(len(managerProxy.AllAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
@@ -690,7 +700,10 @@ var _ = Describe("nex node", func() {
 				})
 			})
 		})
-	})
+	},
+		Entry("sandbox", true),     // sandbox mode
+		Entry("no-sandbox", false), // no-sandbox mode
+	)
 })
 
 func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, string, error) {
