@@ -491,5 +491,5 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 }
 
 func isSandboxed() bool {
-	return !strings.EqualFold(strings.ToLower(os.Getenv("NEX_SANDBOX")), "false")
+	return !strings.EqualFold(strings.ToLower(os.Getenv(nexEnvSandbox)), "false")
 }
