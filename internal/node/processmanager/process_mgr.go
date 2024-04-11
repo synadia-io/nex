@@ -51,7 +51,7 @@ type ProcessManager interface {
 	StopProcess(id string) error
 }
 
-// Initialie an appropriate agent process manager instance based on the sandbox config value
+// Initialize an appropriate agent process manager instance based on the sandbox config value
 func NewProcessManager(
 	log *slog.Logger,
 	config *models.NodeConfiguration,

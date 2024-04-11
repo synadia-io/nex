@@ -450,8 +450,12 @@ var _ = Describe("nex node", func() {
 										_ = cmd.Wait()
 									})
 
-									It("should fail to deploy the ELF workload", func(ctx SpecContext) {
-										Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
+									It("should [fail to] deploy the ELF workload", func(ctx SpecContext) {
+										if sandbox {
+											Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
+										} else {
+											Expect(err).To(BeNil())
+										}
 									})
 
 									// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
