@@ -41,14 +41,14 @@ tasks:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
   rootfs:
-    dir: agent/fc-image
+    dir: nex
     sources:
       - "*.go"
     cmds:
-      - sudo /usr/local/go/bin/go run . ../cmd/nex-agent/nex-agent
+      - sudo ./nex fs --agent ../agent/cmd/nex-agent/nex-agent
       - gunzip rootfs.ext4.gz
     deps:
-      [agent]
+      [agent, nex]
 
   echo-service:
     dir: examples/echoservice
