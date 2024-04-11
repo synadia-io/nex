@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	controlapi "github.com/synadia-io/nex/internal/control-api"
+	controlapi "github.com/synadia-io/nex/control-api"
 )
 
 // This function only works on Linux, but that's okay since nex-node can only run on 64-bit linux

@@ -19,6 +19,10 @@ import (
 // $NEX.RUN.{namespace}.{node}
 // $NEX.STOP.{namespace}.{node}
 
+// A control API client communicates with a "Nexus" of nodes by virtue of the $NEX.> subject space. This
+// client should be used to communicate with Nex nodes whenever possible, and its patterns should be copied
+// for clients in other languages. Requests made to the $NEX.> subject space are, when appropriate, secured
+// via signed JWTs
 type Client struct {
 	nc        *nats.Conn
 	timeout   time.Duration
@@ -32,14 +36,14 @@ func NewApiClient(nc *nats.Conn, timeout time.Duration, log *slog.Logger) *Clien
 	return NewApiClientWithNamespace(nc, timeout, "default", log)
 }
 
-// Creates a new client to communicate with a group of NEX nodes all within a given namespace. Note that
-// this namespace is used for requests where it is mandatory
+// Creates a new client to communicate with a group of Nex nodes with workloads scoped to the
+// given namespace. Note that this namespace is used for requests where it is mandatory
 func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace string, log *slog.Logger) *Client {
 	return &Client{nc: nc, timeout: timeout, namespace: namespace, log: log}
 }
 
 // Attempts to stop a running workload. This can fail for a wide variety of reasons, the most common
-// is likely to be security validation that prevents one issuer from issuing a stop request for
+// is likely to be security validation that prevents one issuer from submitting a stop request for
 // another issuer's workload
 func (api *Client) StopWorkload(stopRequest *StopRequest) (*StopResponse, error) {
 	subject := fmt.Sprintf("%s.STOP.%s.%s", APIPrefix, api.namespace, stopRequest.TargetNode)
@@ -58,7 +62,8 @@ func (api *Client) StopWorkload(stopRequest *StopRequest) (*StopResponse, error)
 }
 
 // Attempts to start a workload. The workload URI, at the moment, must always point to a NATS object store
-// bucket in the form of `nats://{bucket}/{key}`
+// bucket in the form of `nats://{bucket}/{key}`. Note that JetStream domains can be supplied on the workload
+// request and aren't part of the bucket+key URL.
 func (api *Client) StartWorkload(request *DeployRequest) (*RunResponse, error) {
 	subject := fmt.Sprintf("%s.DEPLOY.%s.%s", APIPrefix, api.namespace, *request.TargetNode)
 	bytes, err := api.performRequest(subject, request)
@@ -90,8 +95,8 @@ func (api *Client) NodeInfo(nodeId string) (*InfoResponse, error) {
 	return &response, nil
 }
 
-// Attempts to list all nodes. Note that this operation returns all visible nodes regardless of
-// namespace
+// Attempts to list all nodes. Note that any node within the Nexus will respond to this ping, regardless
+// of the namespaces of their running workloads
 func (api *Client) ListNodes() ([]PingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
@@ -128,14 +133,14 @@ func (api *Client) ListNodes() ([]PingResponse, error) {
 	return responses, nil
 }
 
-// A convenience function that subscribes to all available logs and uses
+// A convenience function that subscribes to all available logs and returns
 // an unbuffered, blocking channel
 func (api *Client) MonitorAllLogs() (chan EmittedLog, error) {
 	return api.MonitorLogs("*", "*", "*", "*", 0)
 }
 
 // Creates a NATS subscription to the appropriate log subject. If you do not want to limit
-// the monitor by any of the filters, supply a '*', not an empty string. Bufferlength refers
+// the monitor by any of the filters, supply a '*', not an empty string. Buffer length refers
 // to the size of the channel buffer, where 0 is unbuffered (aka blocking)
 func (api *Client) MonitorLogs(
 	namespaceFilter string,
@@ -177,7 +182,7 @@ func (api *Client) MonitorEvents(
 
 	eventChannel := make(chan EmittedEvent, bufferLength)
 
-	_, err := api.nc.Subscribe(subscribeSubject, handleEventEntry(api, eventChannel))
+	_, err := api.nc.Subscribe(subscribeSubject, handleEventEntry(eventChannel))
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +191,7 @@ func (api *Client) MonitorEvents(
 	// already include it
 	if namespaceFilter != "*" && namespaceFilter != "system" {
 		systemSub := fmt.Sprintf("%s.events.system.*", APIPrefix)
-		_, err = api.nc.Subscribe(systemSub, handleEventEntry(api, eventChannel))
+		_, err = api.nc.Subscribe(systemSub, handleEventEntry(eventChannel))
 		if err != nil {
 			return nil, err
 		}
@@ -195,7 +200,7 @@ func (api *Client) MonitorEvents(
 	return eventChannel, nil
 }
 
-func handleEventEntry(api *Client, ch chan EmittedEvent) func(m *nats.Msg) {
+func handleEventEntry(ch chan EmittedEvent) func(m *nats.Msg) {
 	return func(m *nats.Msg) {
 		tokens := strings.Split(m.Subject, ".")
 		if len(tokens) != 4 {
