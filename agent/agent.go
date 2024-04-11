@@ -70,7 +70,7 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	var metadata *agentapi.MachineMetadata
 	var err error
 
-	if strings.ToLower(os.Getenv(nexEnvSandbox)) == "false" {
+	if !isSandboxed() {
 		metadata, err = GetMachineMetadataFromEnv()
 	} else {
 		metadata, err = GetMachineMetadata()
@@ -293,12 +293,19 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	}
 	a.provider = provider
 
-	err = a.provider.Validate()
-	if err != nil {
-		msg := fmt.Sprintf("Failed to validate workload: %s", err)
-		a.LogError(msg)
-		_ = a.workAck(m, false, msg)
-		return
+	shouldValidate := true
+	if !a.sandboxed && strings.EqualFold(*request.WorkloadType, agentapi.NexExecutionProviderELF) {
+		shouldValidate = false
+	}
+
+	if shouldValidate {
+		err = a.provider.Validate()
+		if err != nil {
+			msg := fmt.Sprintf("Failed to validate workload: %s", err)
+			a.LogError(msg)
+			_ = a.workAck(m, false, msg)
+			return
+		}
 	}
 
 	err = a.provider.Deploy()
@@ -484,5 +491,5 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 }
 
 func isSandboxed() bool {
-	return strings.ToLower(os.Getenv("NEX_SANDBOX")) != "false"
+	return !strings.EqualFold(strings.ToLower(os.Getenv(nexEnvSandbox)), "false")
 }
