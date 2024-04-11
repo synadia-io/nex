@@ -114,6 +114,7 @@ func init() {
 	logs.Flag("level", "Log level filter").Default("debug").StringVar(&WatchOpts.LogLevel)
 
 	rootfs.Flag("script", "Boot script ran during initialization").StringVar(&RootfsOpts.BuildScriptPath)
+	rootfs.Flag("image", "Base image for rootfs build").Default("alpine:latest").StringVar(&RootfsOpts.BaseImage)
 	rootfs.Flag("agent", "Path to agent binary").Required().StringVar(&RootfsOpts.AgentBinaryPath)
 }
 

@@ -92,6 +92,7 @@ type WatchOptions struct {
 }
 
 type RootfsOptions struct {
+	BaseImage       string
 	BuildScriptPath string
 	AgentBinaryPath string
 }

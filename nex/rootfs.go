@@ -8,5 +8,5 @@ import (
 )
 
 func CreateRootFS(ctx context.Context, logger *slog.Logger) error {
-	return rfs.Build("", "", "", RootfsOpts.AgentBinaryPath)
+	return rfs.Build(RootfsOpts.BuildScriptPath, RootfsOpts.BaseImage, RootfsOpts.AgentBinaryPath)
 }

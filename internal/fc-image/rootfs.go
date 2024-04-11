@@ -15,7 +15,7 @@ import (
 
 const defaultRootFsSize = 1024 * 1024 * 150 // 150 MiB
 
-func Build(buildScript, setupScript, rootImg, agentPath string) error {
+func Build(buildScript, baseImg, agentPath string) error {
 	if os.Getuid() != 0 {
 		return errors.New("Please run as root")
 	}
@@ -90,10 +90,10 @@ func Build(buildScript, setupScript, rootImg, agentPath string) error {
 		return errors.New(string(output) + "\n\n" + err.Error())
 	}
 
-	return build(context.Background(), tempdir, mountPoint)
+	return build(context.Background(), tempdir, mountPoint, baseImg)
 }
 
-func build(ctx context.Context, tempdir string, mountPoint string) error {
+func build(ctx context.Context, tempdir, mountPoint, baseImg string) error {
 	client, err := dagger.Connect(ctx,
 		dagger.WithLogOutput(os.Stderr),
 		dagger.WithWorkdir(tempdir),
@@ -109,7 +109,7 @@ func build(ctx context.Context, tempdir string, mountPoint string) error {
 	rootfs := client.Host().Directory("rootfs-mount")
 
 	c := client.Container().
-		From("alpine:latest").
+		From(baseImg).
 		WithEnvVariable("CACHEBUSTER", time.Now().String()).
 		WithUser("root").
 		WithDirectory("/tmp/rootfs", rootfs).
