@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
@@ -116,6 +117,7 @@ func init() {
 	rootfs.Flag("script", "Boot script ran during initialization").StringVar(&RootfsOpts.BuildScriptPath)
 	rootfs.Flag("image", "Base image for rootfs build").Default("alpine:latest").StringVar(&RootfsOpts.BaseImage)
 	rootfs.Flag("agent", "Path to agent binary").Required().StringVar(&RootfsOpts.AgentBinaryPath)
+	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 }
 
 func main() {

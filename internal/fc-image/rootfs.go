@@ -13,9 +13,7 @@ import (
 	"dagger.io/dagger"
 )
 
-const defaultRootFsSize = 1024 * 1024 * 150 // 150 MiB
-
-func Build(buildScript, baseImg, agentPath string) error {
+func Build(buildScript, baseImg, agentPath string, fsSize int) error {
 	if os.Getuid() != 0 {
 		return errors.New("Please run as root")
 	}
@@ -60,7 +58,7 @@ func Build(buildScript, baseImg, agentPath string) error {
 		return err
 	}
 
-	err = fs.Truncate(defaultRootFsSize)
+	err = fs.Truncate(int64(fsSize))
 	if err != nil {
 		return err
 	}
