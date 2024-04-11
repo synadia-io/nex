@@ -145,6 +145,26 @@ type HandshakeRequest struct {
 type HandshakeResponse struct {
 }
 
+type HostServicesHTTPRequest struct {
+	Method string `json:"method"`
+	URL    string `json:"url"`
+
+	Body    *string          `json:"body,omitempty"`
+	Headers *json.RawMessage `json:"headers,omitempty"`
+
+	// FIXME-- this is very poorly named currently...
+	//these params are parsed as an object and serialized as part of the query string
+	Params *json.RawMessage `json:"params,omitempty"`
+}
+
+type HostServicesHTTPResponse struct {
+	Status  int              `json:"status"`
+	Headers *json.RawMessage `json:"headers,omitempty"`
+	Body    string           `json:"body"`
+
+	Error *string `json:"error,omitempty"`
+}
+
 type HostServicesKeyValueRequest struct {
 	Key   *string          `json:"key"`
 	Value *json.RawMessage `json:"value,omitempty"`

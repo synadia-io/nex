@@ -1,6 +1,8 @@
 module github.com/synadia-io/nex
 
-go 1.21
+go 1.21.5
+
+toolchain go1.21.6
 
 require (
 	dagger.io/dagger v0.9.6
@@ -28,6 +30,7 @@ require (
 	github.com/rs/xid v1.5.0
 	github.com/splode/fname v0.4.1
 	github.com/tetratelabs/wazero v1.6.0
+	github.com/vincent-petithory/dataurl v1.0.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.24.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.24.0
@@ -45,7 +48,7 @@ require (
 require (
 	github.com/99designs/gqlgen v0.17.31 // indirect
 	github.com/Khan/genqlient v0.6.0 // indirect
-	github.com/Microsoft/go-winio v0.4.17 // indirect
+	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
@@ -130,6 +133,7 @@ require (
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/crypto v0.18.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.20.0 // indirect
 	golang.org/x/sync v0.5.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
