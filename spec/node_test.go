@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -24,6 +27,7 @@ import (
 	"github.com/nats-io/nkeys"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/rs/xid"
 
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -664,7 +668,138 @@ var _ = Describe("nex node", func() {
 												})
 											})
 										})
+									})
 
+									Context("http service", func() {
+										var ts *httptest.Server
+
+										Context("when the javascript is valid", func() {
+											JustBeforeEach(func() {
+												ts.Start()
+
+												exbytes, err := os.ReadFile("../examples/v8/echofunction/src/http.js")
+												Expect(err).To(BeNil())
+
+												var jsexample string
+
+												if sandbox {
+													jsexample = strings.ReplaceAll(string(exbytes), "https://example.org", fmt.Sprintf("http://192.168.127.1:%d", ts.Listener.Addr().(*net.TCPAddr).Port))
+												} else {
+													jsexample = strings.ReplaceAll(string(exbytes), "https://example.org", fmt.Sprintf("http://127.0.0.1:%d", ts.Listener.Addr().(*net.TCPAddr).Port))
+												}
+
+												filename := xid.New()
+												tmpfilePath := path.Join(os.TempDir(), fmt.Sprintf("http-hostservice-example-%s.js", filename.String()))
+												err = os.WriteFile(tmpfilePath, []byte(jsexample), 0644)
+												Expect(err).To(BeNil())
+
+												triggerSubject = "hellohttpservice"
+												deployRequest, err = newDeployRequest(*nodeID, "httphostservice", "nex http service example", tmpfilePath, map[string]string{}, []string{triggerSubject}, log)
+												Expect(err).To(BeNil())
+
+												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*3000, "default", log)
+												_, err = nodeClient.StartWorkload(deployRequest)
+												Expect(err).To(BeNil())
+
+												os.Remove(tmpfilePath)
+												time.Sleep(time.Millisecond * 1000)
+											})
+
+											Describe("triggering the deployed function", func() {
+												type hostServicesExampleHttpResp struct {
+													Status  int             `json:"status"`
+													Headers json.RawMessage `json:"headers"`
+													Body    *string         `json:"body"`
+												}
+
+												type hostServicesExampleResp struct {
+													Get    *hostServicesExampleHttpResp `json:"get"`
+													Post   *hostServicesExampleHttpResp `json:"post"`
+													Put    *hostServicesExampleHttpResp `json:"put"`
+													Patch  *hostServicesExampleHttpResp `json:"patch"`
+													Delete *hostServicesExampleHttpResp `json:"delete"`
+													Head   *hostServicesExampleHttpResp `json:"head"`
+												}
+
+												var respmsg *nats.Msg
+												var resp *hostServicesExampleResp
+
+												BeforeEach(func() {
+													ts = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+														switch r.Method {
+														case http.MethodGet:
+															w.WriteHeader(200)
+														case http.MethodPost:
+															w.WriteHeader(201)
+														case http.MethodPut:
+															w.WriteHeader(204)
+														case http.MethodPatch:
+															w.WriteHeader(204)
+														case http.MethodDelete:
+															w.WriteHeader(204)
+														case http.MethodHead:
+															w.WriteHeader(200)
+														default:
+															// no-op
+														}
+													}))
+
+													ts.EnableHTTP2 = true
+													ts.Listener.Close()
+
+													listener, err := net.Listen("tcp", ":0")
+													Expect(err).To(BeNil())
+
+													ts.Listener = listener
+												})
+
+												AfterEach(func() {
+													ts.Close()
+													ts = nil
+
+													respmsg = nil
+												})
+
+												JustBeforeEach(func() {
+													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("payload"), time.Millisecond*5000)
+													Expect(err).To(BeNil())
+
+													err = json.Unmarshal(respmsg.Data, &resp)
+													Expect(err).To(BeNil())
+													Expect(resp).ToNot(BeNil())
+												})
+
+												It("should send a GET request to the configured endpoint", func(ctx SpecContext) {
+													Expect(resp.Get).NotTo(BeNil())
+													Expect(resp.Get.Status).To(Equal(200))
+												})
+
+												It("should send a POST request to the configured endpoint", func(ctx SpecContext) {
+													Expect(resp.Post).NotTo(BeNil())
+													Expect(resp.Post.Status).To(Equal(201))
+												})
+
+												It("should send a PUT request to the configured endpoint", func(ctx SpecContext) {
+													Expect(resp.Put).NotTo(BeNil())
+													Expect(resp.Put.Status).To(Equal(204))
+												})
+
+												It("should send a PATCH request to the configured endpoint", func(ctx SpecContext) {
+													Expect(resp.Patch).NotTo(BeNil())
+													Expect(resp.Patch.Status).To(Equal(204))
+												})
+
+												It("should send a DELETE request to the configured endpoint", func(ctx SpecContext) {
+													Expect(resp.Delete).NotTo(BeNil())
+													Expect(resp.Delete.Status).To(Equal(204))
+												})
+
+												It("should send a HEAD request to the configured endpoint", func(ctx SpecContext) {
+													Expect(resp.Head).NotTo(BeNil())
+													Expect(resp.Head.Status).To(Equal(200))
+												})
+											})
+										})
 									})
 								})
 							})
