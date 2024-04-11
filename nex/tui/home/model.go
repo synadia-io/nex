@@ -12,7 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/nats-io/nats.go"
-	controlapi "github.com/synadia-io/nex/internal/control-api"
+	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/nex/tui/format"
 	"golang.org/x/term"
 )

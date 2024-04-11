@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/inhies/go-bytesize"
 
-	controlapi "github.com/synadia-io/nex/internal/control-api"
+	controlapi "github.com/synadia-io/nex/control-api"
 )
 
 var (
