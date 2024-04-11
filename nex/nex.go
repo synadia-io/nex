@@ -31,7 +31,7 @@ var (
 	_    = ncli.HelpFlag.Short('h')
 	_    = ncli.WithCheats().CheatCommand.Hidden()
 
-	tui   = ncli.Command("tui", "Start the Nex TUI").Alias("ui")
+	tui   = ncli.Command("tui", "Start the Nex TUI [BETA]").Alias("ui")
 	nodes = ncli.Command("node", "Interact with execution engine nodes")
 	run   = ncli.Command("run", "Run a workload on a target node")
 	yeet  = ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
