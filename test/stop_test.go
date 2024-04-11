@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nkeys"
-	. "github.com/synadia-io/nex/internal/control-api"
+	. "github.com/synadia-io/nex/control-api"
 )
 
 func TestStopValidation(t *testing.T) {

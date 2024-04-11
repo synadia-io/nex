@@ -10,8 +10,8 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/google/uuid"
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {

@@ -10,7 +10,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
 
-	. "github.com/synadia-io/nex/internal/control-api"
+	. "github.com/synadia-io/nex/control-api"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

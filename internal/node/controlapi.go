@@ -13,8 +13,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/pkg/errors"
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	controlapi "github.com/synadia-io/nex/internal/control-api"
 )
 
 // The API listener is the command and control interface for the node server

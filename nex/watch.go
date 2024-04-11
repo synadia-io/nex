@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cdfmlr/ellipsis"
-	controlapi "github.com/synadia-io/nex/internal/control-api"
+	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/internal/models"
 )
 
