@@ -30,8 +30,6 @@ type HomeModel struct {
 	selectedNode     nexNode
 	selectedWorkload workload
 
-	msg string
-
 	nc *nats.Conn
 
 	nodeList     list.Model
@@ -40,8 +38,6 @@ type HomeModel struct {
 	workloadData viewport.Model
 
 	selectedList int
-
-	keyMap keyMap
 
 	help help.Model
 }
