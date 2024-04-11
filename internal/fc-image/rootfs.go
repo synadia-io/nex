@@ -1,8 +1,9 @@
-package main
+package rootfs
 
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,104 +15,82 @@ import (
 
 const defaultRootFsSize = 1024 * 1024 * 150 // 150 MiB
 
-func main() {
+func Build(buildScript, setupScript, rootImg, agentPath string) error {
 	if os.Getuid() != 0 {
-		fmt.Println("Please run as root")
-		return
+		return errors.New("Please run as root")
 	}
-
-	if len(os.Args) < 1 {
-		fmt.Println("Please provide path the agent binary")
-		return
-	}
-
 	mkfsext4, err := exec.LookPath("mkfs.ext4")
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	tempdir, err := os.MkdirTemp(os.TempDir(), "dagger-*")
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 	defer os.RemoveAll(tempdir)
 
 	err = os.WriteFile(filepath.Join(tempdir, "openrc-service.sh"), []byte(openrc_service), 0644)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	err = os.WriteFile(filepath.Join(tempdir, "setup-alpine.sh"), []byte(setup_alpine), 0644)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
-	input, err := os.ReadFile(os.Args[1])
+	input, err := os.ReadFile(agentPath)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	err = os.WriteFile(filepath.Join(tempdir, "nex-agent"), input, 0644)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	fs, err := os.Create(filepath.Join(tempdir, "rootfs.ext4"))
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	err = os.Chmod(filepath.Join(tempdir, "rootfs.ext4"), 0777)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	err = fs.Truncate(defaultRootFsSize)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	err = fs.Close()
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	cmd := exec.Command(mkfsext4, filepath.Join(tempdir, "rootfs.ext4"))
-	output, err := cmd.Output()
+	_, err = cmd.Output()
 	if err != nil {
-		fmt.Println(string(output), err)
-		return
+		return err
 	}
 
 	err = os.MkdirAll(filepath.Join(tempdir, "rootfs-mount"), 0777)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
 	device := filepath.Join(tempdir, "rootfs.ext4")
 	mountPoint := filepath.Join(tempdir, "rootfs-mount")
 
 	cmd = exec.Command("mount", device, mountPoint)
-	output, err = cmd.Output()
+	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println(string(output), err)
-		return
+		return errors.New(string(output) + "\n\n" + err.Error())
 	}
 
-	if err := build(context.Background(), tempdir, mountPoint); err != nil {
-		fmt.Println(err)
-	}
+	return build(context.Background(), tempdir, mountPoint)
 }
 
 func build(ctx context.Context, tempdir string, mountPoint string) error {

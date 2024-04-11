@@ -1,4 +1,4 @@
-package main
+package rootfs
 
 const (
 	openrc_service = `#!/sbin/openrc-run
