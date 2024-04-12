@@ -8,18 +8,31 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"dagger.io/dagger"
 )
 
-func Build(buildScript, baseImg, agentPath string, fsSize int) error {
+func Build(buildScript, baseImg, agentPath string, fsSize int, systemd bool) error {
 	if os.Getuid() != 0 {
 		return errors.New("Please run as root")
 	}
+
+	if baseImg == "" {
+		switch runtime.GOARCH {
+		case "amd64":
+			baseImg = "ghcr.io/synadia-io/nex/nex_alpine:latest"
+		case "arm64":
+			baseImg = "ghcr.io/synadia-io/nex/nex_debian:latest"
+		default:
+			return errors.New("please provide a base image")
+		}
+	}
+
 	mkfsext4, err := exec.LookPath("mkfs.ext4")
 	if err != nil {
-		return err
+		return errors.New("'mkfs.ext4' not found in $PATH: " + err.Error())
 	}
 
 	tempdir, err := os.MkdirTemp(os.TempDir(), "dagger-*")
@@ -28,12 +41,19 @@ func Build(buildScript, baseImg, agentPath string, fsSize int) error {
 	}
 	defer os.RemoveAll(tempdir)
 
-	err = os.WriteFile(filepath.Join(tempdir, "openrc-service.sh"), []byte(openrc_service), 0644)
+	// determine if using openrc or systemd
+	serviceFile := "openrc-service.sh"
+	serviceContent := openrc_service
+	if systemd {
+		serviceFile = "agent.service"
+		serviceContent = systemd_service
+	}
+	err = os.WriteFile(filepath.Join(tempdir, serviceFile), []byte(serviceContent), 0644)
 	if err != nil {
 		return err
 	}
 
-	err = os.WriteFile(filepath.Join(tempdir, "setup-alpine.sh"), []byte(setup_alpine), 0644)
+	err = os.WriteFile(filepath.Join(tempdir, "copy_fs.sh"), []byte(copy_fs), 0644)
 	if err != nil {
 		return err
 	}
@@ -101,20 +121,20 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg string) error {
 	}
 	defer client.Close()
 
-	orcFile := client.Host().File("openrc-service.sh")
-	bootstrapScript := client.Host().File("setup-alpine.sh")
+	copyFsScript := client.Host().File("copy_fs.sh")
 	nexagent := client.Host().File("nex-agent")
 	rootfs := client.Host().Directory("rootfs-mount")
 
-	c := client.Container().
+	c := client.Container(
+		dagger.ContainerOpts{Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH)},
+	).
 		From(baseImg).
 		WithEnvVariable("CACHEBUSTER", time.Now().String()).
 		WithUser("root").
+		WithFile("/copy_fs.sh", copyFsScript).
 		WithDirectory("/tmp/rootfs", rootfs).
-		WithMountedFile("/etc/init.d/agent", orcFile).
 		WithMountedFile("/usr/local/bin/agent", nexagent).
-		WithMountedFile("/setup-alpine.sh", bootstrapScript).
-		WithExec([]string{"sh", "/setup-alpine.sh"}).
+		WithExec([]string{"sh", "/copy_fs.sh"}).
 		WithExec([]string{"chown", "1000:1000", "/etc/init.d/agent"}).
 		WithExec([]string{"chown", "-R", "1000:1000", "/home/nex"}).
 		WithExec([]string{"chown", "1000:1000", "/usr/local/bin/agent"})

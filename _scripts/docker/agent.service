@@ -1,0 +1,19 @@
+[Unit]
+Description=Nex Agent
+After=network.target
+
+[Service]
+User=nex
+Group=nex
+ExecStart=/usr/local/bin/agent
+KillSignal=SIGINT
+StandardOutput=file:/home/user/nex.log
+StandardError=file:/home/user/err.log
+Type=simple
+Restart=always
+
+
+[Install]
+WantedBy=default.target
+RequiredBy=network.target
+

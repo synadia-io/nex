@@ -16,6 +16,26 @@ depend() {
 	after net.eth0
 }`
 
+	systemd_service = `[Unit]
+Description=Nex Agent
+After=network.target
+
+[Service]
+User=nex
+Group=nex
+ExecStart=/usr/local/bin/agent
+KillSignal=SIGINT
+StandardOutput=file:/home/user/nex.log
+StandardError=file:/home/user/err.log
+Type=simple
+Restart=always
+
+
+[Install]
+WantedBy=default.target
+RequiredBy=network.target
+`
+
 	setup_alpine = `#!/bin/sh
 
 set -xe
@@ -40,6 +60,19 @@ rc-update add sysfs boot
 
 # This is our script that runs nex-agent
 rc-update add agent boot
+
+for d in bin etc lib root sbin usr; do tar c "/$d" | tar x -C /tmp/rootfs; done
+for dir in dev proc run sys var tmp; do mkdir /tmp/rootfs/${dir}; done
+
+chmod 1777 /tmp/rootfs/tmp
+mkdir -p /tmp/rootfs/home/nex/
+chown 1000:1000 /tmp/rootfs/home/nex/`
+
+	setup_debian = `#!/bin/sh
+`
+
+	copy_fs = `#!/bin/sh
+set -xe
 
 for d in bin etc lib root sbin usr; do tar c "/$d" | tar x -C /tmp/rootfs; done
 for dir in dev proc run sys var tmp; do mkdir /tmp/rootfs/${dir}; done
