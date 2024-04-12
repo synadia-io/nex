@@ -353,40 +353,6 @@ func summarizeMachines(workloads []controlapi.MachineSummary, namespace string) 
 	return machines
 }
 
-// func summarizeMachines(vms *map[string]*runningFirecracker, namespace string) []controlapi.MachineSummary {
-// 	machines := make([]controlapi.MachineSummary, 0)
-// 	now := time.Now().UTC()
-// 	for _, v := range *vms {
-// 		if v.namespace == namespace {
-// 			var desc string
-// 			if v.deployRequest.Description != nil {
-// 				desc = *v.deployRequest.Description // FIXME-- audit controlapi.WorkloadSummary
-// 			}
-
-// 			var workloadType string
-// 			if v.deployRequest.WorkloadType != nil {
-// 				workloadType = *v.deployRequest.WorkloadType
-// 			}
-
-// 			machine := controlapi.MachineSummary{
-// 				Id:      v.vmmID,
-// 				Healthy: true, // TODO cache last health status
-// 				Uptime:  myUptime(now.Sub(v.machineStarted)),
-// 				Workload: controlapi.WorkloadSummary{
-// 					Name:         v.deployRequest.DecodedClaims.Subject,
-// 					Description:  desc,
-// 					Runtime:      myUptime(now.Sub(v.workloadStarted)),
-// 					WorkloadType: workloadType,
-// 					//Hash:         v.deployedWorkload.DecodedClaims.Data["hash"].(string),
-// 				},
-// 			}
-
-// 			machines = append(machines, machine)
-// 		}
-// 	}
-// 	return machines
-// }
-
 func validateIssuer(issuer string, validIssuers []string) bool {
 	if len(validIssuers) == 0 {
 		return true

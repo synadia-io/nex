@@ -86,7 +86,7 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 			cols.Println()
 			cols.AddRow("Id", m.Id)
 			cols.AddRow("Healthy", m.Healthy)
-			cols.AddRow("Runtime", m.Uptime)
+			cols.AddRow("Runtime", m.Workload.Runtime)
 			cols.AddRow("Name", m.Workload.Name)
 			cols.AddRow("Description", m.Workload.Description)
 		}
