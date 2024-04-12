@@ -167,7 +167,7 @@ func (a *AgentClient) Undeploy() error {
 }
 
 func (a *AgentClient) RecordExecTime(elapsedNanos int64) {
-	a.execTotalNanos += elapsedNanos
+	atomic.AddInt64(&a.execTotalNanos, elapsedNanos)
 }
 
 func (a *AgentClient) ExecTimeNanos() int64 {
