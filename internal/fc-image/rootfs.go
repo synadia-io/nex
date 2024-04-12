@@ -120,28 +120,43 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg string, withBuildSc
 	nexagent := client.Host().File("nex-agent")
 	rootfs := client.Host().Directory("rootfs-mount")
 
-	c := client.Container(
-		dagger.ContainerOpts{
-			Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH),
-		},
-	).
-		From(baseImg).
-		WithEnvVariable("CACHEBUSTER", time.Now().String()).
-		WithUser("root").
-		WithDirectory("/tmp/rootfs", rootfs).
-		WithMountedFile("/usr/local/bin/agent", nexagent)
+	var c *dagger.Container
+	if !withBuildScript {
+		c = client.Container(
+			dagger.ContainerOpts{
+				Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH),
+			},
+		).From(baseImg).
+			WithEnvVariable("CACHEBUSTER", time.Now().String()).
+			WithUser("root").
+			WithDirectory("/tmp/rootfs", rootfs).
+			WithMountedFile("/usr/local/bin/agent", nexagent).
+			WithFile("/copy_fs.sh", copyFsScript).
+			WithExec([]string{"sh", "/copy_fs.sh"}).
+			WithExec([]string{"chown", "1000:1000", "/etc/init.d/agent"}).
+			WithExec([]string{"chown", "-R", "1000:1000", "/home/nex"}).
+			WithExec([]string{"chown", "1000:1000", "/usr/local/bin/agent"})
 
-	if withBuildScript {
+	} else {
 		buildScript := client.Host().File("buildscript.sh")
-		c.WithFile("/buildscript.sh", buildScript).
-			WithExec([]string{"sh", "/buildscript.sh"})
-	}
+		c = client.Container(
+			dagger.ContainerOpts{
+				Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH),
+			},
+		).From(baseImg).
+			WithEnvVariable("CACHEBUSTER", time.Now().String()).
+			WithUser("root").
+			WithDirectory("/tmp/rootfs", rootfs).
+			WithMountedFile("/usr/local/bin/agent", nexagent).
+			WithFile("/buildscript.sh", buildScript).
+			WithExec([]string{"sh", "/buildscript.sh"}).
+			WithFile("/copy_fs.sh", copyFsScript).
+			WithExec([]string{"sh", "/copy_fs.sh"}).
+			WithExec([]string{"chown", "1000:1000", "/etc/init.d/agent"}).
+			WithExec([]string{"chown", "-R", "1000:1000", "/home/nex"}).
+			WithExec([]string{"chown", "1000:1000", "/usr/local/bin/agent"})
 
-	c.WithFile("/copy_fs.sh", copyFsScript).
-		WithExec([]string{"sh", "/copy_fs.sh"}).
-		WithExec([]string{"chown", "1000:1000", "/etc/init.d/agent"}).
-		WithExec([]string{"chown", "-R", "1000:1000", "/home/nex"}).
-		WithExec([]string{"chown", "1000:1000", "/usr/local/bin/agent"})
+	}
 
 	_, err = c.Directory("/tmp/rootfs").
 		Export(ctx, "./rootfs-mount")

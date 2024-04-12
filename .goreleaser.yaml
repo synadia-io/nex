@@ -44,7 +44,7 @@ builds:
       - netgo
     hooks:
       post:
-        - sudo go run ./agent/fc-image/. {{.Path}} 
+        - sudo go run ./nex/. fs --agent {{.Path}} --image cjrash/nex_alpine:latest
 
 archives:
   - id: binaries
