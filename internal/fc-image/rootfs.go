@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -33,6 +34,23 @@ func Build(buildScript, baseImg, agentPath string, fsSize int) error {
 		return err
 	}
 	defer os.RemoveAll(tempdir)
+
+	var bS *os.File
+	if buildScript != "" {
+		var err error
+		bS, err = os.Open(buildScript)
+		if err != nil {
+			return err
+		}
+		bS_r, err := io.ReadAll(bS)
+		if err != nil {
+			return nil
+		}
+		err = os.WriteFile(filepath.Join(tempdir, "buildscript.sh"), bS_r, 0644)
+		if err != nil {
+			return err
+		}
+	}
 
 	err = os.WriteFile(filepath.Join(tempdir, "copy_fs.sh"), []byte(copy_fs), 0644)
 	if err != nil {
@@ -89,10 +107,10 @@ func Build(buildScript, baseImg, agentPath string, fsSize int) error {
 		return errors.New(string(output) + "\n\n" + err.Error())
 	}
 
-	return build(context.Background(), tempdir, mountPoint, baseImg)
+	return build(context.Background(), tempdir, mountPoint, baseImg, bS != nil)
 }
 
-func build(ctx context.Context, tempdir, mountPoint, baseImg string) error {
+func build(ctx context.Context, tempdir, mountPoint, baseImg string, withBuildScript bool) error {
 	client, err := dagger.Connect(ctx,
 		dagger.WithLogOutput(os.Stderr),
 		dagger.WithWorkdir(tempdir),
@@ -114,9 +132,16 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg string) error {
 		From(baseImg).
 		WithEnvVariable("CACHEBUSTER", time.Now().String()).
 		WithUser("root").
-		WithFile("/copy_fs.sh", copyFsScript).
 		WithDirectory("/tmp/rootfs", rootfs).
-		WithMountedFile("/usr/local/bin/agent", nexagent).
+		WithMountedFile("/usr/local/bin/agent", nexagent)
+
+	if withBuildScript {
+		buildScript := client.Host().File("buildscript.sh")
+		c.WithFile("/buildscript.sh", buildScript).
+			WithExec([]string{"sh", "/buildscript.sh"})
+	}
+
+	c.WithFile("/copy_fs.sh", copyFsScript).
 		WithExec([]string{"sh", "/copy_fs.sh"}).
 		WithExec([]string{"chown", "1000:1000", "/etc/init.d/agent"}).
 		WithExec([]string{"chown", "-R", "1000:1000", "/home/nex"}).
