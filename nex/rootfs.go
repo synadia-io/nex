@@ -13,6 +13,5 @@ func CreateRootFS(ctx context.Context, logger *slog.Logger) error {
 		RootfsOpts.BaseImage,
 		RootfsOpts.AgentBinaryPath,
 		RootfsOpts.RootFSSize,
-		RootfsOpts.Systemd,
 	)
 }

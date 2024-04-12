@@ -118,7 +118,6 @@ func init() {
 	rootfs.Flag("image", "Base image for rootfs build").PlaceHolder("nex_alpine:latest").StringVar(&RootfsOpts.BaseImage)
 	rootfs.Flag("agent", "Path to agent binary").Required().StringVar(&RootfsOpts.AgentBinaryPath)
 	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
-	rootfs.Flag("systemd", "Uses systemd over open-rc to start the agent").Default("false").UnNegatableBoolVar(&RootfsOpts.Systemd)
 }
 
 func main() {

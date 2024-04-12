@@ -19,3 +19,9 @@ RUN rc-update add procfs boot
 RUN rc-update add sysfs boot
 
 RUN rc-update add agent boot
+
+# └─❯ docker buildx build \
+# --push \
+# --platform linux/arm/v7,linux/arm64/v8,linux/amd64 \ 
+# --tag cjrash/nex-alpine:latest \ 
+# -f Dockerfile.alpine .

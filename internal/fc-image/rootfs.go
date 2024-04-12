@@ -14,20 +14,13 @@ import (
 	"dagger.io/dagger"
 )
 
-func Build(buildScript, baseImg, agentPath string, fsSize int, systemd bool) error {
+func Build(buildScript, baseImg, agentPath string, fsSize int) error {
 	if os.Getuid() != 0 {
 		return errors.New("Please run as root")
 	}
 
 	if baseImg == "" {
-		switch runtime.GOARCH {
-		case "amd64":
-			baseImg = "ghcr.io/synadia-io/nex/nex_alpine:latest"
-		case "arm64":
-			baseImg = "ghcr.io/synadia-io/nex/nex_debian:latest"
-		default:
-			return errors.New("please provide a base image")
-		}
+		baseImg = "ghcr.io/synadia-io/nex/nex_alpine:latest"
 	}
 
 	mkfsext4, err := exec.LookPath("mkfs.ext4")
@@ -40,18 +33,6 @@ func Build(buildScript, baseImg, agentPath string, fsSize int, systemd bool) err
 		return err
 	}
 	defer os.RemoveAll(tempdir)
-
-	// determine if using openrc or systemd
-	serviceFile := "openrc-service.sh"
-	serviceContent := openrc_service
-	if systemd {
-		serviceFile = "agent.service"
-		serviceContent = systemd_service
-	}
-	err = os.WriteFile(filepath.Join(tempdir, serviceFile), []byte(serviceContent), 0644)
-	if err != nil {
-		return err
-	}
 
 	err = os.WriteFile(filepath.Join(tempdir, "copy_fs.sh"), []byte(copy_fs), 0644)
 	if err != nil {
@@ -126,7 +107,9 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg string) error {
 	rootfs := client.Host().Directory("rootfs-mount")
 
 	c := client.Container(
-		dagger.ContainerOpts{Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH)},
+		dagger.ContainerOpts{
+			Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH),
+		},
 	).
 		From(baseImg).
 		WithEnvVariable("CACHEBUSTER", time.Now().String()).
