@@ -20,10 +20,6 @@ func Build(buildScript, baseImg, agentPath string, fsSize int) error {
 		return errors.New("Please run as root")
 	}
 
-	if baseImg == "" {
-		baseImg = "ghcr.io/synadia-io/nex/nex_alpine:latest"
-	}
-
 	mkfsext4, err := exec.LookPath("mkfs.ext4")
 	if err != nil {
 		return errors.New("'mkfs.ext4' not found in $PATH: " + err.Error())

@@ -114,9 +114,9 @@ func init() {
 	logs.Flag("workload_id", "ID of the workload machine to filter on").Default("*").StringVar(&WatchOpts.WorkloadId)
 	logs.Flag("level", "Log level filter").Default("debug").StringVar(&WatchOpts.LogLevel)
 
-	rootfs.Flag("script", "Boot script ran during initialization").StringVar(&RootfsOpts.BuildScriptPath)
-	rootfs.Flag("image", "Base image for rootfs build").PlaceHolder("nex_alpine:latest").StringVar(&RootfsOpts.BaseImage)
-	rootfs.Flag("agent", "Path to agent binary").Required().StringVar(&RootfsOpts.AgentBinaryPath)
+	rootfs.Flag("script", "Additional boot script ran during initialization").PlaceHolder("script.sh").StringVar(&RootfsOpts.BuildScriptPath)
+	rootfs.Flag("image", "Base image for rootfs build").Default("synadia/nex-rootfs:alpine").StringVar(&RootfsOpts.BaseImage)
+	rootfs.Flag("agent", "Path to agent binary").PlaceHolder("../path/to/nex-agent").Required().StringVar(&RootfsOpts.AgentBinaryPath)
 	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 }
 
