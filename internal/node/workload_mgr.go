@@ -293,15 +293,39 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 	summaries := make([]controlapi.MachineSummary, len(procs))
 
 	for i, p := range procs {
+		uptimeFriendly := "unknown"
+		runtimeFriendly := "unknown"
+		agentClient, ok := w.activeAgents[p.ID]
+		if ok {
+			uptimeFriendly = myUptime(agentClient.UptimeMillis())
+			if *p.DeployRequest.WorkloadType == "v8" || *p.DeployRequest.WorkloadType == "wasm" {
+				nanoTime := fmt.Sprintf("%dns", agentClient.ExecTimeNanos())
+				rt, err := time.ParseDuration(nanoTime)
+				if err == nil {
+					if rt.Nanoseconds() < 1000 {
+						runtimeFriendly = nanoTime
+					} else if rt.Milliseconds() < 1000 {
+						runtimeFriendly = fmt.Sprintf("%dms", rt.Milliseconds())
+					} else {
+						runtimeFriendly = myUptime(rt)
+					}
+				} else {
+					w.log.Warn("Failed to generate parsed time from nanos", slog.Any("error", err))
+				}
+			} else {
+				runtimeFriendly = uptimeFriendly
+			}
+		}
+
 		summaries[i] = controlapi.MachineSummary{
 			Id:        p.ID,
 			Healthy:   true,
-			Uptime:    "TBD",
+			Uptime:    uptimeFriendly,
 			Namespace: p.Namespace,
 			Workload: controlapi.WorkloadSummary{
 				Name:         p.Name,
 				Description:  *p.DeployRequest.WorkloadName,
-				Runtime:      "TBD", // TODO: replace with function exec time OR service uptime
+				Runtime:      runtimeFriendly,
 				WorkloadType: *p.DeployRequest.WorkloadType,
 				Hash:         p.DeployRequest.Hash,
 			},
@@ -479,6 +503,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 				w.log.Warn("failed to log function runtime", slog.Any("err", err))
 			}
 			_ = w.publishFunctionExecSucceeded(workloadID, tsub, runTimeNs64)
+			agentClient.RecordExecTime(runTimeNs64)
 			parentSpan.AddEvent("published success event")
 
 			w.t.FunctionTriggers.Add(w.ctx, 1)

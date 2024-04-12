@@ -38,6 +38,9 @@ type AgentClient struct {
 	eventReceived      EventCallback
 	logReceived        LogCallback
 
+	execTotalNanos    int64
+	workloadStartedAt time.Time
+
 	subz []*nats.Subscription
 }
 
@@ -125,6 +128,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		a.log.Error("Failed to deserialize deployment response", slog.Any("error", err))
 		return nil, err
 	}
+	a.workloadStartedAt = time.Now().UTC()
 	return &deployResponse, nil
 }
 
@@ -160,6 +164,19 @@ func (a *AgentClient) Undeploy() error {
 		return err
 	}
 	return nil
+}
+
+func (a *AgentClient) RecordExecTime(elapsedNanos int64) {
+	atomic.AddInt64(&a.execTotalNanos, elapsedNanos)
+}
+
+func (a *AgentClient) ExecTimeNanos() int64 {
+	return a.execTotalNanos
+}
+
+// Returns the time difference between now and when the agent started
+func (a *AgentClient) UptimeMillis() time.Duration {
+	return time.Since(a.workloadStartedAt)
 }
 
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
