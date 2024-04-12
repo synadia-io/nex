@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/choria-io/fisk v0.6.2
 	github.com/cloudevents/sdk-go v1.2.0
+	github.com/docker/docker v26.0.1+incompatible
 	github.com/fatih/color v1.16.0
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0
 	github.com/google/uuid v1.6.0
@@ -21,6 +22,8 @@ require (
 	github.com/nats-io/nats.go v1.34.1
 	github.com/nats-io/natscli v0.1.4
 	github.com/nats-io/nkeys v0.4.7
+	github.com/onsi/ginkgo/v2 v2.16.0
+	github.com/onsi/gomega v1.31.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.0
 	github.com/rs/xid v1.5.0
@@ -44,6 +47,7 @@ require (
 require (
 	github.com/99designs/gqlgen v0.17.45 // indirect
 	github.com/Khan/genqlient v0.7.0 // indirect
+	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
@@ -53,10 +57,15 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/console v1.0.4 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
+	github.com/containerd/log v0.1.0 // indirect
 	github.com/containernetworking/cni v1.1.2 // indirect
 	github.com/containernetworking/plugins v1.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/distribution/reference v0.6.0 // indirect
+	github.com/docker/go-connections v0.5.0 // indirect
+	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -70,7 +79,11 @@ require (
 	github.com/go-openapi/strfmt v0.23.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/go-openapi/validate v0.24.0 // indirect
+	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
+	github.com/gogo/protobuf v1.2.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/pprof v0.0.0-20230323073829-e72429f035bd // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -86,12 +99,17 @@ require (
 	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.1-0.20231216201459-8508981c8b6c // indirect
+	github.com/moby/docker-image-spec v1.3.1 // indirect
+	github.com/moby/term v0.5.0 // indirect
+	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
@@ -105,20 +123,24 @@ require (
 	github.com/vishvananda/netns v0.0.4 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.50.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.2.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8 // indirect
+	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/tools v0.20.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240412170617-26222e5d3d56 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240412170617-26222e5d3d56 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gotest.tools/v3 v3.5.1 // indirect
 )
 
 replace github.com/firecracker-microvm/firecracker-go-sdk => github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240124162534-a5295226c294
