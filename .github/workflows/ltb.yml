@@ -24,8 +24,10 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VER }}
-    - name: golangci-lint
-      uses: golangci/golangci-lint-action@v4
+        cache: false
+    - 
+      name: golangci-lint
+      uses: golangci/golangci-lint-action@v5
       with:
         version: latest
 
