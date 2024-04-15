@@ -55,9 +55,9 @@ jobs:
       name: Run spec suite
       working-directory: .
       run: |
-        sudo go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
-        sudo ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+        sudo -E $GOBIN/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
       name: Run test suite
       working-directory: .
