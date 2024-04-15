@@ -104,6 +104,10 @@ func (request *DeployRequest) SupportsTriggerSubjects() bool {
 func (r *DeployRequest) Validate() error {
 	var err error
 
+	if r.Namespace == nil {
+		err = errors.Join(err, errors.New("namespace is required"))
+	}
+
 	if r.WorkloadName == nil {
 		err = errors.Join(err, errors.New("workload name is required"))
 	}
