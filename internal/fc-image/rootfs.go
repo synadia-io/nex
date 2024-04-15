@@ -164,6 +164,10 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg string, withBuildSc
 		return err
 	}
 
+	err = os.Chmod(filepath.Join(mountPoint, "/usr/local/bin/agent"), 0775)
+	if err != nil {
+		return err
+	}
 	err = os.Chown(filepath.Join(mountPoint, "/home/nex"), 1000, 1000)
 	if err != nil {
 		return err
