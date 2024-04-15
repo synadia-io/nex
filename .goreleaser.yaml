@@ -35,8 +35,16 @@ builds:
     binary: "nex-agent"
     goos:
       - linux
+      - darwin
+      - windows
     goarch:
       - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: arm64
     ldflags:
       - -s -w --X github.com/synadia-io/nex/agent.VERSION={{.Version}} -X github.com/synadia-io/nex/agent.COMMIT={{.Commit}} -X github.com/synadia-io/nex/agent.BUILDDATE={{.Date}}
       - -extldflags "-static"
