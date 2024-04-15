@@ -54,14 +54,19 @@ jobs:
     - 
       name: Run spec suite
       working-directory: .
+      if: ${{ matrix.os }} == ubuntu-latest
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
-        if [[ $(go env GOOS) == 'window' ]]; then
-          $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
-        else
-          sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
-        fi
+        sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+    - 
+      name: Run spec suite
+      working-directory: .
+      if: ${{ matrix.os }} == windows-latest
+      run: |
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+        go mod tidy
+        $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
 
     - 
       name: Run test suite
