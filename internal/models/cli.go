@@ -91,6 +91,13 @@ type WatchOptions struct {
 	LogLevel     string
 }
 
+type RootfsOptions struct {
+	BaseImage       string
+	BuildScriptPath string
+	AgentBinaryPath string
+	RootFSSize      int
+}
+
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeOptions struct {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
@@ -31,13 +32,14 @@ var (
 	_    = ncli.HelpFlag.Short('h')
 	_    = ncli.WithCheats().CheatCommand.Hidden()
 
-	tui   = ncli.Command("tui", "Start the Nex TUI [BETA]").Alias("ui")
-	nodes = ncli.Command("node", "Interact with execution engine nodes")
-	run   = ncli.Command("run", "Run a workload on a target node")
-	yeet  = ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
-	stop  = ncli.Command("stop", "Stop a running workload")
-	logs  = ncli.Command("logs", "Live monitor workload log emissions")
-	evts  = ncli.Command("events", "Live monitor events from nex nodes")
+	tui    = ncli.Command("tui", "Start the Nex TUI [BETA]").Alias("ui")
+	nodes  = ncli.Command("node", "Interact with execution engine nodes")
+	run    = ncli.Command("run", "Run a workload on a target node")
+	yeet   = ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
+	stop   = ncli.Command("stop", "Stop a running workload")
+	logs   = ncli.Command("logs", "Live monitor workload log emissions")
+	evts   = ncli.Command("events", "Live monitor events from nex nodes")
+	rootfs = ncli.Command("rootfs", "Build custom rootfs").Alias("fs")
 
 	nodesLs   = nodes.Command("ls", "List nodes")
 	nodesInfo = nodes.Command("info", "Get information for an engine node")
@@ -55,6 +57,7 @@ var (
 	StopOpts   = &models.StopOptions{}
 	WatchOpts  = &models.WatchOptions{}
 	NodeOpts   = &models.NodeOptions{}
+	RootfsOpts = &models.RootfsOptions{}
 )
 
 func init() {
@@ -110,6 +113,11 @@ func init() {
 	logs.Flag("workload_name", "Name of the workload to filter on").Default("*").StringVar(&WatchOpts.WorkloadName)
 	logs.Flag("workload_id", "ID of the workload machine to filter on").Default("*").StringVar(&WatchOpts.WorkloadId)
 	logs.Flag("level", "Log level filter").Default("debug").StringVar(&WatchOpts.LogLevel)
+
+	rootfs.Flag("script", "Additional boot script ran during initialization").PlaceHolder("script.sh").StringVar(&RootfsOpts.BuildScriptPath)
+	rootfs.Flag("image", "Base image for rootfs build").Default("synadia/nex-rootfs:alpine").StringVar(&RootfsOpts.BaseImage)
+	rootfs.Flag("agent", "Path to agent binary").PlaceHolder("../path/to/nex-agent").Required().StringVar(&RootfsOpts.AgentBinaryPath)
+	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 }
 
 func main() {
@@ -202,6 +210,10 @@ func main() {
 		if err != nil {
 			logger.Error("failed to start node", slog.Any("err", err))
 		}
-
+	case rootfs.FullCommand():
+		err := CreateRootFS(ctx, logger)
+		if err != nil {
+			logger.Error("failed to build rootfs", slog.Any("err", err))
+		}
 	}
 }

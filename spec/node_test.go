@@ -89,7 +89,7 @@ var _ = Describe("nex node", func() {
 			os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), agentPath))
 
 			snapshotAgentRootFSPath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-rootfs.ext4", _fixtures.seededRand.Int()))
-			cmd := exec.Command("go", "run", "../agent/fc-image", "../agent/cmd/nex-agent/nex-agent")
+			cmd := exec.Command("sudo", "go", "run", "../nex", "fs", "--agent", "../agent/cmd/nex-agent/nex-agent")
 			_, err = cmd.CombinedOutput()
 			Expect(err).To(BeNil())
 			Expect(cmd.ProcessState.ExitCode()).To(BeZero())

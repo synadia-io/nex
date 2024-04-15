@@ -1,0 +1,21 @@
+FROM alpine:3.19.1
+
+ADD alpine-openrc.sh /etc/init.d/agent
+
+RUN apk add --no-cache openrc
+RUN apk add --no-cache util-linux
+
+RUN ln -s agetty /etc/init.d/agetty.ttyS0
+RUN echo ttyS0 > /etc/securetty
+RUN rc-update add agetty.ttyS0 default
+
+RUN echo "root:root" | chpasswd
+
+RUN addgroup -g 1000 -S nex
+RUN adduser -u 1000 -S nex -G nex
+
+RUN rc-update add devfs boot
+RUN rc-update add procfs boot
+RUN rc-update add sysfs boot
+
+RUN rc-update add agent boot
