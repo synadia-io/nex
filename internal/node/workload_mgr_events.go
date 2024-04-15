@@ -116,12 +116,6 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload 
 		return nil
 	}
 
-	// FIXME-- namespace should always be non-nil here...
-	namespace := "default"
-	if deployRequest.Namespace != nil {
-		namespace = *deployRequest.Namespace
-	}
-
 	functionExecFailed := struct {
 		Name      string `json:"workload_name"`
 		Subject   string `json:"trigger_subject"`
@@ -129,7 +123,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload 
 		Error     string `json:"error"`
 	}{
 		Name:      workload,
-		Namespace: namespace,
+		Namespace: *deployRequest.Namespace,
 		Subject:   tsub,
 		Error:     origErr.Error(),
 	}
@@ -142,7 +136,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload 
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecFailed)
 
-	err = PublishCloudEvent(w.nc, namespace, cloudevent, w.log)
+	err = PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
 	if err != nil {
 		return err
 	}
