@@ -3,6 +3,7 @@ package nexagent
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"syscall"
 )
 
@@ -21,4 +22,8 @@ func HaltVM(err error) {
 	} else {
 		os.Exit(code)
 	}
+}
+
+func resetSIGUSR() {
+	signal.Reset(syscall.SIGUSR1, syscall.SIGUSR2)
 }

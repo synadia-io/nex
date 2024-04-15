@@ -355,6 +355,7 @@ func (a *Agent) init() error {
 
 func (a *Agent) installSignalHandlers() {
 	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	resetSIGUSR()
 	a.sigs = make(chan os.Signal, 1)
 	signal.Notify(a.sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 }

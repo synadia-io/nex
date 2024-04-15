@@ -16,3 +16,5 @@ func HaltVM(err error) {
 
 	os.Exit(code)
 }
+
+func resetSIGUSR() {}
