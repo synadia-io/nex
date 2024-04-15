@@ -9,9 +9,9 @@ import (
 )
 
 func versionCheck() error {
-	// if VERSION == "development" {
-	// 	return nil
-	// }
+	if VERSION == "development" {
+		return nil
+	}
 
 	res, err := http.Get("https://api.github.com/repos/synadia-io/nex/releases/latest")
 	if err != nil {
