@@ -6,6 +6,9 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
 
+env:
+  GO_VER: '1.22.2'
+
 permissions:
   contents: read
   pages: write
@@ -30,9 +33,9 @@ jobs:
           fetch-depth: 0
       -
         name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21.5'
+          go-version: ${{ env.GO_VER }}
       -
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
