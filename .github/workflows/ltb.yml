@@ -30,7 +30,6 @@ jobs:
       uses: golangci/golangci-lint-action@v4
       with:
         version: v1.54
-        args: --skip-dirs spec/
 
   test:
     timeout-minutes: 10
@@ -59,7 +58,6 @@ jobs:
       name: Run spec suite
       working-directory: .
       run: |
-        mv _spec spec
         go mod tidy
         sudo -E go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
