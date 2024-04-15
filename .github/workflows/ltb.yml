@@ -47,14 +47,6 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VER }}
-    -
-      name: Symlink go
-      run: sudo ln -f -s /opt/hostedtoolcache/go/${{ env.GO_VER }}/x64/bin/* /usr/bin/
-    - 
-      name: Install ginkgo
-      shell: bash --noprofile --norc -x -eo pipefail {0}
-      run: |
-        go install github.com/onsi/ginkgo/v2/ginkgo@latest
     - 
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
@@ -63,8 +55,9 @@ jobs:
       name: Run spec suite
       working-directory: .
       run: |
+        go install github.com/onsi/ginkgo/v2/ginkgo@latest
         go mod tidy
-        sudo -E go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+        sudo -E ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
       name: Run test suite
       working-directory: .
