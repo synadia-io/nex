@@ -9,9 +9,9 @@ import (
 )
 
 func versionCheck() error {
-	if VERSION == "development" {
-		return nil
-	}
+	// if VERSION == "development" {
+	// 	return nil
+	// }
 
 	res, err := http.Get("https://api.github.com/repos/synadia-io/nex/releases/latest")
 	if err != nil {
@@ -38,6 +38,8 @@ func versionCheck() error {
 	if latestTag != VERSION {
 		fmt.Printf(`================================================================
 🎉 There is a newer version [v%s] of the NEX CLI available 🎉
+To update, run:
+     curl -sSf https://nex.synadia.com/install.sh | sh
 ================================================================
 
 `,
