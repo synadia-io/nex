@@ -145,7 +145,7 @@ func (n *Node) EnterLameDuck() error {
 		return err
 	}
 
-	n.publishNodeLameDuckEntered()
+	_ = n.publishNodeLameDuckEntered()
 	return nil
 }
 
