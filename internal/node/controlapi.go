@@ -167,7 +167,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if api.node.lameduck > 0 {
+	if api.node.IsLameDuck() {
 		respondFail(controlapi.RunResponseType, m, "Node is in lame duck mode. Workload deploy request rejected")
 		return
 	}
