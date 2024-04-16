@@ -6,9 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
+	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/synadia-io/nex/internal/models"
 	nextui "github.com/synadia-io/nex/nex/tui"
 )
@@ -17,11 +19,6 @@ var (
 	VERSION   = "development"
 	COMMIT    = ""
 	BUILDDATE = ""
-
-	LevelTrace = slog.Level(-8)
-	LevelNames = map[slog.Leveler]string{
-		LevelTrace: "TRACE",
-	}
 
 	blue = color.New(color.FgBlue).SprintFunc()
 
@@ -74,8 +71,10 @@ func init() {
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
-	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "trace", "debug", "info", "warn", "error")
+	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "debug", "info", "warn", "error")
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").UnNegatableBoolVar(&Opts.LogJSON)
+	ncli.Flag("logcolor", "Prints text logs with color").Envar("NEX_LOG_COLORIZED").Default("false").UnNegatableBoolVar(&Opts.LogsColorized)
+	ncli.Flag("timeformat", "How time is formatted in logger").Envar("NEX_LOG_TIMEFORMAT").Default("DateTime").EnumVar(&Opts.LogTimeFormat, "DateOnly", "DateTime", "Stamp", "RFC822", "RFC3339")
 	ncli.Flag("context", "Configuration context").Envar("NATS_CONTEXT").PlaceHolder("NAME").StringVar(&Opts.ConfigurationContext)
 	ncli.Flag("no-context", "Disable NATS context discovery").UnNegatableBoolVar(&Opts.SkipContexts)
 	ncli.Flag("conn-name", "Name of NATS connection").Default(func() string {
@@ -125,39 +124,41 @@ func main() {
 	cmd := fisk.MustParse(ncli.Parse(os.Args[1:]))
 
 	ctx := context.Background()
-	opts := slog.HandlerOptions{
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-			if a.Key == slog.LevelKey {
-				level := a.Value.Any().(slog.Level)
-				levelLabel, exists := LevelNames[level]
-				if !exists {
-					levelLabel = level.String()
-				}
-				a.Value = slog.StringValue(levelLabel)
-			}
-			return a
-		},
-	}
 
+	var handlerOpts []shandler.HandlerOption
 	switch Opts.LogLevel {
 	case "debug":
-		opts.Level = slog.LevelDebug
+		handlerOpts = append(handlerOpts, shandler.WithLogLevel(slog.LevelDebug))
 	case "info":
-		opts.Level = slog.LevelInfo
+		handlerOpts = append(handlerOpts, shandler.WithLogLevel(slog.LevelInfo))
 	case "warn":
-		opts.Level = slog.LevelWarn
-	case "trace":
-		opts.Level = LevelTrace
+		handlerOpts = append(handlerOpts, shandler.WithLogLevel(slog.LevelWarn))
 	default:
-		opts.Level = slog.LevelError
+		handlerOpts = append(handlerOpts, shandler.WithLogLevel(slog.LevelError))
+	}
+
+	switch Opts.LogTimeFormat {
+	case "DateOnly":
+		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.DateOnly))
+	case "Stamp":
+		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.Stamp))
+	case "RFC822":
+		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.RFC822))
+	case "RFC3339":
+		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.RFC3339))
+	default:
+		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.DateTime))
 	}
 
 	var logger *slog.Logger
 	if Opts.LogJSON {
-		logger = slog.New(slog.NewJSONHandler(os.Stdout, &opts))
-	} else {
-		logger = slog.New(slog.NewTextHandler(os.Stdout, &opts))
+		handlerOpts = append(handlerOpts, shandler.WithJSON())
 	}
+	if Opts.LogsColorized {
+		handlerOpts = append(handlerOpts, shandler.WithColor())
+	}
+
+	logger = slog.New(shandler.NewHandler(handlerOpts...))
 
 	switch cmd {
 	case tui.FullCommand():
