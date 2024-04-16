@@ -49,6 +49,10 @@ type ProcessManager interface {
 
 	// Terminate a running agent process with the given ID
 	StopProcess(id string) error
+
+	// Notifies the process manager that the node is in lame duck mode, so that the processes
+	// can be treated differerently (if applicable)
+	EnterLameDuck() error
 }
 
 // Initialize an appropriate agent process manager instance based on the sandbox config value

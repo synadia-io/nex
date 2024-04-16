@@ -40,6 +40,7 @@ var (
 	logs   = ncli.Command("logs", "Live monitor workload log emissions")
 	evts   = ncli.Command("events", "Live monitor events from nex nodes")
 	rootfs = ncli.Command("rootfs", "Build custom rootfs").Alias("fs")
+	lame   = ncli.Command("lameduck", "Command a node to enter lame duck mdoe")
 
 	nodesLs   = nodes.Command("ls", "List nodes")
 	nodesInfo = nodes.Command("info", "Get information for an engine node")
@@ -108,6 +109,8 @@ func init() {
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
 	stop.Flag("name", "Name of the workload to stop").Required().StringVar(&StopOpts.WorkloadName)
 	stop.Flag("issuer", "Path to the issuer seed key originally used to start the workload").Required().ExistingFileVar(&StopOpts.ClaimsIssuerFile)
+
+	lame.Arg("id", "Public key of the target node to enter lame duck mode").Required().StringVar(&RunOpts.TargetNode)
 
 	logs.Flag("node", "Public key of the nex node to filter on").Default("*").StringVar(&WatchOpts.NodeId)
 	logs.Flag("workload_name", "Name of the workload to filter on").Default("*").StringVar(&WatchOpts.WorkloadName)
@@ -204,6 +207,11 @@ func main() {
 		err := RunNodeUp(ctx, logger)
 		if err != nil {
 			logger.Error("failed to start node", slog.Any("err", err))
+		}
+	case lame.FullCommand():
+		err := LameDuck(ctx, logger)
+		if err != nil {
+			logger.Error("failed to command node to enter lame duck mode", slog.Any("err", err))
 		}
 	case nodePreflight.FullCommand():
 		err := RunNodePreflight(ctx, logger)

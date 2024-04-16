@@ -74,6 +74,16 @@ func (f *FirecrackerProcessManager) ListProcesses() ([]ProcessInfo, error) {
 	return pinfos, nil
 }
 
+func (f *FirecrackerProcessManager) EnterLameDuck() error {
+
+	nope := false
+	for _, req := range f.deployRequests {
+		req.Essential = &nope
+	}
+
+	return nil
+}
+
 // Preparing a workload reads from the warmVMs channel
 func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.DeployRequest) error {
 	vm := <-f.warmVMs
