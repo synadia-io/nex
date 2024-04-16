@@ -802,6 +802,52 @@ var _ = Describe("nex node", func() {
 											})
 										})
 									})
+
+									Context("object store service", func() {
+										Context("when the javascript is valid", func() {
+											JustBeforeEach(func() {
+												triggerSubject = "helloobjectstoreservice"
+												deployRequest, err = newDeployRequest(*nodeID, "objectstorehostservice", "nex object store service example", "../examples/v8/echofunction/src/objectstore.js", map[string]string{}, []string{triggerSubject}, log)
+												Expect(err).To(BeNil())
+
+												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
+												_, err = nodeClient.StartWorkload(deployRequest)
+												Expect(err).To(BeNil())
+
+												time.Sleep(time.Millisecond * 1000)
+											})
+
+											Describe("triggering the deployed function", func() {
+												var respmsg *nats.Msg
+
+												JustBeforeEach(func() {
+													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*15000)
+													Expect(err).To(BeNil())
+												})
+
+												It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
+													Expect(respmsg).NotTo(BeNil())
+
+													type hostServicesExampleResp struct {
+														Hello2 string             `json:"hello2"`
+														List   []*nats.ObjectInfo `json:"list"`
+													}
+
+													var resp *hostServicesExampleResp
+													err = json.Unmarshal(respmsg.Data, &resp)
+													Expect(err).To(BeNil())
+
+													Expect(resp).ToNot(BeNil())
+
+													fmt.Printf("IN TEST NAME: %s; NUID: %s", resp.List[0].Name, resp.List[0].NUID)
+
+													Expect(len(resp.List)).To(Equal(1))
+													Expect(resp.List[0].Name).To(Equal("hello2"))
+													Expect(resp.Hello2).To(Equal("hello!"))
+												})
+											})
+										})
+									})
 								})
 							})
 

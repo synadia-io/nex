@@ -177,6 +177,11 @@ type HostServicesKeyValueRequest struct {
 	Success  *bool `json:"success,omitempty"`
 }
 
+type HostServicesObjectStoreResponse struct {
+	Errors  []string `json:"errors,omitempty"`
+	Success bool     `json:"success,omitempty"`
+}
+
 type HostServicesMessagingRequest struct {
 	Subject *string          `json:"key"`
 	Payload *json.RawMessage `json:"payload,omitempty"`
