@@ -52,10 +52,23 @@ const (
 	hostServicesMessagingRequestTimeout     = time.Millisecond * 500
 	hostServicesMessagingRequestManyTimeout = time.Millisecond * 3000
 
+	hostServicesObjectStoreObjectName         = "objectStore"
+	hostServicesObjectStoreGetFunctionName    = "get"
+	hostServicesObjectStorePutFunctionName    = "put"
+	hostServicesObjectStoreDeleteFunctionName = "delete"
+	hostServicesObjectStoreListFunctionName   = "list"
+
+	hostServicesObjectStoreGetTimeout    = time.Millisecond * 3000
+	hostServicesObjectStorePutTimeout    = time.Millisecond * 3000
+	hostServicesObjectStoreDeleteTimeout = time.Millisecond * 3000
+	hostServicesObjectStoreListTimeout   = time.Millisecond * 3000
+
 	nexTriggerSubject = "x-nex-trigger-subject"
 	nexRuntimeNs      = "x-nex-runtime-ns"
 
 	messageSubject = "x-subject"
+
+	objectName = "x-object-name"
 
 	v8FunctionArrayAppend = "array-append"
 	v8FunctionArrayInit   = "array-init"
@@ -280,6 +293,11 @@ func (v *V8) messagingServiceSubject(method string) string {
 	return fmt.Sprintf("agentint.%s.rpc.%s.%s.messaging.%s", v.vmID, v.namespace, v.name, method)
 }
 
+// agentint.{vmID}.rpc.{namespace}.{workload}.objectstore.{method}
+func (v *V8) objectStoreServiceSubject(method string) string {
+	return fmt.Sprintf("agentint.%s.rpc.%s.%s.objectstore.%s", v.vmID, v.namespace, v.name, strings.ToLower(method))
+}
+
 func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 	hostServices := v8.NewObjectTemplate(v.iso)
 
@@ -294,6 +312,11 @@ func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
 	}
 
 	err = hostServices.Set(hostServicesMessagingObjectName, v.newMessagingObjectTemplate())
+	if err != nil {
+		return nil, err
+	}
+
+	err = hostServices.Set(hostServicesObjectStoreObjectName, v.newObjectStoreObjectTemplate())
 	if err != nil {
 		return nil, err
 	}
@@ -865,7 +888,7 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		key := args[0].String()
 		value := args[1]
 
-		raw, err := value.MarshalJSON()
+		raw, err := value.MarshalJSON() // FIXME-- support Uint8 array
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -1097,6 +1120,134 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 	}))
 
 	return messaging
+}
+
+func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
+	objectStore := v8.NewObjectTemplate(v.iso)
+
+	_ = objectStore.Set(hostServicesObjectStoreGetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) != 1 {
+			val, _ := v8.NewValue(v.iso, "name is required")
+			return v.iso.ThrowException(val)
+		}
+
+		name := args[0].String()
+
+		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStoreGetFunctionName))
+		msg.Header.Add(objectName, name)
+
+		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStoreGetTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		val, err := v8.NewValue(v.iso, string(resp.Data)) // FIXME-- pass []byte natively into javascript using ArrayBuffer
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val
+	}))
+
+	_ = objectStore.Set(hostServicesObjectStorePutFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) != 2 {
+			val, _ := v8.NewValue(v.iso, "name and value are required")
+			return v.iso.ThrowException(val)
+		}
+
+		name := args[0].String()
+		value := args[1].String()
+
+		// FIXME- resolve primitive value from the following types:
+		//   string -> V8::String
+		//   int32 -> V8::Integer
+		//   uint32 -> V8::Integer
+		//   int64 -> V8::BigInt
+		//   uint64 -> V8::BigInt
+		//   bool -> V8::Boolean
+		//   *big.Int -> V8::BigInt
+
+		// raw, err := value.MarshalJSON() // FIXME-- support Uint8 array
+		// if err != nil {
+		// 	val, _ := v8.NewValue(v.iso, err.Error())
+		// 	return v.iso.ThrowException(val)
+		// }
+
+		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStorePutFunctionName))
+		msg.Header.Add(objectName, name)
+		msg.Data = []byte(value)
+
+		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStorePutTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		val, err := v8.JSONParse(v.ctx, string(resp.Data))
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val
+	}))
+
+	_ = objectStore.Set(hostServicesObjectStoreDeleteFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) != 1 {
+			val, _ := v8.NewValue(v.iso, "name is required")
+			return v.iso.ThrowException(val)
+		}
+
+		name := args[0].String()
+
+		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStoreDeleteFunctionName))
+		msg.Header.Add(objectName, name)
+
+		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStoreDeleteTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		var objectStoreResp *agentapi.HostServicesObjectStoreResponse
+		err = json.Unmarshal(resp.Data, &objectStoreResp)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		if !objectStoreResp.Success {
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to delete object: %s", name))
+			return v.iso.ThrowException(val)
+		}
+
+		return nil
+	}))
+
+	_ = objectStore.Set(hostServicesObjectStoreListFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		req, _ := json.Marshal(map[string]interface{}{})
+
+		resp, err := v.nc.Request(v.objectStoreServiceSubject(hostServicesObjectStoreListFunctionName), req, hostServicesObjectStoreListTimeout)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		val, err := v8.JSONParse(v.ctx, string(resp.Data))
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val
+	}))
+
+	return objectStore
 }
 
 // convenience method to initialize a V8 execution provider
