@@ -43,7 +43,6 @@ type NodeStoppedEvent struct {
 }
 
 type HeartbeatEvent struct {
-	Id              string            `json:"id"`
 	Version         string            `json:"version"`
 	NodeId          string            `json:"node_id"`
 	Uptime          string            `json:"uptime"`
