@@ -41,7 +41,8 @@ The pre-flight check requires a configuration file so it can perform the appropr
     },
     "tags": {
         "simple": "true"
-    }
+    },
+    "no_sandbox": true
 }
 ```
 
@@ -59,6 +60,14 @@ Nex is made up of the following components
 * [node](./internal/node) - Service running on a NEX node. Exposes a control API, starts/stops firecracker processes, communicates with the agent inside each process.
 * [nex](./nex) - CLI for communicating with NEX nodes
 * [tui](./nex/tui) - Interactive user interface for viewing the status of NEX nodes in a terminal. BETA feature, not yet fully functional.
+
+## Telemetry Data
+Nex comes prewired with [OpenTelemetry](https://opentelemetry.io) support for traces and metrics.  
+In order to enable OTel support, you will first need to provide the Nex node with access to an OTel exporter.  We have provided a docker-compose solution for local development.  In order to start the OTel evironment, you will need navigate to the `_scripts/otel` directory and run `docker compose up`.  The following ports will be exposed:
+- Web UI (grafana)      -> :14524
+- OTel Collector (grpc) -> :24317
+- OTel Collector (http) -> :24318
+In order to view the metrics and traces, you will need to navigate to `http://localhost:14524` in your browser.
 
 ## Contributing
 For information on how to contribute to Nex, please read our [contributing](./CONTRIBUTING.md) guide.

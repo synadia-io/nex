@@ -2,8 +2,6 @@ version: '3'
 services:
   prometheus:
     image: prom/prometheus:v2.21.0
-    ports:
-      - 9000:9090
     volumes:
       - ./prometheus:/etc/prometheus
     command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml
@@ -14,7 +12,7 @@ services:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     ports:
-      - 5050:3000 # 3000 is used everywhere, 5050 is less likely to conflict
+      - 14524:3000 
     restart: unless-stopped
     volumes:
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
@@ -30,8 +28,8 @@ services:
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml
     ports:
-      - 4317:4317
-      - 4318:4318
+      - 24317:4317
+      - 24318:4318
     depends_on:
       - prometheus
       - tempo
@@ -41,6 +39,3 @@ services:
         - '-config.file=/etc/tempo/config.yaml'
       volumes:
         - ./tempo.yaml:/etc/tempo/config.yaml
-      ports:
-        - 4319 # This port is used for sending traces from otel-collector to tempo
-        - 7999:7999 # tempo      
