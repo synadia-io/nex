@@ -46,6 +46,8 @@ type NodeConfiguration struct {
 	OtelMetrics         bool              `json:"otel_metrics"`
 	OtelMetricsPort     int               `json:"otel_metrics_port"`
 	OtelMetricsExporter string            `json:"otel_metrics_exporter"`
+	OtelTraces          bool              `json:"otel_traces"`
+	OtelTracesExporter  string            `json:"otel_traces_exporter"`
 	PreserveNetwork     bool              `json:"preserve_network,omitempty"`
 	RateLimiters        *Limiters         `json:"rate_limiters,omitempty"`
 	RootFsFilepath      string            `json:"rootfs_filepath"`

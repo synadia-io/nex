@@ -113,6 +113,8 @@ type NodeOptions struct {
 	OtelMetrics         bool   `json:"-"`
 	OtelMetricsPort     int    `json:"-"`
 	OtelMetricsExporter string `json:"-"`
+	OtelTraces          bool   `json:"-"`
+	OtelTracesExporter  string `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }
