@@ -42,7 +42,8 @@ The pre-flight check requires a configuration file so it can perform the appropr
     "tags": {
         "simple": "true"
     },
-    "no_sandbox": false
+    "no_sandbox": false,
+    "otlp_exporter_url": null
 }
 ```
 
