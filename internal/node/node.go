@@ -113,15 +113,18 @@ func (n *Node) Start() {
 
 	_ = n.publishNodeStarted()
 
-	go n.emitHeartbeats()
-
 	timer := time.NewTicker(runloopTickInterval)
 	defer timer.Stop()
+
+	heartbeat := time.NewTicker(heartbeatInterval)
+	defer heartbeat.Stop()
 
 	for !n.shuttingDown() {
 		select {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, machine manager, telemetry etc.
+		case <-heartbeat.C:
+			_ = n.publishHeartbeat()
 		case sig := <-n.sigs:
 			n.log.Debug("received signal: %s", sig)
 			n.shutdown()
@@ -195,17 +198,6 @@ func (n *Node) createPid() error {
 
 	n.log.Debug(fmt.Sprintf("Wrote pidfile to %s", defaultPidFilepath), slog.Int("pid", os.Getpid()))
 	return nil
-}
-
-func (n *Node) emitHeartbeats() {
-	ticker := time.NewTicker(heartbeatInterval)
-	for range ticker.C {
-		_ = n.publishHeartbeat()
-
-		if n.closing > 0 {
-			ticker.Stop()
-		}
-	}
 }
 
 func (n *Node) generateKeypair() error {
