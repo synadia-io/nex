@@ -22,6 +22,11 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 		return nil, err
 	}
 
+	// TODO: should we validate the configuration here
+	// if !config.Validate() {
+	// 	return nil, errors.New("invalid configuration provided: " + err.Error())
+	// }
+
 	if len(config.WorkloadTypes) == 0 {
 		config.WorkloadTypes = models.DefaultWorkloadTypes
 	}

@@ -3,6 +3,7 @@ package nexnode
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -12,9 +13,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"text/template"
 
 	"github.com/fatih/color"
 	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/node/templates"
 
 	_ "embed"
 )
@@ -277,7 +280,6 @@ func CheckPrerequisites(config *models.NodeConfiguration, readonly bool) error {
 	return nil
 }
 
-// func writeCniConf(fileName string, networkName string) error {
 func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
 	for _, tF := range r.files {
 		f, err := os.Create(filepath.Join(r.directories[0], tF.name))
@@ -286,19 +288,17 @@ func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
 		}
 		defer f.Close()
 
-		var fcConfig map[string]interface{}
-		err = json.Unmarshal(defaultFcNetConf, &fcConfig)
+		tmpl, err := template.New("fcnet_conf").Parse(templates.FcnetConfig)
+		if err != nil {
+			return err
+		}
+		var buffer bytes.Buffer
+		err = tmpl.Execute(&buffer, c.CNI)
 		if err != nil {
 			return err
 		}
 
-		fcConfig["name"] = c.CNI.NetworkName
-		raw, err := json.Marshal(fcConfig)
-		if err != nil {
-			return err
-		}
-
-		_, err = f.Write(raw)
+		_, err = f.Write(buffer.Bytes())
 		if err != nil {
 			return nil
 		}
@@ -514,6 +514,3 @@ func decompressTarFromURL(url string, _ string) (*tar.Reader, error) {
 	rawData := tar.NewReader(uncompressedTar)
 	return rawData, nil
 }
-
-//go:embed templates/fcnet.conflist
-var defaultFcNetConf []byte
