@@ -57,7 +57,6 @@ $ nex node preflight
 Nex is made up of the following components
 
 * [agent](./agent) - Agent that runs inside a Firecracker VM, responsible for running untrusted workloads. Not something end users need to interact with.
-* [fc-image](./agent/fc-image/) - Tools for building the rootfs (ext4) file system for use in firecracker VMs
 * [node](./internal/node) - Service running on a NEX node. Exposes a control API, starts/stops firecracker processes, communicates with the agent inside each process.
 * [nex](./nex) - CLI for communicating with NEX nodes
 * [tui](./nex/tui) - Interactive user interface for viewing the status of NEX nodes in a terminal. BETA feature, not yet fully functional.
@@ -71,11 +70,16 @@ Web UI (grafana)      -> :14524
 OTel Collector (grpc) -> :24317
 OTel Collector (http) -> :24318
 ```
-  
+
 In order to view the metrics and traces, you will need to navigate to `http://localhost:14524` in your browser.
 
 ### Traces
 To enable traces, add `"otlp_exporter_url": "0.0.0.0:24317"` to the bottom of your Nex configuration file
+```bash
+nex node up \
+  --traces \                      # enables traces
+  --otel_traces_exporter grpc     # controls where how traces are exported to collector
+```
 
 ### Metrics
 To enable metrics, include the flags when starting the node
