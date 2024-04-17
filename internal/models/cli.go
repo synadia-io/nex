@@ -53,6 +53,10 @@ type Options struct {
 	// LogLevel is the log level to use
 	LogLevel string
 	// LogJSON enables JSON logging
+	LogTimeFormat string
+	// Timeformat for logs.  Must satisfy time.Time format criteria
+	LogsColorized bool
+	// Outputs logs with color
 	LogJSON bool
 	// Name or path to a configuration context
 	ConfigurationContext string

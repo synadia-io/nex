@@ -1,3 +1,5 @@
+//go:build linux
+
 package spec
 
 import (
@@ -29,6 +31,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/rs/xid"
 
+	shandler "github.com/jordan-rash/slog-handler"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
@@ -59,9 +62,7 @@ var _ = Describe("nex node", func() {
 
 	BeforeEach(func() {
 		ctxx, cancel = context.WithCancel(context.Background())
-		log = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		}))
+		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
 
 		opts = &models.Options{
 			Servers: _fixtures.natsServer.ClientURL(),

@@ -24,11 +24,14 @@ import (
 	"github.com/synadia-io/nex/internal/node/observability"
 )
 
-const defaultNatsStoreDir = "pnats"
-const defaultPidFilepath = "/var/run/nex.pid"
-
-const runloopSleepInterval = 100 * time.Millisecond
-const runloopTickInterval = 2500 * time.Millisecond
+const (
+	systemNamespace      = "system"
+	defaultNatsStoreDir  = "pnats"
+	defaultPidFilepath   = "/var/run/nex.pid"
+	runloopSleepInterval = 100 * time.Millisecond
+	runloopTickInterval  = 2500 * time.Millisecond
+	heartbeatInterval    = 30 * time.Second
+)
 
 // Nex node process
 type Node struct {
@@ -110,6 +113,8 @@ func (n *Node) Start() {
 
 	_ = n.publishNodeStarted()
 
+	go n.emitHeartbeats()
+
 	timer := time.NewTicker(runloopTickInterval)
 	defer timer.Stop()
 
@@ -190,6 +195,17 @@ func (n *Node) createPid() error {
 
 	n.log.Debug(fmt.Sprintf("Wrote pidfile to %s", defaultPidFilepath), slog.Int("pid", os.Getpid()))
 	return nil
+}
+
+func (n *Node) emitHeartbeats() {
+	ticker := time.NewTicker(heartbeatInterval)
+	for range ticker.C {
+		n.publishHeartbeat()
+
+		if n.closing > 0 {
+			ticker.Stop()
+		}
+	}
 }
 
 func (n *Node) generateKeypair() error {
@@ -353,6 +369,34 @@ func (n *Node) publishNodeLameDuckEntered() error {
 
 	n.log.Info("Publishing node lame duck entered event")
 	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
+}
+
+func (n *Node) publishHeartbeat() error {
+	machines, err := n.manager.RunningWorkloads()
+	if err != nil {
+		n.log.Error("Failed to query running machines during heartbeat", slog.Any("error", err))
+		return nil
+	}
+
+	now := time.Now().UTC()
+
+	evt := controlapi.HeartbeatEvent{
+		NodeId:          n.publicKey,
+		Version:         Version(),
+		Uptime:          myUptime(now.Sub(n.startedAt)),
+		RunningMachines: len(machines),
+		Tags:            n.config.Tags,
+	}
+
+	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetSource(n.publicKey)
+	cloudevent.SetID(uuid.NewString())
+	cloudevent.SetTime(now)
+	cloudevent.SetType(controlapi.HeartbeatEventType)
+	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
+	_ = cloudevent.SetData(evt)
+
+	return PublishCloudEvent(n.nc, systemNamespace, cloudevent, n.log)
 }
 
 func (n *Node) publishNodeStarted() error {

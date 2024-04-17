@@ -47,24 +47,6 @@ type Agent struct {
 	sandboxed bool
 }
 
-// HaltVM stops the firecracker VM (or the agent if it is not sandboxed)
-func HaltVM(err error) {
-	code := 0
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Terminating process due to fatal error: %s. Sandboxed: %v\n", err, isSandboxed())
-		code = 1
-	}
-
-	if isSandboxed() {
-		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to halt: %s", err)
-		}
-	} else {
-		os.Exit(code)
-	}
-}
-
 // Initialize a new agent to facilitate communications with the host
 func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	var metadata *agentapi.MachineMetadata
@@ -372,7 +354,8 @@ func (a *Agent) init() error {
 }
 
 func (a *Agent) installSignalHandlers() {
-	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	resetSIGUSR()
 	a.sigs = make(chan os.Signal, 1)
 	signal.Notify(a.sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 }

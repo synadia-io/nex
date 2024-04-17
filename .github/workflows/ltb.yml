@@ -32,8 +32,13 @@ jobs:
         version: v1.54
 
   test:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
-    runs-on: ubuntu-latest
     steps:
     - 
       uses: actions/checkout@v4
@@ -42,14 +47,6 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VER }}
-    -
-      name: Symlink go
-      run: sudo ln -f -s /opt/hostedtoolcache/go/${{ env.GO_VER }}/x64/bin/* /usr/bin/
-    - 
-      name: Install ginkgo
-      shell: bash --noprofile --norc -x -eo pipefail {0}
-      run: |
-        go install github.com/onsi/ginkgo/v2/ginkgo@latest
     - 
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
@@ -57,9 +54,20 @@ jobs:
     - 
       name: Run spec suite
       working-directory: .
+      if: runner.os != 'Windows'
       run: |
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
-        sudo -E go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+        sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+    - 
+      name: Run spec suite
+      working-directory: .
+      if: runner.os == 'Windows'
+      run: |
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+        go mod tidy
+        ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+
     - 
       name: Run test suite
       working-directory: .
