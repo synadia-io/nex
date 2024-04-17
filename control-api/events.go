@@ -5,6 +5,7 @@ const (
 	AgentStoppedEventType    = "agent_stopped"
 	NodeStartedEventType     = "node_started"
 	NodeStoppedEventType     = "node_stopped"
+	HeartbeatEventType       = "heartbeat"
 	WorkloadStartedEventType = "workload_started" // FIXME-- should this be WorkloadDeployed?
 	WorkloadStoppedEventType = "workload_stopped" // FIXME-- should this be in addition to WorkloadUndeployed (likely yes, in case of something bad happening...)
 	// FIXME-- where is WorkloadDeployedEventType? (likely just need to rename WorkloadStartedEventType -> WorkloadDeployedEventType)
@@ -39,4 +40,13 @@ type NodeStartedEvent struct {
 type NodeStoppedEvent struct {
 	Id       string `json:"id"`
 	Graceful bool   `json:"graceful"`
+}
+
+type HeartbeatEvent struct {
+	Id              string            `json:"id"`
+	Version         string            `json:"version"`
+	NodeId          string            `json:"node_id"`
+	Uptime          string            `json:"uptime"`
+	Tags            map[string]string `json:"tags,omitempty"`
+	RunningMachines int               `json:"running_machines"`
 }
