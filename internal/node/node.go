@@ -137,15 +137,16 @@ func (n *Node) Stop() {
 }
 
 func (n *Node) EnterLameDuck() error {
-	atomic.StoreUint32(&n.lameduck, 1)
-	n.config.Tags[controlapi.TagLameDuck] = "true"
+	if atomic.AddUint32(&n.lameduck, 1) == 1 {
+		n.config.Tags[controlapi.TagLameDuck] = "true"
+		err := n.manager.procMan.EnterLameDuck()
+		if err != nil {
+			return err
+		}
 
-	err := n.manager.procMan.EnterLameDuck()
-	if err != nil {
-		return err
+		_ = n.publishNodeLameDuckEntered()
 	}
 
-	_ = n.publishNodeLameDuckEntered()
 	return nil
 }
 
