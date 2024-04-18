@@ -3,7 +3,6 @@ package nexnode
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -43,10 +42,6 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 
 	if config.Tags == nil {
 		config.Tags = make(map[string]string)
-	}
-
-	if !config.Validate() {
-		return nil, fmt.Errorf("invalid configuration provided: %v", config.Errors)
 	}
 
 	return &config, nil
