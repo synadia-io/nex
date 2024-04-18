@@ -18,7 +18,7 @@ const (
 	DefaultInternalNodePort = 9222
 	DefaultNodeMemSizeMib   = 256
 	DefaultNodeVcpuCount    = 1
-	DefaultOtelExporterUrl  = "127.0.0.1:14532"
+	DefaultOtelExporterUrl  = "127.0.0.1.24317"
 )
 
 var (
