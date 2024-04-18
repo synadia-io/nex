@@ -454,7 +454,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 	}
 
 	return func(msg *nats.Msg) {
-		ctx, parentSpan := observability.GetTracer().Start(
+		ctx, parentSpan := w.t.Tracer.Start(
 			w.ctx,
 			"workload-trigger",
 			trace.WithNewRoot(),
@@ -467,7 +467,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 
 		defer parentSpan.End()
 
-		resp, err := agentClient.RunTrigger(ctx, observability.GetTracer(), msg.Subject, msg.Data)
+		resp, err := agentClient.RunTrigger(ctx, w.t.Tracer, msg.Subject, msg.Data)
 
 		//for reference - this is what agent exec would do
 		//ctx = otel.GetTextMapPropagator().Extract(cctx, propagation.HeaderCarrier(msg.Header))

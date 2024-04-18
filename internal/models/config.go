@@ -18,6 +18,7 @@ const (
 	DefaultInternalNodePort = 9222
 	DefaultNodeMemSizeMib   = 256
 	DefaultNodeVcpuCount    = 1
+	DefaultOtelExporterUrl  = "127.0.0.1.24317"
 )
 
 var (
@@ -54,7 +55,7 @@ type NodeConfiguration struct {
 	Tags                map[string]string `json:"tags,omitempty"`
 	ValidIssuers        []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes       []string          `json:"workload_types,omitempty"`
-	OtlpExporterUrl     *string           `json:"otlp_exporter_url,omitempty"`
+	OtlpExporterUrl     string            `json:"otlp_exporter_url,omitempty"`
 
 	Errors []error `json:"errors,omitempty"`
 }
@@ -120,8 +121,9 @@ func DefaultNodeConfiguration() NodeConfiguration {
 			VcpuCount:  &defaultVcpuCount,
 			MemSizeMib: &defaultMemSizeMib,
 		},
-		Tags:          tags,
-		RateLimiters:  nil,
-		WorkloadTypes: DefaultWorkloadTypes,
+		OtlpExporterUrl: DefaultOtelExporterUrl,
+		Tags:            tags,
+		RateLimiters:    nil,
+		WorkloadTypes:   DefaultWorkloadTypes,
 	}
 }
