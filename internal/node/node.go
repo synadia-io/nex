@@ -200,7 +200,7 @@ func (n *Node) createPid() error {
 func (n *Node) emitHeartbeats() {
 	ticker := time.NewTicker(heartbeatInterval)
 	for range ticker.C {
-		n.publishHeartbeat()
+		_ = n.publishHeartbeat()
 
 		if n.closing > 0 {
 			ticker.Stop()
