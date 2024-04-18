@@ -219,8 +219,8 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		fmt.Sprintf("NEX_NODE_NATS_PORT=%d", *s.config.InternalNodePort),
 	)
 
-	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log, stderr: true}
-	cmd.Stdout = &procLogEmitter{workloadID: workloadID, log: s.log, stderr: false}
+	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: true}
+	cmd.Stdout = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: false}
 
 	newProc := &spawnedProcess{
 		ID:   workloadID,
