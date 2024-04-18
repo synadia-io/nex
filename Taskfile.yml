@@ -62,6 +62,16 @@ tasks:
     cmds:
       - sudo go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
       - go test -tags netgo -ldflags '-extldflags "-static"'-v -race ./test
+  
+  otel_start:
+    dir: _scripts/otel
+    cmds:
+      - docker compose up -d
+  
+  otel_stop:
+    dir: _scripts/otel
+    cmds:
+      - docker compose down
 
   build:
     deps: [agent, nex, echo-service]

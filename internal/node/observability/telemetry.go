@@ -34,6 +34,9 @@ type Telemetry struct {
 	metricsExporter string
 	metricsPort     int
 
+	tracesEnabled  bool
+	tracesExporter string
+
 	serviceName string
 	nodePubKey  string
 
@@ -57,6 +60,8 @@ func NewTelemetry(ctx context.Context, log *slog.Logger, config *models.NodeConf
 		metricsEnabled:  config.OtelMetrics,
 		metricsExporter: config.OtelMetricsExporter,
 		metricsPort:     config.OtelMetricsPort,
+		tracesEnabled:   config.OtelTraces,
+		tracesExporter:  config.OtelTracesExporter,
 		serviceName:     defaultServiceName,
 		nodePubKey:      nodePubKey,
 		meterProvider:   noop.NewMeterProvider(),
@@ -73,7 +78,7 @@ func NewTelemetry(ctx context.Context, log *slog.Logger, config *models.NodeConf
 func (t *Telemetry) init() error {
 	var e, err error
 	e = t.initMeterProvider()
-	if err != nil {
+	if e != nil {
 		err = errors.Join(err, e)
 	}
 

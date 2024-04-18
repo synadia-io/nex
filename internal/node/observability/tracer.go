@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/synadia-io/nex/internal/models"
@@ -33,7 +34,7 @@ func GetTracer() trace.Tracer {
 }
 
 func InitializeTraceProvider(config *models.NodeConfiguration, log *slog.Logger) error {
-	if config.OtlpExporterUrl == nil {
+	if !config.OtelTraces || config.OtlpExporterUrl == nil {
 		tracer = noop.NewTracerProvider().Tracer("nex")
 		return nil
 	}
@@ -51,7 +52,7 @@ func InitializeTraceProvider(config *models.NodeConfiguration, log *slog.Logger)
 		return err
 	}
 
-	traceExporter, err := newExporter(ctx, conn, *config.OtlpExporterUrl)
+	traceExporter, err := newExporter(ctx, config.OtelTracesExporter, conn, *config.OtlpExporterUrl)
 	if err != nil {
 		slog.Error("Failed to create trace exporter", slog.Any("err", err))
 		return err
@@ -82,8 +83,14 @@ func newResource(ctx context.Context) (*resource.Resource, error) {
 	)
 }
 
-func newExporter(ctx context.Context, conn *grpc.ClientConn, exporterUrl string) (*otlptrace.Exporter, error) {
-	return otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn), otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(exporterUrl))
+func newExporter(ctx context.Context, typeExporter string, conn *grpc.ClientConn, exporterUrl string) (*otlptrace.Exporter, error) {
+	// TODO: add support for other exporters
+	switch typeExporter {
+	case "grpc":
+		return otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn), otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(exporterUrl))
+	default:
+		return nil, errors.New("unsupported exporter type " + typeExporter)
+	}
 }
 
 func newTraceProvider(res *resource.Resource, bsp sdktrace.SpanProcessor) *sdktrace.TracerProvider {
