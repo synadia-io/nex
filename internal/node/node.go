@@ -38,10 +38,11 @@ type Node struct {
 	api     *ApiListener
 	manager *WorkloadManager
 
-	cancelF context.CancelFunc
-	closing uint32
-	ctx     context.Context
-	sigs    chan os.Signal
+	cancelF  context.CancelFunc
+	closing  uint32
+	lameduck uint32
+	ctx      context.Context
+	sigs     chan os.Signal
 
 	log *slog.Logger
 
@@ -74,12 +75,12 @@ func NewNode(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Con
 
 	err := node.validateConfig()
 	if err != nil {
-		return nil, fmt.Errorf("failed to start node: %s", err.Error())
+		return nil, fmt.Errorf("failed to create node: %s", err.Error())
 	}
 
 	err = node.createPid()
 	if err != nil {
-		return nil, fmt.Errorf("failed to start node: %s", err.Error())
+		return nil, fmt.Errorf("failed to create node: %s", err.Error())
 	}
 
 	err = node.generateKeypair()
@@ -138,6 +139,24 @@ func (n *Node) Start() {
 func (n *Node) Stop() {
 	n.log.Debug("stopping node")
 	n.shutdown()
+}
+
+func (n *Node) EnterLameDuck() error {
+	if atomic.AddUint32(&n.lameduck, 1) == 1 {
+		n.config.Tags[controlapi.TagLameDuck] = "true"
+		err := n.manager.procMan.EnterLameDuck()
+		if err != nil {
+			return err
+		}
+
+		_ = n.publishNodeLameDuckEntered()
+	}
+
+	return nil
+}
+
+func (n *Node) IsLameDuck() bool {
+	return n.lameduck > 0
 }
 
 func (n *Node) createPid() error {
@@ -332,6 +351,24 @@ func (n *Node) loadNodeConfig() error {
 	}
 
 	return nil
+}
+
+func (n *Node) publishNodeLameDuckEntered() error {
+	nodeLameDuck := controlapi.LameDuckEnteredEvent{
+		Version: VERSION,
+		Id:      n.publicKey,
+	}
+
+	cloudevent := cloudevents.NewEvent()
+	cloudevent.SetSource(n.publicKey)
+	cloudevent.SetID(uuid.NewString())
+	cloudevent.SetTime(n.startedAt)
+	cloudevent.SetType(controlapi.LameDuckEnteredEventType)
+	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
+	_ = cloudevent.SetData(nodeLameDuck)
+
+	n.log.Info("Publishing node lame duck entered event")
+	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
 }
 
 func (n *Node) publishHeartbeat() error {

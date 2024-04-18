@@ -18,6 +18,7 @@ import (
 // $NEX.INFO.{namespace}.{node}
 // $NEX.RUN.{namespace}.{node}
 // $NEX.STOP.{namespace}.{node}
+// $NEX.LAMEDUCK.{node}
 
 // A control API client communicates with a "Nexus" of nodes by virtue of the $NEX.> subject space. This
 // client should be used to communicate with Nex nodes whenever possible, and its patterns should be copied
@@ -92,6 +93,22 @@ func (api *Client) NodeInfo(nodeId string) (*InfoResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+	return &response, nil
+}
+
+func (api *Client) EnterLameDuck(nodeId string) (*LameDuckResponse, error) {
+	subject := fmt.Sprintf("%s.LAMEDUCK.%s", APIPrefix, nodeId)
+	bytes, err := api.performRequest(subject, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response LameDuckResponse
+	err = json.Unmarshal(bytes, &response)
+	if err != nil {
+		return nil, err
+	}
+
 	return &response, nil
 }
 

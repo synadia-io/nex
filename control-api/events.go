@@ -5,6 +5,7 @@ const (
 	AgentStoppedEventType    = "agent_stopped"
 	NodeStartedEventType     = "node_started"
 	NodeStoppedEventType     = "node_stopped"
+	LameDuckEnteredEventType = "node_entered_lameduck"
 	HeartbeatEventType       = "heartbeat"
 	WorkloadStartedEventType = "workload_started" // FIXME-- should this be WorkloadDeployed?
 	WorkloadStoppedEventType = "workload_stopped" // FIXME-- should this be in addition to WorkloadUndeployed (likely yes, in case of something bad happening...)
@@ -33,6 +34,11 @@ type AgentStoppedEvent struct {
 }
 
 type NodeStartedEvent struct {
+	Version string `json:"version"`
+	Id      string `json:"id"`
+}
+
+type LameDuckEnteredEvent struct {
 	Version string `json:"version"`
 	Id      string `json:"id"`
 }

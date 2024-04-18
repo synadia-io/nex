@@ -93,6 +93,15 @@ func (s *SpawningProcessManager) ListProcesses() ([]ProcessInfo, error) {
 	return pinfos, nil
 }
 
+func (s *SpawningProcessManager) EnterLameDuck() error {
+	nope := false
+	for _, req := range s.deployRequests {
+		req.Essential = &nope
+	}
+
+	return nil
+}
+
 // Attaches a deployment request to a running process. Until a process is prepared, it's just an empty agent
 func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.DeployRequest) error {
 	select {

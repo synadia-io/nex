@@ -74,6 +74,11 @@ func (api *ApiListener) Start() error {
 		api.log.Error("Failed to subscribe to node-specific ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 
+	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".LAMEDUCK."+api.PublicKey(), api.handleLameDuck)
+	if err != nil {
+		api.log.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.PublicKey()))
+	}
+
 	// Namespaced subscriptions, the * below is for the namespace
 	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.PublicKey(), api.handleInfo)
 	if err != nil {
@@ -159,6 +164,11 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	if err != nil {
 		api.log.Error("Invalid subject for workload deployment", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, "Invalid subject for workload deployment")
+		return
+	}
+
+	if api.node.IsLameDuck() {
+		respondFail(controlapi.RunResponseType, m, "Node is in lame duck mode. Workload deploy request rejected")
 		return
 	}
 
@@ -302,6 +312,26 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 	raw, err := json.Marshal(res)
 	if err != nil {
 		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
+	} else {
+		_ = m.Respond(raw)
+	}
+}
+
+func (api *ApiListener) handleLameDuck(m *nats.Msg) {
+	err := api.node.EnterLameDuck()
+	if err != nil {
+		api.log.Error("Failed to enter lame duck mode", slog.Any("error", err))
+		respondFail(controlapi.LameDuckResponseType, m, "Failed to enter lame duck mode")
+		return
+	}
+	res := controlapi.NewEnvelope(controlapi.LameDuckResponseType, controlapi.LameDuckResponse{
+		Success: true,
+		NodeId:  api.PublicKey(),
+	}, nil)
+	raw, err := json.Marshal(res)
+	if err != nil {
+		api.log.Error("Failed to serialize response", slog.Any("error", err))
+		respondFail(controlapi.LameDuckResponseType, m, "Serialization failure")
 	} else {
 		_ = m.Respond(raw)
 	}

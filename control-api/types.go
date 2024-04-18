@@ -11,14 +11,17 @@ const (
 )
 
 const (
-	InfoResponseType = "io.nats.nex.v1.info_response"
-	PingResponseType = "io.nats.nex.v1.ping_response"
-	RunResponseType  = "io.nats.nex.v1.run_response"
-	StopResponseType = "io.nats.nex.v1.stop_response"
-	TagOS            = "nex.os"
-	TagArch          = "nex.arch"
-	TagCPUs          = "nex.cpucount"
-	TagUnsafe        = "nex.unsafe"
+	InfoResponseType     = "io.nats.nex.v1.info_response"
+	PingResponseType     = "io.nats.nex.v1.ping_response"
+	RunResponseType      = "io.nats.nex.v1.run_response"
+	StopResponseType     = "io.nats.nex.v1.stop_response"
+	LameDuckResponseType = "io.nats.nex.v1.lameduck_response"
+
+	TagOS       = "nex.os"
+	TagArch     = "nex.arch"
+	TagCPUs     = "nex.cpucount"
+	TagUnsafe   = "nex.unsafe"
+	TagLameDuck = "nex.lameduck"
 )
 
 type RunResponse struct {
@@ -34,6 +37,11 @@ type PingResponse struct {
 	Uptime          string            `json:"uptime"`
 	Tags            map[string]string `json:"tags,omitempty"`
 	RunningMachines int               `json:"running_machines"`
+}
+
+type LameDuckResponse struct {
+	NodeId  string `json:"node_id"`
+	Success bool   `json:"success"`
 }
 
 type MemoryStat struct {

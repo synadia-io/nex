@@ -32,6 +32,24 @@ func ListNodes(ctx context.Context) error {
 
 }
 
+func LameDuck(ctx context.Context, logger *slog.Logger) error {
+	nodeId := RunOpts.TargetNode
+	nc, err := models.GenerateConnectionFromOpts(Opts)
+	if err != nil {
+		return err
+	}
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
+	_, err = nodeClient.EnterLameDuck(nodeId)
+	if err != nil {
+		fmt.Printf("Failed to issue lame duck command: %s\n", err)
+		return nil
+	}
+	fmt.Printf("Command to enter lame duck mode issued to %s\n", nodeId)
+
+	return nil
+}
+
 // Uses a control API client to retrieve info on a single node
 func NodeInfo(ctx context.Context, nodeid string) error {
 	nc, err := models.GenerateConnectionFromOpts(Opts)
