@@ -220,6 +220,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+
 				nodeConfig.NoSandbox = !sandbox
 			})
 
@@ -268,8 +269,12 @@ var _ = Describe("nex node", func() {
 					})
 
 					JustBeforeEach(func() {
+						var err error
+
 						_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-						node, _ = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
+						node, err = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
+						Expect(err).To(BeNil())
+
 						go node.Start()
 
 						nodeID, _ = node.PublicKey()

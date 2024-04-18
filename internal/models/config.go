@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"net/netip"
 	"os"
 	"path/filepath"
 
@@ -9,12 +10,15 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-const DefaultCNINetworkName = "fcnet"
-const DefaultCNIInterfaceName = "veth0"
-const DefaultInternalNodeHost = "192.168.127.1"
-const DefaultInternalNodePort = 9222
-const DefaultNodeMemSizeMib = 256
-const DefaultNodeVcpuCount = 1
+const (
+	DefaultCNINetworkName   = "fcnet"
+	DefaultCNIInterfaceName = "veth0"
+	DefaultCNISubnet        = "192.168.127.0/24"
+	DefaultInternalNodeHost = "192.168.127.1"
+	DefaultInternalNodePort = 9222
+	DefaultNodeMemSizeMib   = 256
+	DefaultNodeVcpuCount    = 1
+)
 
 var (
 	// docker/OCI needs to be explicitly enabled in node configuration
@@ -68,6 +72,20 @@ func (c *NodeConfiguration) Validate() bool {
 		c.Errors = append(c.Errors, err)
 	}
 
+	cniSubnet, err := netip.ParsePrefix(*c.CNI.Subnet)
+	if err != nil {
+		c.Errors = append(c.Errors, err)
+	}
+	internalNodeHost, err := netip.ParseAddr(*c.InternalNodeHost)
+	if err != nil {
+		c.Errors = append(c.Errors, err)
+	}
+
+	hostInSubnet := cniSubnet.Contains(internalNodeHost)
+	if !hostInSubnet {
+		c.Errors = append(c.Errors, errors.New("internal node host must be in the CNI subnet"))
+	}
+
 	return len(c.Errors) == 0
 }
 
@@ -89,6 +107,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 			BinPath:       DefaultCNIBinPath,
 			NetworkName:   agentapi.StringOrNil(DefaultCNINetworkName),
 			InterfaceName: agentapi.StringOrNil(DefaultCNIInterfaceName),
+			Subnet:        agentapi.StringOrNil(DefaultCNISubnet),
 		},
 		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the inside of the firecracker VM--. This is not necessarily the address
 		// on which the internal NATS server is actually listening on inside the node.

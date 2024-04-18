@@ -11,6 +11,7 @@ import (
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
 	shandler "github.com/jordan-rash/slog-handler"
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/internal/models"
 	nextui "github.com/synadia-io/nex/nex/tui"
 )
@@ -61,7 +62,7 @@ var (
 func init() {
 	_ = versionCheck()
 
-	ncli.Flag("server", "NATS server urls").Short('s').Envar("NATS_URL").PlaceHolder("URL").StringVar(&Opts.Servers)
+	ncli.Flag("server", "NATS server urls").Short('s').Envar("NATS_URL").Default(nats.DefaultURL).StringVar(&Opts.Servers)
 	ncli.Flag("user", "Username or Token").Envar("NATS_USER").PlaceHolder("USER").StringVar(&Opts.Username)
 	ncli.Flag("password", "Password").Envar("NATS_PASSWORD").PlaceHolder("PASSWORD").StringVar(&Opts.Password)
 	ncli.Flag("creds", "User credentials file (JWT authentication)").Envar("NATS_CREDS").PlaceHolder("FILE").StringVar(&Opts.Creds)
