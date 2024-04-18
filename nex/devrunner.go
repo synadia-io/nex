@@ -30,7 +30,7 @@ const (
 	fileExtensionWasm   = "wasm"
 
 	objectStoreName     = "NEXCLIFILES"
-	objectStoreMaxBytes = 100 * 1024 * 1024 // 100 MB
+	objectStoreMaxBytes = uint(100 * 1024 * 1024) // 100 MB
 )
 
 func init() {
@@ -79,7 +79,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	targetPublicXkey := info.PublicXKey
-	workloadUrl, workloadName, workloadType, err := uploadWorkload(nc, DevRunOpts.Filename)
+	workloadUrl, workloadName, workloadType, err := uploadWorkload(nc, *DevRunOpts)
 	if err != nil {
 		return err
 	}
@@ -136,28 +136,32 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	return nil
 }
 
-func uploadWorkload(nc *nats.Conn, filename string) (string, string, string, error) {
+func uploadWorkload(nc *nats.Conn, devOpts models.DevRunOptions) (string, string, string, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
 	}
 	var bucket nats.ObjectStore
+	maxBytes := objectStoreMaxBytes
+	if devOpts.DevBucketMaxBytes > 0 {
+		maxBytes = devOpts.DevBucketMaxBytes
+	}
 	bucket, err = js.ObjectStore(objectStoreName)
 	if err != nil {
 		bucket, err = js.CreateObjectStore(&nats.ObjectStoreConfig{
 			Bucket:      objectStoreName,
 			Description: "Ad hoc object storage for NEX CLI developer mode uploads",
-			MaxBytes:    objectStoreMaxBytes,
+			MaxBytes:    int64(maxBytes),
 		})
 		if err != nil {
 			return "", "", "", err
 		}
 	}
-	bytes, err := os.ReadFile(filename)
+	bytes, err := os.ReadFile(devOpts.Filename)
 	if err != nil {
 		return "", "", "", err
 	}
-	key := filepath.Base(filename)
+	key := filepath.Base(devOpts.Filename)
 	key = strings.ReplaceAll(key, ".", "")
 
 	_, err = bucket.PutBytes(key, bytes)
@@ -166,7 +170,7 @@ func uploadWorkload(nc *nats.Conn, filename string) (string, string, string, err
 	}
 
 	var workloadType string
-	switch strings.Replace(filepath.Ext(DevRunOpts.Filename), ".", "", 1) {
+	switch strings.Replace(filepath.Ext(devOpts.Filename), ".", "", 1) {
 	case fileExtensionJS:
 		workloadType = agentapi.NexExecutionProviderV8
 	case fileExtensionWasm:
