@@ -25,7 +25,6 @@ func setConditionalCommands() {
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
 	ctx, cancel := context.WithCancel(newContext(ctx))
-	logger.Debug("******************* config", slog.String("metrics", NodeOpts.OtelMetricsExporter), slog.String("traces", NodeOpts.OtelTracesExporter))
 	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
 	if err != nil {
 		return err
