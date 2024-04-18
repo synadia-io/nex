@@ -124,7 +124,7 @@ func init() {
 	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 
 	// one day when we refactor, let's get rid of all of these global structs. Such ugly
-	nodesLs.Flag("workload", "Only query nodes currently running the given workload").StringVar(&RunOpts.Name)
+	nodesLs.Flag("workload", "Only query nodes currently running the given workload (id or name)").StringVar(&RunOpts.Name)
 }
 
 func main() {

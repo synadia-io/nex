@@ -335,7 +335,8 @@ func (api *ApiListener) handleWorkloadPing(m *nats.Msg) {
 	}
 	now := time.Now().UTC()
 	for _, machine := range machines {
-		if machine.Namespace == namespace && machine.Id == workloadId {
+		if machine.Namespace == namespace &&
+			(machine.Id == workloadId || strings.EqualFold(machine.Workload.Name, workloadId)) {
 			res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
 				NodeId:          api.PublicKey(),
 				Version:         Version(),
