@@ -112,6 +112,45 @@ func (api *Client) EnterLameDuck(nodeId string) (*LameDuckResponse, error) {
 	return &response, nil
 }
 
+// Functions the same as ListNodes (ping), except that only nodes currently running
+// the workload in question will respond. Useful to answer the questions, "is this workload running?"
+// and if so, on which node?
+func (api *Client) ListNodesWithWorkload(workloadId string) ([]PingResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
+	defer cancel()
+
+	responses := make([]PingResponse, 0)
+
+	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+		env, err := extractEnvelope(m.Data)
+		if err != nil {
+			return
+		}
+		var resp PingResponse
+		bytes, err := json.Marshal(env.Data)
+		if err != nil {
+			return
+		}
+		err = json.Unmarshal(bytes, &resp)
+		if err != nil {
+			return
+		}
+		responses = append(responses, resp)
+	})
+	if err != nil {
+		return nil, nil
+	}
+	msg := nats.NewMsg(fmt.Sprintf("%s.WPING.%s.%s", APIPrefix, api.namespace, workloadId))
+	msg.Reply = sub.Subject
+	err = api.nc.PublishMsg(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	<-ctx.Done()
+	return responses, nil
+}
+
 // Attempts to list all nodes. Note that any node within the Nexus will respond to this ping, regardless
 // of the namespaces of their running workloads
 func (api *Client) ListNodes() ([]PingResponse, error) {

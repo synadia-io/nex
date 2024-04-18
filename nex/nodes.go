@@ -22,7 +22,13 @@ func ListNodes(ctx context.Context) error {
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout, log)
 
-	nodes, err := nodeClient.ListNodes()
+	var nodes []controlapi.PingResponse
+	if strings.TrimSpace(RunOpts.Name) != "" {
+		nodes, err = nodeClient.ListNodesWithWorkload(strings.TrimSpace(RunOpts.Name))
+	} else {
+		nodes, err = nodeClient.ListNodes()
+	}
+
 	if err != nil {
 		return err
 	}

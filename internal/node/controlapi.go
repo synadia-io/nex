@@ -64,7 +64,12 @@ func (api *ApiListener) PublicKey() string {
 }
 
 func (api *ApiListener) Start() error {
-	_, err := api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
+	// $NEX.WPING.{namespace}.{workloadId}
+	_, err := api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.*.*", api.handleWorkloadPing)
+	if err != nil {
+		api.log.Error("Failed to subscribe to workload ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
+	}
+	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
 	if err != nil {
 		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
@@ -270,12 +275,6 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	}
 	workloadName := request.DecodedClaims.Subject
 
-	if err != nil {
-		api.log.Error("Failed to deploy workload to agent", slog.Any("err", err), slog.String("workload_id", *workloadID))
-		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deploy workload: %s", err))
-		return
-	}
-
 	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("workload_id", *workloadID))
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
@@ -314,6 +313,45 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
 	} else {
 		_ = m.Respond(raw)
+	}
+}
+
+func (api *ApiListener) handleWorkloadPing(m *nats.Msg) {
+	// Note that this ping _only_ responds on success, all others are silent
+	// $NEX.WPING.{namespace}.{workloadId}
+	// result payload looks exactly like a node ping reply
+	tokens := strings.Split(m.Subject, ".")
+	if len(tokens) != 4 {
+		return
+	}
+
+	namespace := tokens[2]
+	workloadId := tokens[3]
+
+	machines, err := api.mgr.RunningWorkloads()
+	if err != nil {
+		api.log.Error("Failed to query running machines", slog.Any("error", err))
+		return
+	}
+	now := time.Now().UTC()
+	for _, machine := range machines {
+		if machine.Namespace == namespace && machine.Id == workloadId {
+			res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
+				NodeId:          api.PublicKey(),
+				Version:         Version(),
+				Uptime:          myUptime(now.Sub(api.start)),
+				RunningMachines: len(machines),
+				Tags:            api.node.config.Tags,
+			}, nil)
+
+			raw, err := json.Marshal(res)
+			if err != nil {
+				api.log.Error("Failed to marshal ping response", slog.Any("err", err))
+			} else {
+				_ = m.Respond(raw)
+			}
+			return
+		}
 	}
 }
 
