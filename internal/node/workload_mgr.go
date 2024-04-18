@@ -32,7 +32,7 @@ const (
 	LogSubjectPrefix        = "$NEX.logs"
 	WorkloadCacheBucketName = "NEXCACHE"
 
-	defaultHandshakeTimeoutMillis = 1500
+	defaultHandshakeTimeoutMillis = 5000
 
 	nexRuntimeNs = "x-nex-runtime-ns"
 )
