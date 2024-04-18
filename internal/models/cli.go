@@ -19,6 +19,8 @@ type DevRunOptions struct {
 	Filename string
 	// Stop a workload with the same name on a target
 	AutoStop bool
+	// Max bytes override for when we create the NEXCLIFILES bucket
+	DevBucketMaxBytes uint
 }
 
 // Options configure the CLI
