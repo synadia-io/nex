@@ -319,7 +319,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 			Namespace: p.Namespace,
 			Workload: controlapi.WorkloadSummary{
 				Name:         p.Name,
-				Description:  *p.DeployRequest.WorkloadName,
+				Description:  *p.DeployRequest.Description,
 				Runtime:      runtimeFriendly,
 				WorkloadType: *p.DeployRequest.WorkloadType,
 				Hash:         p.DeployRequest.Hash,
