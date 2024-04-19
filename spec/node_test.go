@@ -67,7 +67,7 @@ var _ = Describe("nex node", func() {
 			"build_date": "2021-01-01T00:00:00Z",
 		}
 
-		ctxx, cancel = context.WithCancel(context.WithValue(context.Background(), "build_data", initData)) //nolint:all
+		ctxx, cancel = context.WithCancel(context.WithValue(context.Background(), "build_data", initData))
 		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
 
 		opts = &models.Options{
