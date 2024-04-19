@@ -122,11 +122,6 @@ func NewWorkloadManager(
 		return nil, err
 	}
 
-	if err != nil {
-		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
-		return nil, err
-	}
-
 	w.hostServices = NewHostServices(w, nc, ncint, w.log)
 	err = w.hostServices.init()
 	if err != nil {
