@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -25,14 +26,22 @@ func (t *Telemetry) initTrace() error {
 	}
 
 	if t.tracesEnabled {
-		t.log.Debug("Traces enabled")
+		t.log.Debug("Traces enabled", slog.String("exporter", t.tracesExporter))
 		switch t.tracesExporter {
 		case "grpc":
+			t.log.Debug("GRPC exporter", slog.String("url", t.otelExporterUrl))
 			conn, err := grpc.DialContext(t.ctx, t.otelExporterUrl, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
 			if err != nil {
 				return err
 			}
 			t.traceExporter, err = otlptracegrpc.New(t.ctx, otlptracegrpc.WithGRPCConn(conn), otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(t.otelExporterUrl))
+			if err != nil {
+				return err
+			}
+			t.log.Info("Initialized OTLP exporter", slog.String("url", t.otelExporterUrl))
+		case "http":
+			t.log.Debug("HTTP exporter", slog.String("url", t.otelExporterUrl))
+			t.traceExporter, err = otlptracehttp.New(t.ctx, otlptracehttp.WithEndpoint(t.otelExporterUrl), otlptracehttp.WithInsecure())
 			if err != nil {
 				return err
 			}
