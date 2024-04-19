@@ -1,5 +1,6 @@
 server:
-  http_listen_port: 7999
+  http_listen_address: "127.0.0.1"
+  http_listen_port: 14530
 
 distributor:
   log_received_spans:
@@ -8,7 +9,10 @@ distributor:
     otlp:
       protocols:
         http:
-          endpoint: "0.0.0.0:4319"
+          endpoint: "127.0.0.1:14531"
+
+usage_report:
+  reporting_enabled: false
 
 storage:
   trace:

@@ -65,31 +65,37 @@ Nex is made up of the following components
 Nex comes prewired with [OpenTelemetry](https://opentelemetry.io) support for traces and metrics.  
 
 In order to enable OTel support, you will first need to provide the Nex node with access to an OTel exporter.  We have provided a docker-compose solution for local development.  In order to start the OTel evironment, you will need navigate to the `_scripts/otel` directory and run `docker compose up`.  The following ports will be exposed:
+
 ```
-Web UI (grafana)      -> :14524
-OTel Collector (grpc) -> :24317
-OTel Collector (http) -> :24318
+Web UI (grafana)      -> 127.0.0.1:14524
+Tempo (http)          -> 127.0.0.1:14530
+Tempo OTLP (http)     -> 127.0.0.1:14531
+OTel Collector (grpc) -> 127.0.0.1:14532
+OTel Collector (http) -> 127.0.0.1:14533
+Prometheus            -> 127.0.0.1:14534
 ```
 
 In order to view the metrics and traces, you will need to navigate to `http://localhost:14524` in your browser.
 
 ### Traces
-To enable traces, add `"otlp_exporter_url": "0.0.0.0:24317"` to the bottom of your Nex configuration file
 ```bash
 nex node up \
   --traces \                      # enables traces
   --otel_traces_exporter grpc     # controls where how traces are exported to collector
 ```
 
+Valid exporters are `grpc`, `http`, and `file`.  The file exporter will write traces to a file in the current working directory called `traces.log`.
+
 ### Metrics
 To enable metrics, include the flags when starting the node
 ```bash
 nex node up \
   --metrics \                      # enables metrics
-  --otel_metrics_exporter stdout \ # controls whether the metrics are printed to stdout or provided via prometheus
+  --otel_metrics_exporter file \   # controls whether the metrics are printed to metrics.log or provided via prometheus
   --metrics_port 8085              # exposes prometheus data on provided port
 ```
 
+Valid exporters are `http` and `prometheus`.  The file exporter will write metrics to a file in the current working directory called `metrics.log`.
 
 ## Contributing
 For information on how to contribute to Nex, please read our [contributing](./CONTRIBUTING.md) guide.

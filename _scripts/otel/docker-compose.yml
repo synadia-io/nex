@@ -2,19 +2,21 @@ version: '3'
 services:
   prometheus:
     image: prom/prometheus:v2.21.0
+    network_mode: host
     volumes:
       - ./prometheus:/etc/prometheus
-    command: --web.enable-lifecycle  --config.file=/etc/prometheus/prometheus.yml
+    command: --web.enable-lifecycle --web.listen-address=127.0.0.1:14534 --config.file=/etc/prometheus/prometheus.yml
   grafana:
     image: grafana/grafana:10.0.10
+    network_mode: host
     environment:
+      - GF_PATHS_CONFIG=/etc/grafana/config.ini
       - GF_AUTH_DISABLE_LOGIN_FORM=true
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-    ports:
-      - 14524:3000 
     restart: unless-stopped
     volumes:
+      - ./grafana/config.ini:/etc/grafana/config.ini
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/provisioning/dashboards/nex.json:/var/lib/grafana/dashboards/nex.json
@@ -23,19 +25,18 @@ services:
       - prometheus
   otelcol:
     image: otel/opentelemetry-collector-contrib:0.95.0
+    network_mode: host
     command:
       - '--config=/etc/otelcol/config.yaml'
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml
-    ports:
-      - 24317:4317
-      - 24318:4318
     depends_on:
       - prometheus
       - tempo
   tempo:
-      image: grafana/tempo:2.3.1
-      command:
-        - '-config.file=/etc/tempo/config.yaml'
-      volumes:
-        - ./tempo.yaml:/etc/tempo/config.yaml
+    image: grafana/tempo:2.3.1
+    network_mode: host
+    command:
+      - '-config.file=/etc/tempo/config.yaml'
+    volumes:
+      - ./tempo.yaml:/etc/tempo/config.yaml
