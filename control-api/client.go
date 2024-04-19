@@ -138,7 +138,7 @@ func (api *Client) ListNodesWithWorkload(workloadId string) ([]PingResponse, err
 		responses = append(responses, resp)
 	})
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 	msg := nats.NewMsg(fmt.Sprintf("%s.WPING.%s.%s", APIPrefix, api.namespace, workloadId))
 	msg.Reply = sub.Subject
