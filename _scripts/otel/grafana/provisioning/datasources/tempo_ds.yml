@@ -2,7 +2,7 @@ datasources:
 - name: Tempo
   type: tempo
   access: proxy
-  url: http://tempo:7999
+  url: http://127.0.0.1:14530
   version: 1
   editable: false
   uid: tempo

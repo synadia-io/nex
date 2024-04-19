@@ -61,7 +61,13 @@ var _ = Describe("nex node", func() {
 	var snapshotAgentRootFSPathOnce sync.Once
 
 	BeforeEach(func() {
-		ctxx, cancel = context.WithCancel(context.Background())
+		initData := map[string]string{
+			"version":    "spec",
+			"commit":     "abc123",
+			"build_date": "2021-01-01T00:00:00Z",
+		}
+
+		ctxx, cancel = context.WithCancel(context.WithValue(context.Background(), "build_data", initData)) //nolint:all
 		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
 
 		opts = &models.Options{

@@ -5,9 +5,9 @@ receivers:
   otlp:
     protocols:
       grpc:
-        endpoint: 0.0.0.0:4317
+        endpoint: 127.0.0.1:14532
       http:
-        endpoint: 0.0.0.0:4318
+        endpoint: 127.0.0.1:14533
 
 processors:
   batch:
@@ -15,9 +15,9 @@ processors:
 exporters:
   debug:
   otlphttp/traces:
-    endpoint: http://tempo:4319
+    endpoint: http://127.0.0.1:14531
   prometheusremotewrite:
-    endpoint: "http://prometheus:9090/api/v1/write"
+    endpoint: "http://127.0.0.1:14534/api/v1/write"
     tls:
       insecure: true
 

@@ -231,13 +231,7 @@ func (n *Node) init() error {
 		if err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
 		} else {
-			n.log.Info("Initialized telemetry")
-		}
-
-		err = observability.InitializeTraceProvider(n.config, n.log)
-		if err != nil {
-			n.log.Error("Failed to initialize OTLP trace exporter", slog.Any("err", err))
-			err = fmt.Errorf("failed to initialize OTLP trace exporter: %s", err)
+			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
 
 		// setup NATS connection
@@ -340,6 +334,8 @@ func (n *Node) loadNodeConfig() error {
 		n.config.OtelMetrics = n.nodeOpts.OtelMetrics
 		n.config.OtelMetricsExporter = n.nodeOpts.OtelMetricsExporter
 		n.config.OtelMetricsPort = n.nodeOpts.OtelMetricsPort
+		n.config.OtelTraces = n.nodeOpts.OtelTraces
+		n.config.OtelTracesExporter = n.nodeOpts.OtelTracesExporter
 	}
 
 	return nil
