@@ -54,7 +54,10 @@ jobs:
     -
       name: Run unit tests
       working-directory: .
-      run: go test -v ./...
+      run: |
+        go mod tidy
+        go test -v ./...
+
     - 
       name: Run spec suite
       working-directory: .
