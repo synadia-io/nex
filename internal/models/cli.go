@@ -116,6 +116,8 @@ type NodeOptions struct {
 	OtelTraces          bool   `json:"-"`
 	OtelTracesExporter  string `json:"-"`
 
+	PreflightInit string `json:"-"`
+
 	Errors []error `json:"errors,omitempty"`
 }
 
