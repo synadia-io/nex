@@ -411,20 +411,15 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPostFunctionName))
 		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
-		msg.Data = []byte(data)
+		msg.Data = []byte(payload)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
@@ -499,20 +494,15 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPutFunctionName))
 		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
-		msg.Data = []byte(data)
+		msg.Data = []byte(payload)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
@@ -587,20 +577,15 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPatchFunctionName))
 		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
-		msg.Data = []byte(data)
+		msg.Data = []byte(payload)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
@@ -830,7 +815,7 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.JSONParse(v.ctx, string(resp.Data)) // FIXME-- support unmarshaling
+		val, err := v8.NewValue(v.iso, string(resp.Data))
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -1142,7 +1127,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.JSONParse(v.ctx, string(resp.Data))
+		val, err := v8.NewValue(v.iso, string(resp.Data))
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
