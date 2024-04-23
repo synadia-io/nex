@@ -66,6 +66,10 @@ const (
 	nexTriggerSubject = "x-nex-trigger-subject"
 	nexRuntimeNs      = "x-nex-runtime-ns"
 
+	httpURL = "x-http-url"
+
+	keyHeader = "x-key"
+
 	messageSubject = "x-subject"
 
 	objectName = "x-object-name"
@@ -342,12 +346,10 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPGetFunctionName,
-			URL:    _url.String(),
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPGetFunctionName))
+		msg.Header.Add(httpURL, _url.String())
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPGetFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -431,13 +433,11 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			}
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPPostFunctionName,
-			URL:    _url.String(),
-			Body:   &data,
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPostFunctionName))
+		msg.Header.Add(httpURL, _url.String())
+		msg.Data = []byte(data)
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPostFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -521,13 +521,11 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			}
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPPutFunctionName,
-			URL:    _url.String(),
-			Body:   &data,
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPutFunctionName))
+		msg.Header.Add(httpURL, _url.String())
+		msg.Data = []byte(data)
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPutFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -611,13 +609,11 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			}
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPPatchFunctionName,
-			URL:    _url.String(),
-			Body:   &data,
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPatchFunctionName))
+		msg.Header.Add(httpURL, _url.String())
+		msg.Data = []byte(data)
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPatchFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -690,24 +686,10 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
-		}
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPDeleteFunctionName))
+		msg.Header.Add(httpURL, _url.String())
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPDeleteFunctionName,
-			URL:    _url.String(),
-			Body:   &data, // this should not be present for DELETE requests, but it is not explicitly forbidden. so we'll allow it
-		})
-
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPDeleteFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -780,12 +762,10 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPHeadFunctionName,
-			URL:    _url.String(),
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPHeadFunctionName))
+		msg.Header.Add(httpURL, _url.String())
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPHeadFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -852,24 +832,16 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
-			Key: &key,
-		})
+		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVGetFunctionName))
+		msg.Header.Add(keyHeader, key)
 
-		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVGetFunctionName), req, hostServicesKVGetTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesKVGetTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		var kvresp *agentapi.HostServicesKeyValueRequest
-		err = json.Unmarshal(resp.Data, &kvresp)
-		if err != nil {
-			val, _ := v8.NewValue(v.iso, err.Error())
-			return v.iso.ThrowException(val)
-		}
-
-		val, err := v8.JSONParse(v.ctx, string(*kvresp.Value))
+		val, err := v8.JSONParse(v.ctx, string(resp.Data)) // FIXME-- support unmarshaling
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -886,27 +858,24 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		key := args[0].String()
-		value := args[1]
 
-		raw, err := value.MarshalJSON() // FIXME-- support Uint8 array
+		value, err := v.marshalValue(args[1])
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		val := json.RawMessage(raw)
-		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
-			Key:   &key,
-			Value: &val,
-		})
+		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVSetFunctionName))
+		msg.Header.Add(keyHeader, key)
+		msg.Data = value
 
-		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVSetFunctionName), req, hostServicesKVSetTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesKVSetTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		var kvresp *agentapi.HostServicesKeyValueRequest
+		var kvresp *agentapi.HostServicesKeyValueResponse
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
@@ -914,7 +883,7 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		if !*kvresp.Success {
-			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to set %d-byte value for key: %s", len(val), key))
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to set %d-byte value for key: %s", len(value), key))
 			return v.iso.ThrowException(val)
 		}
 
@@ -930,17 +899,16 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
-			Key: &key,
-		})
+		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVDeleteFunctionName))
+		msg.Header.Add(keyHeader, key)
 
-		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVDeleteFunctionName), req, hostServicesKVDeleteTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesKVDeleteTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		var kvresp *agentapi.HostServicesKeyValueRequest
+		var kvresp *agentapi.HostServicesKeyValueResponse
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
@@ -987,7 +955,11 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		subject := args[0].String()
-		payload := args[1].String()
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingPublishFunctionName))
 		msg.Header.Add(messageSubject, subject)
@@ -1017,7 +989,11 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		subject := args[0].String()
-		payload := args[1].String()
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingRequestFunctionName))
 		msg.Header.Add(messageSubject, subject)
@@ -1036,7 +1012,7 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.NewValue(v.iso, string(resp.Data)) // FIXME-- pass []byte natively into javascript using ArrayBuffer
+		val, err := v8.NewValue(v.iso, string(resp.Data))
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -1160,22 +1136,12 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		name := args[0].String()
-		value := args[1].String()
 
-		// FIXME- resolve primitive value from the following types:
-		//   string -> V8::String
-		//   int32 -> V8::Integer
-		//   uint32 -> V8::Integer
-		//   int64 -> V8::BigInt
-		//   uint64 -> V8::BigInt
-		//   bool -> V8::Boolean
-		//   *big.Int -> V8::BigInt
-
-		// raw, err := value.MarshalJSON() // FIXME-- support Uint8 array
-		// if err != nil {
-		// 	val, _ := v8.NewValue(v.iso, err.Error())
-		// 	return v.iso.ThrowException(val)
-		// }
+		value, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStorePutFunctionName))
 		msg.Header.Add(objectName, name)
@@ -1248,6 +1214,22 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 	}))
 
 	return objectStore
+}
+
+func (v *V8) marshalValue(val *v8.Value) ([]byte, error) {
+	if val.IsObject() || val.IsArray() {
+		return val.MarshalJSON()
+	} else if val.IsBigInt() {
+		return []byte(val.BigInt().String()), nil
+	} else if val.IsBoolean() {
+		return []byte(fmt.Sprintf("%t", val.Boolean())), nil
+	} else if val.IsNumber() {
+		return []byte(fmt.Sprintf("%f", val.Number())), nil
+	} else if val.IsString() {
+		return []byte(val.String()), nil
+	}
+
+	return nil, fmt.Errorf("failed to marshal v8 value: %v", val)
 }
 
 // convenience method to initialize a V8 execution provider
