@@ -56,7 +56,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	// node "nearby"
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, Opts.Namespace, logger)
 
-	candidates, err := nodeClient.ListNodes()
+	candidates, err := nodeClient.ListAllNodes()
 	if err != nil {
 		return err
 	}

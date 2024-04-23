@@ -57,9 +57,14 @@ tasks:
     cmds:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
+  unit-test:
+    deps: [clean]
+    cmds:
+      - go test $(go list ./... | grep -v spec)
+
   test:
     deps: [clean, agent]
-    cmds:
+    cmds:          
       - sudo go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
       - go test -tags netgo -ldflags '-extldflags "-static"'-v -race ./test
   

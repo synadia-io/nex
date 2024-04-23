@@ -51,6 +51,13 @@ jobs:
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
+    -
+      name: Run unit tests
+      if: runner.os != 'Windows'
+      working-directory: .
+      run: |        
+        go test $(go list ./... | grep -v spec)
+        
     - 
       name: Run spec suite
       working-directory: .
