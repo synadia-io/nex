@@ -66,13 +66,13 @@ const (
 	nexTriggerSubject = "x-nex-trigger-subject"
 	nexRuntimeNs      = "x-nex-runtime-ns"
 
-	httpURL = "x-http-url"
+	httpURLHeader = "x-http-url"
 
-	keyHeader = "x-key"
+	keyValueKeyHeader = "x-keyvalue-key"
 
-	messageSubject = "x-subject"
+	messagingSubjectHeader = "x-subject"
 
-	objectName = "x-object-name"
+	objectStoreObjectNameHeader = "x-object-name"
 
 	v8FunctionArrayAppend = "array-append"
 	v8FunctionArrayInit   = "array-init"
@@ -347,7 +347,7 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPGetFunctionName))
-		msg.Header.Add(httpURL, _url.String())
+		msg.Header.Add(httpURLHeader, _url.String())
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
@@ -434,7 +434,7 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPostFunctionName))
-		msg.Header.Add(httpURL, _url.String())
+		msg.Header.Add(httpURLHeader, _url.String())
 		msg.Data = []byte(data)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
@@ -522,7 +522,7 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPutFunctionName))
-		msg.Header.Add(httpURL, _url.String())
+		msg.Header.Add(httpURLHeader, _url.String())
 		msg.Data = []byte(data)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
@@ -610,7 +610,7 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPatchFunctionName))
-		msg.Header.Add(httpURL, _url.String())
+		msg.Header.Add(httpURLHeader, _url.String())
 		msg.Data = []byte(data)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
@@ -687,7 +687,7 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPDeleteFunctionName))
-		msg.Header.Add(httpURL, _url.String())
+		msg.Header.Add(httpURLHeader, _url.String())
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
@@ -763,7 +763,7 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPHeadFunctionName))
-		msg.Header.Add(httpURL, _url.String())
+		msg.Header.Add(httpURLHeader, _url.String())
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
@@ -833,7 +833,7 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		key := args[0].String()
 
 		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVGetFunctionName))
-		msg.Header.Add(keyHeader, key)
+		msg.Header.Add(keyValueKeyHeader, key)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesKVGetTimeout)
 		if err != nil {
@@ -866,7 +866,7 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVSetFunctionName))
-		msg.Header.Add(keyHeader, key)
+		msg.Header.Add(keyValueKeyHeader, key)
 		msg.Data = value
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesKVSetTimeout)
@@ -900,7 +900,7 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		key := args[0].String()
 
 		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVDeleteFunctionName))
-		msg.Header.Add(keyHeader, key)
+		msg.Header.Add(keyValueKeyHeader, key)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesKVDeleteTimeout)
 		if err != nil {
@@ -962,7 +962,7 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingPublishFunctionName))
-		msg.Header.Add(messageSubject, subject)
+		msg.Header.Add(messagingSubjectHeader, subject)
 		msg.Data = []byte(payload)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesMessagingPublishTimeout)
@@ -996,7 +996,7 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingRequestFunctionName))
-		msg.Header.Add(messageSubject, subject)
+		msg.Header.Add(messagingSubjectHeader, subject)
 		msg.Data = []byte(payload)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesMessagingRequestTimeout)
@@ -1033,7 +1033,7 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 
 		// construct the requestMany request message
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingRequestManyFunctionName))
-		msg.Header.Add(messageSubject, subject)
+		msg.Header.Add(messagingSubjectHeader, subject)
 		msg.Reply = v.nc.NewRespInbox()
 		msg.Data = []byte(payload)
 
@@ -1111,7 +1111,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 		name := args[0].String()
 
 		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStoreGetFunctionName))
-		msg.Header.Add(objectName, name)
+		msg.Header.Add(objectStoreObjectNameHeader, name)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStoreGetTimeout)
 		if err != nil {
@@ -1144,7 +1144,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStorePutFunctionName))
-		msg.Header.Add(objectName, name)
+		msg.Header.Add(objectStoreObjectNameHeader, name)
 		msg.Data = []byte(value)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStorePutTimeout)
@@ -1172,7 +1172,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 		name := args[0].String()
 
 		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStoreDeleteFunctionName))
-		msg.Header.Add(objectName, name)
+		msg.Header.Add(objectStoreObjectNameHeader, name)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStoreDeleteTimeout)
 		if err != nil {
