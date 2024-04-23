@@ -51,6 +51,10 @@ jobs:
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
+    -
+      name: Run unit tests
+      working-directory: .
+      run: go test -v ./...
     - 
       name: Run spec suite
       working-directory: .
@@ -58,7 +62,7 @@ jobs:
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
-        sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+        sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./_spec
     - 
       name: Run spec suite
       working-directory: .
@@ -66,12 +70,12 @@ jobs:
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
-        ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
+        ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./_spec
 
     - 
       name: Run test suite
       working-directory: .
-      run: go test -v -race ./test
+      run: go test -v -race ./_test
 
   build:
     timeout-minutes: 10
