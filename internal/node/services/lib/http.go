@@ -21,8 +21,6 @@ const httpServiceMethodHead = "head"
 
 const defaultHTTPRequestTimeoutMillis = 2500
 
-const httpURLHeader = "x-http-url"
-
 type HTTPService struct {
 	log *slog.Logger
 	nc  *nats.Conn
@@ -76,7 +74,7 @@ func (h *HTTPService) HandleRPC(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handleGet(msg *nats.Msg) {
-	url, err := url.Parse(msg.Header.Get(httpURLHeader))
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -123,7 +121,7 @@ func (h *HTTPService) handleGet(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handlePost(msg *nats.Msg) {
-	url, err := url.Parse(msg.Header.Get(httpURLHeader))
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -170,7 +168,7 @@ func (h *HTTPService) handlePost(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handlePut(msg *nats.Msg) {
-	url, err := url.Parse(msg.Header.Get(httpURLHeader))
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -217,7 +215,7 @@ func (h *HTTPService) handlePut(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handlePatch(msg *nats.Msg) {
-	url, err := url.Parse(msg.Header.Get(httpURLHeader))
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -264,7 +262,7 @@ func (h *HTTPService) handlePatch(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handleDelete(msg *nats.Msg) {
-	url, err := url.Parse(msg.Header.Get(httpURLHeader))
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -311,7 +309,7 @@ func (h *HTTPService) handleDelete(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handleHead(msg *nats.Msg) {
-	url, err := url.Parse(msg.Header.Get(httpURLHeader))
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 

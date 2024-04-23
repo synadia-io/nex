@@ -19,8 +19,6 @@ const objectStoreServiceMethodPut = "put"
 const objectStoreServiceMethodDelete = "delete"
 const objectStoreServiceMethodList = "list"
 
-const objectStoreObjectNameHeader = "x-object-name"
-
 type ObjectStoreService struct {
 	log *slog.Logger
 	nc  *nats.Conn
@@ -79,7 +77,7 @@ func (o *ObjectStoreService) handleGet(msg *nats.Msg) {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 	}
 
-	name := msg.Header.Get(objectStoreObjectNameHeader)
+	name := msg.Header.Get(agentapi.ObjectStoreObjectNameHeader)
 	if name == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesObjectStoreResponse{
 			Errors: []string{"name is required"},
@@ -138,7 +136,7 @@ func (o *ObjectStoreService) handlePut(msg *nats.Msg) {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 	}
 
-	name := msg.Header.Get(objectStoreObjectNameHeader)
+	name := msg.Header.Get(agentapi.ObjectStoreObjectNameHeader)
 	if name == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesObjectStoreResponse{
 			Errors: []string{"name is required"},
@@ -190,7 +188,7 @@ func (o *ObjectStoreService) handleDelete(msg *nats.Msg) {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 	}
 
-	name := msg.Header.Get(objectStoreObjectNameHeader)
+	name := msg.Header.Get(agentapi.ObjectStoreObjectNameHeader)
 	if name == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesObjectStoreResponse{
 			Errors: []string{"name is required"},

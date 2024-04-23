@@ -16,8 +16,6 @@ const kvServiceMethodSet = "set"
 const kvServiceMethodDelete = "delete"
 const kvServiceMethodKeys = "keys"
 
-const keyValueKeyHeader = "x-key"
-
 type KeyValueService struct {
 	log *slog.Logger
 	nc  *nats.Conn
@@ -76,7 +74,7 @@ func (k *KeyValueService) handleGet(msg *nats.Msg) {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
 
-	key := msg.Header.Get(keyValueKeyHeader)
+	key := msg.Header.Get(agentapi.KeyValueKeyHeader)
 	if key == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesKeyValueResponse{
 			Errors: []string{"key is required"},
@@ -120,7 +118,7 @@ func (k *KeyValueService) handleSet(msg *nats.Msg) {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
 
-	key := msg.Header.Get(keyValueKeyHeader)
+	key := msg.Header.Get(agentapi.KeyValueKeyHeader)
 	if key == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesKeyValueResponse{
 			Errors: []string{"key is required"},
@@ -168,7 +166,7 @@ func (k *KeyValueService) handleDelete(msg *nats.Msg) {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
 
-	key := msg.Header.Get(keyValueKeyHeader)
+	key := msg.Header.Get(agentapi.KeyValueKeyHeader)
 	if key == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesKeyValueResponse{
 			Errors: []string{"key is required"},
