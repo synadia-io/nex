@@ -65,7 +65,7 @@ tasks:
   test:
     deps: [clean, agent]
     cmds:          
-      - sudo /usr/local/go/bin/go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
+      - sudo go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going ./spec #--cover --coverprofile=.coverage-report.out
       - go test -tags netgo -ldflags '-extldflags "-static"'-v -race ./test
   
   otel_start:
