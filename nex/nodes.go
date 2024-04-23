@@ -20,22 +20,32 @@ func ListNodes(ctx context.Context) error {
 		return err
 	}
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
+
 	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout, log)
-
-	var nodes []controlapi.PingResponse
-	if strings.TrimSpace(RunOpts.Name) != "" {
-		nodes, err = nodeClient.ListNodesWithWorkload(strings.TrimSpace(RunOpts.Name))
-	} else {
-		nodes, err = nodeClient.ListNodes()
-	}
-
+	nodes, err := nodeClient.ListAllNodes()
 	if err != nil {
 		return err
 	}
-
 	renderNodeList(nodes)
+
 	return nil
 
+}
+
+func ListWorkloads(ctx context.Context) error {
+	nc, err := models.GenerateConnectionFromOpts(Opts)
+	if err != nil {
+		return err
+	}
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
+	nodes, err := nodeClient.ListWorkloads(strings.TrimSpace(RunOpts.Name))
+	if err != nil {
+		return err
+	}
+	renderWorkloadPingList(nodes)
+
+	return nil
 }
 
 func LameDuck(ctx context.Context, logger *slog.Logger) error {
@@ -130,9 +140,31 @@ func renderNodeList(nodes []controlapi.PingResponse) {
 	for _, node := range nodes {
 		nodeName, ok := node.Tags["node_name"]
 		if !ok {
-			nodeName = "no-name-provided"
+			nodeName = "no-name"
 		}
 		table.AddRow(node.NodeId, nodeName, node.Version, node.Uptime, node.RunningMachines)
+	}
+
+	fmt.Println(table.Render())
+}
+
+func renderWorkloadPingList(nodes []controlapi.WorkloadPingResponse) {
+	if len(nodes) == 0 {
+		fmt.Println("No workloads matched")
+		return
+	}
+
+	table := newTableWriter("Discovered Workloads")
+	table.AddHeaders("ID", "Name", "Type", "Namespace", "Node Name")
+
+	for _, node := range nodes {
+		nodeName, ok := node.Tags["node_name"]
+		if !ok {
+			nodeName = "no-name"
+		}
+		for _, work := range node.RunningMachines {
+			table.AddRow(work.Id, work.Name, work.WorkloadType, work.Namespace, nodeName)
+		}
 	}
 
 	fmt.Println(table.Render())

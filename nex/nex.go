@@ -43,6 +43,8 @@ var (
 	nodesLs   = nodes.Command("ls", "List nodes")
 	nodesInfo = nodes.Command("info", "Get information for an engine node")
 
+	nodesProbe = nodes.Command("probe", "Probe nodes for matching workloads")
+
 	// These two commands are GOOS/GOARCH dependent
 	nodeUp        *fisk.CmdClause
 	nodePreflight *fisk.CmdClause
@@ -124,7 +126,7 @@ func init() {
 	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 
 	// one day when we refactor, let's get rid of all of these global structs. Such ugly
-	nodesLs.Flag("workload", "Only query nodes currently running the given workload (id or name)").StringVar(&RunOpts.Name)
+	nodesProbe.Flag("workload", "Only query nodes currently running the given workload (id or name)").StringVar(&RunOpts.Name)
 }
 
 func main() {
@@ -178,6 +180,11 @@ func main() {
 		err := ListNodes(ctx)
 		if err != nil {
 			fmt.Printf("Failed to list nodes: %s\n", err)
+		}
+	case nodesProbe.FullCommand():
+		err := ListWorkloads(ctx)
+		if err != nil {
+			fmt.Printf("Failed to list workloads: %s\n", err)
 		}
 	case nodesInfo.FullCommand():
 		err := NodeInfo(ctx, *node_info_id_arg)

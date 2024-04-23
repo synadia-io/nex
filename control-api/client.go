@@ -112,21 +112,25 @@ func (api *Client) EnterLameDuck(nodeId string) (*LameDuckResponse, error) {
 	return &response, nil
 }
 
-// Functions the same as ListNodes (ping), except that only nodes currently running
-// the workload in question will respond. Useful to answer the questions, "is this workload running?"
-// and if so, on which node?
-func (api *Client) ListNodesWithWorkload(workloadId string) ([]PingResponse, error) {
+// This is a filtered node ping that returns only matching workloads.
+// A workloadId of "" will not filter by workload, and only
+// filter by the client's namespace. If a workload ID/name is supplied, the filter
+// will be for both namespace and workload. If you don't want these filters
+// then use ListAllNodes
+func (api *Client) ListWorkloads(workloadId string) ([]WorkloadPingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
 
-	responses := make([]PingResponse, 0)
+	workloadId = strings.TrimSpace(workloadId)
+
+	responses := make([]WorkloadPingResponse, 0)
 
 	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
 		env, err := extractEnvelope(m.Data)
 		if err != nil {
 			return
 		}
-		var resp PingResponse
+		var resp WorkloadPingResponse
 		bytes, err := json.Marshal(env.Data)
 		if err != nil {
 			return
@@ -140,7 +144,14 @@ func (api *Client) ListNodesWithWorkload(workloadId string) ([]PingResponse, err
 	if err != nil {
 		return nil, err
 	}
-	msg := nats.NewMsg(fmt.Sprintf("%s.WPING.%s.%s", APIPrefix, api.namespace, workloadId))
+
+	var subject string
+	if len(workloadId) == 0 {
+		subject = fmt.Sprintf("%s.WPING.%s", APIPrefix, api.namespace)
+	} else {
+		subject = fmt.Sprintf("%s.WPING.%s.%s", APIPrefix, api.namespace, workloadId)
+	}
+	msg := nats.NewMsg(subject)
 	msg.Reply = sub.Subject
 	err = api.nc.PublishMsg(msg)
 	if err != nil {
@@ -153,7 +164,7 @@ func (api *Client) ListNodesWithWorkload(workloadId string) ([]PingResponse, err
 
 // Attempts to list all nodes. Note that any node within the Nexus will respond to this ping, regardless
 // of the namespaces of their running workloads
-func (api *Client) ListNodes() ([]PingResponse, error) {
+func (api *Client) ListAllNodes() ([]PingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
 

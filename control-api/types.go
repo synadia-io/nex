@@ -39,6 +39,21 @@ type PingResponse struct {
 	RunningMachines int               `json:"running_machines"`
 }
 
+type WorkloadPingResponse struct {
+	NodeId          string                       `json:"node_id"`
+	Version         string                       `json:"version"`
+	Tags            map[string]string            `json:"tags,omitempty"`
+	Uptime          string                       `json:"uptime"`
+	RunningMachines []WorkloadPingMachineSummary `json:"running_machines"`
+}
+
+type WorkloadPingMachineSummary struct {
+	Id           string `json:"id"`
+	Namespace    string `json:"namespace"`
+	Name         string `json:"name"`
+	WorkloadType string `json:"type"`
+}
+
 type LameDuckResponse struct {
 	NodeId  string `json:"node_id"`
 	Success bool   `json:"success"`
