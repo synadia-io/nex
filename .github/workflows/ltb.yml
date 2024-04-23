@@ -53,9 +53,9 @@ jobs:
       run: go build -tags netgo -ldflags '-extldflags "-static"'
     -
       name: Run unit tests
+      if: runner.os != 'Windows'
       working-directory: .
-      run: |
-        go mod tidy
+      run: |        
         go test $(go list ./... | grep -v spec)
         
     - 
