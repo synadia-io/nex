@@ -55,7 +55,8 @@ type Node struct {
 	keypair   nkeys.KeyPair
 	publicKey string
 
-	nc *nats.Conn
+	natspub *server.Server
+	nc      *nats.Conn
 
 	natsint *server.Server
 	ncint   *nats.Conn
@@ -234,6 +235,15 @@ func (n *Node) init() error {
 			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
 
+		// start public NATS server
+		err = n.startPublicNATS()
+		if err != nil {
+			n.log.Error("Failed to start public NATS server", slog.Any("err", err))
+			err = fmt.Errorf("failed to start public NATS server: %s", err)
+		} else {
+			n.log.Info("Public NATS server started", slog.String("client_url", n.natspub.ClientURL()))
+		}
+
 		// setup NATS connection
 		n.nc, err = models.GenerateConnectionFromOpts(n.opts)
 		if err != nil {
@@ -243,7 +253,7 @@ func (n *Node) init() error {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
-		// init internal NATS server
+		// start internal NATS server
 		err = n.startInternalNATS()
 		if err != nil {
 			n.log.Error("Failed to start internal NATS server", slog.Any("err", err))
@@ -317,6 +327,23 @@ func (n *Node) startInternalNATS() error {
 	if err != nil {
 		return fmt.Errorf("failed to create internal object store: %s", err)
 	}
+
+	return nil
+}
+
+func (n *Node) startPublicNATS() error {
+	if n.config.PublicNATSServer == nil {
+		// no-op
+		return nil
+	}
+
+	var err error
+	n.natspub, err = server.NewServer(n.config.PublicNATSServer)
+	if err != nil {
+		return err
+	}
+
+	n.natspub.Start()
 
 	return nil
 }
@@ -456,6 +483,11 @@ func (n *Node) shutdown() {
 		_ = n.nc.Drain()
 		for !n.nc.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
+		}
+
+		if n.natspub != nil {
+			n.natspub.Shutdown()
+			n.natspub.WaitForShutdown()
 		}
 
 		n.natsint.Shutdown()
