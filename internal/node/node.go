@@ -485,13 +485,14 @@ func (n *Node) shutdown() {
 			time.Sleep(time.Millisecond * 25)
 		}
 
+		n.natsint.Shutdown()
+		n.natsint.WaitForShutdown()
+
 		if n.natspub != nil {
 			n.natspub.Shutdown()
 			n.natspub.WaitForShutdown()
 		}
 
-		n.natsint.Shutdown()
-		n.natsint.WaitForShutdown()
 		_ = n.telemetry.Shutdown()
 
 		_ = os.Remove(defaultPidFilepath)
