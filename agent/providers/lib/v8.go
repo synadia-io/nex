@@ -1220,15 +1220,11 @@ func (v *V8) marshalValue(val *v8.Value) ([]byte, error) {
 		return val.MarshalJSON()
 	} else if val.IsBigInt() {
 		return val.BigInt().Bytes(), nil
-	} else if val.IsBoolean() {
-		return []byte(fmt.Sprintf("%t", val.Boolean())), nil
-	} else if val.IsNumber() {
-		return []byte(fmt.Sprintf("%f", val.Number())), nil
 	} else if val.IsString() {
 		return []byte(val.String()), nil
 	}
 
-	return nil, fmt.Errorf("failed to marshal v8 value to []byte: %v", val)
+	return nil, fmt.Errorf("failed to marshal v8 value to []byte: %v; object, arrays, and strings are supported", val)
 }
 
 func (v *V8) toUInt8ArrayValue(data []byte) (*v8.Value, error) {
