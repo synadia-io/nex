@@ -63,8 +63,11 @@ const (
 	hostServicesObjectStoreDeleteTimeout = time.Millisecond * 3000
 	hostServicesObjectStoreListTimeout   = time.Millisecond * 3000
 
-	v8FunctionArrayAppend = "array-append"
-	v8FunctionArrayInit   = "array-init"
+	v8FunctionArrayAppend       = "array-append"
+	v8FunctionArrayInit         = "array-init"
+	v8FunctionUInt8ArrayInit    = "uint8-array-init"
+	v8FunctionUInt8ArraySetIdx  = "uint8-array-set-idx"
+	v8FunctionUInt8ArrayToArray = "uint8-array-to-array"
 
 	v8ExecutionTimeoutMillis = 5000
 	v8MaxFileSizeBytes       = int64(12288) // arbitrarily ~12K, for now
@@ -251,6 +254,24 @@ func (v *V8) Validate() error {
 	initval, _ := init.Run(v.ctx)
 	initfn, _ := initval.AsFunction()
 	v.utils[v8FunctionArrayInit] = initfn
+
+	// FIXME-- move this somewhere cleaner
+	inituint8, _ := v.iso.CompileUnboundScript("(len) => { let arr = new Uint8Array(Number(len)); return arr; };", "uint8-array-init.js", v8.CompileOptions{})
+	inituint8val, _ := inituint8.Run(v.ctx)
+	inituint8fn, _ := inituint8val.AsFunction()
+	v.utils[v8FunctionUInt8ArrayInit] = inituint8fn
+
+	// FIXME-- move this somewhere cleaner
+	uint8arrsetidx, _ := v.iso.CompileUnboundScript("(arr, i, value) => { arr[Number(i)] = value; return arr; };", "uint8-array-set-idx.js", v8.CompileOptions{})
+	uint8arrsetidxval, _ := uint8arrsetidx.Run(v.ctx)
+	uint8arrsetidxfn, _ := uint8arrsetidxval.AsFunction()
+	v.utils[v8FunctionUInt8ArraySetIdx] = uint8arrsetidxfn
+
+	// FIXME-- move this somewhere cleaner
+	uint8arrtoarr, _ := v.iso.CompileUnboundScript("(arr) => { return Array.prototype.slice.call(arr); };", "uint8-array-to-array.js", v8.CompileOptions{})
+	uint8arrtoarrval, _ := uint8arrtoarr.Run(v.ctx)
+	uint8arrtoarrfn, _ := uint8arrtoarrval.AsFunction()
+	v.utils[v8FunctionUInt8ArrayToArray] = uint8arrtoarrfn
 
 	return nil
 }
@@ -815,8 +836,9 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.NewValue(v.iso, string(resp.Data))
+		val, err := v.toUInt8ArrayValue(resp.Data)
 		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -979,15 +1001,16 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var msgresp *agentapi.HostServicesMessagingResponse
-		err = json.Unmarshal(resp.Data, &msgresp)
-		if err == nil && len(msgresp.Errors) > 0 {
-			val, _ := v8.NewValue(v.iso, msgresp.Errors[0])
-			return v.iso.ThrowException(val)
-		}
+		// var msgresp *agentapi.HostServicesMessagingResponse
+		// err = json.Unmarshal(resp.Data, &msgresp)
+		// if err == nil && len(msgresp.Errors) > 0 {
+		// 	val, _ := v8.NewValue(v.iso, msgresp.Errors[0])
+		// 	return v.iso.ThrowException(val)
+		// }
 
-		val, err := v8.NewValue(v.iso, string(resp.Data))
+		val, err := v.toUInt8ArrayValue(resp.Data)
 		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -1052,8 +1075,9 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 			if resp != nil {
 				_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response", len(resp.Data))))
 
-				respval, err := v8.NewValue(v.iso, string(resp.Data)) // FIXME-- pass []byte natively into javascript using ArrayBuffer
+				respval, err := v.toUInt8ArrayValue(resp.Data)
 				if err != nil {
+					_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 					val, _ := v8.NewValue(v.iso, err.Error())
 					return v.iso.ThrowException(val)
 				}
@@ -1093,8 +1117,9 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.NewValue(v.iso, string(resp.Data)) // FIXME-- pass []byte natively into javascript using ArrayBuffer
+		val, err := v.toUInt8ArrayValue(resp.Data)
 		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -1127,7 +1152,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.NewValue(v.iso, string(resp.Data))
+		val, err := v8.JSONParse(v.ctx, string(resp.Data)) // nats.ObjectMeta JSON
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -1204,6 +1229,46 @@ func (v *V8) marshalValue(val *v8.Value) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("failed to marshal v8 value: %v", val)
+}
+
+func (v *V8) toUInt8ArrayValue(data []byte) (*v8.Value, error) {
+	len, err := v8.NewValue(v.iso, uint64(len(data)))
+	if err != nil {
+		return nil, err
+	}
+
+	val, err := v.utils[v8FunctionUInt8ArrayInit].Call(v.ctx.Global(), len)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, _uint := range data {
+		_i, err := v8.NewValue(v.iso, uint64(i))
+		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast i index value to uint32: %s", err.Error())))
+			return nil, err
+		}
+
+		_val, err := v8.NewValue(v.iso, uint32(_uint))
+		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast byte to uint32: %s", err.Error())))
+			return nil, err
+		}
+
+		val, err = v.utils[v8FunctionUInt8ArraySetIdx].Call(v.ctx.Global(), val, _i, _val)
+		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to call %s: %s", v8FunctionUInt8ArraySetIdx, err.Error())))
+			return nil, err
+		}
+	}
+
+	val, err = v.utils[v8FunctionUInt8ArrayToArray].Call(v.ctx.Global(), val)
+	if err != nil {
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to call %s: %s", v8FunctionUInt8ArrayToArray, err.Error())))
+		return nil, err
+	}
+
+	return val, nil
 }
 
 // convenience method to initialize a V8 execution provider

@@ -581,7 +581,7 @@ var _ = Describe("nex node", func() {
 
 													type hostServicesExampleResp struct {
 														Keys   []string `json:"keys"`
-														Hello2 string   `json:"hello2"`
+														Hello2 []uint8  `json:"hello2"`
 													}
 
 													var resp *hostServicesExampleResp
@@ -592,7 +592,7 @@ var _ = Describe("nex node", func() {
 
 													Expect(len(resp.Keys)).To(Equal(1))
 													Expect(resp.Keys[0]).To(Equal("hello2"))
-													Expect(resp.Hello2).To(Equal("hello!"))
+													Expect(resp.Hello2).To(BeEquivalentTo("hello!"))
 												})
 											})
 										})
@@ -645,8 +645,8 @@ var _ = Describe("nex node", func() {
 													Expect(respmsg).NotTo(BeNil())
 
 													type hostServicesExampleResp struct {
-														HelloWorldRequest     string   `json:"hello.world.request"`
-														HelloWorldRequestMany []string `json:"hello.world.request.many"`
+														HelloWorldRequest     []uint8   `json:"hello.world.request"`
+														HelloWorldRequestMany [][]uint8 `json:"hello.world.request.many"`
 													}
 
 													var resp *hostServicesExampleResp
@@ -656,15 +656,15 @@ var _ = Describe("nex node", func() {
 													Expect(resp).ToNot(BeNil())
 
 													Expect(resp.HelloWorldRequest).ToNot(BeNil())
-													Expect(resp.HelloWorldRequest).To(Equal("resp: asdfghjkl;'"))
+													Expect(resp.HelloWorldRequest).To(BeEquivalentTo("resp: asdfghjkl;'"))
 												})
 
 												It("should respond to the request with the hello.world.request.many response values", func(ctx SpecContext) {
 													Expect(respmsg).NotTo(BeNil())
 
 													type hostServicesExampleResp struct {
-														HelloWorldRequest     string   `json:"hello.world.request"`
-														HelloWorldRequestMany []string `json:"hello.world.request.many"`
+														HelloWorldRequest     []uint8   `json:"hello.world.request"`
+														HelloWorldRequestMany [][]uint8 `json:"hello.world.request.many"`
 													}
 
 													var resp *hostServicesExampleResp
@@ -675,8 +675,8 @@ var _ = Describe("nex node", func() {
 
 													Expect(resp.HelloWorldRequestMany).ToNot(BeNil())
 													Expect(len(resp.HelloWorldRequestMany)).To(Equal(2))
-													Expect(resp.HelloWorldRequestMany[0]).To(Equal("resp #1: asdfghjkl;'"))
-													Expect(resp.HelloWorldRequestMany[1]).To(Equal("resp #2: asdfghjkl;'"))
+													Expect(resp.HelloWorldRequestMany[0]).To(BeEquivalentTo("resp #1: asdfghjkl;'"))
+													Expect(resp.HelloWorldRequestMany[1]).To(BeEquivalentTo("resp #2: asdfghjkl;'"))
 												})
 											})
 										})
@@ -840,7 +840,7 @@ var _ = Describe("nex node", func() {
 													Expect(respmsg).NotTo(BeNil())
 
 													type hostServicesExampleResp struct {
-														Hello2 string             `json:"hello2"`
+														Hello2 []uint8            `json:"hello2"`
 														List   []*nats.ObjectInfo `json:"list"`
 													}
 
@@ -850,11 +850,9 @@ var _ = Describe("nex node", func() {
 
 													Expect(resp).ToNot(BeNil())
 
-													fmt.Printf("IN TEST NAME: %s; NUID: %s", resp.List[0].Name, resp.List[0].NUID)
-
 													Expect(len(resp.List)).To(Equal(1))
 													Expect(resp.List[0].Name).To(Equal("hello2"))
-													Expect(resp.Hello2).To(Equal("hello!"))
+													Expect(resp.Hello2).To(BeEquivalentTo("hello!"))
 												})
 											})
 										})
