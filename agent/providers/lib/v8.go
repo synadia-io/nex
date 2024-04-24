@@ -167,8 +167,9 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 			return
 		}
 
-		argv2, err := v8.NewValue(ctx.Isolate(), string(payload))
+		argv2, err := v.toUInt8ArrayValue(payload)
 		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(payload), err.Error())))
 			errs <- err
 			return
 		}
@@ -1001,13 +1002,6 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		// var msgresp *agentapi.HostServicesMessagingResponse
-		// err = json.Unmarshal(resp.Data, &msgresp)
-		// if err == nil && len(msgresp.Errors) > 0 {
-		// 	val, _ := v8.NewValue(v.iso, msgresp.Errors[0])
-		// 	return v.iso.ThrowException(val)
-		// }
-
 		val, err := v.toUInt8ArrayValue(resp.Data)
 		if err != nil {
 			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
@@ -1276,10 +1270,6 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 	if params.TmpFilename == nil {
 		return nil, errors.New("V8 execution provider requires a temporary filename parameter")
 	}
-
-	// if params.TotalBytes == nil {
-	// 	return nil, errors.New("V8 execution provider requires a total bytes parameter")
-	// }
 
 	return &V8{
 		environment: params.Environment,
