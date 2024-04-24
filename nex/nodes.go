@@ -136,7 +136,7 @@ func renderNodeList(nodes []controlapi.PingResponse) {
 	}
 
 	table := newTableWriter("NATS Execution Nodes")
-	table.AddHeaders("ID", "Name", "Sandbox Enabled", "Version", "Uptime", "Workloads")
+	table.AddHeaders("ID", "Name", "Sandboxed", "Version", "Uptime", "Workloads")
 
 	for _, node := range nodes {
 		nodeName, ok := node.Tags["node_name"]
