@@ -67,7 +67,6 @@ const (
 	v8FunctionArrayInit          = "array-init"
 	v8FunctionUInt8ArrayInit     = "uint8-array-init"
 	v8FunctionUInt8ArraySetIdx   = "uint8-array-set-idx"
-	v8FunctionUInt8ArrayToArray  = "uint8-array-to-array"
 	v8FunctionUInt8ArrayToString = "uint8-array-to-string"
 
 	v8ExecutionTimeoutMillis = 5000
@@ -272,11 +271,6 @@ func (v *V8) initUtils() {
 	uint8arrsetidxval, _ := uint8arrsetidx.Run(v.ctx)
 	uint8arrsetidxfn, _ := uint8arrsetidxval.AsFunction()
 	v.utils[v8FunctionUInt8ArraySetIdx] = uint8arrsetidxfn
-
-	uint8arrtoarr, _ := v.iso.CompileUnboundScript("(arr) => { return Array.prototype.slice.call(arr); };", "uint8-array-to-array.js", v8.CompileOptions{})
-	uint8arrtoarrval, _ := uint8arrtoarr.Run(v.ctx)
-	uint8arrtoarrfn, _ := uint8arrtoarrval.AsFunction()
-	v.utils[v8FunctionUInt8ArrayToArray] = uint8arrtoarrfn
 
 	uint8arrtostr, _ := v.iso.CompileUnboundScript("(arr) => { return String.fromCharCode(...arr); };", "uint8-array-to-string.js", v8.CompileOptions{})
 	uint8arrtostrval, _ := uint8arrtostr.Run(v.ctx)
