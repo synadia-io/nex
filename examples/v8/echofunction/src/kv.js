@@ -5,6 +5,6 @@
   this.hostServices.kv.set('hello2', payload);
   return {
     keys: this.hostServices.kv.keys(),
-    hello2: this.hostServices.kv.get('hello2')
+    hello2: String.fromCharCode(...this.hostServices.kv.get('hello2'))
   }
 };

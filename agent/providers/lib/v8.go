@@ -63,11 +63,12 @@ const (
 	hostServicesObjectStoreDeleteTimeout = time.Millisecond * 3000
 	hostServicesObjectStoreListTimeout   = time.Millisecond * 3000
 
-	v8FunctionArrayAppend       = "array-append"
-	v8FunctionArrayInit         = "array-init"
-	v8FunctionUInt8ArrayInit    = "uint8-array-init"
-	v8FunctionUInt8ArraySetIdx  = "uint8-array-set-idx"
-	v8FunctionUInt8ArrayToArray = "uint8-array-to-array"
+	v8FunctionArrayAppend        = "array-append"
+	v8FunctionArrayInit          = "array-init"
+	v8FunctionUInt8ArrayInit     = "uint8-array-init"
+	v8FunctionUInt8ArraySetIdx   = "uint8-array-set-idx"
+	v8FunctionUInt8ArrayToArray  = "uint8-array-to-array"
+	v8FunctionUInt8ArrayToString = "uint8-array-to-bytes"
 
 	v8ExecutionTimeoutMillis = 5000
 	v8MaxFileSizeBytes       = int64(12288) // arbitrarily ~12K, for now
@@ -185,6 +186,8 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 
 	select {
 	case val := <-vals:
+		// FIXME-- switch on val type or are we ok with forcing a JSON response?
+
 		retval, err := val.MarshalJSON()
 		if err != nil {
 			return nil, err
@@ -244,37 +247,41 @@ func (v *V8) Validate() error {
 		return fmt.Errorf("failed to compile source for execution: %s", err)
 	}
 
-	// FIXME-- move this somewhere cleaner
+	v.initUtils()
+
+	return nil
+}
+
+func (v *V8) initUtils() {
 	append, _ := v.iso.CompileUnboundScript("(arr, value) => { arr.push(value); return arr; };", "array-append.js", v8.CompileOptions{})
 	appendval, _ := append.Run(v.ctx)
 	appendfn, _ := appendval.AsFunction()
 	v.utils[v8FunctionArrayAppend] = appendfn
 
-	// FIXME-- move this somewhere cleaner
 	init, _ := v.iso.CompileUnboundScript("() => { let arr = []; return arr; };", "array-init.js", v8.CompileOptions{})
 	initval, _ := init.Run(v.ctx)
 	initfn, _ := initval.AsFunction()
 	v.utils[v8FunctionArrayInit] = initfn
 
-	// FIXME-- move this somewhere cleaner
 	inituint8, _ := v.iso.CompileUnboundScript("(len) => { let arr = new Uint8Array(Number(len)); return arr; };", "uint8-array-init.js", v8.CompileOptions{})
 	inituint8val, _ := inituint8.Run(v.ctx)
 	inituint8fn, _ := inituint8val.AsFunction()
 	v.utils[v8FunctionUInt8ArrayInit] = inituint8fn
 
-	// FIXME-- move this somewhere cleaner
 	uint8arrsetidx, _ := v.iso.CompileUnboundScript("(arr, i, value) => { arr[Number(i)] = value; return arr; };", "uint8-array-set-idx.js", v8.CompileOptions{})
 	uint8arrsetidxval, _ := uint8arrsetidx.Run(v.ctx)
 	uint8arrsetidxfn, _ := uint8arrsetidxval.AsFunction()
 	v.utils[v8FunctionUInt8ArraySetIdx] = uint8arrsetidxfn
 
-	// FIXME-- move this somewhere cleaner
 	uint8arrtoarr, _ := v.iso.CompileUnboundScript("(arr) => { return Array.prototype.slice.call(arr); };", "uint8-array-to-array.js", v8.CompileOptions{})
 	uint8arrtoarrval, _ := uint8arrtoarr.Run(v.ctx)
 	uint8arrtoarrfn, _ := uint8arrtoarrval.AsFunction()
 	v.utils[v8FunctionUInt8ArrayToArray] = uint8arrtoarrfn
 
-	return nil
+	uint8arrtostr, _ := v.iso.CompileUnboundScript("(arr) => { return String.fromCharCode(...arr); };", "uint8-array-to-string.js", v8.CompileOptions{})
+	uint8arrtostrval, _ := uint8arrtostr.Run(v.ctx)
+	uint8arrtostrfn, _ := uint8arrtostrval.AsFunction()
+	v.utils[v8FunctionUInt8ArrayToString] = uint8arrtostrfn
 }
 
 func (v *V8) newV8Context() (*v8.Context, error) {
@@ -1020,7 +1027,12 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		subject := args[0].String()
-		payload := args[1].String()
+
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		// construct the requestMany request message
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingRequestManyFunctionName))
@@ -1209,56 +1221,58 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 	return objectStore
 }
 
+// marshal the given v8 value to an array of bytes that can be sent over the wire
 func (v *V8) marshalValue(val *v8.Value) ([]byte, error) {
-	if val.IsObject() || val.IsArray() {
-		return val.MarshalJSON()
-	} else if val.IsBigInt() {
-		return val.BigInt().Bytes(), nil
-	} else if val.IsString() {
-		return []byte(val.String()), nil
+	if val.IsUint8Array() {
+		v, err := v.utils[v8FunctionUInt8ArrayToString].Call(v.ctx.Global(), val)
+		if err != nil {
+			return nil, err
+		}
+
+		return []byte(v.String()), nil
 	}
 
-	return nil, fmt.Errorf("failed to marshal v8 value to []byte: %v; object, arrays, and strings are supported", val)
+	return nil, fmt.Errorf("failed to marshal v8 value to []byte: %v; only Uint8[] is supported", val)
 }
 
-func (v *V8) toUInt8ArrayValue(data []byte) (*v8.Value, error) {
-	len, err := v8.NewValue(v.iso, uint64(len(data)))
+// unmarshal the given []byte value into a native Uint8Array which can be handed back into v8,
+func (v *V8) toUInt8ArrayValue(val []byte) (*v8.Value, error) {
+	// initialize a v8 value representing the size in bytes of the native Uint8Array to be allocated
+	len, err := v8.NewValue(v.iso, uint64(len(val)))
 	if err != nil {
 		return nil, err
 	}
 
-	val, err := v.utils[v8FunctionUInt8ArrayInit].Call(v.ctx.Global(), len)
+	// initialize a native Uint8Array
+	nativeUint8Arr, err := v.utils[v8FunctionUInt8ArrayInit].Call(v.ctx.Global(), len)
 	if err != nil {
 		return nil, err
 	}
 
-	for i, _uint := range data {
+	for i, _uint := range val {
+		// initialize a v8 value representing the current byte offset in our native Uint8Array
 		_i, err := v8.NewValue(v.iso, uint64(i))
 		if err != nil {
 			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast i index value to uint32: %s", err.Error())))
 			return nil, err
 		}
 
+		// pack 8 bits into a uint32, as this is needed when initializing a v8.Value
 		_val, err := v8.NewValue(v.iso, uint32(_uint))
 		if err != nil {
 			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast byte to uint32: %s", err.Error())))
 			return nil, err
 		}
 
-		val, err = v.utils[v8FunctionUInt8ArraySetIdx].Call(v.ctx.Global(), val, _i, _val)
+		// write 8 bits to the current byte offset in the native Uint8Array
+		nativeUint8Arr, err = v.utils[v8FunctionUInt8ArraySetIdx].Call(v.ctx.Global(), nativeUint8Arr, _i, _val)
 		if err != nil {
 			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to call %s: %s", v8FunctionUInt8ArraySetIdx, err.Error())))
 			return nil, err
 		}
 	}
 
-	val, err = v.utils[v8FunctionUInt8ArrayToArray].Call(v.ctx.Global(), val)
-	if err != nil {
-		_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to call %s: %s", v8FunctionUInt8ArrayToArray, err.Error())))
-		return nil, err
-	}
-
-	return val, nil
+	return nativeUint8Arr, nil
 }
 
 // convenience method to initialize a V8 execution provider
