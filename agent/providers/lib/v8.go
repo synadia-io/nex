@@ -68,7 +68,7 @@ const (
 	v8FunctionUInt8ArrayInit     = "uint8-array-init"
 	v8FunctionUInt8ArraySetIdx   = "uint8-array-set-idx"
 	v8FunctionUInt8ArrayToArray  = "uint8-array-to-array"
-	v8FunctionUInt8ArrayToString = "uint8-array-to-bytes"
+	v8FunctionUInt8ArrayToString = "uint8-array-to-string"
 
 	v8ExecutionTimeoutMillis = 5000
 	v8MaxFileSizeBytes       = int64(12288) // arbitrarily ~12K, for now
