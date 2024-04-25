@@ -174,7 +174,7 @@ func main() {
 	case "nats":
 		nc, err := models.GenerateConnectionFromOpts(Opts)
 		if err != nil {
-			return
+			break
 		}
 		defer func() {
 			err := nc.Drain()
