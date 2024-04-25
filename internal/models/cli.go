@@ -52,6 +52,8 @@ type Options struct {
 	TlsFirst bool
 	// Namespace for scoping workload requests
 	Namespace string
+	// Type of logger
+	Logger string
 	// LogLevel is the log level to use
 	LogLevel string
 	// LogJSON enables JSON logging
@@ -174,6 +176,7 @@ func GenerateConnectionFromOpts(opts *Options) (*nats.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return conn, nil
 }
 
