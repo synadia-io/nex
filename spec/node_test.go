@@ -547,7 +547,7 @@ var _ = Describe("nex node", func() {
 
 											It("should respond to the request by echoing the payload", func(ctx SpecContext) {
 												Expect(respmsg).NotTo(BeNil())
-												Expect(respmsg.Data).To(Equal([]byte(fmt.Sprintf("{\"triggered_on\":\"%s\",\"payload\":[104,101,108,108,111,32,119,111,114,108,100]}", triggerSubject))))
+												Expect(respmsg.Data).To(Equal([]byte(fmt.Sprintf("{\"triggered_on\":\"%s\",\"payload\":\"hello world\"}", triggerSubject))))
 											})
 										})
 									})

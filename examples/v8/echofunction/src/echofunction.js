@@ -2,6 +2,6 @@
   console.log(subject);
   return {
     triggered_on: subject,
-    payload: Array.prototype.slice.call(payload)
+    payload: String.fromCharCode(...payload)
   }
 };
