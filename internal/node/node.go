@@ -2,6 +2,7 @@ package nexnode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -105,14 +106,16 @@ func (n *Node) PublicKey() (*string, error) {
 }
 
 func (n *Node) Start() {
-	n.log.Debug("starting node", slog.String("public_key", n.publicKey))
-	n.startedAt = time.Now()
+	n.log.Debug("Starting node", slog.String("public_key", n.publicKey))
 
 	err := n.init()
 	if err != nil {
-		panic(err) // FIXME-- this panics here because this is written like a proper main() entrypoint (it should never actually panic in practice)
+		n.shutdown()
+		n.cancelF()
+		return
 	}
 
+	n.startedAt = time.Now()
 	_ = n.publishNodeStarted()
 
 	timer := time.NewTicker(runloopTickInterval)
@@ -220,68 +223,68 @@ func (n *Node) generateKeypair() error {
 
 func (n *Node) init() error {
 	var err error
+	var _err error
 
 	n.initOnce.Do(func() {
-		err = n.loadNodeConfig()
-		if err != nil {
-			n.log.Error("Failed to load node configuration file", slog.Any("err", err), slog.String("config_path", n.nodeOpts.ConfigFilepath))
-			return
+		_err = n.loadNodeConfig()
+		if _err != nil {
+			n.log.Error("Failed to load node configuration file", slog.Any("err", _err), slog.String("config_path", n.nodeOpts.ConfigFilepath))
+			err = errors.Join(err, _err)
 		} else {
 			n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
 		}
 
-		n.telemetry, err = observability.NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
-		if err != nil {
-			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
-			return
+		n.telemetry, _err = observability.NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
+		if _err != nil {
+			n.log.Error("Failed to initialize telemetry", slog.Any("err", _err))
+			err = errors.Join(err, _err)
 		} else {
 			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
 
 		// start public NATS server
-		err = n.startPublicNATS()
-		if err != nil {
-			n.log.Error("Failed to start public NATS server", slog.Any("err", err))
-			err = fmt.Errorf("failed to start public NATS server: %s", err)
-			return
+		_err = n.startPublicNATS()
+		if _err != nil {
+			n.log.Error("Failed to start public NATS server", slog.Any("err", _err))
+			err = errors.Join(err, fmt.Errorf("failed to start public NATS server: %s", _err))
 		} else if n.natspub != nil {
 			n.log.Info("Public NATS server started", slog.String("client_url", n.natspub.ClientURL()))
 		}
 
 		// setup NATS connection
-		n.nc, err = models.GenerateConnectionFromOpts(n.opts)
-		if err != nil {
-			n.log.Error("Failed to connect to NATS server", slog.Any("err", err))
-			err = fmt.Errorf("failed to connect to NATS server: %s", err)
-			return
+		n.nc, _err = models.GenerateConnectionFromOpts(n.opts)
+		if _err != nil {
+			n.log.Error("Failed to connect to NATS server", slog.Any("err", _err))
+			err = errors.Join(err, fmt.Errorf("failed to connect to NATS server: %s", _err))
 		} else {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
 		// start internal NATS server
-		err = n.startInternalNATS()
-		if err != nil {
-			n.log.Error("Failed to start internal NATS server", slog.Any("err", err))
-			err = fmt.Errorf("failed to start internal NATS server: %s", err)
-			return
+		_err = n.startInternalNATS()
+		if _err != nil {
+			n.log.Error("Failed to start internal NATS server", slog.Any("err", _err))
+			err = errors.Join(err, fmt.Errorf("failed to start internal NATS server: %s", _err))
 		} else {
 			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 		}
 
-		n.manager, err = NewWorkloadManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
-		if err != nil {
-			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
-			return
+		n.manager, _err = NewWorkloadManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		if _err != nil {
+			n.log.Error("Failed to initialize machine manager", slog.Any("err", _err))
+			err = errors.Join(err, _err)
 		}
 
-		go n.manager.Start()
+		if err == nil {
+			go n.manager.Start()
 
-		// init API listener
-		n.api = NewApiListener(n.log, n.manager, n)
-		err = n.api.Start()
-		if err != nil {
-			n.log.Error("Failed to start API listener", slog.Any("err", err))
-			return
+			// init API listener
+			n.api = NewApiListener(n.log, n.manager, n)
+			_err = n.api.Start()
+			if _err != nil {
+				n.log.Error("Failed to start API listener", slog.Any("err", _err))
+				err = errors.Join(err, _err)
+			}
 		}
 
 		n.installSignalHandlers()
@@ -487,7 +490,10 @@ func (n *Node) shutdown() {
 	if atomic.AddUint32(&n.closing, 1) == 1 {
 		n.log.Debug("shutting down")
 		_ = n.manager.Stop()
-		_ = n.publishNodeStopped()
+
+		if !n.startedAt.IsZero() {
+			_ = n.publishNodeStopped()
+		}
 
 		_ = n.ncint.Drain()
 		for !n.ncint.IsClosed() {
