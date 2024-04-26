@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 )
@@ -58,7 +57,7 @@ To update, run:
 }
 
 func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (string, error) {
-	nexPath, err := exec.LookPath("nex")
+	nexPath, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
@@ -102,24 +101,19 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 		return "", fmt.Errorf("failed to download nex: %s", resp.Status)
 	}
 
-	dir, err := os.MkdirTemp(os.TempDir(), "nex-upgrade-*")
-	if err != nil {
-		return "", err
-	}
-	defer os.RemoveAll(dir)
-
 	nexBinary, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
 
-	nex, err := os.Create(filepath.Join(dir, "nex"))
+	nex, err := os.Create(filepath.Join(filepath.Dir(nexPath), "nex"))
 	if err != nil {
 		return "", err
 	}
 
 	_, err = nex.Write(nexBinary)
 	if err != nil {
+		restoreBackup()
 		return "", err
 	}
 
@@ -129,19 +123,8 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 	}
 
 	shasum := hex.EncodeToString(h.Sum(nil))
+
 	logger.Debug("New binary downloaded", slog.String("sha256", shasum))
-
-	err = os.Chmod(filepath.Join(dir, "nex"), 0775)
-	if err != nil {
-		return "", err
-	}
-
-	err = os.Rename(filepath.Join(dir, "nex"), nexPath)
-	if err != nil {
-		restoreBackup()
-		return "", err
-	}
-
 	logger.Info("nex upgrade complete!", slog.String("new_version", newVersion))
 
 	return shasum, nil
