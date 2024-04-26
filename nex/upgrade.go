@@ -141,6 +141,14 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 		return "", err
 	}
 
+	// Verify binary is working
+	output, err := exec.Command("nex", "--version").CombinedOutput()
+	if err != nil {
+		restoreBackup()
+		logger.Debug("Error running nex --version", slog.Any("err", err), slog.String("output", string(output)))
+		return "", err
+	}
+
 	logger.Info("nex upgrade complete!", slog.String("new_version", newVersion))
 
 	return shasum, nil
