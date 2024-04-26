@@ -13,6 +13,7 @@ import (
 	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/internal/models"
+	natslogger "github.com/synadia-io/nex/internal/nats-logger"
 	nextui "github.com/synadia-io/nex/nex/tui"
 )
 
@@ -75,6 +76,7 @@ func init() {
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
+	ncli.Flag("logger", "How to log").Default("std").Envar("NEX_LOGGER").EnumVar(&Opts.Logger, "std", "file", "nats")
 	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "debug", "info", "warn", "error")
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").UnNegatableBoolVar(&Opts.LogJSON)
 	ncli.Flag("logcolor", "Prints text logs with color").Envar("NEX_LOG_COLORIZED").Default("false").UnNegatableBoolVar(&Opts.LogsColorized)
@@ -168,28 +170,58 @@ func main() {
 		handlerOpts = append(handlerOpts, shandler.WithColor())
 	}
 
+	switch Opts.Logger {
+	case "nats":
+		nc, err := models.GenerateConnectionFromOpts(Opts)
+		if err != nil {
+			break
+		}
+		defer func() {
+			err := nc.Drain()
+			if err != nil {
+				logger.Error("Drain error", slog.Any("err", err))
+			}
+			for !nc.IsClosed() {
+				time.Sleep(time.Millisecond * 25)
+			}
+		}()
+		handlerOpts = append(handlerOpts, shandler.WithStdOut(natslogger.NewNatsLogger(nc, "stdout")))
+		handlerOpts = append(handlerOpts, shandler.WithStdErr(natslogger.NewNatsLogger(nc, "stderr")))
+	case "file":
+		stdout, err := os.Create("nex.log")
+		if err != nil {
+			break
+		}
+		stderr, err := os.Create("nex.err")
+		if err != nil {
+			break
+		}
+		handlerOpts = append(handlerOpts, shandler.WithStdOut(stdout))
+		handlerOpts = append(handlerOpts, shandler.WithStdErr(stderr))
+	}
+
 	logger = slog.New(shandler.NewHandler(handlerOpts...))
 
 	switch cmd {
 	case tui.FullCommand():
 		err := nextui.StartTUI(Opts.ConfigurationContext)
 		if err != nil {
-			fmt.Printf("Failed to start TUI: %s\n", err)
+			logger.Error("Failed to start TUI", slog.Any("err", err))
 		}
 	case nodesLs.FullCommand():
 		err := ListNodes(ctx)
 		if err != nil {
-			fmt.Printf("Failed to list nodes: %s\n", err)
+			logger.Error("Failed to list nodes", slog.Any("err", err))
 		}
 	case nodesProbe.FullCommand():
 		err := ListWorkloads(ctx)
 		if err != nil {
-			fmt.Printf("Failed to list workloads: %s\n", err)
+			logger.Error("Failed to list workloads", slog.Any("err", err))
 		}
 	case nodesInfo.FullCommand():
 		err := NodeInfo(ctx, *node_info_id_arg)
 		if err != nil {
-			fmt.Printf("Failed to get node info: %s\n", err)
+			logger.Error("Failed to get node info", slog.Any("err", err))
 		}
 	case run.FullCommand():
 		err := RunWorkload(ctx, logger)
