@@ -21,6 +21,8 @@ var (
 	COMMIT    = ""
 	BUILDDATE = ""
 
+	updatable = ""
+
 	blue = color.New(color.FgBlue).SprintFunc()
 
 	ncli = fisk.New("nex", fmt.Sprintf("%s\nNATS Execution Engine CLI Version %s\n", blue(Banner), VERSION))
@@ -30,15 +32,16 @@ var (
 	_    = ncli.HelpFlag.Short('h')
 	_    = ncli.WithCheats().CheatCommand.Hidden()
 
-	tui    = ncli.Command("tui", "Start the Nex TUI [BETA]").Alias("ui")
-	nodes  = ncli.Command("node", "Interact with execution engine nodes")
-	run    = ncli.Command("run", "Run a workload on a target node")
-	yeet   = ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
-	stop   = ncli.Command("stop", "Stop a running workload")
-	logs   = ncli.Command("logs", "Live monitor workload log emissions")
-	evts   = ncli.Command("events", "Live monitor events from nex nodes")
-	rootfs = ncli.Command("rootfs", "Build custom rootfs").Alias("fs")
-	lame   = ncli.Command("lameduck", "Command a node to enter lame duck mdoe")
+	tui     = ncli.Command("tui", "Start the Nex TUI [BETA]").Alias("ui")
+	nodes   = ncli.Command("node", "Interact with execution engine nodes").Alias("nodes")
+	run     = ncli.Command("run", "Run a workload on a target node")
+	yeet    = ncli.Command("devrun", "Run a workload locating reasonable defaults (developer mode)").Alias("yeet")
+	stop    = ncli.Command("stop", "Stop a running workload")
+	logs    = ncli.Command("logs", "Live monitor workload log emissions")
+	evts    = ncli.Command("events", "Live monitor events from nex nodes")
+	rootfs  = ncli.Command("rootfs", "Build custom rootfs").Alias("fs")
+	lame    = ncli.Command("lameduck", "Command a node to enter lame duck mode")
+	upgrade = ncli.Command("upgrade", "Upgrade the NEX CLI to the latest version")
 
 	nodesLs   = nodes.Command("ls", "List nodes")
 	nodesInfo = nodes.Command("info", "Get information for an engine node")
@@ -62,7 +65,7 @@ var (
 )
 
 func init() {
-	_ = versionCheck()
+	updatable, _ = versionCheck()
 
 	ncli.Flag("server", "NATS server urls").Short('s').Envar("NATS_URL").Default(nats.DefaultURL).StringVar(&Opts.Servers)
 	ncli.Flag("user", "Username or Token").Envar("NATS_USER").PlaceHolder("USER").StringVar(&Opts.Username)
@@ -235,6 +238,15 @@ func main() {
 		err := CreateRootFS(ctx, logger)
 		if err != nil {
 			logger.Error("failed to build rootfs", slog.Any("err", err))
+		}
+	case upgrade.FullCommand():
+		if updatable != "" {
+			_, err := UpgradeNex(ctx, logger, updatable)
+			if err != nil {
+				logger.Error("failed to upgrade nex", slog.Any("err", err))
+			}
+		} else {
+			logger.Info("no new version found")
 		}
 	}
 }
