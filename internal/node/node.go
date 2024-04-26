@@ -225,6 +225,7 @@ func (n *Node) init() error {
 		err = n.loadNodeConfig()
 		if err != nil {
 			n.log.Error("Failed to load node configuration file", slog.Any("err", err), slog.String("config_path", n.nodeOpts.ConfigFilepath))
+			return
 		} else {
 			n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
 		}
@@ -232,6 +233,7 @@ func (n *Node) init() error {
 		n.telemetry, err = observability.NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
 		if err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", err))
+			return
 		} else {
 			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
@@ -241,6 +243,7 @@ func (n *Node) init() error {
 		if err != nil {
 			n.log.Error("Failed to start public NATS server", slog.Any("err", err))
 			err = fmt.Errorf("failed to start public NATS server: %s", err)
+			return
 		} else {
 			n.log.Info("Public NATS server started", slog.String("client_url", n.natspub.ClientURL()))
 		}
@@ -250,6 +253,7 @@ func (n *Node) init() error {
 		if err != nil {
 			n.log.Error("Failed to connect to NATS server", slog.Any("err", err))
 			err = fmt.Errorf("failed to connect to NATS server: %s", err)
+			return
 		} else {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
@@ -259,6 +263,7 @@ func (n *Node) init() error {
 		if err != nil {
 			n.log.Error("Failed to start internal NATS server", slog.Any("err", err))
 			err = fmt.Errorf("failed to start internal NATS server: %s", err)
+			return
 		} else {
 			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 		}
@@ -266,6 +271,7 @@ func (n *Node) init() error {
 		n.manager, err = NewWorkloadManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
 		if err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", err))
+			return
 		}
 
 		go n.manager.Start()
@@ -275,6 +281,7 @@ func (n *Node) init() error {
 		err = n.api.Start()
 		if err != nil {
 			n.log.Error("Failed to start API listener", slog.Any("err", err))
+			return
 		}
 
 		n.installSignalHandlers()
