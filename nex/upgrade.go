@@ -108,6 +108,7 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 
 	nex, err := os.Create(filepath.Join(filepath.Dir(nexPath), "nex"))
 	if err != nil {
+		restoreBackup()
 		return "", err
 	}
 
