@@ -179,7 +179,10 @@ func main() {
 		defer func() {
 			err := nc.Drain()
 			if err != nil {
-				fmt.Println("Drain error: ", err.Error())
+				logger.Error("Drain error", slog.Any("err", err))
+			}
+			for !nc.IsClosed() {
+				time.Sleep(time.Millisecond * 25)
 			}
 		}()
 		handlerOpts = append(handlerOpts, shandler.WithStdOut(natslogger.NewNatsLogger(nc, "stdout")))
@@ -266,6 +269,4 @@ func main() {
 			logger.Error("failed to build rootfs", slog.Any("err", err))
 		}
 	}
-
-	logger.Info("End")
 }
