@@ -21,10 +21,12 @@ func setEnvironment(t *testing.T) {
 	t.Helper()
 
 	tempPath := t.TempDir()
-	_, err := os.Create(filepath.Join(tempPath, "nex"))
+	f, err := os.Create(filepath.Join(tempPath, "nex"))
 	if err != nil {
 		t.Fail()
 	}
+	f.Close()
+
 	err = os.Chmod(filepath.Join(tempPath, "nex"), 0775)
 	if err != nil {
 		t.Fail()
@@ -38,16 +40,16 @@ func TestUpdateNex(t *testing.T) {
 	setEnvironment(t)
 	log := logger(t)
 
-	textNexPath, _ := exec.LookPath("nex")
-	t.Log("nex path: " + textNexPath)
-	if !strings.HasPrefix(textNexPath, os.TempDir()) {
+	testNexPath, _ := exec.LookPath("nex")
+	t.Log("nex path: " + testNexPath)
+	if !strings.HasPrefix(testNexPath, os.TempDir()) {
 		t.Log("bailing on update nex test so real env isnt affected")
 		t.SkipNow()
 	}
 
 	shasum, err := UpgradeNex(context.Background(), log, "0.2.1")
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	t.Log(shasum)

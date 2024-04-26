@@ -73,12 +73,13 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 	if err != nil {
 		return "", err
 	}
-	defer f_bak.Close()
 	defer os.Remove(nexPath + ".bak")
 	_, err = io.Copy(f_bak, f)
 	if err != nil {
 		return "", err
 	}
+	f_bak.Close()
+	f.Close()
 
 	restoreBackup := func() {
 		logger.Info("Restoring backup binary")
@@ -138,14 +139,6 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 	err = os.Rename(filepath.Join(dir, "nex"), nexPath)
 	if err != nil {
 		restoreBackup()
-		return "", err
-	}
-
-	// Verify binary is working
-	output, err := exec.Command("nex", "--version").CombinedOutput()
-	if err != nil {
-		restoreBackup()
-		logger.Debug("Error running nex --version", slog.Any("err", err), slog.String("output", string(output)))
 		return "", err
 	}
 
