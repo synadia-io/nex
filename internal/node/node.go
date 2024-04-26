@@ -244,7 +244,7 @@ func (n *Node) init() error {
 			n.log.Error("Failed to start public NATS server", slog.Any("err", err))
 			err = fmt.Errorf("failed to start public NATS server: %s", err)
 			return
-		} else {
+		} else if n.natspub != nil {
 			n.log.Info("Public NATS server started", slog.String("client_url", n.natspub.ClientURL()))
 		}
 
