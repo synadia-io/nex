@@ -59,7 +59,7 @@ type NodeConfiguration struct {
 	WorkloadTypes       []string          `json:"workload_types,omitempty"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
-	PublicNATSServer *server.Options `json:"public_nats_options,omitempty"`
+	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`
 
 	Errors []error `json:"errors,omitempty"`
 }
