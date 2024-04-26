@@ -1,0 +1,22 @@
+{
+    "kernel_filepath": "/path/to/vmlinux-5.10",
+    "rootfs_filepath": "/path/to/rootfs.ext4",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "public_nats_server": {
+        "server_name": "Nex Public NATS Server",
+        "addr": "0.0.0.0",
+        "port": 4222,
+        "jetstream": true
+    },
+    "tags": {
+        "simple": "true"
+    }
+}

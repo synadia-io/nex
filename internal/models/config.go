@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/splode/fname"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -44,6 +45,7 @@ type NodeConfiguration struct {
 	MachinePoolSize     int               `json:"machine_pool_size"`
 	MachineTemplate     MachineTemplate   `json:"machine_template"`
 	NoSandbox           bool              `json:"no_sandbox,omitempty"`
+	OtlpExporterUrl     string            `json:"otlp_exporter_url,omitempty"`
 	OtelMetrics         bool              `json:"otel_metrics"`
 	OtelMetricsPort     int               `json:"otel_metrics_port"`
 	OtelMetricsExporter string            `json:"otel_metrics_exporter"`
@@ -55,7 +57,9 @@ type NodeConfiguration struct {
 	Tags                map[string]string `json:"tags,omitempty"`
 	ValidIssuers        []string          `json:"valid_issuers,omitempty"`
 	WorkloadTypes       []string          `json:"workload_types,omitempty"`
-	OtlpExporterUrl     string            `json:"otlp_exporter_url,omitempty"`
+
+	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
+	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`
 
 	Errors []error `json:"errors,omitempty"`
 }
