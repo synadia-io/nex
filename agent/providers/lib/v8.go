@@ -1229,7 +1229,7 @@ func (v *V8) marshalValue(val *v8.Value) ([]byte, error) {
 	return nil, fmt.Errorf("failed to marshal v8 value to []byte: %v; only Uint8[] is supported", val)
 }
 
-// unmarshal the given []byte value into a native Uint8Array which can be handed back into v8,
+// unmarshal the given []byte value into a native Uint8Array which can be handed back into v8
 func (v *V8) toUInt8ArrayValue(val []byte) (*v8.Value, error) {
 	// initialize a v8 value representing the size in bytes of the native Uint8Array to be allocated
 	len, err := v8.NewValue(v.iso, uint64(len(val)))
