@@ -63,6 +63,30 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 		return "", err
 	}
 
+	f, err := os.Open(nexPath)
+	if err != nil {
+		return "", err
+	}
+
+	// copy binary backup
+	f_bak, err := os.Create(nexPath + ".bak")
+	if err != nil {
+		return "", err
+	}
+	defer f_bak.Close()
+	defer os.Remove(nexPath + ".bak")
+	_, err = io.Copy(f_bak, f)
+	if err != nil {
+		return "", err
+	}
+
+	restoreBackup := func() {
+		logger.Info("Restoring backup binary")
+		if err := os.Rename(nexPath+".bak", nexPath); err != nil {
+			logger.Error("Failed to restore backup binary", slog.Any("err", err))
+		}
+	}
+
 	_os := runtime.GOOS
 	arch := runtime.GOARCH
 
@@ -113,6 +137,7 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 
 	err = os.Rename(filepath.Join(dir, "nex"), nexPath)
 	if err != nil {
+		restoreBackup()
 		return "", err
 	}
 
