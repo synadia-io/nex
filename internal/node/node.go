@@ -25,12 +25,13 @@ import (
 )
 
 const (
-	systemNamespace      = "system"
-	defaultNatsStoreDir  = "pnats"
-	defaultPidFilepath   = "/var/run/nex.pid"
-	runloopSleepInterval = 100 * time.Millisecond
-	runloopTickInterval  = 2500 * time.Millisecond
-	heartbeatInterval    = 30 * time.Second
+	systemNamespace              = "system"
+	defaultNatsStoreDir          = "pnats"
+	defaultPidFilepath           = "/var/run/nex.pid"
+	heartbeatInterval            = 30 * time.Second
+	publicNATSServerStartTimeout = 50 * time.Millisecond
+	runloopSleepInterval         = 100 * time.Millisecond
+	runloopTickInterval          = 2500 * time.Millisecond
 )
 
 // Nex node process
@@ -343,7 +344,13 @@ func (n *Node) startPublicNATS() error {
 		return err
 	}
 
+	n.log.Debug("Starting public NATS server")
 	n.natspub.Start()
+
+	ports := n.natspub.PortsInfo(publicNATSServerStartTimeout)
+	if ports == nil {
+		return fmt.Errorf("failed to start public NATS server")
+	}
 
 	return nil
 }
