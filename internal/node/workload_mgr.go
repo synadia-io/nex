@@ -33,8 +33,6 @@ const (
 	WorkloadCacheBucketName = "NEXCACHE"
 
 	defaultHandshakeTimeoutMillis = 5000
-
-	nexRuntimeNs = "x-nex-runtime-ns"
 )
 
 // The workload manager provides the high level strategy for the Nex node's workload management. It is responsible
@@ -484,7 +482,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			_ = w.publishFunctionExecFailed(workloadID, *request.WorkloadName, tsub, err)
 		} else if resp != nil {
 			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
-			runtimeNs := resp.Header.Get(nexRuntimeNs)
+			runtimeNs := resp.Header.Get(agentapi.NexRuntimeNs)
 			w.log.Debug("Received response from execution via trigger subject",
 				slog.String("workload_id", workloadID),
 				slog.String("trigger_subject", tsub),

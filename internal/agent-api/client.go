@@ -23,7 +23,16 @@ type EventCallback func(string, cloudevents.Event)
 type LogCallback func(string, LogEntry)
 
 const (
-	nexTriggerSubject = "x-nex-trigger-subject"
+	NexTriggerSubject = "x-nex-trigger-subject"
+	NexRuntimeNs      = "x-nex-runtime-ns"
+
+	HttpURLHeader = "x-http-url"
+
+	KeyValueKeyHeader = "x-keyvalue-key"
+
+	MessagingSubjectHeader = "x-subject"
+
+	ObjectStoreObjectNameHeader = "x-object-name"
 )
 
 type AgentClient struct {
@@ -182,7 +191,7 @@ func (a *AgentClient) UptimeMillis() time.Duration {
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
 	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
 	// TODO: inject tracer context into message header
-	intmsg.Header.Add(nexTriggerSubject, subject)
+	intmsg.Header.Add(NexTriggerSubject, subject)
 	intmsg.Data = data
 
 	cctx, childSpan := tracer.Start(

@@ -74,13 +74,25 @@ func (k *KeyValueService) handleGet(msg *nats.Msg) {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
 
-	var req *agentapi.HostServicesKeyValueRequest
-	err = json.Unmarshal(msg.Data, &req)
+	key := msg.Header.Get(agentapi.KeyValueKeyHeader)
+	if key == "" {
+		resp, _ := json.Marshal(&agentapi.HostServicesKeyValueResponse{
+			Errors: []string{"key is required"},
+		})
+
+		err := msg.Respond(resp)
+		if err != nil {
+			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
+		}
+		return
+	}
+
+	entry, err := kvStore.Get(key)
 	if err != nil {
-		k.log.Warn(fmt.Sprintf("failed to unmarshal key/value RPC request: %s", err.Error()))
+		k.log.Warn(fmt.Sprintf("failed to get value for key %s: %s", key, err.Error()))
 
 		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal key/value RPC request: %s", err.Error()),
+			"error": fmt.Sprintf("failed to get value for key %s: %s", key, err.Error()),
 		})
 
 		err := msg.Respond(resp)
@@ -90,39 +102,7 @@ func (k *KeyValueService) handleGet(msg *nats.Msg) {
 		return
 	}
 
-	if req.Key == nil {
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": "key is required",
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	entry, err := kvStore.Get(*req.Key)
-	if err != nil {
-		k.log.Warn(fmt.Sprintf("failed to get value for key %s: %s", *req.Key, err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to delete keys %s: %s", *req.Key, err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	val := json.RawMessage(entry.Value())
-	resp, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
-		Key:   req.Key,
-		Value: &val,
-	})
-	err = msg.Respond(resp)
+	err = msg.Respond(entry.Value())
 	if err != nil {
 		k.log.Warn(fmt.Sprintf("failed to respond to key/value host service request: %s", err.Error()))
 	}
@@ -138,54 +118,25 @@ func (k *KeyValueService) handleSet(msg *nats.Msg) {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
 
-	var req *agentapi.HostServicesKeyValueRequest
-	err = json.Unmarshal(msg.Data, &req)
+	key := msg.Header.Get(agentapi.KeyValueKeyHeader)
+	if key == "" {
+		resp, _ := json.Marshal(&agentapi.HostServicesKeyValueResponse{
+			Errors: []string{"key is required"},
+		})
+
+		err := msg.Respond(resp)
+		if err != nil {
+			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
+		}
+		return
+	}
+
+	revision, err := kvStore.Put(key, msg.Data)
 	if err != nil {
-		k.log.Warn(fmt.Sprintf("failed to unmarshal key/value RPC request: %s", err.Error()))
+		k.log.Warn(fmt.Sprintf("failed to write %d-byte value for key %s: %s", len(msg.Data), key, err.Error()))
 
 		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal key/value RPC request: %s", err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	// FIXME-- add req.Validate()
-	if req.Key == nil {
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": "key is required",
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	// FIXME-- add req.Validate()
-	if req.Value == nil {
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": "value is required",
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	revision, err := kvStore.Put(*req.Key, *req.Value)
-	if err != nil {
-		k.log.Warn(fmt.Sprintf("failed to write %d-byte value for key %s: %s", len(*req.Value), *req.Key, err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to write %d-byte value for key %s: %s", len(*req.Value), *req.Key, err.Error()),
+			"error": fmt.Sprintf("failed to write %d-byte value for key %s: %s", len(msg.Data), key, err.Error()),
 		})
 
 		err := msg.Respond(resp)
@@ -215,13 +166,10 @@ func (k *KeyValueService) handleDelete(msg *nats.Msg) {
 		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
 	}
 
-	var req *agentapi.HostServicesKeyValueRequest
-	err = json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		k.log.Warn(fmt.Sprintf("failed to unmarshal key/value RPC request: %s", err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal key/value RPC request: %s", err.Error()),
+	key := msg.Header.Get(agentapi.KeyValueKeyHeader)
+	if key == "" {
+		resp, _ := json.Marshal(&agentapi.HostServicesKeyValueResponse{
+			Errors: []string{"key is required"},
 		})
 
 		err := msg.Respond(resp)
@@ -231,24 +179,12 @@ func (k *KeyValueService) handleDelete(msg *nats.Msg) {
 		return
 	}
 
-	if req.Key == nil {
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": "key is required",
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			k.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	err = kvStore.Delete(*req.Key)
+	err = kvStore.Delete(key)
 	if err != nil {
-		k.log.Warn(fmt.Sprintf("failed to delete key %s: %s", *req.Key, err.Error()))
+		k.log.Warn(fmt.Sprintf("failed to delete key %s: %s", key, err.Error()))
 
 		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to delete keys %s: %s", *req.Key, err.Error()),
+			"error": fmt.Sprintf("failed to delete key %s: %s", key, err.Error()),
 		})
 
 		err := msg.Respond(resp)

@@ -63,15 +63,11 @@ const (
 	hostServicesObjectStoreDeleteTimeout = time.Millisecond * 3000
 	hostServicesObjectStoreListTimeout   = time.Millisecond * 3000
 
-	nexTriggerSubject = "x-nex-trigger-subject"
-	nexRuntimeNs      = "x-nex-runtime-ns"
-
-	messageSubject = "x-subject"
-
-	objectName = "x-object-name"
-
-	v8FunctionArrayAppend = "array-append"
-	v8FunctionArrayInit   = "array-init"
+	v8FunctionArrayAppend        = "array-append"
+	v8FunctionArrayInit          = "array-init"
+	v8FunctionUInt8ArrayInit     = "uint8-array-init"
+	v8FunctionUInt8ArraySetIdx   = "uint8-array-set-idx"
+	v8FunctionUInt8ArrayToString = "uint8-array-to-string"
 
 	v8ExecutionTimeoutMillis = 5000
 	v8MaxFileSizeBytes       = int64(12288) // arbitrarily ~12K, for now
@@ -110,7 +106,7 @@ func (v *V8) Deploy() error {
 	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
 	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
 		startTime := time.Now()
-		val, err := v.Execute(msg.Header.Get(nexTriggerSubject), msg.Data)
+		val, err := v.Execute(msg.Header.Get(agentapi.NexTriggerSubject), msg.Data)
 		if err != nil {
 			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to execute function on trigger subject %s: %s", subject, err.Error())))
 			return
@@ -120,7 +116,7 @@ func (v *V8) Deploy() error {
 		err = msg.RespondMsg(&nats.Msg{
 			Data: val,
 			Header: nats.Header{
-				nexRuntimeNs: []string{strconv.FormatInt(runtimeNanos, 10)},
+				agentapi.NexRuntimeNs: []string{strconv.FormatInt(runtimeNanos, 10)},
 			},
 		})
 		if err != nil {
@@ -171,8 +167,9 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 			return
 		}
 
-		argv2, err := v8.NewValue(ctx.Isolate(), string(payload))
+		argv2, err := v.toUInt8ArrayValue(payload)
 		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(payload), err.Error())))
 			errs <- err
 			return
 		}
@@ -188,6 +185,8 @@ func (v *V8) Execute(subject string, payload []byte) ([]byte, error) {
 
 	select {
 	case val := <-vals:
+		// FIXME-- switch on val type or are we ok with forcing a JSON response?
+
 		retval, err := val.MarshalJSON()
 		if err != nil {
 			return nil, err
@@ -247,19 +246,36 @@ func (v *V8) Validate() error {
 		return fmt.Errorf("failed to compile source for execution: %s", err)
 	}
 
-	// FIXME-- move this somewhere cleaner
+	v.initUtils()
+
+	return nil
+}
+
+func (v *V8) initUtils() {
 	append, _ := v.iso.CompileUnboundScript("(arr, value) => { arr.push(value); return arr; };", "array-append.js", v8.CompileOptions{})
 	appendval, _ := append.Run(v.ctx)
 	appendfn, _ := appendval.AsFunction()
 	v.utils[v8FunctionArrayAppend] = appendfn
 
-	// FIXME-- move this somewhere cleaner
 	init, _ := v.iso.CompileUnboundScript("() => { let arr = []; return arr; };", "array-init.js", v8.CompileOptions{})
 	initval, _ := init.Run(v.ctx)
 	initfn, _ := initval.AsFunction()
 	v.utils[v8FunctionArrayInit] = initfn
 
-	return nil
+	inituint8, _ := v.iso.CompileUnboundScript("(len) => { let arr = new Uint8Array(Number(len)); return arr; };", "uint8-array-init.js", v8.CompileOptions{})
+	inituint8val, _ := inituint8.Run(v.ctx)
+	inituint8fn, _ := inituint8val.AsFunction()
+	v.utils[v8FunctionUInt8ArrayInit] = inituint8fn
+
+	uint8arrsetidx, _ := v.iso.CompileUnboundScript("(arr, i, value) => { arr[Number(i)] = value; return arr; };", "uint8-array-set-idx.js", v8.CompileOptions{})
+	uint8arrsetidxval, _ := uint8arrsetidx.Run(v.ctx)
+	uint8arrsetidxfn, _ := uint8arrsetidxval.AsFunction()
+	v.utils[v8FunctionUInt8ArraySetIdx] = uint8arrsetidxfn
+
+	uint8arrtostr, _ := v.iso.CompileUnboundScript("(arr) => { return String.fromCharCode(...arr); };", "uint8-array-to-string.js", v8.CompileOptions{})
+	uint8arrtostrval, _ := uint8arrtostr.Run(v.ctx)
+	uint8arrtostrfn, _ := uint8arrtostrval.AsFunction()
+	v.utils[v8FunctionUInt8ArrayToString] = uint8arrtostrfn
 }
 
 func (v *V8) newV8Context() (*v8.Context, error) {
@@ -342,12 +358,10 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPGetFunctionName,
-			URL:    _url.String(),
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPGetFunctionName))
+		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPGetFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -420,24 +434,17 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPPostFunctionName,
-			URL:    _url.String(),
-			Body:   &data,
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPostFunctionName))
+		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
+		msg.Data = []byte(payload)
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPostFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -510,24 +517,17 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPPutFunctionName,
-			URL:    _url.String(),
-			Body:   &data,
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPutFunctionName))
+		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
+		msg.Data = []byte(payload)
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPutFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -600,24 +600,17 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPPatchFunctionName,
-			URL:    _url.String(),
-			Body:   &data,
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPPatchFunctionName))
+		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
+		msg.Data = []byte(payload)
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPPatchFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -690,24 +683,10 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var data string
-		if len(args) > 1 {
-			payload := args[1]
-			if payload.IsObject() || payload.IsArray() {
-				payloadJSON, _ := payload.MarshalJSON()
-				data = string(payloadJSON)
-			} else {
-				data = payload.String()
-			}
-		}
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPDeleteFunctionName))
+		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPDeleteFunctionName,
-			URL:    _url.String(),
-			Body:   &data, // this should not be present for DELETE requests, but it is not explicitly forbidden. so we'll allow it
-		})
-
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPDeleteFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -780,12 +759,10 @@ func (v *V8) newHTTPObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		req, _ := json.Marshal(&agentapi.HostServicesHTTPRequest{
-			Method: hostServicesHTTPHeadFunctionName,
-			URL:    _url.String(),
-		})
+		msg := nats.NewMsg(v.httpServiceSubject(hostServicesHTTPHeadFunctionName))
+		msg.Header.Add(agentapi.HttpURLHeader, _url.String())
 
-		resp, err := v.nc.Request(v.httpServiceSubject(hostServicesHTTPHeadFunctionName), req, hostServicesHTTPRequestTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesHTTPRequestTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -852,25 +829,18 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
-			Key: &key,
-		})
+		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVGetFunctionName))
+		msg.Header.Add(agentapi.KeyValueKeyHeader, key)
 
-		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVGetFunctionName), req, hostServicesKVGetTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesKVGetTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		var kvresp *agentapi.HostServicesKeyValueRequest
-		err = json.Unmarshal(resp.Data, &kvresp)
+		val, err := v.toUInt8ArrayValue(resp.Data)
 		if err != nil {
-			val, _ := v8.NewValue(v.iso, err.Error())
-			return v.iso.ThrowException(val)
-		}
-
-		val, err := v8.JSONParse(v.ctx, string(*kvresp.Value))
-		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -886,27 +856,24 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		key := args[0].String()
-		value := args[1]
 
-		raw, err := value.MarshalJSON() // FIXME-- support Uint8 array
+		value, err := v.marshalValue(args[1])
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		val := json.RawMessage(raw)
-		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
-			Key:   &key,
-			Value: &val,
-		})
+		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVSetFunctionName))
+		msg.Header.Add(agentapi.KeyValueKeyHeader, key)
+		msg.Data = value
 
-		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVSetFunctionName), req, hostServicesKVSetTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesKVSetTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		var kvresp *agentapi.HostServicesKeyValueRequest
+		var kvresp *agentapi.HostServicesKeyValueResponse
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
@@ -914,7 +881,7 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		if !*kvresp.Success {
-			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to set %d-byte value for key: %s", len(val), key))
+			val, _ := v8.NewValue(v.iso, fmt.Sprintf("failed to set %d-byte value for key: %s", len(value), key))
 			return v.iso.ThrowException(val)
 		}
 
@@ -930,17 +897,16 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		req, _ := json.Marshal(&agentapi.HostServicesKeyValueRequest{
-			Key: &key,
-		})
+		msg := nats.NewMsg(v.keyValueServiceSubject(hostServicesKVDeleteFunctionName))
+		msg.Header.Add(agentapi.KeyValueKeyHeader, key)
 
-		resp, err := v.nc.Request(v.keyValueServiceSubject(hostServicesKVDeleteFunctionName), req, hostServicesKVDeleteTimeout)
+		resp, err := v.nc.RequestMsg(msg, hostServicesKVDeleteTimeout)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		var kvresp *agentapi.HostServicesKeyValueRequest
+		var kvresp *agentapi.HostServicesKeyValueResponse
 		err = json.Unmarshal(resp.Data, &kvresp)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
@@ -987,10 +953,14 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		subject := args[0].String()
-		payload := args[1].String()
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingPublishFunctionName))
-		msg.Header.Add(messageSubject, subject)
+		msg.Header.Add(agentapi.MessagingSubjectHeader, subject)
 		msg.Data = []byte(payload)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesMessagingPublishTimeout)
@@ -1017,10 +987,14 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		subject := args[0].String()
-		payload := args[1].String()
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingRequestFunctionName))
-		msg.Header.Add(messageSubject, subject)
+		msg.Header.Add(agentapi.MessagingSubjectHeader, subject)
 		msg.Data = []byte(payload)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesMessagingRequestTimeout)
@@ -1029,15 +1003,9 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		var msgresp *agentapi.HostServicesMessagingResponse
-		err = json.Unmarshal(resp.Data, &msgresp)
-		if err == nil && len(msgresp.Errors) > 0 {
-			val, _ := v8.NewValue(v.iso, msgresp.Errors[0])
-			return v.iso.ThrowException(val)
-		}
-
-		val, err := v8.NewValue(v.iso, string(resp.Data)) // FIXME-- pass []byte natively into javascript using ArrayBuffer
+		val, err := v.toUInt8ArrayValue(resp.Data)
 		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -1053,11 +1021,16 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		subject := args[0].String()
-		payload := args[1].String()
+
+		payload, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		// construct the requestMany request message
 		msg := nats.NewMsg(v.messagingServiceSubject(hostServicesMessagingRequestManyFunctionName))
-		msg.Header.Add(messageSubject, subject)
+		msg.Header.Add(agentapi.MessagingSubjectHeader, subject)
 		msg.Reply = v.nc.NewRespInbox()
 		msg.Data = []byte(payload)
 
@@ -1102,8 +1075,9 @@ func (v *V8) newMessagingObjectTemplate() *v8.ObjectTemplate {
 			if resp != nil {
 				_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response", len(resp.Data))))
 
-				respval, err := v8.NewValue(v.iso, string(resp.Data)) // FIXME-- pass []byte natively into javascript using ArrayBuffer
+				respval, err := v.toUInt8ArrayValue(resp.Data)
 				if err != nil {
+					_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 					val, _ := v8.NewValue(v.iso, err.Error())
 					return v.iso.ThrowException(val)
 				}
@@ -1135,7 +1109,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 		name := args[0].String()
 
 		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStoreGetFunctionName))
-		msg.Header.Add(objectName, name)
+		msg.Header.Add(agentapi.ObjectStoreObjectNameHeader, name)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStoreGetTimeout)
 		if err != nil {
@@ -1143,8 +1117,9 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.NewValue(v.iso, string(resp.Data)) // FIXME-- pass []byte natively into javascript using ArrayBuffer
+		val, err := v.toUInt8ArrayValue(resp.Data)
 		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp.Data), err.Error())))
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -1160,25 +1135,15 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 		}
 
 		name := args[0].String()
-		value := args[1].String()
 
-		// FIXME- resolve primitive value from the following types:
-		//   string -> V8::String
-		//   int32 -> V8::Integer
-		//   uint32 -> V8::Integer
-		//   int64 -> V8::BigInt
-		//   uint64 -> V8::BigInt
-		//   bool -> V8::Boolean
-		//   *big.Int -> V8::BigInt
-
-		// raw, err := value.MarshalJSON() // FIXME-- support Uint8 array
-		// if err != nil {
-		// 	val, _ := v8.NewValue(v.iso, err.Error())
-		// 	return v.iso.ThrowException(val)
-		// }
+		value, err := v.marshalValue(args[1])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
 		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStorePutFunctionName))
-		msg.Header.Add(objectName, name)
+		msg.Header.Add(agentapi.ObjectStoreObjectNameHeader, name)
 		msg.Data = []byte(value)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStorePutTimeout)
@@ -1187,7 +1152,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.JSONParse(v.ctx, string(resp.Data))
+		val, err := v8.JSONParse(v.ctx, string(resp.Data)) // nats.ObjectMeta JSON
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -1206,7 +1171,7 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 		name := args[0].String()
 
 		msg := nats.NewMsg(v.objectStoreServiceSubject(hostServicesObjectStoreDeleteFunctionName))
-		msg.Header.Add(objectName, name)
+		msg.Header.Add(agentapi.ObjectStoreObjectNameHeader, name)
 
 		resp, err := v.nc.RequestMsg(msg, hostServicesObjectStoreDeleteTimeout)
 		if err != nil {
@@ -1250,6 +1215,60 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 	return objectStore
 }
 
+// marshal the given v8 value to an array of bytes that can be sent over the wire
+func (v *V8) marshalValue(val *v8.Value) ([]byte, error) {
+	if val.IsUint8Array() {
+		v, err := v.utils[v8FunctionUInt8ArrayToString].Call(v.ctx.Global(), val)
+		if err != nil {
+			return nil, err
+		}
+
+		return []byte(v.String()), nil
+	}
+
+	return nil, fmt.Errorf("failed to marshal v8 value to []byte: %v; only Uint8[] is supported", val)
+}
+
+// unmarshal the given []byte value into a native Uint8Array which can be handed back into v8
+func (v *V8) toUInt8ArrayValue(val []byte) (*v8.Value, error) {
+	// initialize a v8 value representing the size in bytes of the native Uint8Array to be allocated
+	len, err := v8.NewValue(v.iso, uint64(len(val)))
+	if err != nil {
+		return nil, err
+	}
+
+	// initialize a native Uint8Array
+	nativeUint8Arr, err := v.utils[v8FunctionUInt8ArrayInit].Call(v.ctx.Global(), len)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, _uint := range val {
+		// initialize a v8 value representing the current byte offset in our native Uint8Array
+		_i, err := v8.NewValue(v.iso, uint64(i))
+		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast i index value to uint32: %s", err.Error())))
+			return nil, err
+		}
+
+		// pack 8 bits into a uint32, as this is needed when initializing a v8.Value
+		_val, err := v8.NewValue(v.iso, uint32(_uint))
+		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast byte to uint32: %s", err.Error())))
+			return nil, err
+		}
+
+		// write 8 bits to the current byte offset in the native Uint8Array
+		nativeUint8Arr, err = v.utils[v8FunctionUInt8ArraySetIdx].Call(v.ctx.Global(), nativeUint8Arr, _i, _val)
+		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to call %s: %s", v8FunctionUInt8ArraySetIdx, err.Error())))
+			return nil, err
+		}
+	}
+
+	return nativeUint8Arr, nil
+}
+
 // convenience method to initialize a V8 execution provider
 func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, error) {
 	if params.WorkloadName == nil {
@@ -1259,10 +1278,6 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 	if params.TmpFilename == nil {
 		return nil, errors.New("V8 execution provider requires a temporary filename parameter")
 	}
-
-	// if params.TotalBytes == nil {
-	// 	return nil, errors.New("V8 execution provider requires a total bytes parameter")
-	// }
 
 	return &V8{
 		environment: params.Environment,

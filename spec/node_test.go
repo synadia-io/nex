@@ -618,15 +618,15 @@ var _ = Describe("nex node", func() {
 
 												BeforeEach(func() {
 													sub, _ = _fixtures.natsConn.Subscribe("hello.world.request", func(msg *nats.Msg) {
-														resp := fmt.Sprintf("resp: %s", string(msg.Data))
+														resp := fmt.Sprintf("resp: %s", msg.Data)
 														_ = msg.Respond([]byte(resp))
 													})
 
 													sub, _ = _fixtures.natsConn.Subscribe("hello.world.request.many", func(msg *nats.Msg) {
-														resp := fmt.Sprintf("resp #1: %s", string(msg.Data))
+														resp := fmt.Sprintf("resp #1: %s", msg.Data)
 														_ = msg.Respond([]byte(resp))
 
-														resp = fmt.Sprintf("resp #2: %s", string(msg.Data))
+														resp = fmt.Sprintf("resp #2: %s", msg.Data)
 														_ = msg.Respond([]byte(resp))
 													})
 												})
@@ -849,8 +849,6 @@ var _ = Describe("nex node", func() {
 													Expect(err).To(BeNil())
 
 													Expect(resp).ToNot(BeNil())
-
-													fmt.Printf("IN TEST NAME: %s; NUID: %s", resp.List[0].Name, resp.List[0].NUID)
 
 													Expect(len(resp.List)).To(Equal(1))
 													Expect(resp.List[0].Name).To(Equal("hello2"))

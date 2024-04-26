@@ -169,12 +169,11 @@ type HostServicesHTTPResponse struct {
 	Error *string `json:"error,omitempty"`
 }
 
-type HostServicesKeyValueRequest struct {
-	Key   *string          `json:"key"`
-	Value *json.RawMessage `json:"value,omitempty"`
-
+type HostServicesKeyValueResponse struct {
 	Revision int64 `json:"revision,omitempty"`
 	Success  *bool `json:"success,omitempty"`
+
+	Errors []string `json:"errors,omitempty"`
 }
 
 type HostServicesObjectStoreResponse struct {

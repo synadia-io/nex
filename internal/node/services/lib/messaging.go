@@ -19,8 +19,6 @@ const messagingServiceMethodRequestMany = "requestMany"
 const messagingRequestTimeout = time.Millisecond * 500 // FIXME-- make timeout configurable per request?
 const messagingRequestManyTimeout = time.Millisecond * 3000
 
-const messageSubject = "x-subject"
-
 type MessagingService struct {
 	log *slog.Logger
 	nc  *nats.Conn
@@ -66,7 +64,7 @@ func (m *MessagingService) HandleRPC(msg *nats.Msg) {
 }
 
 func (m *MessagingService) handlePublish(msg *nats.Msg) {
-	subject := msg.Header.Get(messageSubject)
+	subject := msg.Header.Get(agentapi.MessagingSubjectHeader)
 	if subject == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesMessagingResponse{
 			Errors: []string{"subject is required"},
@@ -104,7 +102,7 @@ func (m *MessagingService) handlePublish(msg *nats.Msg) {
 }
 
 func (m *MessagingService) handleRequest(msg *nats.Msg) {
-	subject := msg.Header.Get(messageSubject)
+	subject := msg.Header.Get(agentapi.MessagingSubjectHeader)
 	if subject == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesMessagingResponse{
 			Errors: []string{"subject is required"},
@@ -141,7 +139,7 @@ func (m *MessagingService) handleRequest(msg *nats.Msg) {
 }
 
 func (m *MessagingService) handleRequestMany(msg *nats.Msg) {
-	subject := msg.Header.Get(messageSubject)
+	subject := msg.Header.Get(agentapi.MessagingSubjectHeader)
 	if subject == "" {
 		resp, _ := json.Marshal(&agentapi.HostServicesMessagingResponse{
 			Errors: []string{"subject is required"},

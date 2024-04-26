@@ -74,23 +74,7 @@ func (h *HTTPService) HandleRPC(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handleGet(msg *nats.Msg) {
-	var req *agentapi.HostServicesHTTPRequest
-	err := json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		h.log.Warn(fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	url, err := url.Parse(req.URL)
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -109,25 +93,7 @@ func (h *HTTPService) handleGet(msg *nats.Msg) {
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
-	params := map[string]interface{}{}
-	if req.Params != nil {
-		err = json.Unmarshal(*req.Params, &params)
-		if err != nil {
-			h.log.Debug("failed to unmarshal query params for http RPC request", slog.String("error", err.Error()))
-
-			resp, _ := json.Marshal(map[string]interface{}{
-				"error": fmt.Sprintf("failed to unmarshal query params for http RPC request: %s", err.Error()),
-			})
-
-			err := msg.Respond(resp)
-			if err != nil {
-				h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-			}
-			return
-		}
-	}
-
-	status, resphdrs, httpresp, err := client.Get(url.Path, params)
+	status, resphdrs, httpresp, err := client.Get(url.Path, url.Query())
 	if err != nil {
 		resp, _ := json.Marshal(map[string]interface{}{
 			"error": fmt.Sprintf("http reqeust failed: %s", err.Error()),
@@ -155,23 +121,7 @@ func (h *HTTPService) handleGet(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handlePost(msg *nats.Msg) {
-	var req *agentapi.HostServicesHTTPRequest
-	err := json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		h.log.Warn(fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	url, err := url.Parse(req.URL)
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -190,25 +140,7 @@ func (h *HTTPService) handlePost(msg *nats.Msg) {
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
-	params := map[string]interface{}{}
-	if req.Params != nil {
-		err = json.Unmarshal(*req.Params, &params)
-		if err != nil {
-			h.log.Debug("failed to unmarshal query params for http RPC request", slog.String("error", err.Error()))
-
-			resp, _ := json.Marshal(map[string]interface{}{
-				"error": fmt.Sprintf("failed to unmarshal query params for http RPC request: %s", err.Error()),
-			})
-
-			err := msg.Respond(resp)
-			if err != nil {
-				h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-			}
-			return
-		}
-	}
-
-	status, resphdrs, httpresp, err := client.Post(url.Path, req.Body)
+	status, resphdrs, httpresp, err := client.Post(url.Path, msg.Data)
 	if err != nil {
 		resp, _ := json.Marshal(map[string]interface{}{
 			"error": fmt.Sprintf("http reqeust failed: %s", err.Error()),
@@ -236,23 +168,7 @@ func (h *HTTPService) handlePost(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handlePut(msg *nats.Msg) {
-	var req *agentapi.HostServicesHTTPRequest
-	err := json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		h.log.Warn(fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	url, err := url.Parse(req.URL)
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -271,25 +187,7 @@ func (h *HTTPService) handlePut(msg *nats.Msg) {
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
-	params := map[string]interface{}{}
-	if req.Params != nil {
-		err = json.Unmarshal(*req.Params, &params)
-		if err != nil {
-			h.log.Debug("failed to unmarshal query params for http RPC request", slog.String("error", err.Error()))
-
-			resp, _ := json.Marshal(map[string]interface{}{
-				"error": fmt.Sprintf("failed to unmarshal query params for http RPC request: %s", err.Error()),
-			})
-
-			err := msg.Respond(resp)
-			if err != nil {
-				h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-			}
-			return
-		}
-	}
-
-	status, resphdrs, httpresp, err := client.Put(url.Path, req.Body)
+	status, resphdrs, httpresp, err := client.Put(url.Path, msg.Data)
 	if err != nil {
 		resp, _ := json.Marshal(map[string]interface{}{
 			"error": fmt.Sprintf("http reqeust failed: %s", err.Error()),
@@ -317,23 +215,7 @@ func (h *HTTPService) handlePut(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handlePatch(msg *nats.Msg) {
-	var req *agentapi.HostServicesHTTPRequest
-	err := json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		h.log.Warn(fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	url, err := url.Parse(req.URL)
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -352,25 +234,7 @@ func (h *HTTPService) handlePatch(msg *nats.Msg) {
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
-	params := map[string]interface{}{}
-	if req.Params != nil {
-		err = json.Unmarshal(*req.Params, &params)
-		if err != nil {
-			h.log.Debug("failed to unmarshal query params for http RPC request", slog.String("error", err.Error()))
-
-			resp, _ := json.Marshal(map[string]interface{}{
-				"error": fmt.Sprintf("failed to unmarshal query params for http RPC request: %s", err.Error()),
-			})
-
-			err := msg.Respond(resp)
-			if err != nil {
-				h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-			}
-			return
-		}
-	}
-
-	status, resphdrs, httpresp, err := client.Patch(url.Path, req.Body)
+	status, resphdrs, httpresp, err := client.Patch(url.Path, msg.Data)
 	if err != nil {
 		resp, _ := json.Marshal(map[string]interface{}{
 			"error": fmt.Sprintf("http reqeust failed: %s", err.Error()),
@@ -398,23 +262,7 @@ func (h *HTTPService) handlePatch(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handleDelete(msg *nats.Msg) {
-	var req *agentapi.HostServicesHTTPRequest
-	err := json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		h.log.Warn(fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	url, err := url.Parse(req.URL)
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -432,24 +280,6 @@ func (h *HTTPService) handleDelete(msg *nats.Msg) {
 	client := util.NewHTTPClient(url.Scheme, url.Host, "").
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
-
-	params := map[string]interface{}{}
-	if req.Params != nil {
-		err = json.Unmarshal(*req.Params, &params)
-		if err != nil {
-			h.log.Debug("failed to unmarshal query params for http RPC request", slog.String("error", err.Error()))
-
-			resp, _ := json.Marshal(map[string]interface{}{
-				"error": fmt.Sprintf("failed to unmarshal query params for http RPC request: %s", err.Error()),
-			})
-
-			err := msg.Respond(resp)
-			if err != nil {
-				h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-			}
-			return
-		}
-	}
 
 	status, resphdrs, httpresp, err := client.Delete(url.Path)
 	if err != nil {
@@ -479,23 +309,7 @@ func (h *HTTPService) handleDelete(msg *nats.Msg) {
 }
 
 func (h *HTTPService) handleHead(msg *nats.Msg) {
-	var req *agentapi.HostServicesHTTPRequest
-	err := json.Unmarshal(msg.Data, &req)
-	if err != nil {
-		h.log.Warn(fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()))
-
-		resp, _ := json.Marshal(map[string]interface{}{
-			"error": fmt.Sprintf("failed to unmarshal http RPC request: %s", err.Error()),
-		})
-
-		err := msg.Respond(resp)
-		if err != nil {
-			h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-		}
-		return
-	}
-
-	url, err := url.Parse(req.URL)
+	url, err := url.Parse(msg.Header.Get(agentapi.HttpURLHeader))
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
 
@@ -514,25 +328,7 @@ func (h *HTTPService) handleHead(msg *nats.Msg) {
 		WithLogger(h.log).
 		WithTimeoutMillis(defaultHTTPRequestTimeoutMillis)
 
-	params := map[string]interface{}{}
-	if req.Params != nil {
-		err = json.Unmarshal(*req.Params, &params)
-		if err != nil {
-			h.log.Debug("failed to unmarshal query params for http RPC request", slog.String("error", err.Error()))
-
-			resp, _ := json.Marshal(map[string]interface{}{
-				"error": fmt.Sprintf("failed to unmarshal query params for http RPC request: %s", err.Error()),
-			})
-
-			err := msg.Respond(resp)
-			if err != nil {
-				h.log.Error(fmt.Sprintf("failed to respond to host services RPC request: %s", err.Error()))
-			}
-			return
-		}
-	}
-
-	status, resphdrs, err := client.Head(url.Path, params)
+	status, resphdrs, err := client.Head(url.Path, url.Query())
 	if err != nil {
 		resp, _ := json.Marshal(map[string]interface{}{
 			"error": fmt.Sprintf("http reqeust failed: %s", err.Error()),
