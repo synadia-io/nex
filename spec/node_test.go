@@ -71,7 +71,8 @@ var _ = Describe("nex node", func() {
 		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
 
 		opts = &models.Options{
-			Servers: _fixtures.natsServer.ClientURL(),
+			Servers:      _fixtures.natsServer.ClientURL(),
+			SkipContexts: true,
 		}
 		nodeOpts = &models.NodeOptions{}
 
@@ -943,7 +944,7 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, stri
 }
 
 func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, error) {
-	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
 
 	nodes, err := nodeClient.ListAllNodes()
 	if err != nil {
@@ -951,6 +952,7 @@ func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, erro
 	}
 
 	if len(nodes) == 0 {
+		log.Error("no nodes discovered", slog.Any("nc_server", _fixtures.natsConn.Servers()))
 		return nil, errors.New("no nodes discovered")
 	}
 
