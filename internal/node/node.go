@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -28,7 +29,6 @@ import (
 const (
 	systemNamespace              = "system"
 	defaultNatsStoreDir          = "pnats"
-	defaultPidFilepath           = "/var/run/nex.pid"
 	heartbeatInterval            = 30 * time.Second
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
@@ -48,9 +48,10 @@ type Node struct {
 
 	log *slog.Logger
 
-	config   *models.NodeConfiguration
-	opts     *models.Options
-	nodeOpts *models.NodeOptions
+	config      *models.NodeConfiguration
+	opts        *models.Options
+	nodeOpts    *models.NodeOptions
+	pidFilepath string
 
 	initOnce sync.Once
 
@@ -168,8 +169,22 @@ func (n *Node) IsLameDuck() bool {
 }
 
 func (n *Node) createPid() error {
-	if _, err := os.Stat(defaultPidFilepath); err == nil {
-		raw, err := os.ReadFile(defaultPidFilepath)
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+
+	nexConfigPath := filepath.Join(configDir, ".nex")
+
+	err = os.MkdirAll(nexConfigPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	n.pidFilepath = filepath.Join(nexConfigPath, "nex.pid")
+
+	if _, err = os.Stat(n.pidFilepath); err == nil {
+		raw, err := os.ReadFile(n.pidFilepath)
 		if err != nil {
 			return err
 		}
@@ -190,18 +205,18 @@ func (n *Node) createPid() error {
 		}
 	}
 
-	f, err := os.Create(defaultPidFilepath)
+	f, err := os.Create(n.pidFilepath)
 	if err != nil {
 		return err
 	}
 
 	_, err = f.Write([]byte(fmt.Sprintf("%d", os.Getpid())))
 	if err != nil {
-		_ = os.Remove(defaultPidFilepath)
+		_ = os.Remove(n.pidFilepath)
 		return err
 	}
 
-	n.log.Debug(fmt.Sprintf("Wrote pidfile to %s", defaultPidFilepath), slog.Int("pid", os.Getpid()))
+	n.log.Debug(fmt.Sprintf("Wrote pidfile to %s", n.pidFilepath), slog.Int("pid", os.Getpid()))
 	return nil
 }
 
@@ -515,7 +530,7 @@ func (n *Node) shutdown() {
 
 		_ = n.telemetry.Shutdown()
 
-		_ = os.Remove(defaultPidFilepath)
+		_ = os.Remove(n.pidFilepath)
 		close(n.sigs)
 	}
 }
