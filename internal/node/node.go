@@ -174,7 +174,14 @@ func (n *Node) createPid() error {
 		return err
 	}
 
-	n.pidFilepath = filepath.Join(configDir, ".nex", "nex.pid")
+	nexConfigPath := filepath.Join(configDir, ".nex")
+
+	err = os.MkdirAll(nexConfigPath, 0755)
+	if err != nil {
+		return err
+	}
+
+	n.pidFilepath = filepath.Join(nexConfigPath, "nex.pid")
 
 	if _, err = os.Stat(n.pidFilepath); err == nil {
 		raw, err := os.ReadFile(n.pidFilepath)
