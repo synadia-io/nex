@@ -351,10 +351,26 @@ var _ = Describe("nex node", func() {
 							Expect(subsz.Total).To(Equal(1))
 						})
 
+						// It("should initialize a node API subscription for handling workload ping requests", func(ctx SpecContext) {
+						// 	subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+						// 		Subscriptions: true,
+						// 		Test:          "$NEX.WPING",
+						// 	})
+						// 	Expect(subsz.Total).To(Equal(1))
+						// })
+
 						It("should initialize a node API subscription for handling namespaced info requests", func(ctx SpecContext) {
 							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
 								Subscriptions: true,
 								Test:          fmt.Sprintf("$NEX.INFO.default.%s", *nodeID),
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
+
+						It("should initialize a node API subscription for handling lame duck requests", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          fmt.Sprintf("$NEX.LAMEDUCK.%s", *nodeID),
 							})
 							Expect(subsz.Total).To(Equal(1))
 						})
