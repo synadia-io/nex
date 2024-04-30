@@ -55,7 +55,7 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 
 	config.ForceDepInstall = nodeopts.ForceDepInstall
 
-	err = CheckPrerequisites(config, false)
+	err = CheckPrerequisites(config, false, log)
 	if err != nil {
 		return fmt.Errorf("preflight checks failed: %s", err)
 	}
