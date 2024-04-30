@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/nats-io/natscli/columns"
@@ -135,14 +136,20 @@ func renderNodeList(nodes []controlapi.PingResponse) {
 	}
 
 	table := newTableWriter("NATS Execution Nodes")
-	table.AddHeaders("ID", "Name", "Version", "Uptime", "Workloads")
+	table.AddHeaders("ID", "Name", "Sandboxed", "Version", "Uptime", "Workloads")
 
 	for _, node := range nodes {
 		nodeName, ok := node.Tags["node_name"]
 		if !ok {
 			nodeName = "no-name"
 		}
-		table.AddRow(node.NodeId, nodeName, node.Version, node.Uptime, node.RunningMachines)
+
+		nodeUnsafe, ok := node.Tags["nex.unsafe"]
+		if !ok {
+			nodeUnsafe = "false"
+		}
+		nUnsafe, _ := strconv.ParseBool(nodeUnsafe)
+		table.AddRow(node.NodeId, nodeName, !nUnsafe, node.Version, node.Uptime, node.RunningMachines)
 	}
 
 	fmt.Println(table.Render())

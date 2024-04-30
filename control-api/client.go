@@ -173,21 +173,27 @@ func (api *Client) ListAllNodes() ([]PingResponse, error) {
 	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
 		env, err := extractEnvelope(m.Data)
 		if err != nil {
+			api.log.Error("failed to extract envelope", slog.Any("err", err), slog.Any("nats_msg.Data", m.Data))
 			return
 		}
+
 		var resp PingResponse
 		bytes, err := json.Marshal(env.Data)
 		if err != nil {
+			api.log.Error("failed to marshal envelope data", slog.Any("err", err))
 			return
 		}
+
 		err = json.Unmarshal(bytes, &resp)
 		if err != nil {
+			api.log.Error("failed to unmarshal PingResponse", slog.Any("err", err))
 			return
 		}
 		responses = append(responses, resp)
 	})
 	if err != nil {
-		return nil, nil
+		api.log.Error("failed to subscribe", slog.Any("err", err))
+		return nil, err
 	}
 	msg := nats.NewMsg(fmt.Sprintf("%s.PING", APIPrefix))
 	msg.Reply = sub.Subject

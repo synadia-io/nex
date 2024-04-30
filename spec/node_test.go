@@ -951,6 +951,7 @@ func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, erro
 	}
 
 	if len(nodes) == 0 {
+		log.Error("no nodes discovered", slog.Any("nc_server", _fixtures.natsConn.Servers()))
 		return nil, errors.New("no nodes discovered")
 	}
 
