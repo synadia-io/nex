@@ -1,12 +1,7 @@
 package processmanager
 
 import (
-	"context"
-	"log/slog"
-
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	"github.com/synadia-io/nex/internal/models"
-	"github.com/synadia-io/nex/internal/node/observability"
 )
 
 // Information about an agent process without regard to the implementation of the agent process manager
@@ -53,20 +48,4 @@ type ProcessManager interface {
 	// Notifies the process manager that the node is in lame duck mode, so that the processes
 	// can be treated differerently (if applicable)
 	EnterLameDuck() error
-}
-
-// Initialize an appropriate agent process manager instance based on the sandbox config value
-func NewProcessManager(
-	log *slog.Logger,
-	config *models.NodeConfiguration,
-	telemetry *observability.Telemetry,
-	ctx context.Context,
-) (ProcessManager, error) {
-	if config.NoSandbox {
-		log.Warn("⚠️  Sandboxing has been disabled! Workloads are spawned directly by agents")
-		log.Warn("⚠️  Do not run untrusted workloads in this mode!")
-		return NewSpawningProcessManager(log, config, telemetry, ctx)
-	}
-
-	return NewFirecrackerProcessManager(log, config, telemetry, ctx)
 }
