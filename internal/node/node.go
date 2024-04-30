@@ -28,7 +28,7 @@ import (
 
 const (
 	systemNamespace              = "system"
-	defaultNatsStoreDir          = "pnats"
+	defaultInternalNatsStoreDir  = "pnats"
 	heartbeatInterval            = 30 * time.Second
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
@@ -316,7 +316,7 @@ func (n *Node) startInternalNATS() error {
 		Port:      -1,
 		JetStream: true,
 		NoLog:     true,
-		StoreDir:  path.Join(os.TempDir(), defaultNatsStoreDir),
+		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
 	})
 	if err != nil {
 		return err
@@ -522,6 +522,7 @@ func (n *Node) shutdown() {
 
 		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
+		_ = os.Remove(path.Join(os.TempDir(), defaultInternalNatsStoreDir))
 
 		if n.natspub != nil {
 			n.natspub.Shutdown()
