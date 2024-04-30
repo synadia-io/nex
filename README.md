@@ -97,5 +97,13 @@ nex node up \
 
 Valid exporters are `http` and `prometheus`.  The file exporter will write metrics to a file in the current working directory called `metrics.log`.
 
+## Using NATS Context with `nex`
+In order to use your NATS context with Nex, you will need to set the `XDG_CONFIG_HOME` environment variable.  On linux, this is typically `$HOME/.config`, but specifically, it will be wherever your `nats/` configuration directory is located.  This  will allow `nex` to use the same configuration as your NATS context.
+
+```bash
+// Example usage
+XDG_CONFIG_HOME=/home/jordan/.config sudo -E nex node up --loglevel debug --context default
+```
+
 ## Contributing
 For information on how to contribute to Nex, please read our [contributing](./CONTRIBUTING.md) guide.

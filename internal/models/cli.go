@@ -2,9 +2,8 @@ package models
 
 import (
 	"fmt"
+	"log/slog"
 	"net/url"
-	"os"
-	"strings"
 	"time"
 
 	"github.com/nats-io/jsm.go/natscontext"
@@ -64,10 +63,6 @@ type Options struct {
 	LogJSON bool
 	// Name or path to a configuration context
 	ConfigurationContext string
-	// Effective configuration
-	Configuration *natscontext.Context
-	// Indicates whether contexts should not be used
-	SkipContexts bool
 }
 
 type RunOptions struct {
@@ -131,70 +126,64 @@ func (c *NodeOptions) Validate() bool {
 	return len(c.Errors) == 0
 }
 
-func GenerateConnectionFromOpts(opts *Options) (*nats.Conn, error) {
-	ctxOpts := []natscontext.Option{
-		natscontext.WithServerURL(opts.Servers),
-		natscontext.WithCreds(opts.Creds),
-		natscontext.WithNKey(opts.Nkey),
-		natscontext.WithCertificate(opts.TlsCert),
-		natscontext.WithKey(opts.TlsKey),
-		natscontext.WithCA(opts.TlsCA),
+func GenerateConnectionFromOpts(opts *Options, logger *slog.Logger) (*nats.Conn, error) {
+	if opts.ConfigurationContext != "" {
+		if !natscontext.IsKnown(opts.ConfigurationContext) {
+			logger.Error("Unknown nats context provided", slog.String("context", opts.ConfigurationContext))
+			return nil, fmt.Errorf("unknown context provided")
+		}
+
+		p, _ := natscontext.ContextPath(opts.ConfigurationContext)
+		logger.Debug("Using nats context for connection details", slog.String("path", p))
+
+		conn, err := natscontext.Connect(opts.ConfigurationContext, nats.Name(opts.ConnectionName))
+		logger.Info("Connected to NATS server", slog.String("server", conn.ConnectedUrlRedacted()), slog.String("nats_context", opts.ConfigurationContext))
+
+		return conn, err
+	}
+
+	natsOpts := []nats.Option{
+		nats.Name(opts.ConnectionName),
+	}
+
+	if opts.Creds != "" {
+		natsOpts = append(natsOpts, nats.UserCredentials(opts.Creds))
+	}
+
+	if opts.Nkey != "" {
+		natsOpts = append(natsOpts, nats.Nkey(opts.Nkey, nats.DefaultOptions.SignatureCB))
+	}
+
+	if opts.TlsCert != "" && opts.TlsKey != "" {
+		natsOpts = append(natsOpts, nats.ClientCert(opts.TlsCert, opts.TlsKey))
+	}
+
+	if opts.TlsCA != "" {
+		natsOpts = append(natsOpts, nats.RootCAs(opts.TlsCA))
 	}
 
 	if opts.TlsFirst {
-		ctxOpts = append(ctxOpts, natscontext.WithTLSHandshakeFirst())
+		natsOpts = append(natsOpts, nats.TLSHandshakeFirst())
 	}
 
 	if opts.Username != "" && opts.Password == "" {
-		ctxOpts = append(ctxOpts, natscontext.WithToken(opts.Username))
+		natsOpts = append(natsOpts, nats.Token(opts.Username))
 	} else {
-		ctxOpts = append(ctxOpts, natscontext.WithUser(opts.Username), natscontext.WithPassword(opts.Password))
+		natsOpts = append(natsOpts, nats.UserInfo(opts.Username, opts.Password))
 	}
 
-	var err error
+	conn, err := nats.Connect(opts.Servers, natsOpts...)
+	logger.Debug("Connected to NATS server",
+		slog.String("server", conn.ConnectedUrlRedacted()),
+		slog.String("name", opts.ConnectionName),
+		slog.String("creds", opts.Creds),
+		slog.String("nkey", opts.Nkey),
+		slog.String("tls_cert", opts.TlsCert),
+		slog.String("tls_key", opts.TlsKey),
+		slog.String("tls_ca", opts.TlsCA),
+		slog.Bool("tls_first", opts.TlsFirst),
+		slog.String("username", opts.Username),
+	)
 
-	exist, _ := fileAccessible(opts.ConfigurationContext)
-
-	if exist && strings.HasSuffix(opts.ConfigurationContext, ".json") {
-		opts.Configuration, err = natscontext.NewFromFile(opts.ConfigurationContext, ctxOpts...)
-	} else {
-		opts.Configuration, err = natscontext.New(opts.ConfigurationContext, !opts.SkipContexts, ctxOpts...)
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := opts.Configuration.Connect(nats.Name(
-		func() string {
-			if opts.ConnectionName == "" {
-				return "nex"
-			}
-			return opts.ConnectionName
-		}(),
-	))
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
-}
-
-func fileAccessible(f string) (bool, error) {
-	stat, err := os.Stat(f)
-	if err != nil {
-		return false, err
-	}
-
-	if stat.IsDir() {
-		return false, fmt.Errorf("is a directory")
-	}
-
-	file, err := os.Open(f)
-	if err != nil {
-		return false, err
-	}
-	file.Close()
-
-	return true, nil
+	return conn, err
 }

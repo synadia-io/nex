@@ -85,7 +85,6 @@ func init() {
 	ncli.Flag("logcolor", "Prints text logs with color").Envar("NEX_LOG_COLORIZED").Default("false").UnNegatableBoolVar(&Opts.LogsColorized)
 	ncli.Flag("timeformat", "How time is formatted in logger").Envar("NEX_LOG_TIMEFORMAT").Default("DateTime").EnumVar(&Opts.LogTimeFormat, "DateOnly", "DateTime", "Stamp", "RFC822", "RFC3339")
 	ncli.Flag("context", "Configuration context").Envar("NATS_CONTEXT").PlaceHolder("NAME").StringVar(&Opts.ConfigurationContext)
-	ncli.Flag("no-context", "Disable NATS context discovery").UnNegatableBoolVar(&Opts.SkipContexts)
 	ncli.Flag("conn-name", "Name of NATS connection").Default(func() string {
 		if VERSION != "development" {
 			return "nex-" + VERSION
@@ -165,7 +164,6 @@ func main() {
 		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.DateTime))
 	}
 
-	var logger *slog.Logger
 	if Opts.LogJSON {
 		handlerOpts = append(handlerOpts, shandler.WithJSON())
 	}
@@ -173,9 +171,10 @@ func main() {
 		handlerOpts = append(handlerOpts, shandler.WithColor())
 	}
 
+	logger := slog.New(shandler.NewHandler(handlerOpts...))
 	switch Opts.Logger {
 	case "nats":
-		nc, err := models.GenerateConnectionFromOpts(Opts)
+		nc, err := models.GenerateConnectionFromOpts(Opts, logger)
 		if err != nil {
 			break
 		}

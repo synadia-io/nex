@@ -132,7 +132,7 @@ func (n *Node) Start() {
 		case <-heartbeat.C:
 			_ = n.publishHeartbeat()
 		case sig := <-n.sigs:
-			n.log.Debug("received signal: %s", sig)
+			n.log.Debug("received signal", slog.Any("signal", sig))
 			n.shutdown()
 		case <-n.ctx.Done():
 			n.shutdown()
@@ -267,7 +267,7 @@ func (n *Node) init() error {
 		}
 
 		// setup NATS connection
-		n.nc, _err = models.GenerateConnectionFromOpts(n.opts)
+		n.nc, _err = models.GenerateConnectionFromOpts(n.opts, n.log)
 		if _err != nil {
 			n.log.Error("Failed to connect to NATS server", slog.Any("err", _err))
 			err = errors.Join(err, fmt.Errorf("failed to connect to NATS server: %s", _err))
@@ -321,7 +321,6 @@ func (n *Node) startInternalNATS() error {
 	if err != nil {
 		return err
 	}
-
 	n.natsint.Start()
 
 	clientUrl, err := url.Parse(n.natsint.ClientURL())
@@ -335,9 +334,17 @@ func (n *Node) startInternalNATS() error {
 	}
 	n.config.InternalNodePort = &p
 
-	n.ncint, err = nats.Connect(n.natsint.ClientURL())
+	n.ncint, err = nats.Connect("", nats.InProcessServer(n.natsint))
 	if err != nil {
+		n.log.Error("Failed to connect to internal nats", slog.Any("err", err), slog.Any("internal_url", clientUrl), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
 		return fmt.Errorf("failed to connect to internal nats: %s", err)
+	}
+
+	rtt, err := n.ncint.RTT()
+	if err != nil {
+		n.log.Warn("Failed get internal nats RTT", slog.Any("err", err), slog.Any("internal_url", clientUrl))
+	} else {
+		n.log.Debug("Internal NATS RTT", slog.String("rtt", rtt.String()), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
 	}
 
 	jsCtx, err := n.ncint.JetStream()
