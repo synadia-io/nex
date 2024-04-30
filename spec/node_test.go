@@ -71,8 +71,7 @@ var _ = Describe("nex node", func() {
 		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
 
 		opts = &models.Options{
-			Servers:      _fixtures.natsServer.ClientURL(),
-			SkipContexts: true,
+			Servers: _fixtures.natsServer.ClientURL(),
 		}
 		nodeOpts = &models.NodeOptions{}
 
