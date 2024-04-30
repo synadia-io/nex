@@ -21,8 +21,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-const runloopSleepInterval = 100 * time.Millisecond
-
 type FirecrackerProcessManager struct {
 	closing   uint32
 	config    *models.NodeConfiguration

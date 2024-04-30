@@ -1,8 +1,12 @@
 package processmanager
 
 import (
+	"time"
+
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
+
+const runloopSleepInterval = 100 * time.Millisecond
 
 // Information about an agent process without regard to the implementation of the agent process manager
 type ProcessInfo struct {
