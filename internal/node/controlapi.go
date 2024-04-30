@@ -63,6 +63,11 @@ func (api *ApiListener) PublicKey() string {
 	return api.node.publicKey
 }
 
+func (api *ApiListener) PublicXKey() string {
+	pk, _ := api.xk.PublicKey()
+	return pk
+}
+
 func (api *ApiListener) Start() error {
 	_, err := api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.>", api.handleWorkloadPing)
 	if err != nil {
@@ -302,6 +307,7 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 	res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
 		NodeId:          api.PublicKey(),
 		Version:         Version(),
+		TargetXkey:      api.PublicXKey(),
 		Uptime:          myUptime(now.Sub(api.start)),
 		RunningMachines: len(machines),
 		Tags:            api.node.config.Tags,
@@ -343,6 +349,7 @@ func (api *ApiListener) handleWorkloadPing(m *nats.Msg) {
 		now := time.Now().UTC()
 		res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.WorkloadPingResponse{
 			NodeId:          api.PublicKey(),
+			TargetXkey:      api.PublicXKey(),
 			Version:         Version(),
 			Uptime:          myUptime(now.Sub(api.start)),
 			RunningMachines: summaries,
