@@ -98,7 +98,7 @@ func NewWorkloadManager(
 		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
 		kp:               nodeKeypair,
 		log:              log,
-		natsStoreDir:     defaultNatsStoreDir,
+		natsStoreDir:     defaultInternalNatsStoreDir,
 		nc:               nc,
 		ncInternal:       ncint,
 		poolMutex:        &sync.Mutex{},
