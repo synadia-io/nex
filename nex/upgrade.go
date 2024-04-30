@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 )
 
@@ -46,7 +45,7 @@ func versionCheck() (string, error) {
 		fmt.Printf(`================================================================
 🎉 There is a newer version [v%s] of the NEX CLI available 🎉
 To update, run:
-     nex update
+     nex upgrade
 ================================================================
 
 `,
@@ -85,6 +84,10 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 		if err := os.Rename(nexPath+".bak", nexPath); err != nil {
 			logger.Error("Failed to restore backup binary", slog.Any("err", err))
 		}
+		err = os.Chmod(nexPath, 0755)
+		if err != nil {
+			logger.Error("Failed to restore backup binary permissions", slog.Any("err", err))
+		}
 	}
 
 	_os := runtime.GOOS
@@ -106,15 +109,14 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 		return "", err
 	}
 
-	nex, err := os.Create(filepath.Join(filepath.Dir(nexPath), "nex"))
+	nex, err := os.Create(nexPath + ".new")
 	if err != nil {
-		restoreBackup()
 		return "", err
 	}
+	defer os.Remove(nexPath + ".new")
 
 	_, err = nex.Write(nexBinary)
 	if err != nil {
-		restoreBackup()
 		return "", err
 	}
 
@@ -124,6 +126,17 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 	}
 
 	shasum := hex.EncodeToString(h.Sum(nil))
+
+	err = os.Rename(nexPath+".new", nexPath)
+	if err != nil {
+		restoreBackup()
+		return "", err
+	}
+
+	err = os.Chmod(nexPath, 0755)
+	if err != nil {
+		logger.Error("Failed to restore backup binary permissions", slog.Any("err", err))
+	}
 
 	logger.Debug("New binary downloaded", slog.String("sha256", shasum))
 	logger.Info("nex upgrade complete!", slog.String("new_version", newVersion))
