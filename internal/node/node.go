@@ -522,6 +522,7 @@ func (n *Node) shutdown() {
 
 		n.natsint.Shutdown()
 		n.natsint.WaitForShutdown()
+		_ = os.Remove(path.Join(os.TempDir(), defaultNatsStoreDir))
 
 		if n.natspub != nil {
 			n.natspub.Shutdown()
