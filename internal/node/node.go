@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"os/signal"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -498,14 +497,6 @@ func (n *Node) validateConfig() error {
 	}
 
 	return CheckPrerequisites(n.config, true, n.log)
-}
-
-func (n *Node) installSignalHandlers() {
-	n.log.Debug("installing signal handlers")
-	// both firecracker and the embedded NATS server register signal handlers... wipe those so ours are the ones being used
-	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
-	n.sigs = make(chan os.Signal, 1)
-	signal.Notify(n.sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 }
 
 func (n *Node) shutdown() {
