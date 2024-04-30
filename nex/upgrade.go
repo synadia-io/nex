@@ -135,7 +135,7 @@ func UpgradeNex(ctx context.Context, logger *slog.Logger, newVersion string) (st
 
 	err = os.Chmod(nexPath, 0755)
 	if err != nil {
-		logger.Error("Failed to restore backup binary permissions", slog.Any("err", err))
+		logger.Error("Failed to update nex binary permissions", slog.Any("err", err))
 	}
 
 	logger.Debug("New binary downloaded", slog.String("sha256", shasum))
