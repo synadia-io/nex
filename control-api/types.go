@@ -35,12 +35,14 @@ type PingResponse struct {
 	NodeId          string            `json:"node_id"`
 	Version         string            `json:"version"`
 	Uptime          string            `json:"uptime"`
+	TargetXkey      string            `json:"target_xkey"`
 	Tags            map[string]string `json:"tags,omitempty"`
 	RunningMachines int               `json:"running_machines"`
 }
 
 type WorkloadPingResponse struct {
 	NodeId          string                       `json:"node_id"`
+	TargetXkey      string                       `json:"target_xkey"`
 	Version         string                       `json:"version"`
 	Tags            map[string]string            `json:"tags,omitempty"`
 	Uptime          string                       `json:"uptime"`
