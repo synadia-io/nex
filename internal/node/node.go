@@ -344,7 +344,7 @@ func (n *Node) startInternalNATS() error {
 	if err != nil {
 		n.log.Warn("Failed get internal nats RTT", slog.Any("err", err), slog.Any("internal_url", clientUrl))
 	} else {
-		n.log.Debug("Internal NATs RTT", slog.String("rtt", rtt.String()), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
+		n.log.Debug("Internal NATS RTT", slog.String("rtt", rtt.String()), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
 	}
 
 	jsCtx, err := n.ncint.JetStream()
