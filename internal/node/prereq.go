@@ -70,8 +70,8 @@ func init() {
 		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
 		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
 
-		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.ext4.gz", rootFSVersion)
-		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.ext4.gz.sha256", rootFSVersion)
+		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.amd64.ext4.gz", rootFSVersion)
+		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.amd64.ext4.gz.sha256", rootFSVersion)
 	case "arm64":
 		vmLinuxKernelURL = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/aarch64/vmlinux-5.10.186"
 		vmLinuxKernelSHA256 = ""
@@ -85,8 +85,8 @@ func init() {
 		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz"
 		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz.sha256.txt"
 
-		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs_arm64.ext4.gz", rootFSVersion)
-		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs_arm64.ext4.gz.sha256", rootFSVersion)
+		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.arm64.ext4.gz", rootFSVersion)
+		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.arm64.ext4.gz.sha256", rootFSVersion)
 	}
 }
 
