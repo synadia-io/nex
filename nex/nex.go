@@ -124,6 +124,7 @@ func init() {
 	logs.Flag("workload_id", "ID of the workload machine to filter on").Default("*").StringVar(&WatchOpts.WorkloadId)
 	logs.Flag("level", "Log level filter").Default("debug").StringVar(&WatchOpts.LogLevel)
 
+	rootfs.Flag("output", "Output name").Short('o').Default("rootfs.ext4.gz").StringVar(&RootfsOpts.OutName)
 	rootfs.Flag("script", "Additional boot script ran during initialization").PlaceHolder("script.sh").StringVar(&RootfsOpts.BuildScriptPath)
 	rootfs.Flag("image", "Base image for rootfs build").Default("synadia/nex-rootfs:alpine").StringVar(&RootfsOpts.BaseImage)
 	rootfs.Flag("agent", "Path to agent binary").PlaceHolder("../path/to/nex-agent").Required().StringVar(&RootfsOpts.AgentBinaryPath)
