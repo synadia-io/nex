@@ -15,11 +15,11 @@ import (
 
 // Uses a control API client to request a node list from a NATS environment
 func ListNodes(ctx context.Context) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts)
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	nc, err := models.GenerateConnectionFromOpts(Opts, log)
 	if err != nil {
 		return err
 	}
-	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 
 	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout, log)
 	nodes, err := nodeClient.ListAllNodes()
@@ -33,11 +33,11 @@ func ListNodes(ctx context.Context) error {
 }
 
 func ListWorkloads(ctx context.Context) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts)
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	nc, err := models.GenerateConnectionFromOpts(Opts, log)
 	if err != nil {
 		return err
 	}
-	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
 	nodes, err := nodeClient.ListWorkloads(strings.TrimSpace(RunOpts.Name))
 	if err != nil {
@@ -49,12 +49,12 @@ func ListWorkloads(ctx context.Context) error {
 }
 
 func LameDuck(ctx context.Context, logger *slog.Logger) error {
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nodeId := RunOpts.TargetNode
-	nc, err := models.GenerateConnectionFromOpts(Opts)
+	nc, err := models.GenerateConnectionFromOpts(Opts, log)
 	if err != nil {
 		return err
 	}
-	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
 	_, err = nodeClient.EnterLameDuck(nodeId)
 	if err != nil {
@@ -68,11 +68,11 @@ func LameDuck(ctx context.Context, logger *slog.Logger) error {
 
 // Uses a control API client to retrieve info on a single node
 func NodeInfo(ctx context.Context, nodeid string) error {
-	nc, err := models.GenerateConnectionFromOpts(Opts)
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	nc, err := models.GenerateConnectionFromOpts(Opts, log)
 	if err != nil {
 		return err
 	}
-	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
 	nodeInfo, err := nodeClient.NodeInfo(nodeid)
 	if err != nil {
