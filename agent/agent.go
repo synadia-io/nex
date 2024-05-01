@@ -119,7 +119,8 @@ func (a *Agent) Start() {
 		select {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
-		case <-a.sigs:
+		case sig := <-a.sigs:
+			a.LogInfo(fmt.Sprintf("Received signal: %s", sig))
 			a.shutdown()
 		case <-a.ctx.Done():
 			a.shutdown()
@@ -127,6 +128,7 @@ func (a *Agent) Start() {
 			time.Sleep(runloopSleepInterval)
 		}
 	}
+
 	a.cancelF()
 }
 
