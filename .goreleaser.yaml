@@ -45,7 +45,7 @@ builds:
       - netgo
     hooks:
       post:
-        - sudo go run ./nex/. fs --agent {{.Path}}
+        - sudo go run ./nex/. fs --agent {{.Path}} --output rootfs.{{ .Os }}.{{ .Arch }}.ext4.gz
 
 archives:
   - id: binaries
@@ -64,9 +64,13 @@ nfpms:
       - deb 
       - rpm
 
+checksum:
+  split: true
+
 release:
   extra_files:
-    - glob: ./rootfs.ext4.gz
+    - glob: ./rootfs.linux.amd64.ext4.gz
+    - glob: ./rootfs.linux.arm64.ext4.gz
 
 changelog:
   sort: asc

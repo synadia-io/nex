@@ -165,7 +165,8 @@ var _ = Describe("nex node", func() {
 						})
 
 						JustBeforeEach(func() {
-							_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+							Expect(err).To(BeNil())
 						})
 
 						It("should install the host-local CNI plugin", func(ctx SpecContext) {

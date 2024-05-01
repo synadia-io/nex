@@ -497,7 +497,7 @@ func (n *Node) validateConfig() error {
 		}
 	}
 
-	return CheckPrerequisites(n.config, true)
+	return CheckPrerequisites(n.config, true, n.log)
 }
 
 func (n *Node) installSignalHandlers() {

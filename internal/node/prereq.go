@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -70,8 +71,8 @@ func init() {
 		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz"
 		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-x86_64.tgz.sha256.txt"
 
-		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.ext4.gz", rootFSVersion)
-		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.ext4.gz.sha256", rootFSVersion)
+		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.amd64.ext4.gz", rootFSVersion)
+		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.amd64.ext4.gz.sha256", rootFSVersion)
 	case "arm64":
 		vmLinuxKernelURL = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/aarch64/vmlinux-5.10.186"
 		vmLinuxKernelSHA256 = ""
@@ -85,8 +86,8 @@ func init() {
 		firecrackerTarballURL = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz"
 		firecrackerTarballSHA256 = "https://github.com/firecracker-microvm/firecracker/releases/download/v1.5.0/firecracker-v1.5.0-aarch64.tgz.sha256.txt"
 
-		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs_arm64.ext4.gz", rootFSVersion)
-		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs_arm64.ext4.gz.sha256", rootFSVersion)
+		rootfsGzipURL = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.arm64.ext4.gz", rootFSVersion)
+		rootfsGzipSHA256 = fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/rootfs.linux.arm64.ext4.gz.sha256", rootFSVersion)
 	}
 }
 
@@ -129,7 +130,7 @@ type fileSpec struct {
 	satisfied   bool
 }
 
-func CheckPrerequisites(config *models.NodeConfiguration, readonly bool) error {
+func CheckPrerequisites(config *models.NodeConfiguration, readonly bool, logger *slog.Logger) error {
 	var sb strings.Builder
 
 	required := &requirements{
@@ -271,6 +272,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, readonly bool) error {
 			for _, iF := range r.initFuncs {
 				err := iF(r, config)
 				if err != nil {
+					logger.Error("Failed to run initialize function", slog.String("step", r.descriptor), slog.Any("err", err))
 					return err
 				}
 			}
@@ -460,6 +462,9 @@ func downloadRootFS(r *requirement, _ *models.NodeConfiguration) error {
 			return err
 		}
 		defer respTar.Body.Close()
+		if respTar.StatusCode != 200 {
+			return fmt.Errorf("failed to download rootfs. Response Code: %s", respTar.Status)
+		}
 
 		uncompressedFile, err := gzip.NewReader(respTar.Body)
 		if err != nil {
@@ -484,27 +489,6 @@ func decompressTarFromURL(url string, _ string) (*tar.Reader, error) {
 	if err != nil {
 		return nil, err
 	}
-	//	defer respTar.Body.Close()
-
-	// 	if urlSha != "" {
-	// 		respSha, err := http.Get(urlSha)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		defer respSha.Body.Close()
-	// 		sha256_b, err := io.ReadAll(respSha.Body)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	//
-	// //		sha256_g := sha256.Sum256(tar_b)
-	//
-	// 		if string(sha256_b) != string(sha256_g[:]) {
-	// 			fmt.Println(string(sha256_b))
-	// 			fmt.Println(string(sha256_g[:]))
-	// 			return nil, errors.New("downloaded tar did not match provided SHA256")
-	// 		}
-	// 	}
 
 	uncompressedTar, err := gzip.NewReader(respTar.Body)
 	if err != nil {

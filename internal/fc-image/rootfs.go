@@ -15,7 +15,7 @@ import (
 	"dagger.io/dagger"
 )
 
-func Build(buildScript, baseImg, agentPath string, fsSize int) error {
+func Build(outname, buildScript, baseImg, agentPath string, fsSize int) error {
 	if os.Getuid() != 0 {
 		return errors.New("Please run as root")
 	}
@@ -103,10 +103,10 @@ func Build(buildScript, baseImg, agentPath string, fsSize int) error {
 		return errors.New(string(output) + "\n\n" + err.Error())
 	}
 
-	return build(context.Background(), tempdir, mountPoint, baseImg, bS != nil)
+	return build(context.Background(), tempdir, mountPoint, baseImg, outname, bS != nil)
 }
 
-func build(ctx context.Context, tempdir, mountPoint, baseImg string, withBuildScript bool) error {
+func build(ctx context.Context, tempdir, mountPoint, baseImg, outname string, withBuildScript bool) error {
 	client, err := dagger.Connect(ctx,
 		dagger.WithLogOutput(os.Stderr),
 		dagger.WithWorkdir(tempdir),
@@ -202,7 +202,7 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg string, withBuildSc
 		return err
 	}
 
-	rfs, err := os.Create("rootfs.ext4.gz")
+	rfs, err := os.Create(outname)
 	if err != nil {
 		return err
 	}
