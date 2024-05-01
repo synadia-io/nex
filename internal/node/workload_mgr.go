@@ -31,8 +31,6 @@ const (
 	EventSubjectPrefix      = "$NEX.events"
 	LogSubjectPrefix        = "$NEX.logs"
 	WorkloadCacheBucketName = "NEXCACHE"
-
-	defaultHandshakeTimeoutMillis = 5000
 )
 
 // The workload manager provides the high level strategy for the Nex node's workload management. It is responsible
@@ -95,7 +93,7 @@ func NewWorkloadManager(
 		cancel:           cancel,
 		ctx:              ctx,
 		handshakes:       make(map[string]string),
-		handshakeTimeout: time.Duration(defaultHandshakeTimeoutMillis * time.Millisecond),
+		handshakeTimeout: time.Duration(config.AgentHandshakeTimeoutMillisecond) * time.Millisecond,
 		kp:               nodeKeypair,
 		log:              log,
 		natsStoreDir:     defaultInternalNatsStoreDir,
