@@ -167,6 +167,12 @@ func (a *AgentClient) Drain() error {
 
 func (a *AgentClient) Undeploy() error {
 	subject := fmt.Sprintf("agentint.%s.undeploy", a.agentID)
+
+	a.log.Debug("sending undeploy request to agent via internal NATS connection",
+		slog.String("subject", subject),
+		slog.String("agent_id", a.agentID),
+	)
+
 	_, err := a.nc.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
 	if err != nil {
 		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("agent_id", a.agentID), slog.String("error", err.Error()))

@@ -366,10 +366,17 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	for _, sub := range w.subz[id] {
 		err := sub.Drain()
 		if err != nil {
-			w.log.Warn(fmt.Sprintf("failed to drain subscription to subject %s associated with workload %s: %s", sub.Subject, id, err.Error()))
+			w.log.Warn("failed to drain subscription to subject associated with workload",
+				slog.String("subject", sub.Subject),
+				slog.String("workload_id", id),
+				slog.String("err", err.Error()),
+			)
 		}
 
-		w.log.Debug(fmt.Sprintf("drained subscription to subject %s associated with workload %s", sub.Subject, id))
+		w.log.Debug("drained subscription associated with workload",
+			slog.String("subject", sub.Subject),
+			slog.String("workload_id", id),
+		)
 	}
 
 	if deployRequest != nil && undeploy {
