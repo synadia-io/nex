@@ -12,14 +12,15 @@ import (
 )
 
 const (
-	DefaultCNINetworkName   = "fcnet"
-	DefaultCNIInterfaceName = "veth0"
-	DefaultCNISubnet        = "192.168.127.0/24"
-	DefaultInternalNodeHost = "192.168.127.1"
-	DefaultInternalNodePort = 9222
-	DefaultNodeMemSizeMib   = 256
-	DefaultNodeVcpuCount    = 1
-	DefaultOtelExporterUrl  = "127.0.0.1:14532"
+	DefaultCNINetworkName                   = "fcnet"
+	DefaultCNIInterfaceName                 = "veth0"
+	DefaultCNISubnet                        = "192.168.127.0/24"
+	DefaultInternalNodeHost                 = "192.168.127.1"
+	DefaultInternalNodePort                 = 9222
+	DefaultNodeMemSizeMib                   = 256
+	DefaultNodeVcpuCount                    = 1
+	DefaultOtelExporterUrl                  = "127.0.0.1:14532"
+	DefaultAgentHandshakeTimeoutMillisecond = 5000
 )
 
 var (
@@ -110,7 +111,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 	}
 
 	return NodeConfiguration{
-		AgentHandshakeTimeoutMillisecond: 5000,
+		AgentHandshakeTimeoutMillisecond: DefaultAgentHandshakeTimeoutMillisecond,
 		BinPath:                          DefaultBinPath,
 		CNI: CNIDefinition{
 			BinPath:       DefaultCNIBinPath,
