@@ -9,7 +9,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -183,13 +185,15 @@ func (n *Node) createPid() error {
 		}
 
 		process, err := os.FindProcess(int(pid))
-		if err != nil {
+		if err != nil && !strings.EqualFold(runtime.GOOS, "windows") {
 			return err
 		}
 
-		err = process.Signal(syscall.Signal(0))
-		if err == nil {
-			return fmt.Errorf("node process already running; pid: %d", pid)
+		if process != nil {
+			err = process.Signal(syscall.Signal(0))
+			if err == nil {
+				return fmt.Errorf("node process already running; pid: %d", pid)
+			}
 		}
 	}
 
