@@ -26,18 +26,18 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 		config.WorkloadTypes = models.DefaultWorkloadTypes
 	}
 
-	// TODO-- audit for *string
-	if config.KernelFilepath == "" && config.DefaultResourceDir != "" {
-		config.KernelFilepath = filepath.Join(config.DefaultResourceDir, "vmlinux")
-	} else if config.KernelFilepath == "" && config.DefaultResourceDir == "" {
-		return nil, errors.New("invalid kernel file setting")
-	}
+	if !config.NoSandbox {
+		if config.KernelFilepath == "" && config.DefaultResourceDir != "" {
+			config.KernelFilepath = filepath.Join(config.DefaultResourceDir, "vmlinux")
+		} else if config.KernelFilepath == "" && config.DefaultResourceDir == "" {
+			return nil, errors.New("invalid kernel file setting")
+		}
 
-	// TODO-- audit for *string
-	if config.RootFsFilepath == "" && config.DefaultResourceDir != "" {
-		config.RootFsFilepath = filepath.Join(config.DefaultResourceDir, "rootfs.ext4")
-	} else if config.RootFsFilepath == "" && config.DefaultResourceDir == "" {
-		return nil, errors.New("invalid rootfs file setting")
+		if config.RootFsFilepath == "" && config.DefaultResourceDir != "" {
+			config.RootFsFilepath = filepath.Join(config.DefaultResourceDir, "rootfs.ext4")
+		} else if config.RootFsFilepath == "" && config.DefaultResourceDir == "" {
+			return nil, errors.New("invalid rootfs file setting")
+		}
 	}
 
 	if config.Tags == nil {
