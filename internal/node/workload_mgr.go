@@ -334,6 +334,13 @@ func (w *WorkloadManager) Stop() error {
 	if atomic.AddUint32(&w.closing, 1) == 1 {
 		w.log.Info("Workload manager stopping")
 
+		for id := range w.activeAgents {
+			err := w.StopWorkload(id, true)
+			if err != nil {
+				w.log.Warn("Failed to stop agent", slog.String("workload_id", id), slog.String("error", err.Error()))
+			}
+		}
+
 		err := w.procMan.Stop()
 		if err != nil {
 			w.log.Error("failed to stop agent process manager", slog.Any("error", err))
