@@ -151,6 +151,9 @@ func CheckPrerequisites(config *models.NodeConfiguration, readonly bool, logger 
 
 		fmt.Print("\t✅ Windows host properly configured to run in no sandbox mode\n")
 		return nil
+	} else if config.NoSandbox {
+		fmt.Print("\t✅ Host configured to run in no sandbox mode\n")
+		return nil
 	}
 
 	var sb strings.Builder
