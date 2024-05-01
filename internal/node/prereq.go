@@ -143,6 +143,16 @@ type fileSpec struct {
 }
 
 func CheckPrerequisites(config *models.NodeConfiguration, readonly bool, logger *slog.Logger) error {
+	if runtime.GOOS == "windows" {
+		if !config.NoSandbox {
+			fmt.Print("\t⛔ Windows host must be configured to run in no sandbox mode\n")
+			return errors.New("windows host must be configured to run in no sandbox mode")
+		}
+
+		fmt.Print("\t✅ Windows host properly configured to run in no sandbox mode\n")
+		return nil
+	}
+
 	var sb strings.Builder
 
 	required := &requirements{
