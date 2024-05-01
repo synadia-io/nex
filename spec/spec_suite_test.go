@@ -33,6 +33,8 @@ type testFixtures struct {
 var _fixtures *testFixtures
 
 func TestSpec(t *testing.T) {
+	_ = os.Setenv("NEX_ENVIRONMENT", "spec")
+
 	err := initFixtures()
 	if err != nil {
 		t.Errorf(fmt.Sprintf("failed to initialize fixtures; %s", err.Error()))

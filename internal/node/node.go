@@ -186,10 +186,12 @@ func (n *Node) createPid() error {
 
 		process, err := os.FindProcess(int(pid))
 		if err != nil && !strings.EqualFold(runtime.GOOS, "windows") {
+			n.log.Warn("failed to lookup running process by pid", slog.Int("pid", pid), slog.String("err", err.Error()))
 			return err
 		}
 
-		if process != nil {
+		keepExistingPid := strings.EqualFold(os.Getenv("NEX_ENVIRONMENT"), "spec") // HACK!!! there must be a better way 💀
+		if process != nil && !keepExistingPid {
 			err = process.Signal(syscall.Signal(0))
 			if err == nil {
 				return fmt.Errorf("node process already running; pid: %d", pid)
