@@ -69,13 +69,14 @@ func (api *ApiListener) PublicXKey() string {
 }
 
 func (api *ApiListener) Start() error {
-	_, err := api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.>", api.handleWorkloadPing)
-	if err != nil {
-		api.log.Error("Failed to subscribe to workload ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
-	}
-	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
+	_, err := api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
 	if err != nil {
 		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
+	}
+
+	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.>", api.handleWorkloadPing)
+	if err != nil {
+		api.log.Error("Failed to subscribe to workload ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 
 	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING."+api.PublicKey(), api.handlePing)
