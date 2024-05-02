@@ -54,14 +54,30 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - 
+        name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
+      - 
+        name: Setup Pages
         uses: actions/configure-pages@v4
-      - name: Upload artifact
+      - 
+        name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './_scripts/installer'
-      - name: Deploy to GitHub Pages
+      - 
+        name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+  trigger-infra:
+    runs-on: ubuntu-latest
+    needs: [release]
+    steps:
+      - 
+        name: Repository Dispatch
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.NEXUS_INFRA_CI_TRIGGER }}
+          repository: ConnectEverything/nexus-infra
+          event-type: release-successful
+          client-payload: '{"tag": "${{ github.ref_name }}", "commit": "${{ github.sha }}"}'
