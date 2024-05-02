@@ -119,18 +119,18 @@ var _ = Describe("nex node", func() {
 		Context("when the specified configuration file does not exist", func() {
 			BeforeEach(func() {
 				nodeOpts.ConfigFilepath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-conf.json", _fixtures.seededRand.Int()))
+				nodeConfig.NoSandbox = true
 			})
 
-			It("should return an error", func(ctx SpecContext) {
-				Expect(
-					nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log),
-				).To(MatchError(fmt.Errorf("failed to load configuration file: open %s: no such file or directory", nodeOpts.ConfigFilepath)))
+			It("should not return an error", func(ctx SpecContext) {
+				Expect(nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)).To(BeNil())
 			})
 		})
 
 		Context("when the specified node configuration file exists", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
+				nodeConfig.NoSandbox = true
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 
@@ -143,17 +143,15 @@ var _ = Describe("nex node", func() {
 				os.Remove(nodeOpts.ConfigFilepath)
 			})
 
-			Describe("default dependency resolution", func() {
+			Describe("ignoring dependency resolution required for sandbox mode", func() {
 				Context("when the node configuration specifies a default_resource_dir", func() {
 					Context("when the specified default_resource_dir does not exist on the host", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 						})
 
-						It("should return an error", func(ctx SpecContext) {
-							Expect(
-								nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log),
-							).To(MatchError(errors.New("preflight checks failed: EOF")))
+						It("should not return an error", func(ctx SpecContext) {
+							Expect(nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)).To(BeNil())
 						})
 					})
 
@@ -168,39 +166,26 @@ var _ = Describe("nex node", func() {
 							_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 						})
 
-						// It("should install the host-local CNI plugin", func(ctx SpecContext) {
-						// 	_, err := os.Stat(filepath.Join(defaultCNIPluginBinPath, "host-local"))
-						// 	Expect(err).To(BeNil())
-						// })
-
-						// It("should install the ptp CNI plugin", func(ctx SpecContext) {
-						// 	_, err := os.Stat(filepath.Join(defaultCNIPluginBinPath, "ptp"))
-						// 	Expect(err).To(BeNil())
-						// })
-
-						// It("should install the tc-redirect-tap CNI plugin", func(ctx SpecContext) {
-						// 	_, err := os.Stat(filepath.Join(defaultCNIPluginBinPath, "tc-redirect-tap"))
-						// 	Expect(err).To(BeNil())
-						// })
-
-						// It("should install the default firecracker binary", func(ctx SpecContext) {
-						// 	_, err := os.Stat(defaultFirecrackerBinPath)
-						// 	Expect(err).To(BeNil())
-						// })
-
-						// It("should install the default CNI configuration", func(ctx SpecContext) {
-						// 	_, err := os.Stat(filepath.Join(defaultCNIConfigurationPath, fmt.Sprintf("%s.conflist", *nodeConfig.CNI.NetworkName)))
-						// 	Expect(err).To(BeNil())
-						// })
-
-						It("should fetch the default vmlinux kernel", func(ctx SpecContext) {
+						It("should not fetch the default vmlinux kernel", func(ctx SpecContext) {
 							_, err := os.Stat(filepath.Join(nodeConfig.DefaultResourceDir, "vmlinux"))
-							Expect(err).To(BeNil())
+							Expect(err).NotTo(BeNil())
 						})
 
-						It("should fetch the default agent rootfs template", func(ctx SpecContext) {
+						It("should not fetch the default agent rootfs template", func(ctx SpecContext) {
 							_, err := os.Stat(filepath.Join(nodeConfig.DefaultResourceDir, "rootfs.ext4"))
-							Expect(err).To(BeNil())
+							Expect(err).NotTo(BeNil())
+						})
+					})
+
+					Context("when the node is configured with sandboxing enabled", func(ctx SpecContext) {
+						BeforeEach(func() {
+							nodeConfig.NoSandbox = false
+						})
+
+						It("should return an error", func(ctx SpecContext) {
+							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+							Expect(err).ToNot(BeNil())
+							Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
 						})
 					})
 				})
