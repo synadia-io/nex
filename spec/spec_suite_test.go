@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -70,7 +69,6 @@ func cleanupFixtures() {
 	_fixtures.natsServer.WaitForShutdown()
 
 	os.RemoveAll(_fixtures.natsStoreDir)
-	os.RemoveAll(filepath.Join(os.TempDir(), "nex.pid"))
 }
 
 func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {

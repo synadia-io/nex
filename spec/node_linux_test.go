@@ -296,7 +296,7 @@ var _ = Describe("nex node", func() {
 						Expect(err).To(BeNil())
 
 						nodeProxy = nexnode.NewNodeProxyWith(node)
-						time.Sleep(time.Millisecond * 500)
+						time.Sleep(time.Millisecond * 1000)
 					})
 
 					It("should generate a keypair for the node", func(ctx SpecContext) {
