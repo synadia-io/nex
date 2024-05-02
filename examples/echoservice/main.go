@@ -23,7 +23,7 @@ func main() {
 	fmt.Fprintf(os.Stdout, "Echo service using NATS url '%s'\n", natsUrl)
 	nc, err := nats.Connect(natsUrl)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error connecting to NATs server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error connecting to NATS server: %v\n", err)
 		return
 	}
 	setupSignalHandlers(nc)
