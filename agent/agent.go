@@ -119,6 +119,9 @@ func (a *Agent) Start() {
 		select {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
+			if !a.sandboxed {
+				a.LogDebug(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()))
+			}
 		case sig := <-a.sigs:
 			a.LogInfo(fmt.Sprintf("Received signal: %s", sig))
 			a.shutdown()
