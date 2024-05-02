@@ -126,10 +126,32 @@ func (s *SpawningProcessManager) Stop() error {
 		s.log.Info("Spawning process manager stopping")
 		close(s.warmProcs)
 
+		for len(s.warmProcs) > 0 {
+			select {
+			case proc, legit := <-s.warmProcs:
+				if !legit {
+					break
+				}
+
+				err := s.kill(proc)
+				if err != nil {
+					s.log.Warn("Failed to kill spawned process", slog.Bool("warm", true), slog.String("error", err.Error()))
+				} else {
+					s.log.Debug("Killed spawned process",
+						slog.Int("pid", proc.cmd.Process.Pid),
+						slog.Bool("warm", true),
+					)
+				}
+			}
+		}
+
 		for workloadID := range s.liveProcs {
 			err := s.StopProcess(workloadID)
 			if err != nil {
-				s.log.Warn("Failed to stop spawned process", slog.String("workload_id", workloadID), slog.String("error", err.Error()))
+				s.log.Warn("Failed to stop spawned process",
+					slog.String("workload_id", workloadID),
+					slog.String("error", err.Error()),
+				)
 			}
 		}
 	}

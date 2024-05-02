@@ -190,8 +190,8 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	defer mutex.Unlock()
 
 	f.log.Debug("Attempting to stop virtual machine", slog.String("workload_id", workloadID))
-
 	vm.shutdown()
+
 	delete(f.allVMs, workloadID)
 	delete(f.stopMutex, workloadID)
 
