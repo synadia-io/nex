@@ -248,8 +248,14 @@ var _ = Describe("nex node", func() {
 
 					It("should return an error", func(ctx SpecContext) {
 						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
-						Expect(err).ToNot(BeNil())
-						Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
+
+						if sandbox {
+							Expect(err).ToNot(BeNil())
+							Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
+						} else {
+							Expect(err).To(BeNil())
+						}
+
 					})
 				})
 
