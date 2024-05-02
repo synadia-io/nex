@@ -177,7 +177,7 @@ var _ = Describe("nex node", func() {
 						})
 					})
 
-					Context("when the node is configured with sandboxing enabled", func(ctx SpecContext) {
+					Context("when the node is configured with sandboxing enabled", func() {
 						BeforeEach(func() {
 							nodeConfig.NoSandbox = false
 						})
