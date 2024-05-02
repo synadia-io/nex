@@ -29,6 +29,7 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 				return err
 			}
 			defer f.Close()
+
 			if nodeopts.PreflightInit == "sandbox" {
 				_, err = f.WriteString(defaultNodeConfig)
 				if err != nil {
@@ -40,6 +41,7 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 					return err
 				}
 			}
+
 			log.Debug("Configuration file created.", slog.String("path", nodeopts.ConfigFilepath))
 		} else if err != nil || fi.IsDir() {
 			return err
