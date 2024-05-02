@@ -497,6 +497,7 @@ func (n *Node) validateConfig() error {
 func (n *Node) shutdown() {
 	if atomic.AddUint32(&n.closing, 1) == 1 {
 		n.log.Debug("shutting down")
+		_ = n.api.Drain()
 		_ = n.manager.Stop()
 
 		if !n.startedAt.IsZero() {
