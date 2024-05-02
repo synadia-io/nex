@@ -284,13 +284,17 @@ var _ = Describe("nex node", func() {
 					JustBeforeEach(func() {
 						var err error
 
-						_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+						err = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+						Expect(err).To(BeNil())
+
 						node, err = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
 						Expect(err).To(BeNil())
 
 						go node.Start()
 
-						nodeID, _ = node.PublicKey()
+						nodeID, err = node.PublicKey()
+						Expect(err).To(BeNil())
+
 						nodeProxy = nexnode.NewNodeProxyWith(node)
 						time.Sleep(time.Millisecond * 500)
 					})
