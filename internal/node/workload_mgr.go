@@ -332,6 +332,10 @@ func (w *WorkloadManager) Stop() error {
 	if atomic.AddUint32(&w.closing, 1) == 1 {
 		w.log.Info("Workload manager stopping")
 
+		for id := range w.pendingAgents {
+			w.pendingAgents[id].Stop()
+		}
+
 		for id := range w.activeAgents {
 			err := w.StopWorkload(id, true)
 			if err != nil {
