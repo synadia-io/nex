@@ -333,7 +333,7 @@ func (w *WorkloadManager) Stop() error {
 		w.log.Info("Workload manager stopping")
 
 		for id := range w.pendingAgents {
-			w.pendingAgents[id].Stop()
+			_ = w.pendingAgents[id].Stop()
 		}
 
 		for id := range w.activeAgents {
