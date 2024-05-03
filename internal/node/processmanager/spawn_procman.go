@@ -126,11 +126,12 @@ func (s *SpawningProcessManager) Stop() error {
 		s.log.Info("Spawning process manager stopping")
 		close(s.warmProcs)
 
+	For:
 		for len(s.warmProcs) > 0 {
 			select {
 			case proc, legit := <-s.warmProcs:
 				if !legit {
-					break
+					break For
 				}
 
 				err := s.kill(proc)
@@ -142,6 +143,9 @@ func (s *SpawningProcessManager) Stop() error {
 						slog.Bool("warm", true),
 					)
 				}
+			case <-time.After(500 * time.Millisecond):
+				s.log.Debug("timed out waiting for available spawned agent process to kill")
+				break For
 			}
 		}
 
