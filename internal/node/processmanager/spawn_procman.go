@@ -126,33 +126,10 @@ func (s *SpawningProcessManager) Stop() error {
 		s.log.Info("Spawning process manager stopping")
 		close(s.warmProcs)
 
-	For:
-		for len(s.warmProcs) > 0 {
-			select {
-			case proc, legit := <-s.warmProcs:
-				if !legit {
-					break For
-				}
-
-				err := s.kill(proc, os.Kill)
-				if err != nil {
-					s.log.Warn("Failed to kill spawned agent process", slog.Bool("warm", true), slog.String("error", err.Error()))
-				} else {
-					s.log.Debug("Killed spawned agent process",
-						slog.Int("pid", proc.cmd.Process.Pid),
-						slog.Bool("warm", true),
-					)
-				}
-			case <-time.After(500 * time.Millisecond):
-				s.log.Debug("timed out waiting for available spawned agent process to kill")
-				break For
-			}
-		}
-
 		for workloadID := range s.liveProcs {
 			err := s.StopProcess(workloadID)
 			if err != nil {
-				s.log.Warn("Failed to stop spawned process",
+				s.log.Warn("Failed to stop spawned agent process",
 					slog.String("workload_id", workloadID),
 					slog.String("error", err.Error()),
 				)
@@ -213,9 +190,9 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	s.log.Debug("Attempting to stop process", slog.String("workload_id", workloadID))
+	s.log.Debug("Attempting to stop agent process", slog.String("workload_id", workloadID))
 
-	err := s.kill(proc, os.Interrupt)
+	err := s.kill(proc)
 	if err != nil {
 		return err
 	}
@@ -287,20 +264,6 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	}()
 
 	return newProc, nil
-}
-
-func (s *SpawningProcessManager) kill(proc *spawnedProcess, sig os.Signal) error {
-	if proc.cmd.Process != nil {
-		err := proc.cmd.Process.Signal(sig)
-		if err != nil {
-			s.log.Error("Failed to kill agent process",
-				slog.String("workload_id", proc.ID),
-				slog.Int("pid", proc.cmd.Process.Pid))
-			return err
-		}
-	}
-
-	return nil
 }
 
 type procLogEmitter struct {
