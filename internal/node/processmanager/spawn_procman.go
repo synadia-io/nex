@@ -271,8 +271,10 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		if err != nil {
 			if _, ok := err.(*exec.ExitError); ok {
 				s.log.Info("Agent command exited with error", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
-			} else {
+			} else if cmd.Process != nil {
 				s.log.Info("Agent command exited", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
+			} else {
+				s.log.Info("Agent command exited", slog.Any("error", err))
 			}
 		} else {
 			s.log.Info("Agent command exited cleanly", slog.Int("pid", cmd.Process.Pid))
