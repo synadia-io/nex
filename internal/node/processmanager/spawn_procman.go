@@ -290,10 +290,6 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 }
 
 func (s *SpawningProcessManager) kill(proc *spawnedProcess, sig os.Signal) error {
-	for proc.cmd.Process == nil {
-		time.Sleep(time.Millisecond * 25)
-	}
-
 	if proc.cmd.Process != nil {
 		err := proc.cmd.Process.Signal(sig)
 		if err != nil {
