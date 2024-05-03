@@ -165,7 +165,8 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 			fmt.Print("\t✅ Host configured to run in no sandbox mode\n")
 		}
 
-		return nil
+		// FIXME-- returning nil on the following line breaks things
+		// return nil
 	}
 
 	var sb strings.Builder
