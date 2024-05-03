@@ -181,6 +181,8 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 			p, err := s.spawn()
 			if err != nil {
 				s.log.Error("Failed to spawn nex-agent for pool", slog.Any("error", err))
+				time.Sleep(runloopSleepInterval)
+				continue
 			}
 
 			s.liveProcs[p.ID] = p
@@ -266,19 +268,22 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		Exit: make(chan int),
 	}
 
+	err := cmd.Start()
+	if err != nil {
+		s.log.Warn("Agent command failed to start", slog.Any("error", err))
+		return nil, err
+	} else if cmd.Process == nil {
+		s.log.Warn("Agent command failed to start")
+		return nil, fmt.Errorf("agent command failed to start")
+	}
+
 	go func() {
-		err := cmd.Run()
-		if err != nil {
-			if _, ok := err.(*exec.ExitError); ok {
-				s.log.Info("Agent command exited with error", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
-			} else if cmd.Process != nil {
-				s.log.Info("Agent command exited", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
-			} else {
-				s.log.Info("Agent command exited", slog.Any("error", err))
-			}
-		} else {
-			s.log.Info("Agent command exited cleanly", slog.Int("pid", cmd.Process.Pid))
+		if err = cmd.Wait(); err != nil { // blocking until exit
+			s.log.Info("Agent command exited", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
+			return
 		}
+
+		s.log.Info("Agent command exited cleanly", slog.Int("pid", cmd.Process.Pid))
 	}()
 
 	return newProc, nil
