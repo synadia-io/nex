@@ -134,11 +134,11 @@ func (s *SpawningProcessManager) Stop() error {
 					break For
 				}
 
-				err := s.kill(proc)
+				err := s.kill(proc, os.Kill)
 				if err != nil {
-					s.log.Warn("Failed to kill spawned process", slog.Bool("warm", true), slog.String("error", err.Error()))
+					s.log.Warn("Failed to kill spawned agent process", slog.Bool("warm", true), slog.String("error", err.Error()))
 				} else {
-					s.log.Debug("Killed spawned process",
+					s.log.Debug("Killed spawned agent process",
 						slog.Int("pid", proc.cmd.Process.Pid),
 						slog.Bool("warm", true),
 					)
@@ -213,7 +213,7 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 
 	s.log.Debug("Attempting to stop process", slog.String("workload_id", workloadID))
 
-	err := s.kill(proc)
+	err := s.kill(proc, os.Interrupt)
 	if err != nil {
 		return err
 	}
@@ -269,18 +269,28 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	go func() {
 		err := cmd.Run()
 		if err != nil {
-			s.log.Info("Command finished with error", slog.Any("error", err))
+			if _, ok := err.(*exec.ExitError); ok {
+				s.log.Info("Agent command exited with error", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
+			} else {
+				s.log.Info("Agent command exited", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
+			}
+		} else {
+			s.log.Info("Agent command exited cleanly", slog.Int("pid", cmd.Process.Pid))
 		}
 	}()
 
 	return newProc, nil
 }
 
-func (s *SpawningProcessManager) kill(proc *spawnedProcess) error {
+func (s *SpawningProcessManager) kill(proc *spawnedProcess, sig os.Signal) error {
+	for proc.cmd.Process == nil {
+		time.Sleep(time.Millisecond * 25)
+	}
+
 	if proc.cmd.Process != nil {
-		err := proc.cmd.Process.Signal(os.Kill)
+		err := proc.cmd.Process.Signal(sig)
 		if err != nil {
-			s.log.Error("Failed to kill OS process",
+			s.log.Error("Failed to kill agent process",
 				slog.String("workload_id", proc.ID),
 				slog.Int("pid", proc.cmd.Process.Pid))
 			return err
