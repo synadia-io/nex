@@ -150,10 +150,9 @@ var _ = Describe("nex node", func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 						})
 
-						It("should return an error", func(ctx SpecContext) {
-							Expect(
-								nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log),
-							).To(MatchError(errors.New("preflight checks failed: EOF")))
+						It("should [not] return an error", func(ctx SpecContext) {
+							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+							Expect(err).To(MatchError(errors.New("preflight checks failed: EOF")))
 						})
 					})
 
@@ -246,16 +245,10 @@ var _ = Describe("nex node", func() {
 						nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 					})
 
-					It("should return an error", func(ctx SpecContext) {
+					It("should [not] return an error", func(ctx SpecContext) {
 						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
-
-						if sandbox {
-							Expect(err).ToNot(BeNil())
-							Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
-						} else {
-							Expect(err).To(BeNil())
-						}
-
+						Expect(err).ToNot(BeNil())
+						Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
 					})
 				})
 
@@ -266,10 +259,10 @@ var _ = Describe("nex node", func() {
 
 					BeforeEach(func() {
 						nodeConfig.DefaultResourceDir = validResourceDir
-						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
 						_ = os.Mkdir(validResourceDir, 0755)
-						nodeOpts.ForceDepInstall = true
 
+						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
+						nodeOpts.ForceDepInstall = true
 						nodeConfig.MachinePoolSize = 1
 					})
 
@@ -289,6 +282,7 @@ var _ = Describe("nex node", func() {
 
 						node, err = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
 						Expect(err).To(BeNil())
+						Expect(node).ToNot(BeNil())
 
 						go node.Start()
 
