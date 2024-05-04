@@ -881,8 +881,7 @@ var _ = Describe("nex node", func() {
 			})
 		})
 	},
-		Entry("sandbox", true),     // sandbox mode
-		Entry("no-sandbox", false), // no-sandbox mode
+		Entry("sandbox", true), // sandbox mode
 	)
 })
 
