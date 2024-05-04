@@ -126,7 +126,6 @@ func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployReques
 func (s *SpawningProcessManager) Stop() error {
 	if atomic.AddUint32(&s.closing, 1) == 1 {
 		s.log.Info("Spawning process manager stopping")
-		close(s.warmProcs)
 
 		for workloadID := range s.liveProcs {
 			err := s.StopProcess(workloadID)
