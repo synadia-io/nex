@@ -62,7 +62,6 @@ jobs:
       name: Run spec suite
       working-directory: .
       if: runner.os != 'Windows'
-      shell: 'script --return --quiet --log-out /dev/null --command "bash -e {0}"'
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy

@@ -23,6 +23,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/templates"
+	"golang.org/x/term"
 
 	_ "embed"
 )
@@ -548,7 +549,12 @@ func downloadFile(dest *os.File, src io.Reader, size int) error {
 		progress: progress.New(progress.WithSolidFill("#ffffff")),
 	}
 
-	p := tea.NewProgram(fd)
+	opts := []tea.ProgramOption{}
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		opts = append(opts, tea.WithoutRenderer())
+	}
+
+	p := tea.NewProgram(fd, opts...)
 
 	fd.onProgress = func(f float64) {
 		p.Send(f)
