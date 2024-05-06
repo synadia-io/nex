@@ -551,7 +551,7 @@ func downloadFile(dest *os.File, src io.Reader, size int) error {
 
 	opts := []tea.ProgramOption{}
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		opts = append(opts, tea.WithoutRenderer())
+		opts = append(opts, tea.WithoutRenderer(), tea.WithInput(nil))
 	}
 
 	p := tea.NewProgram(fd, opts...)
