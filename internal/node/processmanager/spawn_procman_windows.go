@@ -4,6 +4,7 @@ package processmanager
 
 import (
 	"log/slog"
+	"os"
 	"syscall"
 )
 
@@ -21,12 +22,13 @@ func (s *SpawningProcessManager) kill(proc *spawnedProcess) error {
 
 		_, _, err = p.Call(syscall.CTRL_BREAK_EVENT, uintptr(proc.cmd.Process.Pid)) // err is always non-nil
 		if err != syscall.Errno(0) {
-			s.log.Error("Failed to kill agent process",
+			s.log.Error("Failed to interrupt agent process",
 				slog.String("agent_id", proc.ID),
 				slog.Int("pid", proc.cmd.Process.Pid),
 				slog.String("err", err.Error()),
 			)
-			return err
+
+			return proc.cmd.Process.Signal(os.Kill)
 		}
 	}
 
