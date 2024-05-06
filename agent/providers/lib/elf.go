@@ -92,7 +92,7 @@ func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
 // Undeploy the ELF binary
 func (e *ELF) Undeploy() error {
 	e.undeploy.Do(func() {
-		err := e.cmd.Process.Signal(os.Kill)
+		err := e.cmd.Process.Signal(os.Interrupt)
 		e.removeWorkload()
 		if err != nil {
 			fmt.Println("Couldn't terminate elf binary process")
