@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -182,6 +183,10 @@ func (a *Agent) Version() string {
 func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
+
+	if strings.EqualFold(runtime.GOOS, "windows") && strings.EqualFold(*req.WorkloadType, "elf") {
+		tempFile = fmt.Sprintf("%s.exe", tempFile)
+	}
 
 	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
 	if err != nil {

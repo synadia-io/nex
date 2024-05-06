@@ -57,7 +57,7 @@ func main() {
 
 func setupSignalHandlers(nc *nats.Conn) {
 	go func() {
-		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+		signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 

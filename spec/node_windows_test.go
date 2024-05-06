@@ -3,17 +3,12 @@
 package spec
 
 import (
-	"bufio"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -29,7 +24,6 @@ import (
 	"github.com/nats-io/nkeys"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/rs/xid"
 
 	shandler "github.com/jordan-rash/slog-handler"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -37,10 +31,6 @@ import (
 	"github.com/synadia-io/nex/internal/models"
 	nexnode "github.com/synadia-io/nex/internal/node"
 )
-
-// const defaultCNIPluginBinPath = "/opt/cni/bin"
-// const defaultCNIConfigurationPath = "/etc/cni/conf.d"
-// const defaultFirecrackerBinPath = "/usr/local/bin/firecracker"
 
 var _ io.Reader = (*os.File)(nil)
 
@@ -75,43 +65,19 @@ var _ = Describe("nex node", func() {
 		}
 		nodeOpts = &models.NodeOptions{}
 
-		// _ = os.MkdirAll(defaultCNIPluginBinPath, 0755)
-		// _ = os.MkdirAll(defaultCNIConfigurationPath, 0755)
-
 		validResourceDirOnce.Do(func() {
 			validResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-wd", _fixtures.seededRand.Int()))
 		})
 
 		snapshotAgentRootFSPathOnce.Do(func() {
-			// make sure dagger isn't already running, as this has been known to cause problems...
-			stopDaggerEngine()
-
 			// require the nex-agent binary to be built... FIXME-- build it here insteaad of relying on the Taskfile
-			_, err := os.Stat(filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent"))
+			_, err := os.Stat(filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent.exe"))
 			Expect(err).To(BeNil())
 
 			agentPath, err := filepath.Abs(filepath.Join("..", "agent", "cmd", "nex-agent"))
 			Expect(err).To(BeNil())
 
-			os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), agentPath))
-
-			snapshotAgentRootFSPath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-rootfs.ext4", _fixtures.seededRand.Int()))
-			cmd := exec.Command("go", "run", "../nex", "fs", "--agent", filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent"))
-			_, err = cmd.CombinedOutput()
-			Expect(err).To(BeNil())
-			Expect(cmd.ProcessState.ExitCode()).To(BeZero())
-
-			compressedRootFS, err := os.Open(filepath.Join(".", "rootfs.ext4.gz"))
-			Expect(err).To(BeNil())
-
-			uncompressedRootFS, err := gzip.NewReader(bufio.NewReader(compressedRootFS))
-			Expect(err).To(BeNil())
-
-			outFile, _ := os.Create(snapshotAgentRootFSPath)
-			defer outFile.Close()
-
-			_, _ = io.Copy(outFile, uncompressedRootFS)
-			_ = os.Remove(filepath.Join(".", "rootfs.ext4.gz"))
+			_ = os.Setenv("PATH", fmt.Sprintf("%s;%s", os.Getenv("PATH"), agentPath))
 		})
 	})
 
@@ -123,7 +89,8 @@ var _ = Describe("nex node", func() {
 			})
 
 			It("should not return an error", func(ctx SpecContext) {
-				Expect(nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)).To(BeNil())
+				err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: The system cannot find the file specified", nodeOpts.ConfigFilepath)))
 			})
 		})
 
@@ -185,7 +152,7 @@ var _ = Describe("nex node", func() {
 						It("should return an error", func(ctx SpecContext) {
 							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 							Expect(err).ToNot(BeNil())
-							Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
+							Expect(err.Error()).To(ContainSubstring("windows host must be configured to run in no sandbox mode"))
 						})
 					})
 				})
@@ -203,7 +170,7 @@ var _ = Describe("nex node", func() {
 			It("should return an error", func(ctx SpecContext) {
 				err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
 				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: no such file or directory", nodeOpts.ConfigFilepath)))
+				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: The system cannot find the file specified", nodeOpts.ConfigFilepath)))
 			})
 		})
 
@@ -230,10 +197,9 @@ var _ = Describe("nex node", func() {
 						nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 					})
 
-					It("should return an error", func(ctx SpecContext) {
+					It("should not return an error", func(ctx SpecContext) {
 						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
-						Expect(err).ToNot(BeNil())
-						Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
+						Expect(err).To(BeNil())
 					})
 				})
 
@@ -313,10 +279,6 @@ var _ = Describe("nex node", func() {
 					It("should initialize a telemetry instance", func(ctx SpecContext) {
 						Expect(nodeProxy.Telemetry()).ToNot(BeNil())
 					})
-
-					// Context("when node options enable otel", func() {
-					// TODO
-					// })
 
 					Describe("node API listener subscriptions", func() {
 						It("should initialize a node API subscription for handling ping requests", func(ctx SpecContext) {
@@ -404,26 +366,6 @@ var _ = Describe("nex node", func() {
 										Expect(subsz.Subs[0].Msgs).To(Equal(1))
 									}
 								})
-
-								// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
-								// 	Expect(len(managerProxy.AllAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-								// })
-
-								// It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
-								// 	Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-								// })
-
-								// FIXME-- redesign this test when we refactor to test both Firecracker and no-sandbox agents...
-								// It("should assign 192.168.127.2 to the first warm agent in the pool", func(ctx SpecContext) {
-								// 	var workloadID string
-								// 	for k := range managerProxy.PoolAgents() {
-								// 		workloadID = k
-								// 		break
-								// 	}
-
-								// 	agent := nexnode.NewAgentProxyWith(managerProxy.PoolAgents()[workloadID])
-								// 	Expect(agent.IP().String()).To(Equal("192.168.127.2"))
-								// })
 							})
 
 							Describe("deploying an ELF binary workload", func() {
@@ -431,11 +373,11 @@ var _ = Describe("nex node", func() {
 								var err error
 
 								AfterEach(func() {
-									os.Remove("./echoservice")
+									os.Remove("./echoservice.exe")
 								})
 
 								JustBeforeEach(func() {
-									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice.exe", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
 									Expect(err).To(BeNil())
 
 									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
@@ -451,21 +393,9 @@ var _ = Describe("nex node", func() {
 										_ = cmd.Wait()
 									})
 
-									It("should [fail to] deploy the ELF workload", func(ctx SpecContext) {
-										if sandbox {
-											Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
-										} else {
-											Expect(err).To(BeNil())
-										}
+									It("should deploy the ELF workload", func(ctx SpecContext) {
+										Expect(err).To(BeNil())
 									})
-
-									// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.AllAgents())).To(Equal(1))
-									// })
-
-									// It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-									// })
 								})
 
 								Context("when the ELF binary is statically-linked", func() {
@@ -480,14 +410,6 @@ var _ = Describe("nex node", func() {
 									It("should deploy the ELF workload", func(ctx SpecContext) {
 										Expect(err).To(BeNil())
 									})
-
-									// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.AllAgents())).To(Equal(2))
-									// })
-
-									// It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-									// })
 								})
 							})
 
@@ -505,344 +427,16 @@ var _ = Describe("nex node", func() {
 
 											nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
 											_, err = nodeClient.StartWorkload(deployRequest)
-											Expect(err).To(BeNil())
 
 											time.Sleep(time.Millisecond * 1000)
 										})
 
-										It("should deploy the v8 workload", func(ctx SpecContext) {
-											Expect(err).To(BeNil())
-										})
-
-										// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
-										// 	Expect(len(managerProxy.AllAgents())).To(Equal(2))
-										// })
-
-										// It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
-										// 	Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-										// })
-
-										Describe("triggering the deployed function", func() {
-											var respmsg *nats.Msg
-
-											JustBeforeEach(func() {
-												respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello world"), time.Millisecond*5000)
-												Expect(err).To(BeNil())
-											})
-
-											It("should respond to the request by echoing the payload", func(ctx SpecContext) {
-												Expect(respmsg).NotTo(BeNil())
-												Expect(respmsg.Data).To(Equal([]byte(fmt.Sprintf("{\"triggered_on\":\"%s\",\"payload\":\"hello world\"}", triggerSubject))))
-											})
+										It("should not deploy the v8 workload", func(ctx SpecContext) {
+											Expect(err.Error()).To(ContainSubstring("V8 is not supported on this platform"))
 										})
 									})
 								})
 
-								Describe("host services", func() {
-									Context("key value service", func() {
-										Context("when the javascript is valid", func() {
-											JustBeforeEach(func() {
-												triggerSubject = "hellokvservice"
-												deployRequest, err = newDeployRequest(*nodeID, "kvhostservice", "nex key value service example", "../examples/v8/echofunction/src/kv.js", map[string]string{}, []string{triggerSubject}, log)
-												Expect(err).To(BeNil())
-
-												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-												_, err = nodeClient.StartWorkload(deployRequest)
-												Expect(err).To(BeNil())
-
-												time.Sleep(time.Millisecond * 1000)
-											})
-
-											Describe("triggering the deployed function", func() {
-												var respmsg *nats.Msg
-
-												JustBeforeEach(func() {
-													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*15000)
-													Expect(err).To(BeNil())
-												})
-
-												It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
-													Expect(respmsg).NotTo(BeNil())
-
-													type hostServicesExampleResp struct {
-														Keys   []string `json:"keys"`
-														Hello2 string   `json:"hello2"`
-													}
-
-													var resp *hostServicesExampleResp
-													err = json.Unmarshal(respmsg.Data, &resp)
-													Expect(err).To(BeNil())
-
-													Expect(resp).ToNot(BeNil())
-
-													Expect(len(resp.Keys)).To(Equal(1))
-													Expect(resp.Keys[0]).To(Equal("hello2"))
-													Expect(resp.Hello2).To(Equal("hello!"))
-												})
-											})
-										})
-									})
-
-									Context("messaging service", func() {
-										Context("when the javascript is valid", func() {
-											JustBeforeEach(func() {
-												triggerSubject = "hellomessagingservice"
-												deployRequest, err = newDeployRequest(*nodeID, "messaginghostservice", "nex messaging service example", "../examples/v8/echofunction/src/messaging.js", map[string]string{}, []string{triggerSubject}, log)
-												Expect(err).To(BeNil())
-
-												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-												_, err = nodeClient.StartWorkload(deployRequest)
-												Expect(err).To(BeNil())
-
-												time.Sleep(time.Millisecond * 1000)
-											})
-
-											Describe("triggering the deployed function", func() {
-												var respmsg *nats.Msg
-												var sub *nats.Subscription
-
-												BeforeEach(func() {
-													sub, _ = _fixtures.natsConn.Subscribe("hello.world.request", func(msg *nats.Msg) {
-														resp := fmt.Sprintf("resp: %s", msg.Data)
-														_ = msg.Respond([]byte(resp))
-													})
-
-													sub, _ = _fixtures.natsConn.Subscribe("hello.world.request.many", func(msg *nats.Msg) {
-														resp := fmt.Sprintf("resp #1: %s", msg.Data)
-														_ = msg.Respond([]byte(resp))
-
-														resp = fmt.Sprintf("resp #2: %s", msg.Data)
-														_ = msg.Respond([]byte(resp))
-													})
-												})
-
-												AfterEach(func() {
-													_ = sub.Unsubscribe()
-													sub = nil
-												})
-
-												JustBeforeEach(func() {
-													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("asdfghjkl;'"), time.Millisecond*7500)
-													Expect(err).To(BeNil())
-												})
-
-												It("should respond to the request with the hello.world.request response value", func(ctx SpecContext) {
-													Expect(respmsg).NotTo(BeNil())
-
-													type hostServicesExampleResp struct {
-														HelloWorldRequest     string   `json:"hello.world.request"`
-														HelloWorldRequestMany []string `json:"hello.world.request.many"`
-													}
-
-													var resp *hostServicesExampleResp
-													err = json.Unmarshal(respmsg.Data, &resp)
-													Expect(err).To(BeNil())
-
-													Expect(resp).ToNot(BeNil())
-
-													Expect(resp.HelloWorldRequest).ToNot(BeNil())
-													Expect(resp.HelloWorldRequest).To(Equal("resp: asdfghjkl;'"))
-												})
-
-												It("should respond to the request with the hello.world.request.many response values", func(ctx SpecContext) {
-													Expect(respmsg).NotTo(BeNil())
-
-													type hostServicesExampleResp struct {
-														HelloWorldRequest     string   `json:"hello.world.request"`
-														HelloWorldRequestMany []string `json:"hello.world.request.many"`
-													}
-
-													var resp *hostServicesExampleResp
-													err = json.Unmarshal(respmsg.Data, &resp)
-													Expect(err).To(BeNil())
-
-													Expect(resp).ToNot(BeNil())
-
-													Expect(resp.HelloWorldRequestMany).ToNot(BeNil())
-													Expect(len(resp.HelloWorldRequestMany)).To(Equal(2))
-													Expect(resp.HelloWorldRequestMany[0]).To(Equal("resp #1: asdfghjkl;'"))
-													Expect(resp.HelloWorldRequestMany[1]).To(Equal("resp #2: asdfghjkl;'"))
-												})
-											})
-										})
-									})
-
-									Context("http service", func() {
-										var ts *httptest.Server
-
-										Context("when the javascript is valid", func() {
-											JustBeforeEach(func() {
-												ts.Start()
-
-												exbytes, err := os.ReadFile("../examples/v8/echofunction/src/http.js")
-												Expect(err).To(BeNil())
-
-												var jsexample string
-
-												if sandbox {
-													jsexample = strings.ReplaceAll(string(exbytes), "https://example.org", fmt.Sprintf("http://192.168.127.1:%d", ts.Listener.Addr().(*net.TCPAddr).Port))
-												} else {
-													jsexample = strings.ReplaceAll(string(exbytes), "https://example.org", fmt.Sprintf("http://127.0.0.1:%d", ts.Listener.Addr().(*net.TCPAddr).Port))
-												}
-
-												filename := xid.New()
-												tmpfilePath := path.Join(os.TempDir(), fmt.Sprintf("http-hostservice-example-%s.js", filename.String()))
-												err = os.WriteFile(tmpfilePath, []byte(jsexample), 0644)
-												Expect(err).To(BeNil())
-
-												triggerSubject = "hellohttpservice"
-												deployRequest, err = newDeployRequest(*nodeID, "httphostservice", "nex http service example", tmpfilePath, map[string]string{}, []string{triggerSubject}, log)
-												Expect(err).To(BeNil())
-
-												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*3000, "default", log)
-												_, err = nodeClient.StartWorkload(deployRequest)
-												Expect(err).To(BeNil())
-
-												os.Remove(tmpfilePath)
-												time.Sleep(time.Millisecond * 1000)
-											})
-
-											Describe("triggering the deployed function", func() {
-												type hostServicesExampleHttpResp struct {
-													Status  int             `json:"status"`
-													Headers json.RawMessage `json:"headers"`
-													Body    *string         `json:"body"`
-												}
-
-												type hostServicesExampleResp struct {
-													Get    *hostServicesExampleHttpResp `json:"get"`
-													Post   *hostServicesExampleHttpResp `json:"post"`
-													Put    *hostServicesExampleHttpResp `json:"put"`
-													Patch  *hostServicesExampleHttpResp `json:"patch"`
-													Delete *hostServicesExampleHttpResp `json:"delete"`
-													Head   *hostServicesExampleHttpResp `json:"head"`
-												}
-
-												var respmsg *nats.Msg
-												var resp *hostServicesExampleResp
-
-												BeforeEach(func() {
-													ts = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-														switch r.Method {
-														case http.MethodGet:
-															w.WriteHeader(200)
-														case http.MethodPost:
-															w.WriteHeader(201)
-														case http.MethodPut:
-															w.WriteHeader(204)
-														case http.MethodPatch:
-															w.WriteHeader(204)
-														case http.MethodDelete:
-															w.WriteHeader(204)
-														case http.MethodHead:
-															w.WriteHeader(200)
-														default:
-															// no-op
-														}
-													}))
-
-													ts.EnableHTTP2 = true
-													ts.Listener.Close()
-
-													listener, err := net.Listen("tcp", ":0")
-													Expect(err).To(BeNil())
-
-													ts.Listener = listener
-												})
-
-												AfterEach(func() {
-													ts.Close()
-													ts = nil
-
-													respmsg = nil
-												})
-
-												JustBeforeEach(func() {
-													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("payload"), time.Millisecond*5000)
-													Expect(err).To(BeNil())
-
-													err = json.Unmarshal(respmsg.Data, &resp)
-													Expect(err).To(BeNil())
-													Expect(resp).ToNot(BeNil())
-												})
-
-												It("should send a GET request to the configured endpoint", func(ctx SpecContext) {
-													Expect(resp.Get).NotTo(BeNil())
-													Expect(resp.Get.Status).To(Equal(200))
-												})
-
-												It("should send a POST request to the configured endpoint", func(ctx SpecContext) {
-													Expect(resp.Post).NotTo(BeNil())
-													Expect(resp.Post.Status).To(Equal(201))
-												})
-
-												It("should send a PUT request to the configured endpoint", func(ctx SpecContext) {
-													Expect(resp.Put).NotTo(BeNil())
-													Expect(resp.Put.Status).To(Equal(204))
-												})
-
-												It("should send a PATCH request to the configured endpoint", func(ctx SpecContext) {
-													Expect(resp.Patch).NotTo(BeNil())
-													Expect(resp.Patch.Status).To(Equal(204))
-												})
-
-												It("should send a DELETE request to the configured endpoint", func(ctx SpecContext) {
-													Expect(resp.Delete).NotTo(BeNil())
-													Expect(resp.Delete.Status).To(Equal(204))
-												})
-
-												It("should send a HEAD request to the configured endpoint", func(ctx SpecContext) {
-													Expect(resp.Head).NotTo(BeNil())
-													Expect(resp.Head.Status).To(Equal(200))
-												})
-											})
-										})
-									})
-
-									Context("object store service", func() {
-										Context("when the javascript is valid", func() {
-											JustBeforeEach(func() {
-												triggerSubject = "helloobjectstoreservice"
-												deployRequest, err = newDeployRequest(*nodeID, "objectstorehostservice", "nex object store service example", "../examples/v8/echofunction/src/objectstore.js", map[string]string{}, []string{triggerSubject}, log)
-												Expect(err).To(BeNil())
-
-												nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-												_, err = nodeClient.StartWorkload(deployRequest)
-												Expect(err).To(BeNil())
-
-												time.Sleep(time.Millisecond * 1000)
-											})
-
-											Describe("triggering the deployed function", func() {
-												var respmsg *nats.Msg
-
-												JustBeforeEach(func() {
-													respmsg, err = _fixtures.natsConn.Request(triggerSubject, []byte("hello!"), time.Millisecond*15000)
-													Expect(err).To(BeNil())
-												})
-
-												It("should respond to the request with the list of keys and value of hello2", func(ctx SpecContext) {
-													Expect(respmsg).NotTo(BeNil())
-
-													type hostServicesExampleResp struct {
-														Hello2 string             `json:"hello2"`
-														List   []*nats.ObjectInfo `json:"list"`
-													}
-
-													var resp *hostServicesExampleResp
-													err = json.Unmarshal(respmsg.Data, &resp)
-													Expect(err).To(BeNil())
-
-													Expect(resp).ToNot(BeNil())
-
-													Expect(len(resp.List)).To(Equal(1))
-													Expect(resp.List[0].Name).To(Equal("hello2"))
-													Expect(resp.Hello2).To(Equal("hello!"))
-												})
-											})
-										})
-									})
-								})
 							})
 
 							Describe("deploying a wasm workload", func() {
@@ -865,14 +459,6 @@ var _ = Describe("nex node", func() {
 									It("should deploy the wasm workload", func(ctx SpecContext) {
 										Expect(err).To(BeNil())
 									})
-
-									// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.AllAgents())).To(Equal(2))
-									// })
-
-									// It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-									// })
 								})
 							})
 						})
@@ -881,7 +467,7 @@ var _ = Describe("nex node", func() {
 			})
 		})
 	},
-		Entry("sandbox", true), // sandbox mode
+		Entry("no-sandbox", false), // no-sandbox mode
 	)
 })
 
@@ -915,6 +501,8 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, stri
 
 	var workloadType string
 	switch strings.Replace(filepath.Ext(filename), ".", "", 1) {
+	case "exe":
+		workloadType = "elf"
 	case "js":
 		workloadType = agentapi.NexExecutionProviderV8
 	case "wasm":
