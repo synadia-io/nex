@@ -617,7 +617,7 @@ func (f *fileDownload) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmds []tea.Cmd
 
 		if msg >= 1.0 {
-			cmds = append(cmds, tea.Sequence(tea.Tick(time.Millisecond*750, func(_ time.Time) tea.Msg {
+			cmds = append(cmds, tea.Sequence(tea.Tick(time.Millisecond*250, func(_ time.Time) tea.Msg {
 				return nil
 			}), tea.Quit))
 		}
