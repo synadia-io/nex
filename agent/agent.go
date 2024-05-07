@@ -313,7 +313,6 @@ func (a *Agent) handleUndeploy(m *nats.Msg) {
 	if a.provider == nil {
 		a.LogDebug("Received undeploy workload request on agent without deployed workload")
 		_ = m.Respond([]byte{})
-		a.shutdown()
 		return
 	}
 

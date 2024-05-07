@@ -191,7 +191,7 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 
 	s.log.Debug("Attempting to stop agent process", slog.String("workload_id", workloadID))
 
-	err := s.delegate.OnProcessExit(proc.ID)
+	err := s.kill(proc)
 	if err != nil {
 		return err
 	}

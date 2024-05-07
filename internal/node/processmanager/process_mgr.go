@@ -23,7 +23,7 @@ type ProcessDelegate interface {
 	OnProcessStarted(id string)
 
 	// Indicates that an agent process with the given id should exit
-	OnProcessExit(id string) error
+	// OnProcessExit(id string) error
 }
 
 // A process manager is responsible for stopping and starting a Nex Agent. It is entirely up to

@@ -436,30 +436,30 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 	w.stopMutex[id] = &sync.Mutex{}
 }
 
-// Called by the agent process manager when an agent should exit
-func (w *WorkloadManager) OnProcessExit(id string) error {
-	w.log.Debug("Process should exit", slog.String("workload_id", id))
+// // Called by the agent process manager when an agent should exit
+// func (w *WorkloadManager) OnProcessExit(id string) error {
+// 	w.log.Debug("Process should exit", slog.String("workload_id", id))
 
-	var agentClient *agentapi.AgentClient
-	if client, ok := w.activeAgents[id]; ok {
-		agentClient = client
-	} else if client, ok := w.pendingAgents[id]; ok {
-		agentClient = client
-	}
+// 	var agentClient *agentapi.AgentClient
+// 	if client, ok := w.activeAgents[id]; ok {
+// 		agentClient = client
+// 	} else if client, ok := w.pendingAgents[id]; ok {
+// 		agentClient = client
+// 	}
 
-	if agentClient == nil {
-		w.log.Error("Failed to stop agent process", slog.String("workload_id", id))
-		return errors.New("failed to stop agent process")
-	}
+// 	if agentClient == nil {
+// 		w.log.Error("Failed to stop agent process", slog.String("workload_id", id))
+// 		return errors.New("failed to stop agent process")
+// 	}
 
-	err := agentClient.Undeploy()
-	if err != nil {
-		w.log.Error("Failed to undeploy agent process", slog.String("workload_id", id), slog.Any("err", err))
-		return err
-	}
+// 	err := agentClient.Undeploy()
+// 	if err != nil {
+// 		w.log.Error("Failed to undeploy agent process", slog.String("workload_id", id), slog.Any("err", err))
+// 		return err
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (w *WorkloadManager) agentHandshakeTimedOut(id string) {
 	w.poolMutex.Lock()
