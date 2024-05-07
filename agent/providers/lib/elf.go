@@ -39,6 +39,7 @@ func (e *ELF) Deploy() error {
 	cmd := exec.Command(e.tmpFilename, e.argv...)
 	cmd.Stdout = e.stdout
 	cmd.Stderr = e.stderr
+	cmd.SysProcAttr = e.sysProcAttr()
 
 	cmd.Env = make([]string, len(e.environment))
 	for k, v := range e.environment {

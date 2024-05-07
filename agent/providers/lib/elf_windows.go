@@ -5,6 +5,8 @@ package lib
 import (
 	"fmt"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 // Undeploy the ELF binary
@@ -37,4 +39,10 @@ func (e *ELF) Undeploy() error {
 	})
 
 	return nil
+}
+
+func (e *ELF) sysProcAttr() *syscall.SysProcAttr {
+	return &windows.SysProcAttr{
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
+	}
 }

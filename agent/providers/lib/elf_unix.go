@@ -5,6 +5,7 @@ package lib
 import (
 	"fmt"
 	"os"
+	"syscall"
 )
 
 // Undeploy the ELF binary
@@ -19,4 +20,8 @@ func (e *ELF) Undeploy() error {
 	})
 
 	return nil
+}
+
+func (e *ELF) sysProcAttr() *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{}
 }
