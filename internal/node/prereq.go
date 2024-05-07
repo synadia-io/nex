@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,10 +16,14 @@ import (
 	"runtime"
 	"strings"
 	"text/template"
+	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/templates"
+	"golang.org/x/term"
 
 	_ "embed"
 )
@@ -91,6 +96,11 @@ func init() {
 	}
 }
 
+const (
+	padding  = 2
+	maxWidth = 80
+)
+
 var (
 	cyan    = color.New(color.FgCyan).SprintFunc()
 	red     = color.New(color.FgRed).SprintFunc()
@@ -111,6 +121,8 @@ var (
 
 	rootfsGzipURL    string
 	rootfsGzipSHA256 string
+
+	errDownloadCanceled = errors.New("canceled")
 )
 
 type initFunc func(*requirement, *models.NodeConfiguration) error
@@ -318,7 +330,6 @@ func downloadKernel(r *requirement, _ *models.NodeConfiguration) error {
 		}
 
 		respBin, err := http.Get(vmLinuxKernelURL)
-
 		if err != nil {
 			return err
 		}
@@ -331,11 +342,16 @@ func downloadKernel(r *requirement, _ *models.NodeConfiguration) error {
 			fmt.Println(err)
 			return err
 		}
-		_, err = io.Copy(outFile, respBin.Body)
-		if err != nil {
-			return err
-		}
+
+		err = downloadFile(outFile, respBin.Body, int(respBin.ContentLength))
 		outFile.Close()
+		if err != nil {
+			if !errors.Is(err, errDownloadCanceled) {
+				return err
+			}
+			// canceled, try to clean up
+			os.Remove(f.name)
+		}
 	}
 
 	return nil
@@ -364,12 +380,18 @@ func downloadFirecracker(_ *requirement, _ *models.NodeConfiguration) error {
 				fmt.Println(err)
 				return err
 			}
-			_, err = io.Copy(outFile, rawData)
-			if err != nil {
-				fmt.Println(err)
-				return err
-			}
+
+			err = downloadFile(outFile, rawData, int(header.Size))
 			outFile.Close()
+			if err != nil {
+				if !errors.Is(err, errDownloadCanceled) {
+					fmt.Println(err)
+					return err
+				}
+				// canceled, try to clean up
+				os.Remove(outFile.Name())
+				return nil
+			}
 
 			err = os.Chmod(outFile.Name(), 0755)
 			if err != nil {
@@ -400,20 +422,27 @@ func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
 		f := strings.TrimPrefix(strings.TrimSpace(header.Name), "./")
 
 		if f == "ptp" || f == "host-local" {
+			fmt.Println(strings.Repeat(" ", padding), f)
 			outFile, err := os.Create(filepath.Join(r.directories[0], f))
 			if err != nil {
 				fmt.Println(err)
 				return err
 			}
-			_, err = io.Copy(outFile, rawData)
-			if err != nil {
-				return err
-			}
-			outFile.Close()
 
-			err = os.Chmod(outFile.Name(), 0755)
+			err = downloadFile(outFile, rawData, int(header.Size))
+			outFile.Close()
 			if err != nil {
-				return err
+				if !errors.Is(err, errDownloadCanceled) {
+					fmt.Println(err)
+					return err
+				}
+				// canceled, try to clean up
+				os.Remove(outFile.Name())
+			} else {
+				err = os.Chmod(outFile.Name(), 0755)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -422,6 +451,9 @@ func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
 }
 
 func downloadTCRedirectTap(r *requirement, _ *models.NodeConfiguration) error {
+	// for CNI Plugin display consistency
+	fmt.Println(strings.Repeat(" ", padding), "tcp-redirect-tap")
+
 	_ = tcRedirectCNIPluginSHA256
 	respBin, err := http.Get(tcRedirectCNIPluginURL)
 	if err != nil {
@@ -436,11 +468,18 @@ func downloadTCRedirectTap(r *requirement, _ *models.NodeConfiguration) error {
 		fmt.Println(err)
 		return err
 	}
-	_, err = io.Copy(outFile, respBin.Body)
-	if err != nil {
-		return err
-	}
+
+	err = downloadFile(outFile, respBin.Body, int(respBin.ContentLength))
 	outFile.Close()
+	if err != nil {
+		if !errors.Is(err, errDownloadCanceled) {
+			fmt.Println(err)
+			return err
+		}
+		// canceled, try to clean up
+		os.Remove(outFile.Name())
+		return nil
+	}
 
 	err = os.Chmod(outFile.Name(), 0755)
 	if err != nil {
@@ -470,16 +509,21 @@ func downloadRootFS(r *requirement, _ *models.NodeConfiguration) error {
 		if err != nil {
 			return err
 		}
+
 		outFile, err := os.Create(f.name)
 		if err != nil {
-			fmt.Println(err)
 			return err
 		}
-		_, err = io.Copy(outFile, uncompressedFile)
-		if err != nil {
-			return err
-		}
+
+		err = downloadFile(outFile, uncompressedFile, int(respTar.ContentLength))
 		outFile.Close()
+		if err != nil {
+			if !errors.Is(err, errDownloadCanceled) {
+				return err
+			}
+			// canceled, try to clean up
+			os.Remove(f.name)
+		}
 	}
 	return nil
 }
@@ -497,4 +541,118 @@ func decompressTarFromURL(url string, _ string) (*tar.Reader, error) {
 
 	rawData := tar.NewReader(uncompressedTar)
 	return rawData, nil
+}
+
+func downloadFile(dest *os.File, src io.Reader, size int) error {
+	fd := &fileDownload{
+		size:     size,
+		progress: progress.New(progress.WithSolidFill("#ffffff")),
+	}
+
+	opts := []tea.ProgramOption{}
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		opts = append(opts, tea.WithoutRenderer(), tea.WithInput(nil))
+	}
+
+	p := tea.NewProgram(fd, opts...)
+
+	fd.onProgress = func(f float64) {
+		p.Send(f)
+	}
+
+	go func() {
+		_, err := io.Copy(dest, io.TeeReader(src, fd))
+		if err != nil {
+			p.Send(err)
+		}
+	}()
+
+	if _, err := p.Run(); err != nil {
+		return err
+	}
+
+	if fd.canceled {
+		return errDownloadCanceled
+	}
+
+	return nil
+}
+
+type fileDownload struct {
+	size       int
+	complete   int
+	progress   progress.Model
+	err        error
+	canceled   bool
+	onProgress func(float64)
+}
+
+func (f *fileDownload) Write(b []byte) (int, error) {
+	f.complete += len(b)
+
+	if f.size > 0 && f.onProgress != nil {
+		f.onProgress(float64(f.complete) / float64(f.size))
+	}
+
+	return len(b), nil
+}
+
+func (f *fileDownload) Init() tea.Cmd {
+	return nil
+}
+
+func (f *fileDownload) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		f.canceled = true
+		return f, tea.Quit
+
+	case tea.WindowSizeMsg:
+		f.progress.Width = msg.Width - padding*2 - 4
+		if f.progress.Width > maxWidth {
+			f.progress.Width = maxWidth
+		}
+
+		return f, nil
+
+	case error:
+		f.err = msg
+		return f, tea.Quit
+
+	case float64:
+		var cmds []tea.Cmd
+
+		if msg >= 1.0 {
+			cmds = append(cmds, tea.Sequence(tea.Tick(time.Millisecond*250, func(_ time.Time) tea.Msg {
+				return nil
+			}), tea.Quit))
+		}
+
+		cmds = append(cmds, f.progress.SetPercent(float64(msg)))
+		return f, tea.Batch(cmds...)
+
+	// FrameMsg is sent when the progress bar wants to animate itself
+	case progress.FrameMsg:
+		progressModel, cmd := f.progress.Update(msg)
+		f.progress = progressModel.(progress.Model)
+		return f, cmd
+
+	default:
+		return f, nil
+	}
+}
+
+func (f *fileDownload) View() string {
+	if f.err != nil {
+		return "Error downloading: " + f.err.Error() + "\n"
+	}
+
+	if f.canceled {
+		return "Canceled"
+	}
+
+	pad := strings.Repeat(" ", padding)
+	return "\n" +
+		pad + f.progress.View() + "\n\n" +
+		pad + "Press any key to quit"
 }
