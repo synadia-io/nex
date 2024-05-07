@@ -193,10 +193,7 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 
 	err := s.delegate.OnProcessExit(proc.ID)
 	if err != nil {
-		err = s.kill(proc)
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
 	delete(s.liveProcs, workloadID)
