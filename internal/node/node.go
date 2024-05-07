@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -526,6 +527,8 @@ func (n *Node) shutdown() {
 		_ = n.telemetry.Shutdown()
 
 		_ = os.Remove(n.pidFilepath)
+
+		signal.Stop(n.sigs)
 		close(n.sigs)
 	}
 }
