@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 func (s *SpawningProcessManager) kill(proc *spawnedProcess) error {
@@ -33,4 +35,10 @@ func (s *SpawningProcessManager) kill(proc *spawnedProcess) error {
 	}
 
 	return nil
+}
+
+func (s *SpawningProcessManager) sysProcAttr() *syscall.SysProcAttr {
+	return &windows.SysProcAttr{
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
+	}
 }

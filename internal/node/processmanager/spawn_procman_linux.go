@@ -5,6 +5,7 @@ package processmanager
 import (
 	"log/slog"
 	"os"
+	"syscall"
 )
 
 func (s *SpawningProcessManager) kill(proc *spawnedProcess) error {
@@ -22,4 +23,8 @@ func (s *SpawningProcessManager) kill(proc *spawnedProcess) error {
 	}
 
 	return nil
+}
+
+func (s *SpawningProcessManager) sysProcAttr() *syscall.SysProcAttr {
+	return &syscall.SysProcAttr{}
 }

@@ -234,6 +234,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 
 	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: true}
 	cmd.Stdout = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: false}
+	cmd.SysProcAttr = s.sysProcAttr()
 
 	newProc := &spawnedProcess{
 		ID:   workloadID,
