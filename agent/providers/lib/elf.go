@@ -89,20 +89,6 @@ func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
 	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
 }
 
-// Undeploy the ELF binary
-func (e *ELF) Undeploy() error {
-	e.undeploy.Do(func() {
-		err := e.cmd.Process.Signal(os.Interrupt)
-		e.removeWorkload()
-		if err != nil {
-			fmt.Println("Couldn't terminate elf binary process")
-			e.fail <- true
-		}
-	})
-
-	return nil
-}
-
 // Validate the underlying artifact to be a 64-bit linux native ELF
 // binary that is statically-linked
 func (e *ELF) Validate() error {

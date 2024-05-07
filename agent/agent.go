@@ -310,6 +310,12 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 }
 
 func (a *Agent) handleUndeploy(m *nats.Msg) {
+	if a.provider == nil {
+		a.LogDebug("Received undeploy workload request on agent without deployed workload")
+		_ = m.Respond([]byte{})
+		return
+	}
+
 	err := a.provider.Undeploy()
 	if err != nil {
 		// don't return an error here so worst-case scenario is an ungraceful shutdown,

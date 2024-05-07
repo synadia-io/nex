@@ -19,8 +19,11 @@ type ProcessInfo struct {
 // A process delegate is any struct that wishes to be notified when the configured agent process
 // manager has successfully started an agent
 type ProcessDelegate interface {
-	// Indicates that an agent process with the given id has been started and is ready to be "prepared" for workload deployment
+	// Indicates that an agent process with the given id has been started and is ready for workload deployment
 	OnProcessStarted(id string)
+
+	// Indicates that an agent process with the given id should exit
+	OnProcessExit(id string) error
 }
 
 // A process manager is responsible for stopping and starting a Nex Agent. It is entirely up to

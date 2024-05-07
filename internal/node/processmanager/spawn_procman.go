@@ -37,7 +37,6 @@ type SpawningProcessManager struct {
 	deployRequests map[string]*agentapi.DeployRequest
 
 	log *slog.Logger
-	wg  *sync.WaitGroup
 }
 
 type spawnedProcess struct {
@@ -65,7 +64,6 @@ func NewSpawningProcessManager(
 		t:      telemetry,
 		log:    log,
 		ctx:    ctx,
-		wg:     &sync.WaitGroup{},
 
 		stopMutexes: make(map[string]*sync.Mutex),
 
@@ -136,8 +134,6 @@ func (s *SpawningProcessManager) Stop() error {
 				)
 			}
 		}
-
-		s.wg.Wait()
 	}
 
 	return nil
@@ -195,9 +191,12 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 
 	s.log.Debug("Attempting to stop agent process", slog.String("workload_id", workloadID))
 
-	err := s.kill(proc)
+	err := s.delegate.OnProcessExit(proc.ID)
 	if err != nil {
-		return err
+		err = s.kill(proc)
+		if err != nil {
+			return err
+		}
 	}
 
 	delete(s.liveProcs, workloadID)
@@ -248,8 +247,6 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		Exit: make(chan int),
 	}
 
-	s.wg.Add(1)
-
 	err := cmd.Start()
 	if err != nil {
 		s.log.Warn("Agent command failed to start", slog.Any("error", err))
@@ -262,12 +259,10 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	go func() {
 		if err = cmd.Wait(); err != nil { // blocking until exit
 			s.log.Info("Agent command exited", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
-			s.wg.Done()
 			return
 		}
 
 		s.log.Info("Agent command exited cleanly", slog.Int("pid", cmd.Process.Pid))
-		s.wg.Done()
 	}()
 
 	return newProc, nil
