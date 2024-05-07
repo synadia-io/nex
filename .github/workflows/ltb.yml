@@ -50,13 +50,7 @@ jobs:
     - 
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
-      if: runner.os != 'Windows'
       run: go build -tags netgo -ldflags '-extldflags "-static"'
-    - 
-      name: Build agent
-      working-directory: ./agent/cmd/nex-agent
-      if: runner.os == 'Windows'
-      run: go build .
     -
       name: Run unit tests
       if: runner.os != 'Windows'
