@@ -107,14 +107,15 @@ func (a *Agent) FullVersion() string {
 // Start the agent
 // NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() {
+	if !a.sandboxed {
+		a.LogDebug(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()))
+	}
+
 	err := a.init()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize agent: %s\n", err)
-		panic(err)
-	}
-
-	if !a.sandboxed {
-		a.LogDebug(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()))
+		a.LogError(fmt.Sprintf("Agent process failed to initialize; %s", err.Error()))
+		a.shutdown()
 	}
 
 	timer := time.NewTicker(runloopTickInterval)
