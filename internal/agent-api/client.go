@@ -41,6 +41,7 @@ type AgentClient struct {
 	agentID           string
 	handshakeTimeout  time.Duration
 	handshakeReceived *atomic.Bool
+	stopping          uint32
 
 	handshakeTimedOut  HandshakeCallback
 	handshakeSucceeded HandshakeCallback
@@ -141,8 +142,8 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 	return &deployResponse, nil
 }
 
-// Stop the agent client instance and cleanup by draining subscriptions
-// and releasing other associated resources
+// Draining subscriptions and release other resources associated
+// with the agent client
 func (a *AgentClient) Drain() error {
 	for _, sub := range a.subz {
 		err := sub.Drain()
@@ -165,8 +166,24 @@ func (a *AgentClient) Drain() error {
 	return nil
 }
 
+// Stop the agent client instance
+// Currently this method simply sets the stopping flag, e.g., allowing any pending handshakes to be aborted
+func (a *AgentClient) Stop() error {
+	if atomic.AddUint32(&a.stopping, 1) == 1 {
+		return nil
+	}
+
+	return errors.New("agent client already stopping")
+}
+
 func (a *AgentClient) Undeploy() error {
 	subject := fmt.Sprintf("agentint.%s.undeploy", a.agentID)
+
+	a.log.Debug("sending undeploy request to agent via internal NATS connection",
+		slog.String("subject", subject),
+		slog.String("agent_id", a.agentID),
+	)
+
 	_, err := a.nc.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
 	if err != nil {
 		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("agent_id", a.agentID), slog.String("error", err.Error()))
@@ -211,9 +228,17 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 }
 
 func (a *AgentClient) awaitHandshake(agentID string) {
-	<-time.After(a.handshakeTimeout)
-	if !a.handshakeReceived.Load() {
-		a.handshakeTimedOut(agentID)
+	timeoutAt := time.Now().UTC().Add(a.handshakeTimeout)
+
+	handshakeOk := false
+	for !handshakeOk && !a.shuttingDown() {
+		if time.Now().UTC().After(timeoutAt) {
+			a.handshakeTimedOut(agentID)
+			return
+		}
+
+		handshakeOk = a.handshakeReceived.Load()
+		time.Sleep(time.Millisecond * DefaultRunloopSleepTimeoutMillis)
 	}
 }
 
@@ -268,4 +293,8 @@ func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 
 	a.log.Debug("Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
 	a.logReceived(agentID, logentry)
+}
+
+func (a *AgentClient) shuttingDown() bool {
+	return (atomic.LoadUint32(&a.stopping) > 0)
 }

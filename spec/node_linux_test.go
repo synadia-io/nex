@@ -150,10 +150,9 @@ var _ = Describe("nex node", func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 						})
 
-						It("should return an error", func(ctx SpecContext) {
-							Expect(
-								nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log),
-							).To(MatchError(errors.New("preflight checks failed: EOF")))
+						It("should [not] return an error", func(ctx SpecContext) {
+							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+							Expect(err).To(MatchError(errors.New("preflight checks failed: EOF")))
 						})
 					})
 
@@ -246,7 +245,7 @@ var _ = Describe("nex node", func() {
 						nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 					})
 
-					It("should return an error", func(ctx SpecContext) {
+					It("should [not] return an error", func(ctx SpecContext) {
 						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
 						Expect(err).ToNot(BeNil())
 						Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
@@ -260,10 +259,10 @@ var _ = Describe("nex node", func() {
 
 					BeforeEach(func() {
 						nodeConfig.DefaultResourceDir = validResourceDir
-						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
 						_ = os.Mkdir(validResourceDir, 0755)
-						nodeOpts.ForceDepInstall = true
 
+						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
+						nodeOpts.ForceDepInstall = true
 						nodeConfig.MachinePoolSize = 1
 					})
 
@@ -278,15 +277,20 @@ var _ = Describe("nex node", func() {
 					JustBeforeEach(func() {
 						var err error
 
-						_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+						err = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+						Expect(err).To(BeNil())
+
 						node, err = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
 						Expect(err).To(BeNil())
+						Expect(node).ToNot(BeNil())
 
 						go node.Start()
 
-						nodeID, _ = node.PublicKey()
+						nodeID, err = node.PublicKey()
+						Expect(err).To(BeNil())
+
 						nodeProxy = nexnode.NewNodeProxyWith(node)
-						time.Sleep(time.Millisecond * 500)
+						time.Sleep(time.Millisecond * 1000)
 					})
 
 					It("should generate a keypair for the node", func(ctx SpecContext) {
@@ -351,10 +355,26 @@ var _ = Describe("nex node", func() {
 							Expect(subsz.Total).To(Equal(1))
 						})
 
+						// It("should initialize a node API subscription for handling workload ping requests", func(ctx SpecContext) {
+						// 	subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+						// 		Subscriptions: true,
+						// 		Test:          "$NEX.WPING",
+						// 	})
+						// 	Expect(subsz.Total).To(Equal(1))
+						// })
+
 						It("should initialize a node API subscription for handling namespaced info requests", func(ctx SpecContext) {
 							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
 								Subscriptions: true,
 								Test:          fmt.Sprintf("$NEX.INFO.default.%s", *nodeID),
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
+
+						It("should initialize a node API subscription for handling lame duck requests", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          fmt.Sprintf("$NEX.LAMEDUCK.%s", *nodeID),
 							})
 							Expect(subsz.Total).To(Equal(1))
 						})

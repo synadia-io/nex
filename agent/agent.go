@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -106,10 +107,15 @@ func (a *Agent) FullVersion() string {
 // Start the agent
 // NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() {
+	if !a.sandboxed {
+		a.LogDebug(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()))
+	}
+
 	err := a.init()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize agent: %s\n", err)
-		panic(err)
+		a.LogError(fmt.Sprintf("Agent process failed to initialize; %s", err.Error()))
+		a.shutdown()
 	}
 
 	timer := time.NewTicker(runloopTickInterval)
@@ -119,7 +125,8 @@ func (a *Agent) Start() {
 		select {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
-		case <-a.sigs:
+		case sig := <-a.sigs:
+			a.LogInfo(fmt.Sprintf("Received signal: %s", sig))
 			a.shutdown()
 		case <-a.ctx.Done():
 			a.shutdown()
@@ -127,6 +134,7 @@ func (a *Agent) Start() {
 			time.Sleep(runloopSleepInterval)
 		}
 	}
+
 	a.cancelF()
 }
 
@@ -176,6 +184,10 @@ func (a *Agent) Version() string {
 func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
+
+	if strings.EqualFold(runtime.GOOS, "windows") && strings.EqualFold(*req.WorkloadType, "elf") {
+		tempFile = fmt.Sprintf("%s.exe", tempFile)
+	}
 
 	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
 	if err != nil {
@@ -299,6 +311,12 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 }
 
 func (a *Agent) handleUndeploy(m *nats.Msg) {
+	if a.provider == nil {
+		a.LogDebug("Received undeploy workload request on agent without deployed workload")
+		_ = m.Respond([]byte{})
+		return
+	}
+
 	err := a.provider.Undeploy()
 	if err != nil {
 		// don't return an error here so worst-case scenario is an ungraceful shutdown,

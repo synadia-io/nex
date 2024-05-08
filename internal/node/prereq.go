@@ -142,7 +142,33 @@ type fileSpec struct {
 	satisfied   bool
 }
 
-func CheckPrerequisites(config *models.NodeConfiguration, readonly bool, logger *slog.Logger) error {
+// Check prerequisites returns an error if preflight is unsuccessful using the
+// given node configuration.
+//
+// When noninteractive is true, the preflight checks are run non-interactively,
+// and required prerequisites are automatically installed to configured paths
+// if they are otherwise missing when paired with config.ForceDepInstall.
+func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, logger *slog.Logger) error {
+	if strings.EqualFold(runtime.GOOS, "windows") {
+		if !config.NoSandbox {
+			fmt.Print("\t⛔ Windows host must be configured to run in no sandbox mode\n")
+			return errors.New("windows host must be configured to run in no sandbox mode")
+		}
+
+		if !noninteractive {
+			fmt.Print("\t✅ Windows host properly configured to run in no sandbox mode\n")
+		}
+
+		return nil
+	} else if config.NoSandbox {
+		if !noninteractive {
+			fmt.Print("\t✅ Host configured to run in no sandbox mode\n")
+		}
+
+		// FIXME-- returning nil on the following line breaks things
+		// return nil
+	}
+
 	var sb strings.Builder
 
 	required := &requirements{
@@ -203,7 +229,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, readonly bool, logger 
 		depsFound := 0
 		for _, dir := range r.directories {
 			if dir != "" {
-				sb.WriteString(fmt.Sprintf("\t  🔎Searching - %s \n", cyan(dir)))
+				sb.WriteString(fmt.Sprintf("\t  🔎 Searching - %s \n", cyan(dir)))
 			}
 
 			for _, f := range r.files {
@@ -238,7 +264,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, readonly bool, logger 
 		r.satisfied = depsFound == len(r.files)
 	}
 
-	if !readonly {
+	if !noninteractive {
 		fmt.Print(sb.String())
 	}
 
@@ -251,7 +277,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, readonly bool, logger 
 		var err error
 
 		if !config.ForceDepInstall {
-			if readonly {
+			if noninteractive {
 				return fmt.Errorf("configuration prerequisites not met: %s", r.descriptor)
 			}
 

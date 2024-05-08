@@ -24,6 +24,8 @@ type ApiListener struct {
 	log   *slog.Logger
 	start time.Time
 	xk    nkeys.KeyPair
+
+	subz []*nats.Subscription
 }
 
 func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiListener {
@@ -56,7 +58,28 @@ func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiList
 		xk:    kp,
 		start: time.Now().UTC(),
 		node:  node,
+		subz:  make([]*nats.Subscription, 0),
 	}
+}
+
+func (api *ApiListener) Drain() error {
+	for _, sub := range api.subz {
+		err := sub.Drain()
+		if err != nil {
+			api.log.Warn("failed to drain subscription associated with api listener",
+				slog.String("subject", sub.Subject),
+				slog.String("error", err.Error()),
+			)
+
+			// no-op for now, try the next one...
+		}
+
+		api.log.Debug("drained subscription associated with api listener",
+			slog.String("subject", sub.Subject),
+		)
+	}
+
+	return nil
 }
 
 func (api *ApiListener) PublicKey() string {
@@ -69,40 +92,52 @@ func (api *ApiListener) PublicXKey() string {
 }
 
 func (api *ApiListener) Start() error {
-	_, err := api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.>", api.handleWorkloadPing)
-	if err != nil {
-		api.log.Error("Failed to subscribe to workload ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
-	}
-	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
+	var sub *nats.Subscription
+	var err error
+
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
 	if err != nil {
 		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
+	api.subz = append(api.subz, sub)
 
-	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING."+api.PublicKey(), api.handlePing)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING."+api.PublicKey(), api.handlePing)
 	if err != nil {
 		api.log.Error("Failed to subscribe to node-specific ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
+	api.subz = append(api.subz, sub)
 
-	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".LAMEDUCK."+api.PublicKey(), api.handleLameDuck)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.>", api.handleWorkloadPing)
 	if err != nil {
-		api.log.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.PublicKey()))
+		api.log.Error("Failed to subscribe to workload ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
+	api.subz = append(api.subz, sub)
 
 	// Namespaced subscriptions, the * below is for the namespace
-	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.PublicKey(), api.handleInfo)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.PublicKey(), api.handleInfo)
 	if err != nil {
 		api.log.Error("Failed to subscribe to info subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
+	api.subz = append(api.subz, sub)
 
-	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".DEPLOY.*."+api.PublicKey(), api.handleDeploy)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".DEPLOY.*."+api.PublicKey(), api.handleDeploy)
 	if err != nil {
 		api.log.Error("Failed to subscribe to run subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
+	api.subz = append(api.subz, sub)
 
-	_, err = api.node.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.PublicKey(), api.handleStop)
+	// FIXME? per contract, this should probably be renamed from STOP to UNDEPLOY
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.PublicKey(), api.handleStop)
 	if err != nil {
 		api.log.Error("Failed to subscribe to stop subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
+	api.subz = append(api.subz, sub)
+
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".LAMEDUCK."+api.PublicKey(), api.handleLameDuck)
+	if err != nil {
+		api.log.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.PublicKey()))
+	}
+	api.subz = append(api.subz, sub)
 
 	api.log.Info("NATS execution engine awaiting commands", slog.String("id", api.PublicKey()), slog.String("version", VERSION))
 	return nil
@@ -204,7 +239,8 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 	err = request.DecryptRequestEnvironment(api.xk)
 	if err != nil {
-		api.log.Error("Failed to decrypt environment for deploy request", slog.Any("err", err))
+		publicKey, _ := api.xk.PublicKey()
+		api.log.Error("Failed to decrypt environment for deploy request", slog.String("public_key", publicKey), slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to decrypt environment for deploy request: %s", err))
 		return
 	}

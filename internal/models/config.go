@@ -73,26 +73,29 @@ func (c *NodeConfiguration) Validate() bool {
 		c.Errors = append(c.Errors, errors.New("machine pool size must be >= 1"))
 	}
 
-	if _, err := os.Stat(c.KernelFilepath); errors.Is(err, os.ErrNotExist) {
-		c.Errors = append(c.Errors, err)
-	}
+	if !c.NoSandbox {
+		if _, err := os.Stat(c.KernelFilepath); errors.Is(err, os.ErrNotExist) {
+			c.Errors = append(c.Errors, err)
+		}
 
-	if _, err := os.Stat(c.RootFsFilepath); errors.Is(err, os.ErrNotExist) {
-		c.Errors = append(c.Errors, err)
-	}
+		if _, err := os.Stat(c.RootFsFilepath); errors.Is(err, os.ErrNotExist) {
+			c.Errors = append(c.Errors, err)
+		}
 
-	cniSubnet, err := netip.ParsePrefix(*c.CNI.Subnet)
-	if err != nil {
-		c.Errors = append(c.Errors, err)
-	}
-	internalNodeHost, err := netip.ParseAddr(*c.InternalNodeHost)
-	if err != nil {
-		c.Errors = append(c.Errors, err)
-	}
+		cniSubnet, err := netip.ParsePrefix(*c.CNI.Subnet)
+		if err != nil {
+			c.Errors = append(c.Errors, err)
+		}
 
-	hostInSubnet := cniSubnet.Contains(internalNodeHost)
-	if !hostInSubnet {
-		c.Errors = append(c.Errors, errors.New("internal node host must be in the CNI subnet"))
+		internalNodeHost, err := netip.ParseAddr(*c.InternalNodeHost)
+		if err != nil {
+			c.Errors = append(c.Errors, err)
+		}
+
+		hostInSubnet := cniSubnet.Contains(internalNodeHost)
+		if !hostInSubnet {
+			c.Errors = append(c.Errors, errors.New("internal node host must be in the CNI subnet"))
+		}
 	}
 
 	return len(c.Errors) == 0
@@ -110,17 +113,11 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		tags["node_name"] = nodeName
 	}
 
-	return NodeConfiguration{
+	config := NodeConfiguration{
 		AgentHandshakeTimeoutMillisecond: DefaultAgentHandshakeTimeoutMillisecond,
 		BinPath:                          DefaultBinPath,
-		CNI: CNIDefinition{
-			BinPath:       DefaultCNIBinPath,
-			NetworkName:   agentapi.StringOrNil(DefaultCNINetworkName),
-			InterfaceName: agentapi.StringOrNil(DefaultCNIInterfaceName),
-			Subnet:        agentapi.StringOrNil(DefaultCNISubnet),
-		},
-		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the inside of the firecracker VM--. This is not necessarily the address
-		// on which the internal NATS server is actually listening on inside the node.
+		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the agent.
+		// This is not necessarily the address on which the internal NATS server is actually listening inside the node.
 		InternalNodeHost: agentapi.StringOrNil(DefaultInternalNodeHost),
 		InternalNodePort: &defaultNodePort,
 		MachinePoolSize:  1,
@@ -129,8 +126,19 @@ func DefaultNodeConfiguration() NodeConfiguration {
 			MemSizeMib: &defaultMemSizeMib,
 		},
 		OtlpExporterUrl: DefaultOtelExporterUrl,
-		Tags:            tags,
 		RateLimiters:    nil,
+		Tags:            tags,
 		WorkloadTypes:   DefaultWorkloadTypes,
 	}
+
+	if !config.NoSandbox {
+		config.CNI = CNIDefinition{
+			BinPath:       DefaultCNIBinPath,
+			NetworkName:   agentapi.StringOrNil(DefaultCNINetworkName),
+			InterfaceName: agentapi.StringOrNil(DefaultCNIInterfaceName),
+			Subnet:        agentapi.StringOrNil(DefaultCNISubnet),
+		}
+	}
+
+	return config
 }
