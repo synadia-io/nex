@@ -507,7 +507,10 @@ func (v *V8) newKeyValueObjectTemplate() *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.NewValue(v.iso, resp)
+		// TODO: excessive marshal?
+		d, _ := json.Marshal(resp)
+
+		val, err := v8.JSONParse(v.ctx, string(d))
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)

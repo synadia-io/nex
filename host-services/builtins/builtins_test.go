@@ -44,7 +44,7 @@ func TestKvBuiltin(t *testing.T) {
 	bClient := NewBuiltinServicesClient(client)
 
 	service, _ := NewKeyValueService(nc, slog.Default())
-	_ = server.AddService("keyvalue", service, make(map[string]string))
+	_ = server.AddService("kv", service, make(map[string]string))
 
 	_ = server.Start()
 

@@ -14,7 +14,7 @@ type BuiltinServicesClient struct {
 }
 
 const (
-	builtinServiceNameKeyValue    = "keyvalue"
+	builtinServiceNameKeyValue    = "kv"
 	builtinServiceNameHttpClient  = "http"
 	builtinServiceNameMessaging   = "messaging"
 	builtinServiceNameObjectStore = "objectstore"
