@@ -1,7 +1,6 @@
 package hostservices
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -18,9 +17,7 @@ type ServiceResult struct {
 }
 
 func (r ServiceResult) Error() error {
-	return errors.New(
-		fmt.Sprintf("Error: %s (%d)", r.Message, r.Code),
-	)
+	return fmt.Errorf("Error: %s (%d)", r.Message, r.Code)
 }
 
 func (r ServiceResult) IsError() bool {

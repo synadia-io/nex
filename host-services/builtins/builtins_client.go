@@ -14,10 +14,6 @@ type BuiltinServicesClient struct {
 }
 
 const (
-	builtinKVFunctionNameGet    = "get"
-	builtinKVFunctionNameSet    = "set"
-	builtinKVFunctionNameDelete = "delete"
-
 	builtinServiceNameKeyValue    = "keyvalue"
 	builtinServiceNameHttpClient  = "http"
 	builtinServiceNameMessaging   = "messaging"
@@ -165,6 +161,25 @@ func (c *BuiltinServicesClient) ObjectGet(objectName string) ([]byte, error) {
 	}
 
 	return resp.Data, nil
+}
+
+func (c *BuiltinServicesClient) ObjectList() ([]*nats.ObjectInfo, error) {
+
+	resp, err := c.hsClient.PerformRpc(builtinServiceNameObjectStore, objectStoreServiceMethodList, []byte{}, make(map[string]string))
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		return nil, resp.Error()
+	}
+
+	var theList []*nats.ObjectInfo
+	err = json.Unmarshal(resp.Data, &theList)
+	if err != nil {
+		return nil, err
+	}
+
+	return theList, nil
 }
 
 func (c *BuiltinServicesClient) ObjectPut(objectName string, payload []byte) (*nats.ObjectInfo, error) {

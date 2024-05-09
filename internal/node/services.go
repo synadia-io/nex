@@ -46,7 +46,10 @@ func (h *HostServices) init() error {
 	} else {
 		h.log.Debug("initialized http host service")
 	}
-	h.hsServer.AddService(hostServiceHTTP, http, make(map[string]string))
+	err = h.hsServer.AddService(hostServiceHTTP, http, make(map[string]string))
+	if err != nil {
+		return err
+	}
 
 	kv, err := builtins.NewKeyValueService(h.nc, h.log)
 	if err != nil {
@@ -55,7 +58,10 @@ func (h *HostServices) init() error {
 	} else {
 		h.log.Debug("initialized key/value host service")
 	}
-	h.hsServer.AddService(hostServiceKeyValue, kv, make(map[string]string))
+	err = h.hsServer.AddService(hostServiceKeyValue, kv, make(map[string]string))
+	if err != nil {
+		return err
+	}
 
 	messaging, err := builtins.NewMessagingService(h.nc, h.log)
 	if err != nil {
@@ -64,7 +70,10 @@ func (h *HostServices) init() error {
 	} else {
 		h.log.Debug("initialized messaging host service")
 	}
-	h.hsServer.AddService(hostServiceMessaging, messaging, make(map[string]string))
+	err = h.hsServer.AddService(hostServiceMessaging, messaging, make(map[string]string))
+	if err != nil {
+		return err
+	}
 
 	object, err := builtins.NewObjectStoreService(h.nc, h.log)
 	if err != nil {
@@ -73,7 +82,10 @@ func (h *HostServices) init() error {
 	} else {
 		h.log.Debug("initialized object store host service")
 	}
-	h.hsServer.AddService(hostServiceObjectStore, object, make(map[string]string))
+	err = h.hsServer.AddService(hostServiceObjectStore, object, make(map[string]string))
+	if err != nil {
+		return err
+	}
 
 	return h.hsServer.Start()
 }

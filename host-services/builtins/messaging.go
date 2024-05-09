@@ -15,8 +15,7 @@ const messagingServiceMethodPublish = "publish"
 const messagingServiceMethodRequest = "request"
 const messagingServiceMethodRequestMany = "requestMany"
 
-const messagingRequestTimeout = time.Millisecond * 500 // FIXME-- make timeout configurable per request?
-const messagingRequestManyTimeout = time.Millisecond * 3000
+const messagingRequestTimeout = time.Millisecond * 750 // FIXME-- make timeout configurable per request?
 
 type MessagingService struct {
 	log *slog.Logger

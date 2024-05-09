@@ -31,7 +31,7 @@ func TestBogusService(t *testing.T) {
 		data:    []byte{1, 2, 3, 4, 5, 6},
 	}
 
-	server.AddService("boguss", &boguss, make(map[string]string, 0))
+	_ = server.AddService("boguss", &boguss, make(map[string]string, 0))
 
 	err = server.Start()
 	if err != nil {
@@ -72,7 +72,7 @@ func TestServiceError(t *testing.T) {
 		data:    []byte{1, 2, 3, 4, 5, 6},
 	}
 
-	server.AddService("boguss", &boguss, make(map[string]string, 0))
+	_ = server.AddService("boguss", &boguss, make(map[string]string, 0))
 
 	err = server.Start()
 	if err != nil {

@@ -28,7 +28,7 @@ func TestKvBuiltin(t *testing.T) {
 	bClient := NewBuiltinServicesClient(client)
 
 	service, _ := NewKeyValueService(nc, slog.Default())
-	server.AddService("keyvalue", service, make(map[string]string))
+	_ = server.AddService("keyvalue", service, make(map[string]string))
 
 	_ = server.Start()
 
@@ -46,6 +46,9 @@ func TestKvBuiltin(t *testing.T) {
 	}
 
 	keys, err := bClient.KVKeys()
+	if err != nil {
+		t.Fatalf("Failed to get bucket keys: %s", err.Error())
+	}
 	if !slices.Contains(keys, "testone") {
 		t.Fatalf("Expected to see testone in the keys list, but got '%+v'", keys)
 	}
@@ -62,12 +65,12 @@ func TestMessagingBuiltin(t *testing.T) {
 	bClient := NewBuiltinServicesClient(client)
 
 	service, _ := NewMessagingService(nc, slog.Default())
-	server.AddService("messaging", service, make(map[string]string))
+	_ = server.AddService("messaging", service, make(map[string]string))
 	_ = server.Start()
 
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
-	nc.Subscribe("foo.bar", func(m *nats.Msg) {
+	_, _ = nc.Subscribe("foo.bar", func(m *nats.Msg) {
 		wg.Done()
 	})
 
@@ -90,7 +93,7 @@ func TestObjectBuiltin(t *testing.T) {
 	bClient := NewBuiltinServicesClient(client)
 
 	service, _ := NewObjectStoreService(nc, slog.Default())
-	server.AddService("objectstore", service, make(map[string]string))
+	_ = server.AddService("objectstore", service, make(map[string]string))
 	_ = server.Start()
 
 	res, err := bClient.ObjectPut("objecttest", []byte{100, 101, 102})
@@ -110,6 +113,14 @@ func TestObjectBuiltin(t *testing.T) {
 	}
 	if !slices.Equal(res2, []byte{100, 101, 102}) {
 		t.Fatalf("Retrieved the wrong bytes, got %v", res2)
+	}
+
+	infos, err := bClient.ObjectList()
+	if err != nil {
+		t.Fatalf("Failed to list objects in bucket")
+	}
+	if infos[0].Name != "objecttest" {
+		t.Fatalf("Got unexpected list of items in bucket: %+v", infos)
 	}
 
 	err = bClient.ObjectDelete("objecttest")

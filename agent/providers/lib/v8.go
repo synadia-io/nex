@@ -32,38 +32,25 @@ const (
 	hostServicesHTTPDeleteFunctionName = "delete"
 	hostServicesHTTPHeadFunctionName   = "head"
 
-	hostServicesHTTPRequestTimeout = time.Millisecond * 3000
-
 	hostServicesKVObjectName         = "kv"
 	hostServicesKVGetFunctionName    = "get"
 	hostServicesKVSetFunctionName    = "set"
 	hostServicesKVDeleteFunctionName = "delete"
 	hostServicesKVKeysFunctionName   = "keys"
 
-	hostServicesKVGetTimeout    = time.Millisecond * 250
-	hostServicesKVSetTimeout    = time.Millisecond * 250
-	hostServicesKVDeleteTimeout = time.Millisecond * 250
-	hostServicesKVKeysTimeout   = time.Millisecond * 250
+	// NOTE: individual timeout values will be supported again after we add
+	// per-service configuration details to the machine config file
 
 	hostServicesMessagingObjectName              = "messaging"
 	hostServicesMessagingPublishFunctionName     = "publish"
 	hostServicesMessagingRequestFunctionName     = "request"
 	hostServicesMessagingRequestManyFunctionName = "requestMany"
 
-	hostServicesMessagingPublishTimeout     = time.Millisecond * 500
-	hostServicesMessagingRequestTimeout     = time.Millisecond * 500
-	hostServicesMessagingRequestManyTimeout = time.Millisecond * 3000
-
 	hostServicesObjectStoreObjectName         = "objectStore"
 	hostServicesObjectStoreGetFunctionName    = "get"
 	hostServicesObjectStorePutFunctionName    = "put"
 	hostServicesObjectStoreDeleteFunctionName = "delete"
 	hostServicesObjectStoreListFunctionName   = "list"
-
-	hostServicesObjectStoreGetTimeout    = time.Millisecond * 3000
-	hostServicesObjectStorePutTimeout    = time.Millisecond * 3000
-	hostServicesObjectStoreDeleteTimeout = time.Millisecond * 3000
-	hostServicesObjectStoreListTimeout   = time.Millisecond * 3000
 
 	v8FunctionArrayAppend        = "array-append"
 	v8FunctionArrayInit          = "array-init"
@@ -296,26 +283,6 @@ func (v *V8) newV8Context() (*v8.Context, error) {
 	}
 
 	return v8.NewContext(v.iso, global), nil
-}
-
-// agentint.{vmID}.rpc.{namespace}.{workload}.http.{method}
-func (v *V8) httpServiceSubject(method string) string {
-	return fmt.Sprintf("agentint.%s.rpc.%s.%s.http.%s", v.vmID, v.namespace, v.name, method)
-}
-
-// agentint.{vmID}.rpc.{namespace}.{workload}.kv.{method}
-func (v *V8) keyValueServiceSubject(method string) string {
-	return fmt.Sprintf("agentint.%s.rpc.%s.%s.kv.%s", v.vmID, v.namespace, v.name, method)
-}
-
-// agentint.{vmID}.rpc.{namespace}.{workload}.messaging.{method}
-func (v *V8) messagingServiceSubject(method string) string {
-	return fmt.Sprintf("agentint.%s.rpc.%s.%s.messaging.%s", v.vmID, v.namespace, v.name, method)
-}
-
-// agentint.{vmID}.rpc.{namespace}.{workload}.objectstore.{method}
-func (v *V8) objectStoreServiceSubject(method string) string {
-	return fmt.Sprintf("agentint.%s.rpc.%s.%s.objectstore.%s", v.vmID, v.namespace, v.name, strings.ToLower(method))
 }
 
 func (v *V8) newHostServicesTemplate() (*v8.ObjectTemplate, error) {
@@ -772,15 +739,16 @@ func (v *V8) newObjectStoreObjectTemplate() *v8.ObjectTemplate {
 	}))
 
 	_ = objectStore.Set(hostServicesObjectStoreListFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
-		req, _ := json.Marshal(map[string]interface{}{})
-
-		resp, err := v.nc.Request(v.objectStoreServiceSubject(hostServicesObjectStoreListFunctionName), req, hostServicesObjectStoreListTimeout)
+		resp, err := v.builtins.ObjectList()
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
 
-		val, err := v8.JSONParse(v.ctx, string(resp.Data))
+		// TODO: excessive marshal?
+		d, _ := json.Marshal(resp)
+
+		val, err := v8.JSONParse(v.ctx, string(d)) // nats.ObjectMeta JSON
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -861,7 +829,7 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 		time.Second*2,
 		*params.Namespace,
 		*params.WorkloadName,
-		*&params.VmID,
+		params.VmID,
 	)
 
 	builtins := builtins.NewBuiltinServicesClient(hsclient)
