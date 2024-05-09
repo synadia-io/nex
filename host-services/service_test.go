@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 )
 
@@ -15,12 +16,26 @@ const (
 	testWorkloadId = "abc12346"
 )
 
-func TestBogusService(t *testing.T) {
+func setupSuite(_ testing.TB, port int) (*nats.Conn, func(tb testing.TB)) {
 
-	nc, err := nats.Connect("0.0.0.0:4222")
-	if err != nil {
-		panic(err)
+	svr, _ := server.NewServer(&server.Options{
+		Port:      port,
+		Host:      "0.0.0.0",
+		JetStream: true,
+	})
+	svr.Start()
+
+	nc, _ := nats.Connect(svr.ClientURL())
+
+	// Return a function to teardown the test
+	return nc, func(tb testing.TB) {
+		svr.Shutdown()
 	}
+}
+
+func TestBogusService(t *testing.T) {
+	nc, teardownSuite := setupSuite(t, 4444)
+	defer teardownSuite(t)
 
 	server := NewHostServicesServer(nc)
 	client := NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
@@ -33,7 +48,7 @@ func TestBogusService(t *testing.T) {
 
 	_ = server.AddService("boguss", &boguss, make(map[string]string, 0))
 
-	err = server.Start()
+	err := server.Start()
 	if err != nil {
 		panic(err)
 	}
@@ -58,10 +73,8 @@ func TestBogusService(t *testing.T) {
 }
 
 func TestServiceError(t *testing.T) {
-	nc, err := nats.Connect("0.0.0.0:4222")
-	if err != nil {
-		panic(err)
-	}
+	nc, teardownSuite := setupSuite(t, 4445)
+	defer teardownSuite(t)
 
 	server := NewHostServicesServer(nc)
 	client := NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
@@ -74,7 +87,7 @@ func TestServiceError(t *testing.T) {
 
 	_ = server.AddService("boguss", &boguss, make(map[string]string, 0))
 
-	err = server.Start()
+	err := server.Start()
 	if err != nil {
 		panic(err)
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	hostservices "github.com/synadia-io/nex/host-services"
 )
@@ -17,11 +18,26 @@ const (
 	testWorkloadId = "abc12346"
 )
 
-func TestKvBuiltin(t *testing.T) {
-	nc, err := nats.Connect("0.0.0.0:4222")
-	if err != nil {
-		panic(err)
+func setupSuite(_ testing.TB, port int) (*nats.Conn, func(tb testing.TB)) {
+
+	svr, _ := server.NewServer(&server.Options{
+		Port:      port,
+		Host:      "0.0.0.0",
+		JetStream: true,
+	})
+	svr.Start()
+
+	nc, _ := nats.Connect(svr.ClientURL())
+
+	// Return a function to teardown the test
+	return nc, func(tb testing.TB) {
+		svr.Shutdown()
 	}
+}
+
+func TestKvBuiltin(t *testing.T) {
+	nc, teardownSuite := setupSuite(t, 4446)
+	defer teardownSuite(t)
 
 	server := hostservices.NewHostServicesServer(nc)
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
@@ -32,7 +48,7 @@ func TestKvBuiltin(t *testing.T) {
 
 	_ = server.Start()
 
-	_, err = bClient.KVSet("testone", []byte{9, 8, 7, 6, 5})
+	_, err := bClient.KVSet("testone", []byte{9, 8, 7, 6, 5})
 	if err != nil {
 		t.Fatalf("Got an error setting kv: %s", err.Error())
 	}
@@ -55,10 +71,8 @@ func TestKvBuiltin(t *testing.T) {
 }
 
 func TestMessagingBuiltin(t *testing.T) {
-	nc, err := nats.Connect("0.0.0.0:4222")
-	if err != nil {
-		panic(err)
-	}
+	nc, teardownSuite := setupSuite(t, 4447)
+	defer teardownSuite(t)
 
 	server := hostservices.NewHostServicesServer(nc)
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
@@ -74,7 +88,7 @@ func TestMessagingBuiltin(t *testing.T) {
 		wg.Done()
 	})
 
-	err = bClient.MessagingPublish("foo.bar", []byte("baz"))
+	err := bClient.MessagingPublish("foo.bar", []byte("baz"))
 	if err != nil {
 		t.Fatalf("Failed to publish message: %s", err)
 	}
@@ -83,10 +97,8 @@ func TestMessagingBuiltin(t *testing.T) {
 }
 
 func TestObjectBuiltin(t *testing.T) {
-	nc, err := nats.Connect("0.0.0.0:4222")
-	if err != nil {
-		panic(err)
-	}
+	nc, teardownSuite := setupSuite(t, 4448)
+	defer teardownSuite(t)
 
 	server := hostservices.NewHostServicesServer(nc)
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
