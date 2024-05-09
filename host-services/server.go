@@ -34,7 +34,7 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config map
 }
 
 func (h *HostServicesServer) Start() error {
-	_, err := h.nc.Subscribe("agentint.*.rpc.>", h.handleRPC)
+	_, err := h.nc.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
 		return err
 	}
