@@ -124,12 +124,14 @@ func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployReques
 func (s *SpawningProcessManager) Stop() error {
 	if atomic.AddUint32(&s.closing, 1) == 1 {
 		s.log.Info("Spawning process manager stopping")
-		close(s.warmProcs)
 
 		for workloadID := range s.liveProcs {
 			err := s.StopProcess(workloadID)
 			if err != nil {
-				s.log.Warn("Failed to stop spawned process", slog.String("workload_id", workloadID), slog.String("error", err.Error()))
+				s.log.Warn("Failed to stop spawned agent process",
+					slog.String("workload_id", workloadID),
+					slog.String("error", err.Error()),
+				)
 			}
 		}
 	}
@@ -155,6 +157,8 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 			p, err := s.spawn()
 			if err != nil {
 				s.log.Error("Failed to spawn nex-agent for pool", slog.Any("error", err))
+				time.Sleep(runloopSleepInterval)
+				continue
 			}
 
 			s.liveProcs[p.ID] = p
@@ -185,7 +189,7 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	s.log.Debug("Attempting to stop process", slog.String("workload_id", workloadID))
+	s.log.Debug("Attempting to stop agent process", slog.String("workload_id", workloadID))
 
 	err := s.kill(proc)
 	if err != nil {
@@ -230,6 +234,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 
 	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: true}
 	cmd.Stdout = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: false}
+	cmd.SysProcAttr = s.sysProcAttr()
 
 	newProc := &spawnedProcess{
 		ID:   workloadID,
@@ -240,28 +245,25 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		Exit: make(chan int),
 	}
 
+	err := cmd.Start()
+	if err != nil {
+		s.log.Warn("Agent command failed to start", slog.Any("error", err))
+		return nil, err
+	} else if cmd.Process == nil {
+		s.log.Warn("Agent command failed to start")
+		return nil, fmt.Errorf("agent command failed to start")
+	}
+
 	go func() {
-		err := cmd.Run()
-		if err != nil {
-			s.log.Info("Command finished with error", slog.Any("error", err))
+		if err = cmd.Wait(); err != nil { // blocking until exit
+			s.log.Info("Agent command exited", slog.Int("pid", cmd.Process.Pid), slog.Any("error", err))
+			return
 		}
+
+		s.log.Info("Agent command exited cleanly", slog.Int("pid", cmd.Process.Pid))
 	}()
 
 	return newProc, nil
-}
-
-func (s *SpawningProcessManager) kill(proc *spawnedProcess) error {
-	if proc.cmd.Process != nil {
-		err := proc.cmd.Process.Signal(os.Kill)
-		if err != nil {
-			s.log.Error("Failed to kill OS process",
-				slog.String("workload_id", proc.ID),
-				slog.Int("pid", proc.cmd.Process.Pid))
-			return err
-		}
-	}
-
-	return nil
 }
 
 type procLogEmitter struct {

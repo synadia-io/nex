@@ -39,6 +39,7 @@ func (e *ELF) Deploy() error {
 	cmd := exec.Command(e.tmpFilename, e.argv...)
 	cmd.Stdout = e.stdout
 	cmd.Stderr = e.stderr
+	cmd.SysProcAttr = e.sysProcAttr()
 
 	cmd.Env = make([]string, len(e.environment))
 	for k, v := range e.environment {
@@ -87,20 +88,6 @@ func (e *ELF) removeWorkload() {
 
 func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
 	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
-}
-
-// Undeploy the ELF binary
-func (e *ELF) Undeploy() error {
-	e.undeploy.Do(func() {
-		err := e.cmd.Process.Signal(os.Kill)
-		e.removeWorkload()
-		if err != nil {
-			fmt.Println("Couldn't terminate elf binary process")
-			e.fail <- true
-		}
-	})
-
-	return nil
 }
 
 // Validate the underlying artifact to be a 64-bit linux native ELF

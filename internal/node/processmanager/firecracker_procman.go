@@ -1,3 +1,5 @@
+//go:build linux
+
 package processmanager
 
 import (
@@ -18,8 +20,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
-
-const runloopSleepInterval = 100 * time.Millisecond
 
 type FirecrackerProcessManager struct {
 	closing   uint32
@@ -190,8 +190,8 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	defer mutex.Unlock()
 
 	f.log.Debug("Attempting to stop virtual machine", slog.String("workload_id", workloadID))
-
 	vm.shutdown()
+
 	delete(f.allVMs, workloadID)
 	delete(f.stopMutex, workloadID)
 

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/synadia-io/nex/internal/models"
 )
@@ -26,14 +28,16 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 		config.WorkloadTypes = models.DefaultWorkloadTypes
 	}
 
-	// TODO-- audit for *string
+	if strings.EqualFold(runtime.GOOS, "windows") && !config.NoSandbox {
+		return nil, errors.New("windows host must be configured to run in no sandbox mode")
+	}
+
 	if config.KernelFilepath == "" && config.DefaultResourceDir != "" {
 		config.KernelFilepath = filepath.Join(config.DefaultResourceDir, "vmlinux")
 	} else if config.KernelFilepath == "" && config.DefaultResourceDir == "" {
 		return nil, errors.New("invalid kernel file setting")
 	}
 
-	// TODO-- audit for *string
 	if config.RootFsFilepath == "" && config.DefaultResourceDir != "" {
 		config.RootFsFilepath = filepath.Join(config.DefaultResourceDir, "rootfs.ext4")
 	} else if config.RootFsFilepath == "" && config.DefaultResourceDir == "" {

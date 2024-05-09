@@ -10,7 +10,9 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -169,20 +171,9 @@ func (n *Node) IsLameDuck() bool {
 }
 
 func (n *Node) createPid() error {
-	configDir, err := os.UserConfigDir()
-	if err != nil {
-		return err
-	}
+	n.pidFilepath = filepath.Join(os.TempDir(), "nex.pid")
 
-	nexConfigPath := filepath.Join(configDir, ".nex")
-
-	err = os.MkdirAll(nexConfigPath, 0755)
-	if err != nil {
-		return err
-	}
-
-	n.pidFilepath = filepath.Join(nexConfigPath, "nex.pid")
-
+	var err error
 	if _, err = os.Stat(n.pidFilepath); err == nil {
 		raw, err := os.ReadFile(n.pidFilepath)
 		if err != nil {
@@ -195,13 +186,17 @@ func (n *Node) createPid() error {
 		}
 
 		process, err := os.FindProcess(int(pid))
-		if err != nil {
+		if err != nil && !strings.EqualFold(runtime.GOOS, "windows") {
+			n.log.Warn("failed to lookup running process by pid", slog.Int("pid", pid), slog.String("err", err.Error()))
 			return err
 		}
 
-		err = process.Signal(syscall.Signal(0))
-		if err == nil {
-			return fmt.Errorf("node process already running; pid: %d", pid)
+		keepExistingPid := strings.EqualFold(os.Getenv("NEX_ENVIRONMENT"), "spec") // HACK!!! there must be a better way 💀
+		if process != nil && !keepExistingPid {
+			err = process.Signal(syscall.Signal(0))
+			if err == nil {
+				return fmt.Errorf("node process already running; pid: %d", pid)
+			}
 		}
 	}
 
@@ -500,17 +495,10 @@ func (n *Node) validateConfig() error {
 	return CheckPrerequisites(n.config, true, n.log)
 }
 
-func (n *Node) installSignalHandlers() {
-	n.log.Debug("installing signal handlers")
-	// both firecracker and the embedded NATS server register signal handlers... wipe those so ours are the ones being used
-	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
-	n.sigs = make(chan os.Signal, 1)
-	signal.Notify(n.sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-}
-
 func (n *Node) shutdown() {
 	if atomic.AddUint32(&n.closing, 1) == 1 {
 		n.log.Debug("shutting down")
+		_ = n.api.Drain()
 		_ = n.manager.Stop()
 
 		if !n.startedAt.IsZero() {
@@ -539,6 +527,8 @@ func (n *Node) shutdown() {
 		_ = n.telemetry.Shutdown()
 
 		_ = os.Remove(n.pidFilepath)
+
+		signal.Stop(n.sigs)
 		close(n.sigs)
 	}
 }

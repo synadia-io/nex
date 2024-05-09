@@ -1,5 +1,3 @@
-//go:build linux
-
 package spec
 
 import (
@@ -35,6 +33,8 @@ type testFixtures struct {
 var _fixtures *testFixtures
 
 func TestSpec(t *testing.T) {
+	_ = os.Setenv("NEX_ENVIRONMENT", "spec")
+
 	err := initFixtures()
 	if err != nil {
 		t.Errorf(fmt.Sprintf("failed to initialize fixtures; %s", err.Error()))
@@ -69,8 +69,6 @@ func cleanupFixtures() {
 	_fixtures.natsServer.WaitForShutdown()
 
 	os.RemoveAll(_fixtures.natsStoreDir)
-
-	time.Sleep(time.Millisecond * 5000)
 }
 
 func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
