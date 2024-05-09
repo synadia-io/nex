@@ -28,11 +28,16 @@ type HostServices struct {
 
 func NewHostServices(mgr *WorkloadManager, nc, ncint *nats.Conn, log *slog.Logger) *HostServices {
 	return &HostServices{
-		log:      log,
-		mgr:      mgr,
-		nc:       nc,
-		ncint:    ncint,
-		hsServer: hs.NewHostServicesServer(nc),
+		log:   log,
+		mgr:   mgr,
+		nc:    nc,
+		ncint: ncint,
+		// ‼️ It cannot be overstated how important it is that the host services server
+		// be given the -internal- NATS connection and -not- the external/control one
+		//
+		// Sincerely,
+		//     Someone who lost a day of troubleshooting
+		hsServer: hs.NewHostServicesServer(ncint, log),
 	}
 }
 

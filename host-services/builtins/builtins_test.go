@@ -39,7 +39,7 @@ func TestKvBuiltin(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4446)
 	defer teardownSuite(t)
 
-	server := hostservices.NewHostServicesServer(nc)
+	server := hostservices.NewHostServicesServer(nc, slog.Default())
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
 
@@ -74,7 +74,7 @@ func TestMessagingBuiltin(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4447)
 	defer teardownSuite(t)
 
-	server := hostservices.NewHostServicesServer(nc)
+	server := hostservices.NewHostServicesServer(nc, slog.Default())
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
 
@@ -100,7 +100,7 @@ func TestObjectBuiltin(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4448)
 	defer teardownSuite(t)
 
-	server := hostservices.NewHostServicesServer(nc)
+	server := hostservices.NewHostServicesServer(nc, slog.Default())
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
 

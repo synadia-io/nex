@@ -2,6 +2,7 @@ package hostservices
 
 import (
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/nats-io/nats.go"
@@ -10,11 +11,14 @@ import (
 type HostServicesServer struct {
 	nc       *nats.Conn
 	services map[string]HostService
+
+	log *slog.Logger
 }
 
-func NewHostServicesServer(nc *nats.Conn) *HostServicesServer {
+func NewHostServicesServer(nc *nats.Conn, log *slog.Logger) *HostServicesServer {
 	return &HostServicesServer{
 		nc:       nc,
+		log:      log,
 		services: make(map[string]HostService),
 	}
 }
@@ -30,7 +34,7 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config map
 }
 
 func (h *HostServicesServer) Start() error {
-	_, err := h.nc.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
+	_, err := h.nc.Subscribe("agentint.*.rpc.>", h.handleRPC)
 	if err != nil {
 		return err
 	}
@@ -39,6 +43,7 @@ func (h *HostServicesServer) Start() error {
 }
 
 func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
+	// agentint.couhd3752omu7o74h4fg.rpc.default.httpjs.http.get
 	// agentint.{vmID}.rpc.{namespace}.{workload}.{service}.{method}
 	tokens := strings.Split(msg.Subject, ".")
 	vmID := tokens[1]
@@ -46,6 +51,13 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 	workloadName := tokens[4]
 	serviceName := tokens[5]
 	method := tokens[6]
+
+	h.log.Debug("Handling host service RPC request",
+		slog.String("workload_id", vmID),
+		slog.String("workload_name", workloadName),
+		slog.String("service_name", serviceName),
+		slog.String("method", method),
+	)
 
 	service, ok := h.services[serviceName]
 	if !ok {

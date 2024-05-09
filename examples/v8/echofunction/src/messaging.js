@@ -32,8 +32,8 @@
 
   return {
     'hello.world.request': reqResp,
-    'hello.world.request.ex': reqEx,
-    'hello.world.request.many': reqManyResp,
-    'hello.world.request.many.ex': reqManyEx
+    'hello.world.request.ex': reqEx
+//    'hello.world.request.many': reqManyResp,
+//    'hello.world.request.many.ex': reqManyEx
   }
 };

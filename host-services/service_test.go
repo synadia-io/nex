@@ -2,6 +2,7 @@ package hostservices
 
 import (
 	"errors"
+	"log/slog"
 	"slices"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ func TestBogusService(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4444)
 	defer teardownSuite(t)
 
-	server := NewHostServicesServer(nc)
+	server := NewHostServicesServer(nc, slog.Default())
 	client := NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 
 	boguss := bogusService{
@@ -76,7 +77,7 @@ func TestServiceError(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4445)
 	defer teardownSuite(t)
 
-	server := NewHostServicesServer(nc)
+	server := NewHostServicesServer(nc, slog.Default())
 	client := NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 
 	boguss := bogusService{

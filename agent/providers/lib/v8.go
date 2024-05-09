@@ -104,6 +104,7 @@ func (v *V8) Deploy() error {
 		}
 
 		runtimeNanos := time.Since(startTime).Nanoseconds()
+
 		err = msg.RespondMsg(&nats.Msg{
 			Data: val,
 			Header: nats.Header{
