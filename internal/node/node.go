@@ -271,9 +271,9 @@ func (n *Node) init() error {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
-		_err = n.startHostServicesConnection()
+		_err = n.startHostServicesConnection(n.nc)
 		if _err != nil {
-			n.log.Error("Failed to start host services connection", slog.Any("error", err))
+			n.log.Error("Failed to start host services connection", slog.Any("error", _err))
 			err = errors.Join(err, fmt.Errorf("failed to start host services NATS connection: %s", _err))
 		} else {
 			n.log.Info("Established host services NATS connection", slog.String("server", n.ncHostServices.Servers()[0]))
@@ -315,7 +315,7 @@ func (n *Node) init() error {
 	return err
 }
 
-func (n *Node) startHostServicesConnection() error {
+func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
 	if n.config.HostServicesConfiguration != nil {
 		natsOpts := []nats.Option{
 			nats.Name("nex-hostservices"),
@@ -329,11 +329,16 @@ func (n *Node) startHostServicesConnection() error {
 			)
 		}
 
-		nc, err := nats.Connect(n.config.HostServicesConfiguration.NatsUrl, natsOpts...)
-		if err != nil {
-			return err
+		if len(n.config.HostServicesConfiguration.NatsUrl) == 0 {
+			n.config.HostServicesConfiguration.NatsUrl = defaultConnection.Servers()[0]
+			n.ncHostServices = n.nc
+		} else {
+			nc, err := nats.Connect(n.config.HostServicesConfiguration.NatsUrl, natsOpts...)
+			if err != nil {
+				return err
+			}
+			n.ncHostServices = nc
 		}
-		n.ncHostServices = nc
 	} else {
 		n.ncHostServices = n.nc
 	}
