@@ -63,8 +63,9 @@ type Node struct {
 	natspub *server.Server
 	nc      *nats.Conn
 
-	natsint *server.Server
-	ncint   *nats.Conn
+	natsint        *server.Server
+	ncint          *nats.Conn
+	ncHostServices *nats.Conn
 
 	startedAt time.Time
 	telemetry *observability.Telemetry
@@ -259,6 +260,14 @@ func (n *Node) init() error {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
+		_err = n.startHostServicesConnection(n.nc)
+		if _err != nil {
+			n.log.Error("Failed to start host services connection", slog.Any("error", _err))
+			err = errors.Join(err, fmt.Errorf("failed to start host services NATS connection: %s", _err))
+		} else {
+			n.log.Info("Established host services NATS connection", slog.String("server", n.ncHostServices.Servers()[0]))
+		}
+
 		// start internal NATS server
 		_err = n.startInternalNATS()
 		if _err != nil {
@@ -268,7 +277,10 @@ func (n *Node) init() error {
 			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 		}
 
-		n.manager, _err = NewWorkloadManager(n.ctx, n.cancelF, n.keypair, n.publicKey, n.nc, n.ncint, n.config, n.log, n.telemetry)
+		n.manager, _err = NewWorkloadManager(n.ctx, n.cancelF,
+			n.keypair, n.publicKey,
+			n.nc, n.ncint, n.ncHostServices,
+			n.config, n.log, n.telemetry)
 		if _err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", _err))
 			err = errors.Join(err, _err)
@@ -290,6 +302,36 @@ func (n *Node) init() error {
 	})
 
 	return err
+}
+
+func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
+	if n.config.HostServicesConfiguration != nil {
+		natsOpts := []nats.Option{
+			nats.Name("nex-hostservices"),
+		}
+		if len(n.config.HostServicesConfiguration.NatsUserJwt) > 0 {
+			natsOpts = append(natsOpts,
+				nats.UserJWTAndSeed(
+					n.config.HostServicesConfiguration.NatsUserJwt,
+					n.config.HostServicesConfiguration.NatsUserSeed,
+				),
+			)
+		}
+
+		if len(n.config.HostServicesConfiguration.NatsUrl) == 0 {
+			n.config.HostServicesConfiguration.NatsUrl = defaultConnection.Servers()[0]
+			n.ncHostServices = n.nc
+		} else {
+			nc, err := nats.Connect(n.config.HostServicesConfiguration.NatsUrl, natsOpts...)
+			if err != nil {
+				return err
+			}
+			n.ncHostServices = nc
+		}
+	} else {
+		n.ncHostServices = n.nc
+	}
+	return nil
 }
 
 func (n *Node) startInternalNATS() error {

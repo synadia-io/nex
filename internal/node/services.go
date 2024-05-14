@@ -7,6 +7,7 @@ import (
 	"github.com/nats-io/nats.go"
 	hs "github.com/synadia-io/nex/host-services"
 	"github.com/synadia-io/nex/host-services/builtins"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 const hostServiceHTTP = "http"
@@ -18,20 +19,27 @@ const hostServiceObjectStore = "objectstore"
 // exposed to workloads by way of the agent which makes RPC calls
 // via the internal NATS connection
 type HostServices struct {
-	log   *slog.Logger
-	mgr   *WorkloadManager
-	nc    *nats.Conn
-	ncint *nats.Conn
+	log            *slog.Logger
+	mgr            *WorkloadManager
+	ncHostServices *nats.Conn
+	ncint          *nats.Conn
 
 	hsServer *hs.HostServicesServer
+	config   *models.HostServicesConfig
 }
 
-func NewHostServices(mgr *WorkloadManager, nc, ncint *nats.Conn, log *slog.Logger) *HostServices {
+func NewHostServices(
+	mgr *WorkloadManager,
+	ncint *nats.Conn,
+	ncHostServices *nats.Conn,
+	config *models.HostServicesConfig,
+	log *slog.Logger) *HostServices {
 	return &HostServices{
-		log:   log,
-		mgr:   mgr,
-		nc:    nc,
-		ncint: ncint,
+		log:            log,
+		mgr:            mgr,
+		ncHostServices: ncHostServices,
+		config:         config,
+		ncint:          ncint,
 		// ‼️ It cannot be overstated how important it is that the host services server
 		// be given the -internal- NATS connection and -not- the external/control one
 		//
@@ -42,55 +50,69 @@ func NewHostServices(mgr *WorkloadManager, nc, ncint *nats.Conn, log *slog.Logge
 }
 
 func (h *HostServices) init() error {
-	var err error
 
-	http, err := builtins.NewHTTPService(h.nc, h.log)
-	if err != nil {
-		h.log.Error(fmt.Sprintf("failed to initialize http host service: %s", err.Error()))
-		return err
-	} else {
-		h.log.Debug("initialized http host service")
+	if httpConfig, ok := h.config.Services[hostServiceHTTP]; ok {
+		if httpConfig.Enabled {
+			http, err := builtins.NewHTTPService(h.ncHostServices, h.log)
+			if err != nil {
+				h.log.Error(fmt.Sprintf("failed to initialize http host service: %s", err.Error()))
+				return err
+			} else {
+				h.log.Debug("initialized http host service")
+			}
+			err = h.hsServer.AddService(hostServiceHTTP, http, httpConfig.Configuration)
+			if err != nil {
+				return err
+			}
+		}
 	}
-	err = h.hsServer.AddService(hostServiceHTTP, http, make(map[string]string))
-	if err != nil {
-		return err
+	if kvConfig, ok := h.config.Services[hostServiceKeyValue]; ok {
+		if kvConfig.Enabled {
+			kv, err := builtins.NewKeyValueService(h.ncHostServices, h.log)
+			if err != nil {
+				h.log.Error(fmt.Sprintf("failed to initialize key/value host service: %s", err.Error()))
+				return err
+			} else {
+				h.log.Debug("initialized key/value host service")
+			}
+			err = h.hsServer.AddService(hostServiceKeyValue, kv, kvConfig.Configuration)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if messagingConfig, ok := h.config.Services[hostServiceMessaging]; ok {
+		if messagingConfig.Enabled {
+			messaging, err := builtins.NewMessagingService(h.ncHostServices, h.log)
+			if err != nil {
+				h.log.Error(fmt.Sprintf("failed to initialize messaging host service: %s", err.Error()))
+				return err
+			} else {
+				h.log.Debug("initialized messaging host service")
+			}
+			err = h.hsServer.AddService(hostServiceMessaging, messaging, messagingConfig.Configuration)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	if objectConfig, ok := h.config.Services[hostServiceObjectStore]; ok {
+		if objectConfig.Enabled {
+			object, err := builtins.NewObjectStoreService(h.ncHostServices, h.log)
+			if err != nil {
+				h.log.Error(fmt.Sprintf("failed to initialize object store host service: %s", err.Error()))
+				return err
+			} else {
+				h.log.Debug("initialized object store host service")
+			}
+			err = h.hsServer.AddService(hostServiceObjectStore, object, objectConfig.Configuration)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	kv, err := builtins.NewKeyValueService(h.nc, h.log)
-	if err != nil {
-		h.log.Error(fmt.Sprintf("failed to initialize key/value host service: %s", err.Error()))
-		return err
-	} else {
-		h.log.Debug("initialized key/value host service")
-	}
-	err = h.hsServer.AddService(hostServiceKeyValue, kv, make(map[string]string))
-	if err != nil {
-		return err
-	}
-
-	messaging, err := builtins.NewMessagingService(h.nc, h.log)
-	if err != nil {
-		h.log.Error(fmt.Sprintf("failed to initialize messaging host service: %s", err.Error()))
-		return err
-	} else {
-		h.log.Debug("initialized messaging host service")
-	}
-	err = h.hsServer.AddService(hostServiceMessaging, messaging, make(map[string]string))
-	if err != nil {
-		return err
-	}
-
-	object, err := builtins.NewObjectStoreService(h.nc, h.log)
-	if err != nil {
-		h.log.Error(fmt.Sprintf("failed to initialize object store host service: %s", err.Error()))
-		return err
-	} else {
-		h.log.Debug("initialized object store host service")
-	}
-	err = h.hsServer.AddService(hostServiceObjectStore, object, make(map[string]string))
-	if err != nil {
-		return err
-	}
+	h.log.Info("Host services configured", slog.Any("services", h.hsServer.Services()))
 
 	return h.hsServer.Start()
 }

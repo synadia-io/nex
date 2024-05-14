@@ -44,11 +44,17 @@ func TestKvBuiltin(t *testing.T) {
 	bClient := NewBuiltinServicesClient(client)
 
 	service, _ := NewKeyValueService(nc, slog.Default())
-	_ = server.AddService("kv", service, make(map[string]string))
+	err := server.AddService("kv", service, nil)
+	if err != nil {
+		t.Fatalf("Failed to add service: %s", err)
+	}
 
-	_ = server.Start()
+	err = server.Start()
+	if err != nil {
+		t.Fatalf("Failed to start server: %s", err)
+	}
 
-	_, err := bClient.KVSet("testone", []byte{9, 8, 7, 6, 5})
+	_, err = bClient.KVSet("testone", []byte{9, 8, 7, 6, 5})
 	if err != nil {
 		t.Fatalf("Got an error setting kv: %s", err.Error())
 	}
@@ -79,7 +85,7 @@ func TestMessagingBuiltin(t *testing.T) {
 	bClient := NewBuiltinServicesClient(client)
 
 	service, _ := NewMessagingService(nc, slog.Default())
-	_ = server.AddService("messaging", service, make(map[string]string))
+	_ = server.AddService("messaging", service, nil)
 	_ = server.Start()
 
 	wg := new(sync.WaitGroup)
@@ -105,7 +111,7 @@ func TestObjectBuiltin(t *testing.T) {
 	bClient := NewBuiltinServicesClient(client)
 
 	service, _ := NewObjectStoreService(nc, slog.Default())
-	_ = server.AddService("objectstore", service, make(map[string]string))
+	_ = server.AddService("objectstore", service, []byte{})
 	_ = server.Start()
 
 	res, err := bClient.ObjectPut("objecttest", []byte{100, 101, 102})

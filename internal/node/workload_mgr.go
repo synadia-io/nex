@@ -78,7 +78,7 @@ func NewWorkloadManager(
 	cancel context.CancelFunc,
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
-	nc, ncint *nats.Conn,
+	nc, ncint, ncHostServices *nats.Conn,
 	config *models.NodeConfiguration,
 	log *slog.Logger,
 	telemetry *observability.Telemetry,
@@ -118,7 +118,7 @@ func NewWorkloadManager(
 		return nil, err
 	}
 
-	w.hostServices = NewHostServices(w, nc, ncint, w.log)
+	w.hostServices = NewHostServices(w, ncint, ncHostServices, config.HostServicesConfiguration, w.log)
 	err = w.hostServices.init()
 	if err != nil {
 		w.log.Warn("Failed to initialize host services.", slog.Any("err", err))

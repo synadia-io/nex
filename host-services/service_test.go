@@ -1,6 +1,7 @@
 package hostservices
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"slices"
@@ -47,7 +48,7 @@ func TestBogusService(t *testing.T) {
 		data:    []byte{1, 2, 3, 4, 5, 6},
 	}
 
-	_ = server.AddService("boguss", &boguss, make(map[string]string, 0))
+	_ = server.AddService("boguss", &boguss, []byte{})
 
 	err := server.Start()
 	if err != nil {
@@ -86,7 +87,7 @@ func TestServiceError(t *testing.T) {
 		data:    []byte{1, 2, 3, 4, 5, 6},
 	}
 
-	_ = server.AddService("boguss", &boguss, make(map[string]string, 0))
+	_ = server.AddService("boguss", &boguss, []byte{})
 
 	err := server.Start()
 	if err != nil {
@@ -108,13 +109,13 @@ func TestServiceError(t *testing.T) {
 }
 
 type bogusService struct {
-	config  map[string]string
+	config  json.RawMessage
 	code    uint
 	message string
 	data    []byte
 }
 
-func (b *bogusService) Initialize(config map[string]string) error {
+func (b *bogusService) Initialize(config json.RawMessage) error {
 	b.config = config
 
 	return nil
