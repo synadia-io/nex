@@ -225,6 +225,7 @@ var _ = Describe("nex node", func() {
 						node = nil
 						nodeID = nil
 						nodeProxy = nil
+						nodeKey = nil
 					})
 
 					JustBeforeEach(func() {
