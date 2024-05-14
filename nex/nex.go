@@ -8,13 +8,13 @@ import (
 	"os"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
 	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/internal/models"
 	natslogger "github.com/synadia-io/nex/internal/nats-logger"
 	nextui "github.com/synadia-io/nex/nex/tui"
@@ -176,6 +176,10 @@ func main() {
 	}
 
 	logger := slog.New(shandler.NewHandler(handlerOpts...))
+	keypair, err := nkeys.CreateServer()
+	if err != nil {
+		panic(err)
+	}
 
 	stdoutWriters := []io.Writer{}
 	stderrWriters := []io.Writer{}
@@ -194,6 +198,8 @@ func main() {
 		}
 	}
 	if slices.Contains(Opts.Logger, "nats") {
+		natsLogSubject := fmt.Sprintf("$NEX.logs.%s.stdout")
+		natsErrLogSubject := fmt.Sprintf("$NEX.logs.%s.stderr")
 		nc, err := models.GenerateConnectionFromOpts(Opts, logger)
 		if err == nil {
 			defer func() {
@@ -205,8 +211,8 @@ func main() {
 					time.Sleep(time.Millisecond * 25)
 				}
 			}()
-			stdoutWriters = append(stdoutWriters, natslogger.NewNatsLogger(nc, "stdout"))
-			stderrWriters = append(stderrWriters, natslogger.NewNatsLogger(nc, "stderr"))
+			stdoutWriters = append(stdoutWriters, natslogger.NewNatsLogger(nc, natsLogSubject))
+			stderrWriters = append(stderrWriters, natslogger.NewNatsLogger(nc, natsErrLogSubject))
 		}
 	}
 
@@ -262,7 +268,7 @@ func main() {
 			logger.Error("failed to start event watcher", slog.Any("err", err))
 		}
 	case nodeUp.FullCommand():
-		err := RunNodeUp(ctx, logger)
+		err := RunNodeUp(ctx, logger, keypair)
 		if err != nil {
 			logger.Error("failed to start node", slog.Any("err", err))
 		}

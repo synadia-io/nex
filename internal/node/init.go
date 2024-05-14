@@ -6,11 +6,19 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/nats-io/nkeys"
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
 
-func CmdUp(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx context.Context, cancel context.CancelFunc, log *slog.Logger) error {
-	node, err := NewNode(opts, nodeopts, ctx, cancel, log)
+func CmdUp(
+	opts *nexmodels.Options,
+	nodeopts *nexmodels.NodeOptions,
+	ctx context.Context,
+	cancel context.CancelFunc,
+	keypair nkeys.KeyPair,
+	log *slog.Logger) error {
+
+	node, err := NewNode(keypair, opts, nodeopts, ctx, cancel, log)
 	if err != nil {
 		return fmt.Errorf("failed to initialize node: %s", err)
 	}

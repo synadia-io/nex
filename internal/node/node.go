@@ -70,7 +70,13 @@ type Node struct {
 	telemetry *observability.Telemetry
 }
 
-func NewNode(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Context, cancelF context.CancelFunc, log *slog.Logger) (*Node, error) {
+func NewNode(
+	keypair nkeys.KeyPair,
+	opts *models.Options,
+	nodeOpts *models.NodeOptions,
+	ctx context.Context,
+	cancelF context.CancelFunc,
+	log *slog.Logger) (*Node, error) {
 	node := &Node{
 		ctx:      ctx,
 		cancelF:  cancelF,
@@ -89,12 +95,8 @@ func NewNode(opts *models.Options, nodeOpts *models.NodeOptions, ctx context.Con
 		return nil, fmt.Errorf("failed to create node: %s", err.Error())
 	}
 
-	err = node.generateKeypair()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate keypair for node: %s", err)
-	} else {
-		node.log.Info("Generated keypair for node", slog.String("public_key", node.publicKey))
-	}
+	node.keypair = keypair
+	_, err = node.keypair.PublicKey()
 
 	return node, nil
 }
@@ -212,22 +214,6 @@ func (n *Node) createPid() error {
 	}
 
 	n.log.Debug(fmt.Sprintf("Wrote pidfile to %s", n.pidFilepath), slog.Int("pid", os.Getpid()))
-	return nil
-}
-
-func (n *Node) generateKeypair() error {
-	var err error
-
-	n.keypair, err = nkeys.CreateServer()
-	if err != nil {
-		return fmt.Errorf("failed to generate node keypair: %s", err)
-	}
-
-	n.publicKey, err = n.keypair.PublicKey()
-	if err != nil {
-		return fmt.Errorf("failed to encode public key: %s", err)
-	}
-
 	return nil
 }
 
