@@ -52,7 +52,7 @@ type Options struct {
 	// Namespace for scoping workload requests
 	Namespace string
 	// Type of logger
-	Logger string
+	Logger []string
 	// LogLevel is the log level to use
 	LogLevel string
 	// LogJSON enables JSON logging
