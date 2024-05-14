@@ -53,7 +53,7 @@ func (o *ObjectStoreService) Initialize(config json.RawMessage) error {
 	o.config.JitProvision = true
 	o.config.MaxBytes = defaultMaxBytes
 
-	if config != nil && len(config) > 0 {
+	if len(config) > 0 {
 		err := json.Unmarshal(config, &o.config)
 		if err != nil {
 			return err

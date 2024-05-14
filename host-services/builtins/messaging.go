@@ -46,7 +46,7 @@ func (m *MessagingService) Initialize(config json.RawMessage) error {
 	m.config.RequestManyTimeoutMs = int(defaultMessagingRequestManyTimeout)
 	m.config.RequestTimeoutMs = int(defaultMessagingRequestTimeout)
 
-	if config != nil && len(config) > 0 {
+	if len(config) > 0 {
 		err := json.Unmarshal(config, &m.config)
 		if err != nil {
 			return err

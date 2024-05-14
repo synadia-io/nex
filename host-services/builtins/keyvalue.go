@@ -44,7 +44,7 @@ func (k *KeyValueService) Initialize(config json.RawMessage) error {
 	k.config.JitProvision = true
 	k.config.MaxBytes = 524288
 
-	if config != nil && len(config) > 0 {
+	if len(config) > 0 {
 		err := json.Unmarshal(config, &k.config)
 		if err != nil {
 			return err

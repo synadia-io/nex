@@ -26,7 +26,7 @@ func NewHostServicesServer(nc *nats.Conn, log *slog.Logger) *HostServicesServer 
 
 func (h *HostServicesServer) Services() []string {
 	result := make([]string, 0)
-	for k, _ := range h.services {
+	for k := range h.services {
 		result = append(result, k)
 	}
 
