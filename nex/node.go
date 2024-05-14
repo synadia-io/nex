@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/nats-io/nkeys"
 	nexnode "github.com/synadia-io/nex/internal/node"
 )
 
@@ -24,9 +25,9 @@ func setConditionalCommands() {
 	nodePreflight.Flag("init", "creates the configuration file if it does not exist").EnumVar(&NodeOpts.PreflightInit, "sandbox", "nosandbox")
 }
 
-func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
+func RunNodeUp(ctx context.Context, logger *slog.Logger, keypair nkeys.KeyPair) error {
 	ctx, cancel := context.WithCancel(newContext(ctx))
-	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, logger)
+	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, keypair, logger)
 	if err != nil {
 		return err
 	}

@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/fatih/color"
 	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/internal/models"
 	natslogger "github.com/synadia-io/nex/internal/nats-logger"
 	nextui "github.com/synadia-io/nex/nex/tui"
@@ -79,7 +82,7 @@ func init() {
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
-	ncli.Flag("logger", "How to log").Default("std").Envar("NEX_LOGGER").EnumVar(&Opts.Logger, "std", "file", "nats")
+	ncli.Flag("logger", "How to log").Default("std").Envar("NEX_LOGGER").StringsVar(&Opts.Logger) // Valid options: "std", "file", "nats"
 	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "debug", "info", "warn", "error")
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").UnNegatableBoolVar(&Opts.LogJSON)
 	ncli.Flag("logcolor", "Prints text logs with color").Envar("NEX_LOG_COLORIZED").Default("false").UnNegatableBoolVar(&Opts.LogsColorized)
@@ -173,35 +176,49 @@ func main() {
 	}
 
 	logger := slog.New(shandler.NewHandler(handlerOpts...))
-	switch Opts.Logger {
-	case "nats":
-		nc, err := models.GenerateConnectionFromOpts(Opts, logger)
-		if err != nil {
-			break
-		}
-		defer func() {
-			err := nc.Drain()
-			if err != nil {
-				logger.Error("Drain error", slog.Any("err", err))
-			}
-			for !nc.IsClosed() {
-				time.Sleep(time.Millisecond * 25)
-			}
-		}()
-		handlerOpts = append(handlerOpts, shandler.WithStdOut(natslogger.NewNatsLogger(nc, "stdout")))
-		handlerOpts = append(handlerOpts, shandler.WithStdErr(natslogger.NewNatsLogger(nc, "stderr")))
-	case "file":
-		stdout, err := os.Create("nex.log")
-		if err != nil {
-			break
-		}
-		stderr, err := os.Create("nex.err")
-		if err != nil {
-			break
-		}
-		handlerOpts = append(handlerOpts, shandler.WithStdOut(stdout))
-		handlerOpts = append(handlerOpts, shandler.WithStdErr(stderr))
+	keypair, err := nkeys.CreateServer()
+	if err != nil {
+		panic(err)
 	}
+	pk, _ := keypair.PublicKey()
+
+	stdoutWriters := []io.Writer{}
+	stderrWriters := []io.Writer{}
+	if slices.Contains(Opts.Logger, "std") {
+		stdoutWriters = append(stdoutWriters, os.Stdout)
+		stderrWriters = append(stderrWriters, os.Stderr)
+	}
+	if slices.Contains(Opts.Logger, "file") {
+		stdout, err := os.Create("nex.log")
+		if err == nil {
+			stderr, err := os.Create("nex.err")
+			if err == nil {
+				stdoutWriters = append(stdoutWriters, stdout)
+				stderrWriters = append(stderrWriters, stderr)
+			}
+		}
+	}
+	if slices.Contains(Opts.Logger, "nats") {
+		natsLogSubject := fmt.Sprintf("$NEX.logs.%s.stdout", pk)
+		natsErrLogSubject := fmt.Sprintf("$NEX.logs.%s.stderr", pk)
+		nc, err := models.GenerateConnectionFromOpts(Opts, logger)
+		if err == nil {
+			defer func() {
+				err := nc.Drain()
+				if err != nil {
+					logger.Error("Drain error", slog.Any("err", err))
+				}
+				for !nc.IsClosed() {
+					time.Sleep(time.Millisecond * 25)
+				}
+			}()
+			stdoutWriters = append(stdoutWriters, natslogger.NewNatsLogger(nc, natsLogSubject))
+			stderrWriters = append(stderrWriters, natslogger.NewNatsLogger(nc, natsErrLogSubject))
+		}
+	}
+
+	handlerOpts = append(handlerOpts, shandler.WithStdOut(stdoutWriters...))
+	handlerOpts = append(handlerOpts, shandler.WithStdErr(stderrWriters...))
 
 	logger = slog.New(shandler.NewHandler(handlerOpts...))
 
@@ -252,7 +269,7 @@ func main() {
 			logger.Error("failed to start event watcher", slog.Any("err", err))
 		}
 	case nodeUp.FullCommand():
-		err := RunNodeUp(ctx, logger)
+		err := RunNodeUp(ctx, logger, keypair)
 		if err != nil {
 			logger.Error("failed to start node", slog.Any("err", err))
 		}

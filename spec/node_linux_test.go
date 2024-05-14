@@ -60,12 +60,16 @@ var _ = Describe("nex node", func() {
 	var snapshotAgentRootFSPath string
 	var snapshotAgentRootFSPathOnce sync.Once
 
+	var keypair nkeys.KeyPair
+
 	BeforeEach(func() {
 		initData := map[string]string{
 			"version":    "spec",
 			"commit":     "abc123",
 			"build_date": "2021-01-01T00:00:00Z",
 		}
+
+		keypair, _ = nkeys.CreateServer()
 
 		ctxx, cancel = context.WithCancel(context.WithValue(context.Background(), "build_data", initData)) //nolint:all
 		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
@@ -216,7 +220,7 @@ var _ = Describe("nex node", func() {
 			})
 
 			It("should return an error", func(ctx SpecContext) {
-				err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
+				err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, keypair, log)
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: no such file or directory", nodeOpts.ConfigFilepath)))
 			})
@@ -246,7 +250,7 @@ var _ = Describe("nex node", func() {
 					})
 
 					It("should [not] return an error", func(ctx SpecContext) {
-						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
+						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, keypair, log)
 						Expect(err).ToNot(BeNil())
 						Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
 					})
@@ -280,7 +284,7 @@ var _ = Describe("nex node", func() {
 						err = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 						Expect(err).To(BeNil())
 
-						node, err = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
+						node, err = nexnode.NewNode(keypair, opts, nodeOpts, ctxx, cancel, log)
 						Expect(err).To(BeNil())
 						Expect(node).ToNot(BeNil())
 
