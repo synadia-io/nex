@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 
 	"github.com/nats-io/nats.go"
 	hostservices "github.com/synadia-io/nex/host-services"
@@ -17,8 +18,15 @@ const kvServiceMethodDelete = "delete"
 const kvServiceMethodKeys = "keys"
 
 type KeyValueService struct {
-	log *slog.Logger
-	nc  *nats.Conn
+	log    *slog.Logger
+	nc     *nats.Conn
+	config kvConfig
+}
+
+type kvConfig struct {
+	BucketName   string `json:"bucket_name"`
+	MaxBytes     int    `json:"max_bytes"`
+	JitProvision bool   `json:"jit_provision"`
 }
 
 func NewKeyValueService(nc *nats.Conn, log *slog.Logger) (*KeyValueService, error) {
@@ -30,7 +38,19 @@ func NewKeyValueService(nc *nats.Conn, log *slog.Logger) (*KeyValueService, erro
 	return kv, nil
 }
 
-func (k *KeyValueService) Initialize(_ map[string]string) error {
+func (k *KeyValueService) Initialize(config json.RawMessage) error {
+
+	k.config.BucketName = "hs_${namespace}_${workload_name}_kv"
+	k.config.JitProvision = true
+	k.config.MaxBytes = 524288
+
+	if config != nil && len(config) > 0 {
+		err := json.Unmarshal(config, &k.config)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -170,12 +190,16 @@ func (k *KeyValueService) resolveKeyValueStore(namespace, workload string) (nats
 		return nil, err
 	}
 
-	kvStoreName := fmt.Sprintf("hs_%s_%s_kv", namespace, workload)
+	reWorkload := regexp.MustCompile(`(?i)\$\{workload_name\}`)
+	reNamespace := regexp.MustCompile(`(?i)\$\{namespace\}`)
+
+	kvStoreName := reWorkload.ReplaceAllString(k.config.BucketName, workload)
+	kvStoreName = reNamespace.ReplaceAllString(kvStoreName, namespace)
+
 	kvStore, err := js.KeyValue(kvStoreName)
 	if err != nil {
-		if errors.Is(err, nats.ErrBucketNotFound) {
-			// TODO: make this configurable after kubecon
-			kvStore, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: kvStoreName, MaxBytes: 524288})
+		if errors.Is(err, nats.ErrBucketNotFound) && k.config.JitProvision {
+			kvStore, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: kvStoreName, MaxBytes: int64(k.config.MaxBytes)})
 			if err != nil {
 				return nil, err
 			}

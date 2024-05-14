@@ -1,6 +1,7 @@
 package hostservices
 
 import (
+	"encoding/json"
 	"fmt"
 )
 
@@ -41,7 +42,7 @@ func ServiceResultPass(code uint, message string, data []byte) ServiceResult {
 }
 
 type HostService interface {
-	Initialize(map[string]string) error
+	Initialize(json.RawMessage) error
 	HandleRequest(namespace string,
 		workloadId string,
 		method string,

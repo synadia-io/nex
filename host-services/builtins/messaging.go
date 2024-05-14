@@ -11,15 +11,25 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-const messagingServiceMethodPublish = "publish"
-const messagingServiceMethodRequest = "request"
-const messagingServiceMethodRequestMany = "requestMany"
+const (
+	messagingServiceMethodPublish     = "publish"
+	messagingServiceMethodRequest     = "request"
+	messagingServiceMethodRequestMany = "requestMany"
 
-const messagingRequestTimeout = time.Millisecond * 750 // FIXME-- make timeout configurable per request?
+	defaultMessagingRequestTimeout     = time.Millisecond * 750
+	defaultMessagingRequestManyTimeout = time.Second * 3
+)
 
 type MessagingService struct {
 	log *slog.Logger
 	nc  *nats.Conn
+
+	config messagingConfig
+}
+
+type messagingConfig struct {
+	RequestTimeoutMs     int `json:"request_timeout_ms"`
+	RequestManyTimeoutMs int `json:"request_many_timeout_ms"`
 }
 
 func NewMessagingService(nc *nats.Conn, log *slog.Logger) (*MessagingService, error) {
@@ -31,7 +41,18 @@ func NewMessagingService(nc *nats.Conn, log *slog.Logger) (*MessagingService, er
 	return messaging, nil
 }
 
-func (m *MessagingService) Initialize(_ map[string]string) error {
+func (m *MessagingService) Initialize(config json.RawMessage) error {
+
+	m.config.RequestManyTimeoutMs = int(defaultMessagingRequestManyTimeout)
+	m.config.RequestTimeoutMs = int(defaultMessagingRequestTimeout)
+
+	if config != nil && len(config) > 0 {
+		err := json.Unmarshal(config, &m.config)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -88,7 +109,7 @@ func (m *MessagingService) handleRequest(_, _ string,
 		return hostservices.ServiceResultFail(400, "subject is required"), nil
 	}
 
-	resp, err := m.nc.Request(subject, data, messagingRequestTimeout)
+	resp, err := m.nc.Request(subject, data, time.Duration(m.config.RequestTimeoutMs*int(time.Millisecond)))
 	if err != nil {
 		m.log.Debug(fmt.Sprintf("failed to send %d-byte request on subject %s: %s", len(data), subject, err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to send request"), nil

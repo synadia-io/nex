@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"regexp"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -15,14 +16,26 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-const objectStoreServiceMethodGet = "get"
-const objectStoreServiceMethodPut = "put"
-const objectStoreServiceMethodDelete = "delete"
-const objectStoreServiceMethodList = "list"
+const (
+	objectStoreServiceMethodGet    = "get"
+	objectStoreServiceMethodPut    = "put"
+	objectStoreServiceMethodDelete = "delete"
+	objectStoreServiceMethodList   = "list"
+
+	defaultMaxBytes   = 524288
+	defaultBucketName = "hs_${namespace}_${workload_name}_obj"
+)
 
 type ObjectStoreService struct {
-	log *slog.Logger
-	nc  *nats.Conn
+	log    *slog.Logger
+	nc     *nats.Conn
+	config objectStoreConfig
+}
+
+type objectStoreConfig struct {
+	BucketName   string `json:"bucket_name"`
+	MaxBytes     int    `json:"max_bytes"`
+	JitProvision bool   `json:"jit_provision"`
 }
 
 func NewObjectStoreService(nc *nats.Conn, log *slog.Logger) (*ObjectStoreService, error) {
@@ -34,7 +47,19 @@ func NewObjectStoreService(nc *nats.Conn, log *slog.Logger) (*ObjectStoreService
 	return objectStore, nil
 }
 
-func (o *ObjectStoreService) Initialize(_ map[string]string) error {
+func (o *ObjectStoreService) Initialize(config json.RawMessage) error {
+
+	o.config.BucketName = defaultBucketName
+	o.config.JitProvision = true
+	o.config.MaxBytes = defaultMaxBytes
+
+	if config != nil && len(config) > 0 {
+		err := json.Unmarshal(config, &o.config)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -181,18 +206,23 @@ func (o *ObjectStoreService) handleList(_, workload string,
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-// resolve the object store for the given workload; initialize it if necessary
+// resolve the object store for the given workload; initialize it if necessary & configured to do so
 func (o *ObjectStoreService) resolveObjectStore(namespace, workload string) (nats.ObjectStore, error) {
 	js, err := o.nc.JetStream()
 	if err != nil {
 		return nil, err
 	}
 
-	objectStoreName := fmt.Sprintf("hs_%s_%s_os", namespace, workload)
+	reWorkload := regexp.MustCompile(`(?i)\$\{workload_name\}`)
+	reNamespace := regexp.MustCompile(`(?i)\$\{namespace\}`)
+
+	objectStoreName := reWorkload.ReplaceAllString(o.config.BucketName, workload)
+	objectStoreName = reNamespace.ReplaceAllString(objectStoreName, namespace)
+
 	objectStore, err := js.ObjectStore(objectStoreName)
 	if err != nil {
-		if errors.Is(err, nats.ErrStreamNotFound) {
-			objectStore, err = js.CreateObjectStore(&nats.ObjectStoreConfig{Bucket: objectStoreName, MaxBytes: 524288}) // FIXME-- make configurable
+		if errors.Is(err, nats.ErrStreamNotFound) && o.config.JitProvision {
+			objectStore, err = js.CreateObjectStore(&nats.ObjectStoreConfig{Bucket: objectStoreName, MaxBytes: int64(o.config.MaxBytes)})
 			if err != nil {
 				return nil, err
 			}

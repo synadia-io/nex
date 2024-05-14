@@ -1,0 +1,42 @@
+{
+    "default_resource_dir": "/tmp/wd",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "tags": {
+        "simple": "true"
+    },
+    "host_services": {
+        "nats_url": "nats://0.0.0.0:4222",
+        "nats_user_jwt": "",
+        "nats_user_seed": "",
+        "services": {
+            "kv": {
+                "enabled": true,
+                "config": {
+                    "bucket_name": "SAMPLEHSKV_${namespace}_${workload_name}",
+                    "max_bytes": 0,
+                    "jit_provision": false
+                }
+            },
+            "messaging": {
+                "enabled": true,
+                "config": {}
+            },
+            "objectstore": {
+                "enabled": true,
+                "config": {}
+            },
+            "http": {
+                "enabled": false,
+                "config": {}
+            }
+        }
+    }
+}

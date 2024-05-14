@@ -35,7 +35,7 @@ func NewHTTPService(nc *nats.Conn, log *slog.Logger) (*HTTPService, error) {
 	return http, nil
 }
 
-func (h *HTTPService) Initialize(_ map[string]string) error {
+func (h *HTTPService) Initialize(_ json.RawMessage) error {
 	return nil
 }
 

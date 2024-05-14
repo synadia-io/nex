@@ -1,6 +1,7 @@
 package hostservices
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -9,21 +10,30 @@ import (
 )
 
 type HostServicesServer struct {
-	nc       *nats.Conn
-	services map[string]HostService
+	ncInternal *nats.Conn
+	services   map[string]HostService
 
 	log *slog.Logger
 }
 
 func NewHostServicesServer(nc *nats.Conn, log *slog.Logger) *HostServicesServer {
 	return &HostServicesServer{
-		nc:       nc,
-		log:      log,
-		services: make(map[string]HostService),
+		ncInternal: nc,
+		log:        log,
+		services:   make(map[string]HostService),
 	}
 }
 
-func (h *HostServicesServer) AddService(name string, svc HostService, config map[string]string) error {
+func (h *HostServicesServer) Services() []string {
+	result := make([]string, 0)
+	for k, _ := range h.services {
+		result = append(result, k)
+	}
+
+	return result
+}
+
+func (h *HostServicesServer) AddService(name string, svc HostService, config json.RawMessage) error {
 	err := svc.Initialize(config)
 	if err != nil {
 		return err
@@ -34,7 +44,7 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config map
 }
 
 func (h *HostServicesServer) Start() error {
-	_, err := h.nc.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
+	_, err := h.ncInternal.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
 		return err
 	}
@@ -61,6 +71,7 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 
 	service, ok := h.services[serviceName]
 	if !ok {
+		fmt.Printf("%+v", h.services)
 		serverMsg := serverFailMessage(msg.Reply, 404, fmt.Sprintf("No such host service: %s", serviceName))
 		_ = msg.RespondMsg(serverMsg)
 		return
