@@ -71,7 +71,6 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 
 	service, ok := h.services[serviceName]
 	if !ok {
-		fmt.Printf("%+v", h.services)
 		serverMsg := serverFailMessage(msg.Reply, 404, fmt.Sprintf("No such host service: %s", serviceName))
 		_ = msg.RespondMsg(serverMsg)
 		return
