@@ -41,6 +41,7 @@ var _ = Describe("nex node", func() {
 
 	var opts *models.Options
 	var nodeOpts *models.NodeOptions
+	var nodeKey nkeys.KeyPair
 
 	var nodeConfig models.NodeConfiguration
 
@@ -168,7 +169,7 @@ var _ = Describe("nex node", func() {
 			})
 
 			It("should return an error", func(ctx SpecContext) {
-				err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
+				err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, nodeKey, log)
 				Expect(err).ToNot(BeNil())
 				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: The system cannot find the file specified", nodeOpts.ConfigFilepath)))
 			})
@@ -180,6 +181,7 @@ var _ = Describe("nex node", func() {
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 
 				nodeConfig.NoSandbox = !sandbox
+				nodeKey, _ = nkeys.CreateServer()
 			})
 
 			JustBeforeEach(func() {
@@ -198,7 +200,7 @@ var _ = Describe("nex node", func() {
 					})
 
 					It("should not return an error", func(ctx SpecContext) {
-						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, log)
+						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, nodeKey, log)
 						Expect(err).To(BeNil())
 					})
 				})
@@ -229,7 +231,7 @@ var _ = Describe("nex node", func() {
 						var err error
 
 						_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-						node, err = nexnode.NewNode(opts, nodeOpts, ctxx, cancel, log)
+						node, err = nexnode.NewNode(nodeKey, opts, nodeOpts, ctxx, cancel, log)
 						Expect(err).To(BeNil())
 
 						go node.Start()
