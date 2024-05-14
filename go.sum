@@ -197,8 +197,6 @@ github.com/jedib0t/go-pretty/v6 v6.5.8 h1:8BCzJdSvUbaDuRba4YVh+SKMGcAAKdkcF3SVFb
 github.com/jedib0t/go-pretty/v6 v6.5.8/go.mod h1:zbn98qrYlh95FIhwwsbIip0LYpwSG8SUOScs+v9/t0E=
 github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240422123121-239cc054eb0a h1:HAp7k1pz8Ecz1nq/bBYKwxHY0Dc932K28G3om15Gvhg=
 github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240422123121-239cc054eb0a/go.mod h1:bZQpQss4wFMwC7vku5/hQc1IpG+IemXqzNPUB/h8LdA=
-github.com/jordan-rash/slog-handler v0.0.0-20240514143022-82f784c2d31a h1:m+e1JT4L7JJkv/cVGGA72caXOA9mGle+iD6j9+Qf9oA=
-github.com/jordan-rash/slog-handler v0.0.0-20240514143022-82f784c2d31a/go.mod h1:ZXgFXP35hKZTDjbTUFow7epfEoCkazXwe/mQBqAHaX0=
 github.com/jordan-rash/slog-handler v0.0.0-20240514154657-1f72d9d2d911 h1:CoPeVFn7XpyZz5O5YLd1wmJ8PG7NPK/9CJSyKILMvEY=
 github.com/jordan-rash/slog-handler v0.0.0-20240514154657-1f72d9d2d911/go.mod h1:ZXgFXP35hKZTDjbTUFow7epfEoCkazXwe/mQBqAHaX0=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=

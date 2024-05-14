@@ -5,6 +5,8 @@ package main
 import (
 	"context"
 	"log/slog"
+
+	"github.com/nats-io/nkeys"
 )
 
 func setConditionalCommands() {
@@ -12,7 +14,7 @@ func setConditionalCommands() {
 	nodePreflight = nodes.Command("preflight", "Checks system for node requirements and installs missing").Hidden()
 }
 
-func RunNodeUp(ctx context.Context, logger *slog.Logger) error {
+func RunNodeUp(ctx context.Context, logger *slog.Logger, keypair nkeys.KeyPair) error {
 	return nil
 }
 

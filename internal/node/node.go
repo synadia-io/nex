@@ -96,7 +96,10 @@ func NewNode(
 	}
 
 	node.keypair = keypair
-	node.publicKey, _ = node.keypair.PublicKey()
+	node.publicKey, err = node.keypair.PublicKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract public key: %s", err.Error())
+	}
 
 	return node, nil
 }
