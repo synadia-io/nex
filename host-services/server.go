@@ -1,23 +1,28 @@
 package hostservices
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type HostServicesServer struct {
+	ctx        context.Context
+	log        *slog.Logger
 	ncInternal *nats.Conn
 	services   map[string]HostService
-
-	log *slog.Logger
 }
 
-func NewHostServicesServer(nc *nats.Conn, log *slog.Logger) *HostServicesServer {
+func NewHostServicesServer(ctx context.Context, nc *nats.Conn, log *slog.Logger) *HostServicesServer {
 	return &HostServicesServer{
+		ctx:        ctx,
 		ncInternal: nc,
 		log:        log,
 		services:   make(map[string]HostService),
@@ -81,6 +86,12 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		metadata[k] = v[0]
 	}
 
+	cctx := otel.GetTextMapPropagator().Extract(h.ctx, propagation.HeaderCarrier(msg.Header))
+	span := trace.SpanFromContext(cctx)
+	defer span.End()
+
+	// TODO-- trace the things
+
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
 		// TODO: log the err.Error()
@@ -91,7 +102,6 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
-
 }
 
 func serverFailMessage(reply string, code uint, message string) *nats.Msg {

@@ -478,9 +478,6 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 
 		resp, err := agentClient.RunTrigger(ctx, w.t.Tracer, msg.Subject, msg.Data)
 
-		//for reference - this is what agent exec would do
-		//ctx = otel.GetTextMapPropagator().Extract(cctx, propagation.HeaderCarrier(msg.Header))
-
 		parentSpan.AddEvent("Completed internal request")
 		if err != nil {
 			parentSpan.SetStatus(codes.Error, "Internal trigger request failed")

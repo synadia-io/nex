@@ -220,8 +220,6 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 
 	otel.GetTextMapPropagator().Inject(cctx, propagation.HeaderCarrier(intmsg.Header))
 
-	// TODO: make the agent's exec handler extract and forward the otel context
-	// so it continues in the host services like kv, obj, msg, etc
 	resp, err := a.nc.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
 	childSpan.End()
 
