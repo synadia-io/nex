@@ -90,15 +90,18 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 	span := trace.SpanFromContext(cctx)
 	defer span.End()
 
-	// TODO-- trace the things
+	span.AddEvent("Attempting host service RPC request")
 
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
+		span.RecordError(err)
 		// TODO: log the err.Error()
 		serverMsg := serverFailMessage(msg.Reply, 500, fmt.Sprintf("Failed to execute host service method: %s", err.Error()))
 		_ = msg.RespondMsg(serverMsg)
 		return
 	}
+
+	span.AddEvent("Host service RPC request succeeded")
 
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
