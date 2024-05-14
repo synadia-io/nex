@@ -180,6 +180,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	pk, _ := keypair.PublicKey()
 
 	stdoutWriters := []io.Writer{}
 	stderrWriters := []io.Writer{}
@@ -198,8 +199,8 @@ func main() {
 		}
 	}
 	if slices.Contains(Opts.Logger, "nats") {
-		natsLogSubject := fmt.Sprintf("$NEX.logs.%s.stdout")
-		natsErrLogSubject := fmt.Sprintf("$NEX.logs.%s.stderr")
+		natsLogSubject := fmt.Sprintf("$NEX.logs.%s.stdout", pk)
+		natsErrLogSubject := fmt.Sprintf("$NEX.logs.%s.stderr", pk)
 		nc, err := models.GenerateConnectionFromOpts(Opts, logger)
 		if err == nil {
 			defer func() {

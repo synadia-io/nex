@@ -96,7 +96,7 @@ func NewNode(
 	}
 
 	node.keypair = keypair
-	_, err = node.keypair.PublicKey()
+	node.publicKey, err = node.keypair.PublicKey()
 
 	return node, nil
 }
