@@ -144,7 +144,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		Tags:            tags,
 		WorkloadTypes:   DefaultWorkloadTypes,
 		HostServicesConfiguration: &HostServicesConfig{
-			NatsUrl:      "0.0.0.0:4222",
+			NatsUrl:      "", // this will trigger logic to re-use the main connection
 			NatsUserJwt:  "",
 			NatsUserSeed: "",
 			Services: map[string]ServiceConfig{
