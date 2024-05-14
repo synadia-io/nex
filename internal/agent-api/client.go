@@ -25,6 +25,7 @@ type LogCallback func(string, LogEntry)
 const (
 	NexTriggerSubject = "x-nex-trigger-subject"
 	NexRuntimeNs      = "x-nex-runtime-ns"
+	OtelTraceparent   = "Traceparent"
 
 	HttpURLHeader = "x-http-url"
 

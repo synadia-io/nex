@@ -108,7 +108,8 @@ func (v *V8) Deploy() error {
 		err = msg.RespondMsg(&nats.Msg{
 			Data: val,
 			Header: nats.Header{
-				agentapi.NexRuntimeNs: []string{strconv.FormatInt(runtimeNanos, 10)},
+				agentapi.NexRuntimeNs:    []string{strconv.FormatInt(runtimeNanos, 10)},
+				agentapi.OtelTraceparent: msg.Header.Values(agentapi.OtelTraceparent),
 			},
 		})
 		if err != nil {
