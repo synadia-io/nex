@@ -5,10 +5,6 @@ import (
 	"log/slog"
 )
 
-var typeMap = map[string]any{
-	"main.globals": globals{},
-}
-
 type configCmd struct {
 	Conf    string `default:"all" enum:"all,global,node,run,devrun,stop,monitor,rootfs,lame,upgrade" help:"View current config"`
 	Outfile string `help:"Save final config to file" placeholder:"nex.json"`

@@ -71,6 +71,10 @@ type globals struct {
 	LogJSON bool `env:"NEX_LOG_JSON" default:"false" group:"Logger Configuration" json:"globals_logger_json"`
 }
 
+func (g globals) Validate() error {
+	return nil
+}
+
 func (g globals) Table() error {
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleRounded)

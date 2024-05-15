@@ -37,6 +37,10 @@ func (r rootfsOptions) Table() error {
 	return nil
 }
 
+func (rootfsOptions) Validate() error {
+	return nil
+}
+
 func (r rootfsOptions) Run(ctx Context) error {
 	return nil
 }

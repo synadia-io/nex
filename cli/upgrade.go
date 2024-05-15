@@ -9,3 +9,7 @@ func (u upgradeOptions) Run(ctx Context) error {
 func (u upgradeOptions) Table() error {
 	return nil
 }
+
+func (u upgradeOptions) Validate() error {
+	return nil
+}

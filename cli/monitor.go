@@ -16,6 +16,11 @@ type monitorOptions struct {
 	Level      string `default:"info" enum:"debug,warn,info,error" help:"Level of logs to monitor" group:"Monitor Configuration"`
 }
 
+func (m monitorOptions) Validate() error {
+	fmt.Println("Validating monitor options")
+	return nil
+}
+
 func (m monitorOptions) Table() error {
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleRounded)

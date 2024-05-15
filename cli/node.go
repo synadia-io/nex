@@ -9,6 +9,11 @@ type nodeOptions struct {
 	NodeExtendedCmds `json:"-"`
 }
 
+func (n nodeOptions) Validate() error {
+	fmt.Println("running node validate")
+	return nil
+}
+
 type ListCmd struct{}
 
 func (l ListCmd) Run() error {

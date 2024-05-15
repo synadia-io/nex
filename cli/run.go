@@ -71,6 +71,10 @@ func (r runOptions) Run(ctx Context) error {
 	return nil
 }
 
+func (r runOptions) Validate() error {
+	return nil
+}
+
 func (r runOptions) Table() error {
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleRounded)

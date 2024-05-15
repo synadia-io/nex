@@ -18,6 +18,10 @@ func (s stopOptions) Run(ctx Context) error {
 	return nil
 }
 
+func (s stopOptions) Validate() error {
+	return nil
+}
+
 func (s stopOptions) Table() error {
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleRounded)

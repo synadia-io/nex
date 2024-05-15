@@ -42,12 +42,9 @@ func main() {
 		},
 	)
 
-	err := cliCtx.Validate()
-	cliCtx.FatalIfErrorf(err)
-
 	logger = configLogger(nCLI.Global)
 
-	err = cliCtx.Run(Context{nCLI, logger})
+	err := cliCtx.Run(Context{nCLI, logger})
 	cliCtx.FatalIfErrorf(err)
 }
 
