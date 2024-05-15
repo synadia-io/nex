@@ -98,7 +98,7 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		))
 	defer span.End()
 
-	span.AddEvent("RPC request")
+	span.AddEvent("RPC Request Began")
 
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
@@ -116,7 +116,7 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		return
 	}
 
-	span.AddEvent("RPC request succeeded")
+	span.AddEvent("RPC Request Completed")
 
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
