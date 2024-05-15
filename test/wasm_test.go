@@ -45,7 +45,7 @@ func TestWasmExecution(t *testing.T) {
 	input := []byte("Hello world")
 	subject := "test.trigger"
 
-	ctx := context.WithValue(context.Background(), agentapi.MessagingSubjectHeader, subject) //nolint:all
+	ctx := context.WithValue(context.Background(), agentapi.NexTriggerSubject, subject) //nolint:all
 	output, err := wasm.Execute(ctx, input)
 	if err != nil {
 		t.Fatalf("Failed to run trigger: %s", err)
