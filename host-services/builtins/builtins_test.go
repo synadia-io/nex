@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"context"
 	"log/slog"
 	"slices"
 	"sync"
@@ -53,12 +54,12 @@ func TestKvBuiltin(t *testing.T) {
 		t.Fatalf("Failed to start server: %s", err)
 	}
 
-	_, err = bClient.KVSet("testone", []byte{9, 8, 7, 6, 5}, nil)
+	_, err = bClient.KVSet(context.Background(), "testone", []byte{9, 8, 7, 6, 5})
 	if err != nil {
 		t.Fatalf("Got an error setting kv: %s", err.Error())
 	}
 
-	v, err := bClient.KVGet("testone", nil)
+	v, err := bClient.KVGet(context.Background(), "testone")
 	if err != nil {
 		t.Fatalf("Got an error getting key: %s", err.Error())
 	}
@@ -93,7 +94,7 @@ func TestMessagingBuiltin(t *testing.T) {
 		wg.Done()
 	})
 
-	err := bClient.MessagingPublish("foo.bar", []byte("baz"))
+	err := bClient.MessagingPublish(context.Background(), "foo.bar", []byte("baz"))
 	if err != nil {
 		t.Fatalf("Failed to publish message: %s", err)
 	}
@@ -113,7 +114,7 @@ func TestObjectBuiltin(t *testing.T) {
 	_ = server.AddService("objectstore", service, []byte{})
 	_ = server.Start()
 
-	res, err := bClient.ObjectPut("objecttest", []byte{100, 101, 102})
+	res, err := bClient.ObjectPut(context.Background(), "objecttest", []byte{100, 101, 102})
 	if err != nil {
 		t.Fatalf("Expected no error, but got %s", err.Error())
 	}
@@ -124,7 +125,7 @@ func TestObjectBuiltin(t *testing.T) {
 		t.Fatalf("Expected to store 3 bytes, got %d", res.Size)
 	}
 
-	res2, err := bClient.ObjectGet("objecttest")
+	res2, err := bClient.ObjectGet(context.Background(), "objecttest")
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %s", err.Error())
 	}
@@ -132,7 +133,7 @@ func TestObjectBuiltin(t *testing.T) {
 		t.Fatalf("Retrieved the wrong bytes, got %v", res2)
 	}
 
-	infos, err := bClient.ObjectList()
+	infos, err := bClient.ObjectList(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to list objects in bucket")
 	}
@@ -140,12 +141,12 @@ func TestObjectBuiltin(t *testing.T) {
 		t.Fatalf("Got unexpected list of items in bucket: %+v", infos)
 	}
 
-	err = bClient.ObjectDelete("objecttest")
+	err = bClient.ObjectDelete(context.Background(), "objecttest")
 	if err != nil {
 		t.Fatalf("Failed to delete object: %s", err.Error())
 	}
 
-	res3, err := bClient.ObjectGet("objecttest")
+	res3, err := bClient.ObjectGet(context.Background(), "objecttest")
 	if err == nil {
 		t.Fatalf("Expected to get an error for non-existing object but didn't: %+v", res3)
 	}
