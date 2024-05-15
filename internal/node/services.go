@@ -46,7 +46,7 @@ func NewHostServices(
 		//
 		// Sincerely,
 		//     Someone who lost a day of troubleshooting
-		hsServer: hs.NewHostServicesServer(mgr.ctx, ncint, log),
+		hsServer: hs.NewHostServicesServer(ncint, log, mgr.t.Tracer),
 	}
 }
 

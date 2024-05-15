@@ -1,7 +1,6 @@
 package builtins
 
 import (
-	"context"
 	"log/slog"
 	"slices"
 	"sync"
@@ -20,7 +19,6 @@ const (
 )
 
 func setupSuite(_ testing.TB, port int) (*nats.Conn, func(tb testing.TB)) {
-
 	svr, _ := server.NewServer(&server.Options{
 		Port:      port,
 		Host:      "0.0.0.0",
@@ -40,7 +38,7 @@ func TestKvBuiltin(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4446)
 	defer teardownSuite(t)
 
-	server := hostservices.NewHostServicesServer(context.Background(), nc, slog.Default())
+	server := hostservices.NewHostServicesServer(nc, slog.Default(), nil)
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
 
@@ -81,7 +79,7 @@ func TestMessagingBuiltin(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4447)
 	defer teardownSuite(t)
 
-	server := hostservices.NewHostServicesServer(context.Background(), nc, slog.Default())
+	server := hostservices.NewHostServicesServer(nc, slog.Default(), nil)
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
 
@@ -107,7 +105,7 @@ func TestObjectBuiltin(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4448)
 	defer teardownSuite(t)
 
-	server := hostservices.NewHostServicesServer(context.Background(), nc, slog.Default())
+	server := hostservices.NewHostServicesServer(nc, slog.Default(), nil)
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
 

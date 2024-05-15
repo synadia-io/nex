@@ -15,18 +15,18 @@ import (
 )
 
 type HostServicesServer struct {
-	ctx        context.Context
 	log        *slog.Logger
 	ncInternal *nats.Conn
 	services   map[string]HostService
+	tracer     trace.Tracer
 }
 
-func NewHostServicesServer(ctx context.Context, nc *nats.Conn, log *slog.Logger) *HostServicesServer {
+func NewHostServicesServer(nc *nats.Conn, log *slog.Logger, tracer trace.Tracer) *HostServicesServer {
 	return &HostServicesServer{
-		ctx:        ctx,
 		ncInternal: nc,
 		log:        log,
 		services:   make(map[string]HostService),
+		tracer:     tracer,
 	}
 }
 
@@ -87,24 +87,24 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		metadata[k] = v[0]
 	}
 
-	h.log.Debug("traceparent context", slog.String("traceparent", msg.Header.Get(agentapi.OtelTraceparent)))
+	h.log.Debug("traceparent", slog.String("traceparent", msg.Header.Get(agentapi.OtelTraceparent)))
 
-	cctx := otel.GetTextMapPropagator().Extract(h.ctx, propagation.HeaderCarrier(msg.Header))
-	span := trace.SpanFromContext(cctx)
+	ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
+	_, span := h.tracer.Start(ctx, msg.Subject)
 	defer span.End()
 
-	span.AddEvent("Attempting host service RPC request")
+	span.AddEvent("RPC request")
 
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
+		h.log.Warn("failed to handle host service RPC request", slog.String("error", err.Error()))
 		span.RecordError(err)
-		// TODO: log the err.Error()
 		serverMsg := serverFailMessage(msg.Reply, 500, fmt.Sprintf("Failed to execute host service method: %s", err.Error()))
 		_ = msg.RespondMsg(serverMsg)
 		return
 	}
 
-	span.AddEvent("Host service RPC request succeeded")
+	span.AddEvent("RPC request succeeded")
 
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)

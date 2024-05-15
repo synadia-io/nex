@@ -208,7 +208,6 @@ func (a *AgentClient) UptimeMillis() time.Duration {
 
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
 	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
-	// TODO: inject tracer context into message header
 	intmsg.Header.Add(NexTriggerSubject, subject)
 	intmsg.Data = data
 
