@@ -67,7 +67,7 @@ func TestKvBuiltin(t *testing.T) {
 		t.Fatalf("Didn't get expected byte array back, got %+v", v)
 	}
 
-	keys, err := bClient.KVKeys(nil)
+	keys, err := bClient.KVKeys(context.Background())
 	if err != nil {
 		t.Fatalf("Failed to get bucket keys: %s", err.Error())
 	}
