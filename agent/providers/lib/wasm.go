@@ -36,7 +36,7 @@ func (e *Wasm) Deploy() error {
 	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
 		ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
-		ctx = context.WithValue(ctx, agentapi.NexTriggerSubject, subject)
+		ctx = context.WithValue(ctx, agentapi.NexTriggerSubject, subject) //nolint:all
 
 		val, err := e.Execute(ctx, msg.Data)
 		if err != nil {
