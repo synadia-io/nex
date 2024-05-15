@@ -55,7 +55,7 @@ func TestBogusService(t *testing.T) {
 		panic(err)
 	}
 
-	result, err := client.PerformRpc(
+	result, err := client.PerformRPC(
 		"boguss",
 		"test",
 		[]byte{9, 9, 9},
@@ -94,7 +94,7 @@ func TestServiceError(t *testing.T) {
 		panic(err)
 	}
 
-	result, _ := client.PerformRpc(
+	result, _ := client.PerformRPC(
 		"boguss",
 		"test",
 		[]byte{9, 9, 9},

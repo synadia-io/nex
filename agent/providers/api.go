@@ -1,9 +1,9 @@
 package providers
 
 import (
+	"context"
 	"errors"
 
-	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/agent/providers/lib"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -28,7 +28,7 @@ type ExecutionProvider interface {
 	Deploy() error
 
 	// Execute a deployed function, if supported by the execution provider implementation (e.g., "v8" and "wasm" types)
-	Execute(headers nats.Header, payload []byte) ([]byte, error)
+	Execute(ctx context.Context, payload []byte) ([]byte, error)
 
 	// Undeploy a workload, giving it a chance to gracefully clean up after itself (if applicable)
 	Undeploy() error
@@ -37,6 +37,14 @@ type ExecutionProvider interface {
 	// statically-linked binary or raw source code, depending on provider implementation
 	Validate() error
 }
+
+// HACK!!! theory was otel was not returning a propagator... but this didn't help...
+// func init() {
+// 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+// 		propagation.TraceContext{},
+// 		propagation.Baggage{},
+// 	))
+// }
 
 // NewExecutionProvider initializes and returns an execution provider for a given work request
 func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {

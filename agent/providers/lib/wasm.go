@@ -12,6 +12,8 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 // Wasm execution provider implementation
@@ -33,7 +35,10 @@ type Wasm struct {
 func (e *Wasm) Deploy() error {
 	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
-		val, err := e.Execute(msg.Header, msg.Data)
+		ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
+		ctx = context.WithValue(ctx, agentapi.NexTriggerSubject, subject)
+
+		val, err := e.Execute(ctx, msg.Data)
 		if err != nil {
 			// TODO-- propagate this error to agent logs
 			return
@@ -51,9 +56,14 @@ func (e *Wasm) Deploy() error {
 	return nil
 }
 
-func (e *Wasm) Execute(headers nats.Header, payload []byte) ([]byte, error) {
-	subject := headers.Get(agentapi.NexTriggerSubject)
-	ctx := context.Background()
+func (e *Wasm) Execute(ctx context.Context, payload []byte) ([]byte, error) {
+	var subject string
+	sub, ok := ctx.Value(agentapi.NexTriggerSubject).(string)
+	if ok {
+		subject = sub
+	} else {
+		return nil, errors.New("failed to execute WASI function; no trigger subject provided in context")
+	}
 
 	out := newStdOutBuf()
 	in := newStdInBuf()

@@ -3,6 +3,7 @@
 package lib
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,8 @@ import (
 	hostservices "github.com/synadia-io/nex/host-services"
 	"github.com/synadia-io/nex/host-services/builtins"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	v8 "rogchap.com/v8go"
 )
 
@@ -96,8 +99,11 @@ func (v *V8) Deploy() error {
 
 	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
 	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
+		ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
+		ctx = context.WithValue(ctx, agentapi.NexTriggerSubject, subject)
+
 		startTime := time.Now()
-		val, err := v.Execute(msg.Header, msg.Data)
+		val, err := v.Execute(ctx, msg.Data)
 		if err != nil {
 			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to execute function on trigger subject %s: %s", subject, err.Error())))
 			return
@@ -105,12 +111,14 @@ func (v *V8) Deploy() error {
 
 		runtimeNanos := time.Since(startTime).Nanoseconds()
 
+		header := nats.Header{
+			agentapi.NexRuntimeNs: []string{strconv.FormatInt(runtimeNanos, 10)},
+		}
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(header))
+
 		err = msg.RespondMsg(&nats.Msg{
-			Data: val,
-			Header: nats.Header{
-				agentapi.NexRuntimeNs:    []string{strconv.FormatInt(runtimeNanos, 10)},
-				agentapi.OtelTraceparent: msg.Header.Values(agentapi.OtelTraceparent),
-			},
+			Data:   val,
+			Header: header,
 		})
 		if err != nil {
 			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to write %d-byte response: %s", len(val), err.Error())))
@@ -128,20 +136,20 @@ func (v *V8) Deploy() error {
 // Trigger execution of the deployed function; expects a `Validate` to have succeeded and `ubs` to be non-nil.
 // The executed function can optionally return a value, in which case it will be deemed a reply and returned
 // to the caller. In the case of a nil or empty value returned by the function, no reply will be sent.
-func (v *V8) Execute(headers nats.Header, payload []byte) ([]byte, error) {
+func (v *V8) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 	if v.ubs == nil {
 		return nil, fmt.Errorf("invalid state for execution; no compiled code available for vm: %s", v.name)
 	}
 
-	subject := headers.Get(agentapi.NexTriggerSubject)
-
-	var traceID *string
-	tid := headers.Get(agentapi.OtelTraceparent)
-	if tid != "" {
-		traceID = &tid
+	var subject string
+	sub, ok := ctx.Value(agentapi.NexTriggerSubject).(string)
+	if ok {
+		subject = sub
+	} else {
+		return nil, fmt.Errorf("failed to initialize context in vm; no trigger subject provided in context: %s", v.name)
 	}
 
-	ctx, err := v.newV8Context(traceID)
+	v8ctx, err := v.newV8Context(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize context in vm: %s", err.Error())
 	}
@@ -150,7 +158,7 @@ func (v *V8) Execute(headers nats.Header, payload []byte) ([]byte, error) {
 	errs := make(chan error, 1)
 
 	go func() {
-		val, err := v.ubs.Run(ctx)
+		val, err := v.ubs.Run(v8ctx)
 		if err != nil {
 			errs <- err
 			return
@@ -162,7 +170,7 @@ func (v *V8) Execute(headers nats.Header, payload []byte) ([]byte, error) {
 			return
 		}
 
-		argv1, err := v8.NewValue(ctx.Isolate(), subject)
+		argv1, err := v8.NewValue(v8ctx.Isolate(), subject)
 		if err != nil {
 			errs <- err
 			return
@@ -175,7 +183,7 @@ func (v *V8) Execute(headers nats.Header, payload []byte) ([]byte, error) {
 			return
 		}
 
-		val, err = fn.Call(ctx.Global(), argv1, argv2)
+		val, err = fn.Call(v8ctx.Global(), argv1, argv2)
 		if err != nil {
 			errs <- err
 			return
@@ -279,10 +287,10 @@ func (v *V8) initUtils() {
 	v.utils[v8FunctionUInt8ArrayToString] = uint8arrtostrfn
 }
 
-func (v *V8) newV8Context(traceID *string) (*v8.Context, error) {
+func (v *V8) newV8Context(ctx context.Context) (*v8.Context, error) {
 	global := v8.NewObjectTemplate(v.iso)
 
-	hostServices, err := v.newHostServicesTemplate(traceID)
+	hostServices, err := v.newHostServicesTemplate(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -295,25 +303,25 @@ func (v *V8) newV8Context(traceID *string) (*v8.Context, error) {
 	return v8.NewContext(v.iso, global), nil
 }
 
-func (v *V8) newHostServicesTemplate(traceID *string) (*v8.ObjectTemplate, error) {
+func (v *V8) newHostServicesTemplate(ctx context.Context) (*v8.ObjectTemplate, error) {
 	hostServices := v8.NewObjectTemplate(v.iso)
 
-	err := hostServices.Set(hostServicesHTTPObjectName, v.newHTTPObjectTemplate(traceID))
+	err := hostServices.Set(hostServicesHTTPObjectName, v.newHTTPObjectTemplate(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	err = hostServices.Set(hostServicesKVObjectName, v.newKeyValueObjectTemplate(traceID))
+	err = hostServices.Set(hostServicesKVObjectName, v.newKeyValueObjectTemplate(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	err = hostServices.Set(hostServicesMessagingObjectName, v.newMessagingObjectTemplate(traceID))
+	err = hostServices.Set(hostServicesMessagingObjectName, v.newMessagingObjectTemplate(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	err = hostServices.Set(hostServicesObjectStoreObjectName, v.newObjectStoreObjectTemplate(traceID))
+	err = hostServices.Set(hostServicesObjectStoreObjectName, v.newObjectStoreObjectTemplate(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -321,37 +329,37 @@ func (v *V8) newHostServicesTemplate(traceID *string) (*v8.ObjectTemplate, error
 	return hostServices, nil
 }
 
-func (v *V8) newHTTPObjectTemplate(traceID *string) *v8.ObjectTemplate {
+func (v *V8) newHTTPObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 	http := v8.NewObjectTemplate(v.iso)
 
 	_ = http.Set(hostServicesHTTPGetFunctionName, v8.NewFunctionTemplate(
-		v.iso, v.genHttpClientFunc(hostServicesHTTPGetFunctionName),
+		v.iso, v.genHttpClientFunc(ctx, hostServicesHTTPGetFunctionName),
 	))
 
 	_ = http.Set(hostServicesHTTPPostFunctionName, v8.NewFunctionTemplate(
-		v.iso, v.genHttpClientFunc(hostServicesHTTPPostFunctionName),
+		v.iso, v.genHttpClientFunc(ctx, hostServicesHTTPPostFunctionName),
 	))
 
 	_ = http.Set(hostServicesHTTPPutFunctionName, v8.NewFunctionTemplate(
-		v.iso, v.genHttpClientFunc(hostServicesHTTPPutFunctionName),
+		v.iso, v.genHttpClientFunc(ctx, hostServicesHTTPPutFunctionName),
 	))
 
 	_ = http.Set(hostServicesHTTPPatchFunctionName, v8.NewFunctionTemplate(
-		v.iso, v.genHttpClientFunc(hostServicesHTTPPatchFunctionName),
+		v.iso, v.genHttpClientFunc(ctx, hostServicesHTTPPatchFunctionName),
 	))
 
 	_ = http.Set(hostServicesHTTPDeleteFunctionName, v8.NewFunctionTemplate(
-		v.iso, v.genHttpClientFunc(hostServicesHTTPDeleteFunctionName),
+		v.iso, v.genHttpClientFunc(ctx, hostServicesHTTPDeleteFunctionName),
 	))
 
 	_ = http.Set(hostServicesHTTPHeadFunctionName, v8.NewFunctionTemplate(
-		v.iso, v.genHttpClientFunc(hostServicesHTTPHeadFunctionName),
+		v.iso, v.genHttpClientFunc(ctx, hostServicesHTTPHeadFunctionName),
 	))
 
 	return http
 }
 
-func (v *V8) genHttpClientFunc(method string) func(info *v8.FunctionCallbackInfo) *v8.Value {
+func (v *V8) genHttpClientFunc(ctx context.Context, method string) func(info *v8.FunctionCallbackInfo) *v8.Value {
 	return func(info *v8.FunctionCallbackInfo) *v8.Value {
 		args := info.Args()
 		if len(args) == 0 {
@@ -376,7 +384,7 @@ func (v *V8) genHttpClientFunc(method string) func(info *v8.FunctionCallbackInfo
 			}
 		}
 
-		httpresp, err := v.builtins.SimpleHttpRequest(method, url.String(), payload)
+		httpresp, err := v.builtins.SimpleHttpRequest(ctx, method, url.String(), payload)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -428,7 +436,7 @@ func (v *V8) genHttpClientFunc(method string) func(info *v8.FunctionCallbackInfo
 	}
 }
 
-func (v *V8) newKeyValueObjectTemplate(traceID *string) *v8.ObjectTemplate {
+func (v *V8) newKeyValueObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 	kv := v8.NewObjectTemplate(v.iso)
 
 	_ = kv.Set(hostServicesKVGetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
@@ -440,7 +448,7 @@ func (v *V8) newKeyValueObjectTemplate(traceID *string) *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		resp, err := v.builtins.KVGet(key, traceID)
+		resp, err := v.builtins.KVGet(ctx, key)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -471,7 +479,7 @@ func (v *V8) newKeyValueObjectTemplate(traceID *string) *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		kvresp, err := v.builtins.KVSet(key, value, traceID)
+		kvresp, err := v.builtins.KVSet(ctx, key, value)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -494,7 +502,7 @@ func (v *V8) newKeyValueObjectTemplate(traceID *string) *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		kvresp, err := v.builtins.KVDelete(key, traceID)
+		kvresp, err := v.builtins.KVDelete(ctx, key)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -510,7 +518,7 @@ func (v *V8) newKeyValueObjectTemplate(traceID *string) *v8.ObjectTemplate {
 
 	_ = kv.Set(hostServicesKVKeysFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
 
-		resp, err := v.builtins.KVKeys(traceID)
+		resp, err := v.builtins.KVKeys(ctx)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -531,7 +539,7 @@ func (v *V8) newKeyValueObjectTemplate(traceID *string) *v8.ObjectTemplate {
 	return kv
 }
 
-func (v *V8) newMessagingObjectTemplate(traceID *string) *v8.ObjectTemplate {
+func (v *V8) newMessagingObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 	messaging := v8.NewObjectTemplate(v.iso)
 
 	_ = messaging.Set(hostServicesMessagingPublishFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
@@ -548,7 +556,7 @@ func (v *V8) newMessagingObjectTemplate(traceID *string) *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		err = v.builtins.MessagingPublish(subject, payload)
+		err = v.builtins.MessagingPublish(ctx, subject, payload)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -571,7 +579,7 @@ func (v *V8) newMessagingObjectTemplate(traceID *string) *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		resp, err := v.builtins.MessagingRequest(subject, payload)
+		resp, err := v.builtins.MessagingRequest(ctx, subject, payload)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -673,7 +681,7 @@ func (v *V8) newMessagingObjectTemplate(traceID *string) *v8.ObjectTemplate {
 	return messaging
 }
 
-func (v *V8) newObjectStoreObjectTemplate(traceID *string) *v8.ObjectTemplate {
+func (v *V8) newObjectStoreObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 	objectStore := v8.NewObjectTemplate(v.iso)
 
 	_ = objectStore.Set(hostServicesObjectStoreGetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
@@ -684,7 +692,7 @@ func (v *V8) newObjectStoreObjectTemplate(traceID *string) *v8.ObjectTemplate {
 		}
 
 		name := args[0].String()
-		resp, err := v.builtins.ObjectGet(name)
+		resp, err := v.builtins.ObjectGet(ctx, name)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -715,7 +723,7 @@ func (v *V8) newObjectStoreObjectTemplate(traceID *string) *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		resp, err := v.builtins.ObjectPut(name, value)
+		resp, err := v.builtins.ObjectPut(ctx, name, value)
 
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
@@ -742,7 +750,7 @@ func (v *V8) newObjectStoreObjectTemplate(traceID *string) *v8.ObjectTemplate {
 		}
 
 		name := args[0].String()
-		err := v.builtins.ObjectDelete(name)
+		err := v.builtins.ObjectDelete(ctx, name)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -752,7 +760,7 @@ func (v *V8) newObjectStoreObjectTemplate(traceID *string) *v8.ObjectTemplate {
 	}))
 
 	_ = objectStore.Set(hostServicesObjectStoreListFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
-		resp, err := v.builtins.ObjectList()
+		resp, err := v.builtins.ObjectList(ctx)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)

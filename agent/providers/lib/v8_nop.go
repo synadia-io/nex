@@ -3,9 +3,9 @@
 package lib
 
 import (
+	"context"
 	"errors"
 
-	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -13,7 +13,7 @@ type V8 struct{}
 
 func (V8) Deploy() error { return nil }
 
-func (V8) Execute(headers nats.Header, payload []byte) ([]byte, error) { return []byte{}, nil }
+func (V8) Execute(ctx context.Context, payload []byte) ([]byte, error) { return []byte{}, nil }
 
 func (V8) Undeploy() error { return nil }
 

@@ -1,9 +1,9 @@
 package lib
 
 import (
+	"context"
 	"errors"
 
-	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -15,7 +15,7 @@ func (o *OCI) Deploy() error {
 	return errors.New("oci execution provider not yet implemented")
 }
 
-func (o *OCI) Execute(headers nats.Header, payload []byte) ([]byte, error) {
+func (o *OCI) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 	return nil, errors.New("oci execution provider does not support execution via trigger subjects")
 }
 

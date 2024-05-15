@@ -1,11 +1,14 @@
 package hostservices
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type HostServicesClient struct {
@@ -26,8 +29,7 @@ func NewHostServicesClient(nc *nats.Conn, timeout time.Duration, namespace, work
 	}
 }
 
-func (c *HostServicesClient) PerformRpc(service string, method string, payload []byte, metadata map[string]string) (ServiceResult, error) {
-
+func (c *HostServicesClient) PerformRPC(ctx context.Context, service string, method string, payload []byte, metadata map[string]string) (ServiceResult, error) {
 	subject := fmt.Sprintf("agentint.%s.rpc.%s.%s.%s.%s",
 		c.workloadId,
 		c.namespace,
@@ -35,6 +37,8 @@ func (c *HostServicesClient) PerformRpc(service string, method string, payload [
 		service,
 		method,
 	)
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.MapCarrier(metadata))
 
 	msg := nats.NewMsg(subject)
 	msg.Data = payload
