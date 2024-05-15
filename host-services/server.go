@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -93,7 +94,11 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 	_, span := h.tracer.Start(ctx, msg.Subject)
 	defer span.End()
 
-	span.AddEvent("RPC request")
+	span.AddEvent("host services call", trace.WithAttributes(
+		attribute.KeyValue{Key: "workload_id", Value: attribute.StringValue(vmID)},
+		attribute.KeyValue{Key: "service", Value: attribute.StringValue(serviceName)},
+		attribute.KeyValue{Key: "method", Value: attribute.StringValue(method)},
+	))
 
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
@@ -104,7 +109,11 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		return
 	}
 
-	span.AddEvent("RPC request succeeded")
+	span.AddEvent("host services call succeeded", trace.WithAttributes(
+		attribute.KeyValue{Key: "workload_id", Value: attribute.StringValue(vmID)},
+		attribute.KeyValue{Key: "service", Value: attribute.StringValue(serviceName)},
+		attribute.KeyValue{Key: "method", Value: attribute.StringValue(method)},
+	))
 
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
