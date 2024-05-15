@@ -100,7 +100,7 @@ func (v *V8) Deploy() error {
 	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
 	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
 		ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
-		ctx = context.WithValue(ctx, agentapi.NexTriggerSubject, subject) //nolint:all
+		ctx = context.WithValue(ctx, agentapi.NexTriggerSubject, msg.Subject) //nolint:all
 
 		startTime := time.Now()
 		val, err := v.Execute(ctx, msg.Data)
