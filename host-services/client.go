@@ -38,14 +38,14 @@ func (c *HostServicesClient) PerformRPC(ctx context.Context, service string, met
 		method,
 	)
 
-	otel.GetTextMapPropagator().Inject(ctx, propagation.MapCarrier(metadata))
-
 	msg := nats.NewMsg(subject)
 	msg.Data = payload
 
 	for k, v := range metadata {
 		msg.Header.Set(k, v)
 	}
+
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(msg.Header))
 
 	result, err := c.nc.RequestMsg(msg, c.timeout)
 	if err != nil {

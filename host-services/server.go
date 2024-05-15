@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/nats-io/nats.go"
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
@@ -88,11 +87,9 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		metadata[k] = v[0]
 	}
 
-	h.log.Debug("traceparent", slog.String("traceparent", msg.Header.Get(agentapi.OtelTraceparent)))
-
 	ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
 
-	_, span := h.tracer.Start(ctx, msg.Subject,
+	_, span := h.tracer.Start(ctx, "host services call",
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("workload_id", vmID),
@@ -101,18 +98,25 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		))
 	defer span.End()
 
-	span.AddEvent("host services call")
+	span.AddEvent("RPC request")
 
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
-		h.log.Warn("failed to handle host service RPC request", slog.String("error", err.Error()))
+		h.log.Warn("Failed to handle host service RPC request",
+			slog.String("workload_id", vmID),
+			slog.String("workload_name", workloadName),
+			slog.String("service_name", serviceName),
+			slog.String("method", method),
+			slog.String("error", err.Error()),
+		)
 		span.RecordError(err)
+
 		serverMsg := serverFailMessage(msg.Reply, 500, fmt.Sprintf("Failed to execute host service method: %s", err.Error()))
 		_ = msg.RespondMsg(serverMsg)
 		return
 	}
 
-	span.AddEvent("host services call succeeded")
+	span.AddEvent("RPC request succeeded")
 
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
