@@ -1,6 +1,7 @@
 package hostservices
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -56,6 +57,7 @@ func TestBogusService(t *testing.T) {
 	}
 
 	result, err := client.PerformRPC(
+		context.Background(),
 		"boguss",
 		"test",
 		[]byte{9, 9, 9},
@@ -95,6 +97,7 @@ func TestServiceError(t *testing.T) {
 	}
 
 	result, _ := client.PerformRPC(
+		context.Background(),
 		"boguss",
 		"test",
 		[]byte{9, 9, 9},
