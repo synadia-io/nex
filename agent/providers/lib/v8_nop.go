@@ -3,6 +3,7 @@
 package lib
 
 import (
+	"context"
 	"errors"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -12,7 +13,7 @@ type V8 struct{}
 
 func (V8) Deploy() error { return nil }
 
-func (V8) Execute(subject string, payload []byte) ([]byte, error) { return []byte{}, nil }
+func (V8) Execute(ctx context.Context, payload []byte) ([]byte, error) { return []byte{}, nil }
 
 func (V8) Undeploy() error { return nil }
 

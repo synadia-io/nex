@@ -19,6 +19,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/agent/providers"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 const defaultAgentHandshakeTimeoutMillis = 500
@@ -343,6 +345,11 @@ func (a *Agent) handleHealthz(w http.ResponseWriter, req *http.Request) {
 
 func (a *Agent) init() error {
 	a.installSignalHandlers()
+
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
 
 	err := a.requestHandshake()
 	if err != nil {

@@ -1,26 +1,32 @@
 package hostservices
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type HostServicesServer struct {
+	log        *slog.Logger
 	ncInternal *nats.Conn
 	services   map[string]HostService
-
-	log *slog.Logger
+	tracer     trace.Tracer
 }
 
-func NewHostServicesServer(nc *nats.Conn, log *slog.Logger) *HostServicesServer {
+func NewHostServicesServer(nc *nats.Conn, log *slog.Logger, tracer trace.Tracer) *HostServicesServer {
 	return &HostServicesServer{
 		ncInternal: nc,
 		log:        log,
 		services:   make(map[string]HostService),
+		tracer:     tracer,
 	}
 }
 
@@ -81,17 +87,39 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		metadata[k] = v[0]
 	}
 
+	ctx := otel.GetTextMapPropagator().Extract(context.Background(), propagation.HeaderCarrier(msg.Header))
+
+	_, span := h.tracer.Start(ctx, "host services call",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(
+			attribute.String("workload_id", vmID),
+			attribute.String("service", serviceName),
+			attribute.String("method", method),
+		))
+	defer span.End()
+
+	span.AddEvent("RPC Request Began")
+
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
-		// TODO: log the err.Error()
+		h.log.Warn("Failed to handle host service RPC request",
+			slog.String("workload_id", vmID),
+			slog.String("workload_name", workloadName),
+			slog.String("service_name", serviceName),
+			slog.String("method", method),
+			slog.String("error", err.Error()),
+		)
+		span.RecordError(err)
+
 		serverMsg := serverFailMessage(msg.Reply, 500, fmt.Sprintf("Failed to execute host service method: %s", err.Error()))
 		_ = msg.RespondMsg(serverMsg)
 		return
 	}
 
+	span.AddEvent("RPC Request Completed")
+
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
-
 }
 
 func serverFailMessage(reply string, code uint, message string) *nats.Msg {

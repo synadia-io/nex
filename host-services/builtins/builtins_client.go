@@ -1,6 +1,7 @@
 package builtins
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 
@@ -26,12 +27,12 @@ func NewBuiltinServicesClient(hsClient *hostservices.HostServicesClient) *Builti
 	}
 }
 
-func (c *BuiltinServicesClient) KVGet(key string) ([]byte, error) {
+func (c *BuiltinServicesClient) KVGet(ctx context.Context, key string) ([]byte, error) {
 	metadata := map[string]string{
 		agentapi.KeyValueKeyHeader: key,
 	}
 
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodGet, []byte{}, metadata)
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodGet, []byte{}, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -43,12 +44,12 @@ func (c *BuiltinServicesClient) KVGet(key string) ([]byte, error) {
 	return resp.Data, nil
 }
 
-func (c *BuiltinServicesClient) KVSet(key string, value []byte) (*agentapi.HostServicesKeyValueResponse, error) {
+func (c *BuiltinServicesClient) KVSet(ctx context.Context, key string, value []byte) (*agentapi.HostServicesKeyValueResponse, error) {
 	metadata := map[string]string{
 		agentapi.KeyValueKeyHeader: key,
 	}
 
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodSet, value, metadata)
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodSet, value, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -65,12 +66,12 @@ func (c *BuiltinServicesClient) KVSet(key string, value []byte) (*agentapi.HostS
 	return &kvResponse, nil
 }
 
-func (c *BuiltinServicesClient) KVDelete(key string) (*agentapi.HostServicesKeyValueResponse, error) {
+func (c *BuiltinServicesClient) KVDelete(ctx context.Context, key string) (*agentapi.HostServicesKeyValueResponse, error) {
 	metadata := map[string]string{
 		agentapi.KeyValueKeyHeader: key,
 	}
 
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodDelete, []byte{}, metadata)
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodDelete, []byte{}, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +88,10 @@ func (c *BuiltinServicesClient) KVDelete(key string) (*agentapi.HostServicesKeyV
 	return &kvResponse, nil
 }
 
-func (c *BuiltinServicesClient) KVKeys() ([]string, error) {
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodKeys, []byte{}, make(map[string]string))
+func (c *BuiltinServicesClient) KVKeys(ctx context.Context) ([]string, error) {
+	metadata := map[string]string{}
+
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodKeys, []byte{}, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +107,12 @@ func (c *BuiltinServicesClient) KVKeys() ([]string, error) {
 	return results, err
 }
 
-func (c *BuiltinServicesClient) MessagingPublish(subject string, payload []byte) error {
+func (c *BuiltinServicesClient) MessagingPublish(ctx context.Context, subject string, payload []byte) error {
 	metadata := map[string]string{
 		agentapi.MessagingSubjectHeader: subject,
 	}
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameMessaging, messagingServiceMethodPublish, payload, metadata)
+
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameMessaging, messagingServiceMethodPublish, payload, metadata)
 	if err != nil {
 		return err
 	}
@@ -133,11 +137,11 @@ func (c *BuiltinServicesClient) MessagingPublish(subject string, payload []byte)
 	return nil
 }
 
-func (c *BuiltinServicesClient) MessagingRequest(subject string, payload []byte) ([]byte, error) {
+func (c *BuiltinServicesClient) MessagingRequest(ctx context.Context, subject string, payload []byte) ([]byte, error) {
 	metadata := map[string]string{
 		agentapi.MessagingSubjectHeader: subject,
 	}
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameMessaging, messagingServiceMethodRequest, payload, metadata)
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameMessaging, messagingServiceMethodRequest, payload, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -148,11 +152,12 @@ func (c *BuiltinServicesClient) MessagingRequest(subject string, payload []byte)
 	return resp.Data, nil
 }
 
-func (c *BuiltinServicesClient) ObjectGet(objectName string) ([]byte, error) {
+func (c *BuiltinServicesClient) ObjectGet(ctx context.Context, objectName string) ([]byte, error) {
 	metadata := map[string]string{
 		agentapi.ObjectStoreObjectNameHeader: objectName,
 	}
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameObjectStore, objectStoreServiceMethodGet, []byte{}, metadata)
+
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodGet, []byte{}, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -163,9 +168,8 @@ func (c *BuiltinServicesClient) ObjectGet(objectName string) ([]byte, error) {
 	return resp.Data, nil
 }
 
-func (c *BuiltinServicesClient) ObjectList() ([]*nats.ObjectInfo, error) {
-
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameObjectStore, objectStoreServiceMethodList, []byte{}, make(map[string]string))
+func (c *BuiltinServicesClient) ObjectList(ctx context.Context) ([]*nats.ObjectInfo, error) {
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodList, []byte{}, make(map[string]string))
 	if err != nil {
 		return nil, err
 	}
@@ -182,11 +186,11 @@ func (c *BuiltinServicesClient) ObjectList() ([]*nats.ObjectInfo, error) {
 	return theList, nil
 }
 
-func (c *BuiltinServicesClient) ObjectPut(objectName string, payload []byte) (*nats.ObjectInfo, error) {
+func (c *BuiltinServicesClient) ObjectPut(ctx context.Context, objectName string, payload []byte) (*nats.ObjectInfo, error) {
 	metadata := map[string]string{
 		agentapi.ObjectStoreObjectNameHeader: objectName,
 	}
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameObjectStore, objectStoreServiceMethodPut, payload, metadata)
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodPut, payload, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -202,11 +206,11 @@ func (c *BuiltinServicesClient) ObjectPut(objectName string, payload []byte) (*n
 	return &result, nil
 }
 
-func (c *BuiltinServicesClient) ObjectDelete(objectName string) error {
+func (c *BuiltinServicesClient) ObjectDelete(ctx context.Context, objectName string) error {
 	metadata := map[string]string{
 		agentapi.ObjectStoreObjectNameHeader: objectName,
 	}
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameObjectStore, objectStoreServiceMethodDelete, []byte{}, metadata)
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodDelete, []byte{}, metadata)
 	if err != nil {
 		return err
 	}
@@ -226,11 +230,11 @@ func (c *BuiltinServicesClient) ObjectDelete(objectName string) error {
 	return nil
 }
 
-func (c *BuiltinServicesClient) SimpleHttpRequest(method string, url string, payload []byte) (*agentapi.HostServicesHTTPResponse, error) {
+func (c *BuiltinServicesClient) SimpleHttpRequest(ctx context.Context, method string, url string, payload []byte) (*agentapi.HostServicesHTTPResponse, error) {
 	metadata := map[string]string{
 		agentapi.HttpURLHeader: url,
 	}
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameHttpClient, method, payload, metadata)
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameHttpClient, method, payload, metadata)
 	if err != nil {
 		return nil, err
 	}

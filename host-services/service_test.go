@@ -1,6 +1,7 @@
 package hostservices
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const (
@@ -39,7 +41,7 @@ func TestBogusService(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4444)
 	defer teardownSuite(t)
 
-	server := NewHostServicesServer(nc, slog.Default())
+	server := NewHostServicesServer(nc, slog.Default(), noop.NewTracerProvider().Tracer("nex-node"))
 	client := NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 
 	boguss := bogusService{
@@ -55,7 +57,8 @@ func TestBogusService(t *testing.T) {
 		panic(err)
 	}
 
-	result, err := client.PerformRpc(
+	result, err := client.PerformRPC(
+		context.Background(),
 		"boguss",
 		"test",
 		[]byte{9, 9, 9},
@@ -78,7 +81,7 @@ func TestServiceError(t *testing.T) {
 	nc, teardownSuite := setupSuite(t, 4445)
 	defer teardownSuite(t)
 
-	server := NewHostServicesServer(nc, slog.Default())
+	server := NewHostServicesServer(nc, slog.Default(), noop.NewTracerProvider().Tracer("nex-node"))
 	client := NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 
 	boguss := bogusService{
@@ -94,7 +97,8 @@ func TestServiceError(t *testing.T) {
 		panic(err)
 	}
 
-	result, _ := client.PerformRpc(
+	result, _ := client.PerformRPC(
+		context.Background(),
 		"boguss",
 		"test",
 		[]byte{9, 9, 9},

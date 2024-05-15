@@ -44,8 +44,8 @@ func (h *HTTPService) HandleRequest(namespace string,
 	method string,
 	workloadName string,
 	metadata map[string]string,
-	request []byte) (hostservices.ServiceResult, error) {
-
+	request []byte,
+) (hostservices.ServiceResult, error) {
 	switch method {
 	case httpServiceMethodGet:
 		return h.handleGet(workloadId, workloadName, request, metadata)

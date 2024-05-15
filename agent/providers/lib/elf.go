@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"context"
 	"debug/elf"
 	"errors"
 	"fmt"
@@ -86,7 +87,7 @@ func (e *ELF) removeWorkload() {
 	_ = os.Remove(e.tmpFilename)
 }
 
-func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
+func (e *ELF) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
 }
 

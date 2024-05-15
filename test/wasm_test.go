@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/synadia-io/nex/agent/providers/lib"
@@ -44,7 +45,8 @@ func TestWasmExecution(t *testing.T) {
 	input := []byte("Hello world")
 	subject := "test.trigger"
 
-	output, err := wasm.Execute(subject, input)
+	ctx := context.WithValue(context.Background(), agentapi.NexTriggerSubject, subject) //nolint:all
+	output, err := wasm.Execute(ctx, input)
 	if err != nil {
 		t.Fatalf("Failed to run trigger: %s", err)
 	}

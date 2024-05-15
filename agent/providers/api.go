@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"context"
 	"errors"
 
 	"github.com/synadia-io/nex/agent/providers/lib"
@@ -27,7 +28,7 @@ type ExecutionProvider interface {
 	Deploy() error
 
 	// Execute a deployed function, if supported by the execution provider implementation (e.g., "v8" and "wasm" types)
-	Execute(subject string, payload []byte) ([]byte, error)
+	Execute(ctx context.Context, payload []byte) ([]byte, error)
 
 	// Undeploy a workload, giving it a chance to gracefully clean up after itself (if applicable)
 	Undeploy() error

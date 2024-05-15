@@ -33,7 +33,8 @@ func NewHostServices(
 	ncint *nats.Conn,
 	ncHostServices *nats.Conn,
 	config *models.HostServicesConfig,
-	log *slog.Logger) *HostServices {
+	log *slog.Logger,
+) *HostServices {
 	return &HostServices{
 		log:            log,
 		mgr:            mgr,
@@ -45,7 +46,7 @@ func NewHostServices(
 		//
 		// Sincerely,
 		//     Someone who lost a day of troubleshooting
-		hsServer: hs.NewHostServicesServer(ncint, log),
+		hsServer: hs.NewHostServicesServer(ncint, log, mgr.t.Tracer),
 	}
 }
 
