@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -86,7 +87,7 @@ func (e *ELF) removeWorkload() {
 	_ = os.Remove(e.tmpFilename)
 }
 
-func (e *ELF) Execute(subject string, payload []byte) ([]byte, error) {
+func (e *ELF) Execute(headers nats.Header, payload []byte) ([]byte, error) {
 	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
 }
 

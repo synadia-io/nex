@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/nats-io/nats.go"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -85,6 +86,8 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 	for k, v := range msg.Header {
 		metadata[k] = v[0]
 	}
+
+	h.log.Debug("traceparent context", slog.String("traceparent", msg.Header.Get(agentapi.OtelTraceparent)))
 
 	cctx := otel.GetTextMapPropagator().Extract(h.ctx, propagation.HeaderCarrier(msg.Header))
 	span := trace.SpanFromContext(cctx)

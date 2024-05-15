@@ -26,9 +26,13 @@ func NewBuiltinServicesClient(hsClient *hostservices.HostServicesClient) *Builti
 	}
 }
 
-func (c *BuiltinServicesClient) KVGet(key string) ([]byte, error) {
+func (c *BuiltinServicesClient) KVGet(key string, traceID *string) ([]byte, error) {
 	metadata := map[string]string{
 		agentapi.KeyValueKeyHeader: key,
+	}
+
+	if traceID != nil {
+		metadata[agentapi.OtelTraceparent] = *traceID
 	}
 
 	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodGet, []byte{}, metadata)
@@ -43,9 +47,13 @@ func (c *BuiltinServicesClient) KVGet(key string) ([]byte, error) {
 	return resp.Data, nil
 }
 
-func (c *BuiltinServicesClient) KVSet(key string, value []byte) (*agentapi.HostServicesKeyValueResponse, error) {
+func (c *BuiltinServicesClient) KVSet(key string, value []byte, traceID *string) (*agentapi.HostServicesKeyValueResponse, error) {
 	metadata := map[string]string{
 		agentapi.KeyValueKeyHeader: key,
+	}
+
+	if traceID != nil {
+		metadata[agentapi.OtelTraceparent] = *traceID
 	}
 
 	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodSet, value, metadata)
@@ -65,9 +73,13 @@ func (c *BuiltinServicesClient) KVSet(key string, value []byte) (*agentapi.HostS
 	return &kvResponse, nil
 }
 
-func (c *BuiltinServicesClient) KVDelete(key string) (*agentapi.HostServicesKeyValueResponse, error) {
+func (c *BuiltinServicesClient) KVDelete(key string, traceID *string) (*agentapi.HostServicesKeyValueResponse, error) {
 	metadata := map[string]string{
 		agentapi.KeyValueKeyHeader: key,
+	}
+
+	if traceID != nil {
+		metadata[agentapi.OtelTraceparent] = *traceID
 	}
 
 	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodDelete, []byte{}, metadata)
@@ -87,8 +99,14 @@ func (c *BuiltinServicesClient) KVDelete(key string) (*agentapi.HostServicesKeyV
 	return &kvResponse, nil
 }
 
-func (c *BuiltinServicesClient) KVKeys() ([]string, error) {
-	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodKeys, []byte{}, make(map[string]string))
+func (c *BuiltinServicesClient) KVKeys(traceID *string) ([]string, error) {
+	metadata := map[string]string{}
+
+	if traceID != nil {
+		metadata[agentapi.OtelTraceparent] = *traceID
+	}
+
+	resp, err := c.hsClient.PerformRpc(builtinServiceNameKeyValue, kvServiceMethodKeys, []byte{}, metadata)
 	if err != nil {
 		return nil, err
 	}

@@ -55,12 +55,12 @@ func TestKvBuiltin(t *testing.T) {
 		t.Fatalf("Failed to start server: %s", err)
 	}
 
-	_, err = bClient.KVSet("testone", []byte{9, 8, 7, 6, 5})
+	_, err = bClient.KVSet("testone", []byte{9, 8, 7, 6, 5}, nil)
 	if err != nil {
 		t.Fatalf("Got an error setting kv: %s", err.Error())
 	}
 
-	v, err := bClient.KVGet("testone")
+	v, err := bClient.KVGet("testone", nil)
 	if err != nil {
 		t.Fatalf("Got an error getting key: %s", err.Error())
 	}
@@ -68,7 +68,7 @@ func TestKvBuiltin(t *testing.T) {
 		t.Fatalf("Didn't get expected byte array back, got %+v", v)
 	}
 
-	keys, err := bClient.KVKeys()
+	keys, err := bClient.KVKeys(nil)
 	if err != nil {
 		t.Fatalf("Failed to get bucket keys: %s", err.Error())
 	}

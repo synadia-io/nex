@@ -33,7 +33,7 @@ type Wasm struct {
 func (e *Wasm) Deploy() error {
 	subject := fmt.Sprintf("agentint.%s.trigger", e.vmID)
 	_, err := e.nc.Subscribe(subject, func(msg *nats.Msg) {
-		val, err := e.Execute(msg.Header.Get("x-nex-trigger-subject"), msg.Data)
+		val, err := e.Execute(msg.Header, msg.Data)
 		if err != nil {
 			// TODO-- propagate this error to agent logs
 			return
@@ -51,7 +51,8 @@ func (e *Wasm) Deploy() error {
 	return nil
 }
 
-func (e *Wasm) Execute(subject string, payload []byte) ([]byte, error) {
+func (e *Wasm) Execute(headers nats.Header, payload []byte) ([]byte, error) {
+	subject := headers.Get(agentapi.NexTriggerSubject)
 	ctx := context.Background()
 
 	out := newStdOutBuf()

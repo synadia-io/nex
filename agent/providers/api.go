@@ -3,6 +3,7 @@ package providers
 import (
 	"errors"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/agent/providers/lib"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -27,7 +28,7 @@ type ExecutionProvider interface {
 	Deploy() error
 
 	// Execute a deployed function, if supported by the execution provider implementation (e.g., "v8" and "wasm" types)
-	Execute(subject string, payload []byte) ([]byte, error)
+	Execute(headers nats.Header, payload []byte) ([]byte, error)
 
 	// Undeploy a workload, giving it a chance to gracefully clean up after itself (if applicable)
 	Undeploy() error
