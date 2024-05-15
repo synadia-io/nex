@@ -4,6 +4,9 @@ go 1.22.2
 
 require (
 	dagger.io/dagger v0.11.2
+	github.com/alecthomas/kong v0.9.0
+	github.com/alecthomas/kong-toml v0.2.0
+	github.com/alecthomas/kong-yaml v0.2.0
 	github.com/cdfmlr/ellipsis v0.0.1
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.25.0
@@ -114,6 +117,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
+	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.53.0 // indirect
