@@ -38,14 +38,6 @@ type ExecutionProvider interface {
 	Validate() error
 }
 
-// HACK!!! theory was otel was not returning a propagator... but this didn't help...
-// func init() {
-// 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-// 		propagation.TraceContext{},
-// 		propagation.Baggage{},
-// 	))
-// }
-
 // NewExecutionProvider initializes and returns an execution provider for a given work request
 func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
 	if params.WorkloadType == nil {
