@@ -94,11 +94,13 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 	_, span := h.tracer.Start(ctx, msg.Subject)
 	defer span.End()
 
-	span.AddEvent("host services call", trace.WithAttributes(
+	span.SetAttributes(
 		attribute.KeyValue{Key: "workload_id", Value: attribute.StringValue(vmID)},
 		attribute.KeyValue{Key: "service", Value: attribute.StringValue(serviceName)},
 		attribute.KeyValue{Key: "method", Value: attribute.StringValue(method)},
-	))
+	)
+
+	span.AddEvent("host services call")
 
 	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
@@ -109,11 +111,7 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 		return
 	}
 
-	span.AddEvent("host services call succeeded", trace.WithAttributes(
-		attribute.KeyValue{Key: "workload_id", Value: attribute.StringValue(vmID)},
-		attribute.KeyValue{Key: "service", Value: attribute.StringValue(serviceName)},
-		attribute.KeyValue{Key: "method", Value: attribute.StringValue(method)},
-	))
+	span.AddEvent("host services call succeeded")
 
 	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
