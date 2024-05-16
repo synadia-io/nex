@@ -1,4 +1,4 @@
-package main
+package node
 
 type NodeExtendedCmds struct{}
 

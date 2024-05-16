@@ -1,79 +1,9 @@
-//go:build linux || windows
-
-package main
+package up
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
-	"reflect"
-
-	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/jedib0t/go-pretty/v6/text"
 )
-
-type NodeExtendedCmds struct {
-	Preflight PreflightCmd `cmd:"" json:"-"`
-	Up        UpCmd        `cmd:"" json:"-"`
-}
-
-func (n NodeExtendedCmds) Table() error {
-	tw := table.NewWriter()
-	tw.SetStyle(table.StyleRounded)
-
-	tw.Style().Title.Align = text.AlignCenter
-	tw.Style().Format.Header = text.FormatDefault
-
-	tw.SetTitle("Node Configuration")
-	tw.AppendHeader(table.Row{"Command", "Field", "Value", "Type"})
-	tw.AppendRows([]table.Row{
-		{"up", "Agent Handshake Timeout Millisecond", n.Up.AgentHandshakeTimeoutMillisecond, reflect.TypeOf(n.Up.AgentHandshakeTimeoutMillisecond).String()},
-		{"up", "Default Resource Directory", n.Up.DefaultResourceDir, reflect.TypeOf(n.Up.DefaultResourceDir).String()},
-		{"up", "Internal Node NATS Host", n.Up.InternalNodeHost, reflect.TypeOf(n.Up.InternalNodeHost).String()},
-		{"up", "Internal Node NATS Port", n.Up.InternalNodePort, reflect.TypeOf(n.Up.InternalNodePort).String()},
-		{"up", "Machine Pool Size", n.Up.MachinePoolSize, reflect.TypeOf(n.Up.MachinePoolSize).String()},
-		{"up", "No Sandbox", n.Up.NoSandbox, reflect.TypeOf(n.Up.NoSandbox).String()},
-		{"up", "Preserve Network", n.Up.PreserveNetwork, reflect.TypeOf(n.Up.PreserveNetwork).String()},
-		{"up", "Kernel Filepath", n.Up.KernelFilepath, reflect.TypeOf(n.Up.KernelFilepath).String()},
-		{"up", "RootFs Filepath", n.Up.RootFsFilepath, reflect.TypeOf(n.Up.RootFsFilepath).String()},
-		{"up", "Tags", n.Up.Tags, reflect.TypeOf(n.Up.Tags).String()},
-		{"up", "Valid Issuers", n.Up.ValidIssuers, reflect.TypeOf(n.Up.ValidIssuers).String()},
-		{"up", "Workload Type", n.Up.WorkloadType, reflect.TypeOf(n.Up.WorkloadType).String()},
-		{"up", "CNI Bin Paths", n.Up.CniBinPaths, reflect.TypeOf(n.Up.CniBinPaths).String()},
-		{"up", "CNI Interface Name", n.Up.CniInterfaceName, reflect.TypeOf(n.Up.CniInterfaceName).String()},
-		{"up", "CNI Network Name", n.Up.CniNetworkName, reflect.TypeOf(n.Up.CniNetworkName).String()},
-		{"up", "CNI Subnet", n.Up.CniSubnet, reflect.TypeOf(n.Up.CniSubnet).String()},
-		{"up", "Firecracker Vcpu Count", n.Up.FirecrackerVcpuCount, reflect.TypeOf(n.Up.FirecrackerVcpuCount).String()},
-		{"up", "Firecracker Mem Size Mib", n.Up.FirecrackerMemSizeMib, reflect.TypeOf(n.Up.FirecrackerMemSizeMib).String()},
-		{"up", "Bandwidth One Time Burst", n.Up.Limiters.Bandwidth.OneTimeBurst, reflect.TypeOf(n.Up.Limiters.Bandwidth.OneTimeBurst).String()},
-		{"up", "Bandwidth Refill Time", n.Up.Limiters.Bandwidth.RefillTime, reflect.TypeOf(n.Up.Limiters.Bandwidth.RefillTime).String()},
-		{"up", "Bandwidth Size", n.Up.Limiters.Bandwidth.Size, reflect.TypeOf(n.Up.Limiters.Bandwidth.Size).String()},
-		{"up", "Operations One Time Burst", n.Up.Limiters.Operations.OneTimeBurst, reflect.TypeOf(n.Up.Limiters.Operations.OneTimeBurst).String()},
-		{"up", "Operations Refill Time", n.Up.Limiters.Operations.RefillTime, reflect.TypeOf(n.Up.Limiters.Operations.RefillTime).String()},
-		{"up", "Operations Size", n.Up.Limiters.Operations.Size, reflect.TypeOf(n.Up.Limiters.Operations.Size).String()},
-		{"up", "OpenTelemetry Metrics Enabled", n.Up.OtelMetrics, reflect.TypeOf(n.Up.OtelMetrics).String()},
-		{"up", "OpenTelemetry Metrics Port", n.Up.OtelMetricsPort, reflect.TypeOf(n.Up.OtelMetricsPort).String()},
-		{"up", "OpenTelemetry Metrics Exporter", n.Up.OtelMetricsExporter, reflect.TypeOf(n.Up.OtelMetricsExporter).String()},
-		{"up", "OpenTelemetry Traces Enabled", n.Up.OtelTraces, reflect.TypeOf(n.Up.OtelTraces).String()},
-		{"up", "OpenTelemetry Traces Exporter", n.Up.OtelTracesExporter, reflect.TypeOf(n.Up.OtelTracesExporter).String()},
-		{"up", "OpenTelemetry Exporter URL", n.Up.OtlpExporterUrl, reflect.TypeOf(n.Up.OtlpExporterUrl).String()},
-		{"preflight", "Force Dependency Install", n.Preflight.ForceDepInstall, reflect.TypeOf(n.Preflight.ForceDepInstall).String()},
-	})
-	fmt.Println(tw.Render())
-	return nil
-}
-
-type PreflightCmd struct {
-	ForceDepInstall bool `name:"force" default:"false" help:"Install missing dependencies without prompt" json:"preflight_force"`
-}
-
-func (p PreflightCmd) Run() error {
-	return nil
-}
-
-func (u UpCmd) Run(ctx Context) error {
-	return nil
-}
 
 type UpCmd struct {
 	AgentHandshakeTimeoutMillisecond int               `default:"5000" group:"Nex Node Configuration" json:"up_agent_handshake_timeout_ms"`
@@ -104,10 +34,6 @@ type UpCmd struct {
 
 	Errors []error `kong:"-"`
 }
-
-// -----------------------------------------------------------------------
-// Node configuration is used to configure the node process as well
-// as the virtual machines it produces
 
 type HostServicesConfig struct {
 	NatsUrl      string                   `group:"Host Services Configuration" json:"hostservices_nats_url"`

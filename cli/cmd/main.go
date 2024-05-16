@@ -10,20 +10,17 @@ import (
 	"github.com/alecthomas/kong-yaml"
 	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
+
+	"github.com/synadia-io/nex/cli"
 )
 
 var (
 	VERSION = "development"
 )
 
-type Context struct {
-	config nexCLI
-
-	logger *slog.Logger
-}
-
 func main() {
 	logger := slog.New(shandler.NewHandler())
+	nCLI := cli.NewNexCLI(logger)
 
 	cliCtx := kong.Parse(
 		&nCLI,
@@ -42,9 +39,12 @@ func main() {
 		},
 	)
 
-	logger = configLogger(nCLI.Global)
+	err := nCLI.UpdateLogger()
+	if err != nil {
+		logger.Error("Failed up upgrade logger", slog.Any("err", err))
+	}
 
-	err := cliCtx.Run(Context{nCLI, logger})
+	err = cliCtx.Run(nCLI.Global)
 	cliCtx.FatalIfErrorf(err)
 }
 
