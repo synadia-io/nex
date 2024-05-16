@@ -1,0 +1,31 @@
+version: 1
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  -
+    id: "echoservice"
+    main: "../examples/echoservice"
+    binary: "echoservice"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -extldflags "-static"
+    tags:
+      - netgo
+
+archives:
+  - id: binaries
+    format: binary
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    allow_different_binary_count: true
