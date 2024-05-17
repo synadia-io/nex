@@ -86,9 +86,9 @@ var _ = FDescribe("nexus integration", func() {
 						errmsg := fmt.Sprintf("❌ nex run %v of %v failed; %s\n", i, attempts, _err.Error())
 						err = errors.Join(err, errors.New(errmsg))
 						fmt.Printf(errmsg)
+					} else {
+						fmt.Printf("completed nex run %v of %v on %s/%s\n", i, attempts, arch, os)
 					}
-
-					fmt.Printf("completed nex run %v of %v on %s/%s\n", i, attempts, arch, os)
 
 					i++
 				}
