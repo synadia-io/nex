@@ -355,6 +355,13 @@ func (w *WorkloadManager) Stop() error {
 
 // Stop a workload, optionally attempting a graceful undeploy prior to termination
 func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
+	defer func() {
+		delete(w.activeAgents, id)
+		delete(w.stopMutex, id)
+
+		_ = w.publishWorkloadStopped(id)
+	}()
+
 	deployRequest, err := w.procMan.Lookup(id)
 	if err != nil {
 		w.log.Warn("request to undeploy workload failed", slog.String("workload_id", id), slog.String("error", err.Error()))
@@ -400,11 +407,6 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		w.log.Warn("failed to stop workload process", slog.String("workload_id", id), slog.String("error", err.Error()))
 		return err
 	}
-
-	delete(w.activeAgents, id)
-	delete(w.stopMutex, id)
-
-	_ = w.publishWorkloadStopped(id)
 
 	return nil
 }
