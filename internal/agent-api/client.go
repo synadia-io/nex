@@ -289,6 +289,9 @@ func (a *AgentClient) monitorAgent() {
 			}
 			break
 		}
+		if a.stopping > 0 {
+			break
+		}
 	}
 }
 

@@ -457,9 +457,7 @@ func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
 
 func (w *WorkloadManager) agentContactLost(workloadID string) {
 	w.log.Warn("Lost contact with agent", slog.String("workload_id", workloadID))
-	delete(w.activeAgents, workloadID)
-	delete(w.pendingAgents, workloadID)
-	_ = w.procMan.StopProcess(workloadID)
+	_ = w.StopWorkload(workloadID, false)
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
