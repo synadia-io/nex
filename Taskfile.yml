@@ -69,7 +69,11 @@ tasks:
       - mv spec _spec
       - go test -tags netgo -ldflags '-extldflags "-static"'-v -race ./...
       - mv _spec spec
-  
+
+  integration:
+    cmds:
+      - sudo --preserve-env go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --v --trace --keep-going ./spec
+
   otel_start:
     dir: _scripts/otel
     cmds:
