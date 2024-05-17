@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path"
@@ -110,17 +111,15 @@ func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout 
 	// node "nearby"
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, timeout, namespace, logger)
 
-	candidates, err := nodeClient.ListAllNodes()
+	target, err := randomNode(nodeClient)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve random nexus node: %s", err)
 	}
-	if len(candidates) == 0 {
-		return errors.New("unable to locate candidate node - no nodes discovered")
-	}
-	target := candidates[0]
+	fmt.Printf("resolved random node from nexus for execution: %s\n", target.NodeId)
+
 	info, err := nodeClient.NodeInfo(target.NodeId)
 	if err != nil {
-		return fmt.Errorf("failed to get node info for potential execution target: %s", err)
+		return fmt.Errorf("failed to get node info for execution target: %s", err)
 	}
 
 	issuerKp, err := readOrGenerateIssuer()
@@ -190,6 +189,33 @@ func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout 
 	}
 
 	return nil
+}
+
+func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error) {
+	candidates, err := listNodes(nodeClient)
+	if err != nil {
+		return nil, err
+	}
+
+	shuffled := make([]*controlapi.PingResponse, len(candidates))
+	for i, x := range rand.Perm(len(candidates)) {
+		shuffled[x] = &candidates[i]
+	}
+
+	return shuffled[0], nil
+}
+
+func listNodes(nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
+	candidates, err := nodeClient.ListAllNodes() // TODO- would expect "ListNodes" to return []NexNode...
+	if err != nil {
+		return nil, err
+	}
+
+	if len(candidates) == 0 {
+		return nil, errors.New("unable to locate candidate node - no nodes discovered")
+	}
+
+	return candidates, nil
 }
 
 // All remaining funcs defined below are copypasta from nex/devrunner.go...
