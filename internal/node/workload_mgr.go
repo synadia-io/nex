@@ -355,6 +355,14 @@ func (w *WorkloadManager) Stop() error {
 
 // Stop a workload, optionally attempting a graceful undeploy prior to termination
 func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
+	defer func() {
+		delete(w.activeAgents, id)
+		delete(w.pendingAgents, id)
+		delete(w.stopMutex, id)
+
+		_ = w.publishWorkloadStopped(id)
+	}()
+
 	deployRequest, err := w.procMan.Lookup(id)
 	if err != nil {
 		w.log.Warn("request to undeploy workload failed", slog.String("workload_id", id), slog.String("error", err.Error()))
@@ -362,8 +370,10 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	}
 
 	mutex := w.stopMutex[id]
-	mutex.Lock()
-	defer mutex.Unlock()
+	if mutex != nil {
+		mutex.Lock()
+		defer mutex.Unlock()
+	}
 
 	w.log.Debug("Attempting to stop workload", slog.String("workload_id", id), slog.Bool("undeploy", undeploy))
 
@@ -401,11 +411,6 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		return err
 	}
 
-	delete(w.activeAgents, id)
-	delete(w.stopMutex, id)
-
-	_ = w.publishWorkloadStopped(id)
-
 	return nil
 }
 
@@ -424,6 +429,7 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 		w.agentHandshakeSucceeded,
 		w.agentEvent,
 		w.agentLog,
+		w.agentContactLost,
 	)
 
 	err := agentClient.Start(id)
@@ -452,6 +458,11 @@ func (w *WorkloadManager) agentHandshakeTimedOut(id string) {
 func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
 	now := time.Now().UTC()
 	w.handshakes[workloadID] = now.Format(time.RFC3339)
+}
+
+func (w *WorkloadManager) agentContactLost(workloadID string) {
+	w.log.Warn("Lost contact with agent", slog.String("workload_id", workloadID))
+	_ = w.StopWorkload(workloadID, false)
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads

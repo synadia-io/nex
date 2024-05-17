@@ -21,6 +21,7 @@ import (
 type HandshakeCallback func(string)
 type EventCallback func(string, cloudevents.Event)
 type LogCallback func(string, LogEntry)
+type ContactLostCallback func(string)
 
 const (
 	NexTriggerSubject = "x-nex-trigger-subject"
@@ -47,6 +48,7 @@ type AgentClient struct {
 	handshakeSucceeded HandshakeCallback
 	eventReceived      EventCallback
 	logReceived        LogCallback
+	contactLost        ContactLostCallback
 
 	execTotalNanos    int64
 	workloadStartedAt time.Time
@@ -62,6 +64,7 @@ func NewAgentClient(
 	onSuccess HandshakeCallback,
 	onEvent EventCallback,
 	onLog LogCallback,
+	onContactLost ContactLostCallback,
 ) *AgentClient {
 	return &AgentClient{
 		eventReceived:      onEvent,
@@ -69,6 +72,7 @@ func NewAgentClient(
 		handshakeTimeout:   handshakeTimeout,
 		handshakeTimedOut:  onTimedOut,
 		handshakeSucceeded: onSuccess,
+		contactLost:        onContactLost,
 		log:                log,
 		logReceived:        onLog,
 		nc:                 nc,
@@ -192,6 +196,18 @@ func (a *AgentClient) Undeploy() error {
 	return nil
 }
 
+func (a *AgentClient) Ping() error {
+	subject := fmt.Sprintf("agentint.%s.ping", a.agentID)
+
+	_, err := a.nc.Request(subject, []byte{}, 750*time.Millisecond)
+	if err != nil {
+		a.log.Warn("Agent failed to respond to ping", slog.Any("error", err))
+		return err
+	}
+
+	return nil
+}
+
 func (a *AgentClient) RecordExecTime(elapsedNanos int64) {
 	atomic.AddInt64(&a.execTotalNanos, elapsedNanos)
 }
@@ -259,6 +275,24 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 
 	a.handshakeReceived.Store(true)
 	a.handshakeSucceeded(*req.ID)
+	go a.monitorAgent()
+}
+
+func (a *AgentClient) monitorAgent() {
+	ticker := time.NewTicker(15 * time.Second)
+	for {
+		<-ticker.C
+		err := a.Ping()
+		if err != nil {
+			if a.contactLost != nil {
+				a.contactLost(a.agentID)
+			}
+			break
+		}
+		if a.stopping > 0 {
+			break
+		}
+	}
 }
 
 func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
