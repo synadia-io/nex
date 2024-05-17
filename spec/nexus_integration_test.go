@@ -65,14 +65,19 @@ var _ = FDescribe("nexus integration", func() {
 	// })
 
 	DescribeTableSubtree("nex run", func(arch, os, namespace string, attempts int, timeout time.Duration) {
-		Context("when attempting to run a valid executable", func() {
+		Context("when attempting to run a valid binary", func() {
 			It("should deploy the workload successfully", func(ctx SpecContext) {
 				i := 0
 				for i < attempts {
 					i++
 				}
 
-				err := devrun(nc, fmt.Sprintf("./dist/echoservice_%s_%s_v1/echoservice", os, arch), namespace, logger, timeout, true, []string{}) // FIXME-- add as subtree params
+				path := fmt.Sprintf("./dist/echoservice_%s_%s_v1/echoservice", os, arch)
+				if strings.EqualFold(os, "windows") {
+					path = fmt.Sprintf("%s.exe", path)
+				}
+
+				err := devrun(nc, path, namespace, logger, timeout, true, []string{}) // FIXME-- add as subtree params
 				Expect(err).To(BeNil())
 
 				fmt.Printf("completed nex run #%v of %v on %s/%s", i, attempts, arch, os)
