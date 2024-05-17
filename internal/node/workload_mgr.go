@@ -357,6 +357,7 @@ func (w *WorkloadManager) Stop() error {
 func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	defer func() {
 		delete(w.activeAgents, id)
+		delete(w.pendingAgents, id)
 		delete(w.stopMutex, id)
 
 		_ = w.publishWorkloadStopped(id)
@@ -369,8 +370,10 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	}
 
 	mutex := w.stopMutex[id]
-	mutex.Lock()
-	defer mutex.Unlock()
+	if mutex != nil {
+		mutex.Lock()
+		defer mutex.Unlock()
+	}
 
 	w.log.Debug("Attempting to stop workload", slog.String("workload_id", id), slog.Bool("undeploy", undeploy))
 
