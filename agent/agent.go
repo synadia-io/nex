@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"path"
@@ -329,18 +328,8 @@ func (a *Agent) handleUndeploy(m *nats.Msg) {
 	_ = m.Respond([]byte{})
 }
 
-// At the moment this is really not much more than an HTTP ping to verify that the host
-// can talk to the agent. As agent functionality progresses, we'll likely add more to
-// this
-func (a *Agent) handleHealthz(w http.ResponseWriter, req *http.Request) {
-	res := struct {
-		Started string `json:"started"`
-	}{
-		Started: a.started.Format(time.RFC3339),
-	}
-	bytes, _ := json.Marshal(res)
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(bytes)
+func (a *Agent) handlePing(m *nats.Msg) {
+	_ = m.Respond([]byte("OK"))
 }
 
 func (a *Agent) init() error {
@@ -371,7 +360,12 @@ func (a *Agent) init() error {
 		return err
 	}
 
-	go a.startDiagnosticEndpoint()
+	pingSubject := fmt.Sprintf("agentint.%s.ping", *a.md.VmID)
+	_, err = a.nc.Subscribe(pingSubject, a.handlePing)
+	if err != nil {
+		a.LogError(fmt.Sprintf("failed to subscribe to ping subject: %s", err))
+	}
+
 	go a.dispatchEvents()
 	go a.dispatchLogs()
 
@@ -460,12 +454,6 @@ func (a *Agent) shutdown() {
 
 func (a *Agent) shuttingDown() bool {
 	return (atomic.LoadUint32(&a.closing) > 0)
-}
-
-func (a *Agent) startDiagnosticEndpoint() {
-	// TODO: decide whether we should have `/logz` endpoint to read from the agent's openrc-defined log files
-	http.HandleFunc("/healthz", a.handleHealthz)
-	_ = http.ListenAndServe(":9999", nil)
 }
 
 func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {

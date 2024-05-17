@@ -424,6 +424,7 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 		w.agentHandshakeSucceeded,
 		w.agentEvent,
 		w.agentLog,
+		w.agentContactLost,
 	)
 
 	err := agentClient.Start(id)
@@ -452,6 +453,13 @@ func (w *WorkloadManager) agentHandshakeTimedOut(id string) {
 func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
 	now := time.Now().UTC()
 	w.handshakes[workloadID] = now.Format(time.RFC3339)
+}
+
+func (w *WorkloadManager) agentContactLost(workloadID string) {
+	w.log.Warn("Lost contact with agent", slog.String("workload_id", workloadID))
+	delete(w.activeAgents, workloadID)
+	delete(w.pendingAgents, workloadID)
+	_ = w.procMan.StopProcess(workloadID)
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
