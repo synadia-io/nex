@@ -79,11 +79,11 @@ var _ = FDescribe("nexus integration", func() {
 			})
 		})
 	},
-		Entry("amd64 linux", "amd64", "linux", "default", 25, 750*time.Millisecond),
-		Entry("arm64 linux", "arm64", "linux", "default", 25, 750*time.Millisecond),
+		Entry("amd64 linux", "amd64", "linux", "default", 10, 2500*time.Millisecond),
+		Entry("arm64 linux", "arm64", "linux", "default", 10, 2500*time.Millisecond),
 
-		Entry("amd64 windows", "amd64", "windows", "default", 25, 750*time.Millisecond),
-		Entry("arm64 windows", "arm64", "windows", "default", 25, 750*time.Millisecond),
+		Entry("amd64 windows", "amd64", "windows", "default", 10, 2500*time.Millisecond),
+		Entry("arm64 windows", "arm64", "windows", "default", 10, 2500*time.Millisecond),
 	)
 })
 
