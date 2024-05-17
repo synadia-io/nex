@@ -6,9 +6,9 @@ before:
 
 builds:
   -
-    id: "echoservice"
-    main: "../examples/echoservice"
-    binary: "echoservice"
+    id: "helloworld"
+    main: "../examples/helloworld"
+    binary: "helloworld"
     goos:
       - linux
       - darwin

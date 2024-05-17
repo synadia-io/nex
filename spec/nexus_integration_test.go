@@ -68,9 +68,9 @@ var _ = FDescribe("nexus integration", func() {
 	DescribeTableSubtree("nex run", func(arch, os, namespace string, attempts int, timeout time.Duration) {
 		Context("when attempting to run a valid binary", func() {
 			It("should deploy the workload successfully", func(ctx SpecContext) {
-				path := fmt.Sprintf("./dist/echoservice_%s_%s/echoservice", os, arch)
+				path := fmt.Sprintf("./dist/helloworld_%s_%s/helloworld", os, arch)
 				if strings.EqualFold(arch, "amd64") { // FIXME use string builder instead
-					path = fmt.Sprintf("./dist/echoservice_%s_%s_v1/echoservice", os, arch) // amd64 dist directory is amd64_v1
+					path = fmt.Sprintf("./dist/helloworld_%s_%s_v1/helloworld", os, arch) // amd64 dist directory is amd64_v1
 				}
 				if strings.EqualFold(os, "windows") {
 					path = fmt.Sprintf("%s.exe", path)
@@ -82,7 +82,7 @@ var _ = FDescribe("nexus integration", func() {
 				for i <= attempts {
 					fmt.Printf("attempting nex run %v of %v on %s/%s\n", i, attempts, arch, os)
 
-					_err := devrun(nc, path, namespace, logger, timeout, true, []string{}) // FIXME-- add as subtree params
+					_err := devrun(nc, path, namespace, logger, timeout, true, false, []string{}) // FIXME-- add as subtree params
 					if _err != nil {
 						errmsg := fmt.Sprintf("❌ nex run %v of %v failed; %s\n", i, attempts, _err.Error())
 						err = errors.Join(err, errors.New(errmsg))
@@ -106,7 +106,7 @@ var _ = FDescribe("nexus integration", func() {
 })
 
 // FIXME-- drop devrun and just use the run command
-func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout time.Duration, stopIfExists bool, triggerSubjects []string) error {
+func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout time.Duration, stopIfExists, essential bool, triggerSubjects []string) error {
 	// developer mode can have a smaller discovery timeout, since we're assuming there's a NEX
 	// node "nearby"
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, timeout, namespace, logger)
@@ -168,7 +168,7 @@ func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout 
 	request, err := controlapi.NewDeployRequest(
 		controlapi.Location(workloadUrl),
 		// TODO controlapi.Environment(),
-		// TODO controlapi.Essential(essential),
+		controlapi.Essential(essential),
 		controlapi.Issuer(issuerKp),
 		controlapi.SenderXKey(publisherXKey),
 		controlapi.TargetNode(target.NodeId),
