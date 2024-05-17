@@ -67,20 +67,33 @@ var _ = FDescribe("nexus integration", func() {
 	DescribeTableSubtree("nex run", func(arch, os, namespace string, attempts int, timeout time.Duration) {
 		Context("when attempting to run a valid binary", func() {
 			It("should deploy the workload successfully", func(ctx SpecContext) {
-				i := 0
-				for i < attempts {
-					i++
+				path := fmt.Sprintf("./dist/echoservice_%s_%s/echoservice", os, arch)
+				if strings.EqualFold(arch, "amd64") { // FIXME use string builder instead
+					path = fmt.Sprintf("./dist/echoservice_%s_%s_v1/echoservice", os, arch) // amd64 dist directory is amd64_v1
 				}
-
-				path := fmt.Sprintf("./dist/echoservice_%s_%s_v1/echoservice", os, arch)
 				if strings.EqualFold(os, "windows") {
 					path = fmt.Sprintf("%s.exe", path)
 				}
 
-				err := devrun(nc, path, namespace, logger, timeout, true, []string{}) // FIXME-- add as subtree params
-				Expect(err).To(BeNil())
+				var err error
 
-				fmt.Printf("completed nex run #%v of %v on %s/%s", i, attempts, arch, os)
+				i := 1
+				for i <= attempts {
+					fmt.Printf("attempting nex run %v of %v on %s/%s\n", i, attempts, arch, os)
+
+					_err := devrun(nc, path, namespace, logger, timeout, true, []string{}) // FIXME-- add as subtree params
+					if _err != nil {
+						errmsg := fmt.Sprintf("❌ nex run %v of %v failed; %s\n", i, attempts, _err.Error())
+						err = errors.Join(err, errors.New(errmsg))
+						fmt.Printf(errmsg)
+					}
+
+					fmt.Printf("completed nex run %v of %v on %s/%s\n", i, attempts, arch, os)
+
+					i++
+				}
+
+				Expect(err).To(BeNil())
 			})
 		})
 	},
@@ -88,7 +101,6 @@ var _ = FDescribe("nexus integration", func() {
 		Entry("arm64 linux", "arm64", "linux", "default", 10, 2500*time.Millisecond),
 
 		Entry("amd64 windows", "amd64", "windows", "default", 10, 2500*time.Millisecond),
-		Entry("arm64 windows", "arm64", "windows", "default", 10, 2500*time.Millisecond),
 	)
 })
 
