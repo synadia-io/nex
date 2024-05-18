@@ -133,6 +133,8 @@ func init() {
 	rootfs.Flag("agent", "Path to agent binary").PlaceHolder("../path/to/nex-agent").Required().StringVar(&RootfsOpts.AgentBinaryPath)
 	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 
+	nodesLs.Flag("full", "List more detailed table").Default("false").UnNegatableBoolVar(&NodeOpts.ListFull)
+
 	// one day when we refactor, let's get rid of all of these global structs. Such ugly
 	nodesProbe.Flag("workload", "Only query nodes currently running the given workload (id or name)").StringVar(&RunOpts.Name)
 }
