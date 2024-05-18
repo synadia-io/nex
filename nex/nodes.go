@@ -41,7 +41,7 @@ func ListWorkloads(ctx context.Context) error {
 		return err
 	}
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
-	nodes, err := nodeClient.ListWorkloads(strings.TrimSpace(RunOpts.Name), NodeOpts.ListFull)
+	nodes, err := nodeClient.ListWorkloads(strings.TrimSpace(RunOpts.Name))
 	if err != nil {
 		return err
 	}
