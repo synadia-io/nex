@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/nats-io/natscli/columns"
 	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/internal/models"
@@ -27,7 +28,7 @@ func ListNodes(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	renderNodeList(nodes)
+	renderNodeList(nodes, NodeOpts.ListFull)
 
 	return nil
 
@@ -40,7 +41,7 @@ func ListWorkloads(ctx context.Context) error {
 		return err
 	}
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
-	nodes, err := nodeClient.ListWorkloads(strings.TrimSpace(RunOpts.Name))
+	nodes, err := nodeClient.ListWorkloads(strings.TrimSpace(RunOpts.Name), NodeOpts.ListFull)
 	if err != nil {
 		return err
 	}
@@ -129,14 +130,18 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 	}
 }
 
-func renderNodeList(nodes []controlapi.PingResponse) {
+func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
 	if len(nodes) == 0 {
 		fmt.Println("No nodes discovered")
 		return
 	}
 
-	table := newTableWriter("NATS Execution Nodes")
-	table.AddHeaders("ID", "Name", "Sandboxed", "Version", "Uptime", "Workloads")
+	tbl := newTableWriter("NATS Execution Nodes")
+	if !listFull {
+		tbl.AddHeaders("ID", "Name", "Version", "Workloads")
+	} else {
+		tbl.AddHeaders("ID", "Name", "Version", "Workloads", "Uptime", "Sandboxed", "OS", "Arch")
+	}
 
 	for _, node := range nodes {
 		nodeName, ok := node.Tags["node_name"]
@@ -144,15 +149,32 @@ func renderNodeList(nodes []controlapi.PingResponse) {
 			nodeName = "no-name"
 		}
 
-		nodeUnsafe, ok := node.Tags["nex.unsafe"]
-		if !ok {
-			nodeUnsafe = "false"
-		}
-		nUnsafe, _ := strconv.ParseBool(nodeUnsafe)
-		table.AddRow(node.NodeId, nodeName, !nUnsafe, node.Version, node.Uptime, node.RunningMachines)
-	}
+		row := []any{node.NodeId, nodeName, node.Version, node.RunningMachines}
 
-	fmt.Println(table.Render())
+		if listFull {
+			nodeUnsafe, ok := node.Tags["nex.unsafe"]
+			if !ok {
+				nodeUnsafe = "false"
+			}
+			nUnsafe, _ := strconv.ParseBool(nodeUnsafe)
+			nodeOS, ok := node.Tags["nex.os"]
+			if !ok {
+				nodeOS = "unknown"
+			}
+
+			nodeArch, ok := node.Tags["nex.arch"]
+			if !ok {
+				nodeArch = "unknown"
+			}
+
+			row = append(row, node.Uptime, !nUnsafe, nodeOS, nodeArch)
+		}
+		tbl.AddRow(row...)
+	}
+	tbl.writer.SortBy([]table.SortBy{
+		{Name: "Name", Mode: table.Asc},
+	})
+	fmt.Println(tbl.Render())
 }
 
 func renderWorkloadPingList(nodes []controlapi.WorkloadPingResponse) {

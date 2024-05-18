@@ -117,7 +117,7 @@ func (api *Client) EnterLameDuck(nodeId string) (*LameDuckResponse, error) {
 // filter by the client's namespace. If a workload ID/name is supplied, the filter
 // will be for both namespace and workload. If you don't want these filters
 // then use ListAllNodes
-func (api *Client) ListWorkloads(workloadId string) ([]WorkloadPingResponse, error) {
+func (api *Client) ListWorkloads(workloadId string, listFull bool) ([]WorkloadPingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
 
