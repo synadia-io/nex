@@ -8,8 +8,10 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-// NexExecutionProviderELF Executable Linkable Format execution provider
-const NexExecutionProviderELF = "elf"
+// TODO: change this to "native" from "elf" when appropriate
+
+// NexExecutionProviderNative Executable Linkable Format execution provider
+const NexExecutionProviderNative = "elf"
 
 // NexExecutionProviderV8 V8 execution provider
 const NexExecutionProviderV8 = "v8"
@@ -45,8 +47,8 @@ func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionPr
 	}
 
 	switch *params.WorkloadType {
-	case NexExecutionProviderELF:
-		return lib.InitNexExecutionProviderELF(params)
+	case NexExecutionProviderNative:
+		return lib.InitNexExecutionProviderNative(params)
 	case NexExecutionProviderV8:
 		return lib.InitNexExecutionProviderV8(params)
 	case NexExecutionProviderOCI:

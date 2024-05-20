@@ -15,8 +15,8 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-// ELF execution provider implementation
-type ELF struct {
+// NativeExecutable execution provider implementation
+type NativeExecutable struct {
 	argv        []string
 	environment map[string]string
 	name        string
@@ -36,7 +36,13 @@ type ELF struct {
 }
 
 // Deploy the ELF binary
-func (e *ELF) Deploy() error {
+func (e *NativeExecutable) Deploy() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New("deploy recovered from panic")
+		}
+	}()
+
 	cmd := exec.Command(e.tmpFilename, e.argv...)
 	cmd.Stdout = e.stdout
 	cmd.Stderr = e.stderr
@@ -48,10 +54,10 @@ func (e *ELF) Deploy() error {
 		cmd.Env = append(cmd.Env, item)
 	}
 
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		e.fail <- true
-		return err
+		return
 	}
 
 	e.cmd = cmd
@@ -76,42 +82,42 @@ func (e *ELF) Deploy() error {
 				e.exit <- exitError.ExitCode() // this is here for now for review but can likely be simplified to one line: `e.exit <- cmd.ProcessState.ExitCode()``
 			}
 		} else {
-			e.exit <- cmd.ProcessState.ExitCode()
+			if cmd.ProcessState != nil {
+				e.exit <- cmd.ProcessState.ExitCode()
+			} else {
+				e.exit <- 1
+			}
 		}
 	}()
 
-	return nil
+	return
 }
 
-func (e *ELF) removeWorkload() {
+func (e *NativeExecutable) removeWorkload() {
 	_ = os.Remove(e.tmpFilename)
 }
 
-func (e *ELF) Execute(ctx context.Context, payload []byte) ([]byte, error) {
-	return nil, errors.New("ELF execution provider does not support execution via trigger subjects")
+func (e *NativeExecutable) Execute(ctx context.Context, payload []byte) ([]byte, error) {
+	return nil, errors.New("Native execution provider does not support execution via trigger subjects")
 }
 
 // Validate the underlying artifact to be a 64-bit linux native ELF
 // binary that is statically-linked
-func (e *ELF) Validate() error {
+func (e *NativeExecutable) Validate() error {
 	return validateNativeBinary(e.tmpFilename)
 }
 
 // convenience method to initialize an ELF execution provider
-func InitNexExecutionProviderELF(params *agentapi.ExecutionProviderParams) (*ELF, error) {
+func InitNexExecutionProviderNative(params *agentapi.ExecutionProviderParams) (*NativeExecutable, error) {
 	if params.WorkloadName == nil {
-		return nil, errors.New("ELF execution provider requires a workload name parameter")
+		return nil, errors.New("Native execution provider requires a workload name parameter")
 	}
 
 	if params.TmpFilename == nil {
-		return nil, errors.New("ELF execution provider requires a temporary filename parameter")
+		return nil, errors.New("Native execution provider requires a temporary filename parameter")
 	}
 
-	if params.TotalBytes == 0 {
-		params.TotalBytes = 0
-	}
-
-	return &ELF{
+	return &NativeExecutable{
 		argv:        params.Argv,
 		environment: params.Environment,
 		name:        *params.WorkloadName,
