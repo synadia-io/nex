@@ -140,12 +140,7 @@ func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error)
 		return nil, err
 	}
 
-	shuffled := make([]*controlapi.PingResponse, len(candidates))
-	for i, x := range rand.Perm(len(candidates)) {
-		shuffled[x] = &candidates[i]
-	}
-
-	return shuffled[0], nil
+	return &candidates[rand.Intn(len(candidates))], nil
 }
 
 func listNodes(nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
