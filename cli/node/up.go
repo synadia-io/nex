@@ -1,8 +1,10 @@
-package up
+package node
 
 import (
 	"encoding/json"
 	"os"
+
+	"github.com/synadia-io/nex/cli/globals"
 )
 
 type UpCmd struct {
@@ -25,7 +27,7 @@ type UpCmd struct {
 	HostServicesConfig               `group:"Host Services Configuration"`
 	PublicNATSServer                 []byte `placeholder:"./path/to/nats_server.conf" type:"filecontent" help:"Path to nats server config to be used for userland NATS server. JSON format" group:"Nex Node Configuration"`
 
-	OtelMetrics         bool   `name:"metrics" default:"false" help:"Enables OTel Metrics" group:"OpenTelemetry Configuration" json:"up_otel_metrics" json:"up_otel_metrics_enabled"`
+	OtelMetrics         bool   `name:"metrics" default:"false" help:"Enables OTel Metrics" group:"OpenTelemetry Configuration" json:"up_otel_metrics_enabled"`
 	OtelMetricsPort     int    `default:"8085" group:"OpenTelemetry Configuration" json:"up_otel_metrics_port"`
 	OtelMetricsExporter string `default:"file" enum:"file,prometheus" group:"OpenTelemetry Configuration" json:"up_otel_metrics_exporter"`
 	OtelTraces          bool   `name:"traces" default:"false" help:"Enables OTel Traces" group:"OpenTelemetry Configuration" json:"up_otel_traces_enabled"`
@@ -81,4 +83,15 @@ type TokenBucket struct {
 	// Required: true
 	// Minimum: 0
 	Size int64 `placeholder:"0" json:"token_bucket_size"`
+}
+
+func (u UpCmd) Run(cfg globals.Globals) error {
+	if cfg.Check {
+		return u.Table()
+	}
+	return nil
+}
+
+func (u UpCmd) Validate() error {
+	return nil
 }
