@@ -9,10 +9,13 @@ import (
 )
 
 // Undeploy the ELF binary
-func (e *ELF) Undeploy() error {
+func (e *NativeExecutable) Undeploy() error {
 	e.undeploy.Do(func() {
+		defer func() {
+			e.removeWorkload()
+		}()
 		err := e.cmd.Process.Signal(os.Interrupt)
-		e.removeWorkload()
+
 		if err != nil {
 			fmt.Println("Couldn't terminate elf binary process")
 			e.fail <- true
@@ -22,6 +25,6 @@ func (e *ELF) Undeploy() error {
 	return nil
 }
 
-func (e *ELF) sysProcAttr() *syscall.SysProcAttr {
+func (e *NativeExecutable) sysProcAttr() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{}
 }
