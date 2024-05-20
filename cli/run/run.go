@@ -1,7 +1,9 @@
 package run
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"net/url"
 
 	"github.com/synadia-io/nex/cli/globals"
@@ -25,9 +27,9 @@ type RunOptions struct {
 	SharedRunOptions
 }
 
-func (r RunOptions) Run(ctx globals.Globals) error {
-	if ctx.Check {
-		return errors.Join(ctx.Table(), r.Table())
+func (r RunOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+	if cfg.Check {
+		return errors.Join(cfg.Table(), r.Table())
 	}
 	return nil
 }

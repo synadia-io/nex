@@ -1,12 +1,18 @@
 package upgrade
 
-import "github.com/synadia-io/nex/cli/globals"
+import (
+	"context"
+	"errors"
+	"log/slog"
+
+	"github.com/synadia-io/nex/cli/globals"
+)
 
 type UpgradeOptions struct{}
 
-func (u UpgradeOptions) Run(cfg globals.Globals) error {
+func (u UpgradeOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
-		return u.Table()
+		return errors.Join(cfg.Table(), u.Table())
 	}
 	return nil
 }

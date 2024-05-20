@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,11 +15,18 @@ import (
 	"github.com/synadia-io/nex/cli"
 )
 
-var (
-	VERSION = "development"
+const (
+	VERSION   = "development"
+	COMMIT    = "none"
+	BUILDDATE = "unknown"
 )
 
 func main() {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "VERSION", VERSION)      //nolint:staticcheck
+	ctx = context.WithValue(ctx, "COMMIT", COMMIT)        //nolint:staticcheck
+	ctx = context.WithValue(ctx, "BUILD_DATE", BUILDDATE) //nolint:staticcheck
+
 	logger := slog.New(shandler.NewHandler())
 	nCLI := cli.NewNexCLI(logger)
 
@@ -27,7 +35,7 @@ func main() {
 		kong.Name("nex"),
 		kong.Description("NATS Execution Engine CLI | Synadia Communications"),
 		kong.ShortHelp(shortHelp),
-		kong.ShortUsageOnError(),
+		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true, NoExpandSubcommands: true, FlagsLast: true}),
 		kong.Configuration(logConfig(kong.JSON, logger), "/etc/nex/config.json", "./nex.json"),
 		kong.Configuration(logConfig(kongtoml.Loader, logger), "/etc/nex/config.toml", "./nex.toml"),
@@ -39,12 +47,12 @@ func main() {
 		},
 	)
 
-	err := nCLI.UpdateLogger()
-	if err != nil {
-		logger.Error("Failed up upgrade logger", slog.Any("err", err))
-	}
+	// TODO: implement settings from config
+	logger = slog.New(shandler.NewHandler())
 
-	err = cliCtx.Run(nCLI.Global)
+	cliCtx.BindTo(ctx, (*context.Context)(nil))
+	cliCtx.BindTo(logger, (*slog.Logger)(nil))
+	err := cliCtx.Run(ctx, logger, nCLI.Global)
 	cliCtx.FatalIfErrorf(err)
 }
 

@@ -1,6 +1,12 @@
 package rootfs
 
-import "github.com/synadia-io/nex/cli/globals"
+import (
+	"errors"
+	"log/slog"
+
+	"github.com/synadia-io/nex/cli/globals"
+	"golang.org/x/net/context"
+)
 
 type RootfsOptions struct {
 	OutName         string `default:"rootfs.ext4.gz" required:"" help:"Name of the output file" group:"RootFS Configuration" json:"rootfs_outfile"`
@@ -10,9 +16,9 @@ type RootfsOptions struct {
 	RootFSSize      int    `default:"157286400" help:"Size of the rootfs in bytes" group:"RootFS Configuration" json:"rootfs_size"` //150MB default
 }
 
-func (r RootfsOptions) Run(cfg globals.Globals) error {
+func (r RootfsOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
-		return r.Table()
+		return errors.Join(cfg.Table(), r.Table())
 	}
 	return nil
 }

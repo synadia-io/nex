@@ -1,6 +1,12 @@
 package stop
 
-import "github.com/synadia-io/nex/cli/globals"
+import (
+	"context"
+	"errors"
+	"log/slog"
+
+	"github.com/synadia-io/nex/cli/globals"
+)
 
 type StopOptions struct {
 	WorkloadId           string `required:"" placeholder:"<workload_id>" help:"ID of the workload to stop" group:"Stop Configuration" json:"stop_workload_id"`
@@ -8,9 +14,9 @@ type StopOptions struct {
 	ClaimsIssuerFilePath string `required:"" placeholder:"./path/to/nkey.nk" help:"Path to the claims issuer nkey file." group:"Stop Configuration" json:"stop_claims_issuer_file"`
 }
 
-func (s StopOptions) Run(cfg globals.Globals) error {
+func (s StopOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
-		return s.Table()
+		return errors.Join(cfg.Table(), s.Table())
 	}
 	return nil
 }
