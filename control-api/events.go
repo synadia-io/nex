@@ -48,9 +48,11 @@ type NodeStoppedEvent struct {
 	Graceful bool   `json:"graceful"`
 }
 
+// TODO: remove omitempty in next version bump
 type HeartbeatEvent struct {
 	Version         string            `json:"version"`
 	NodeId          string            `json:"node_id"`
+	Nexus           string            `json:"nexus,omitempty"`
 	Uptime          string            `json:"uptime"`
 	Tags            map[string]string `json:"tags,omitempty"`
 	RunningMachines int               `json:"running_machines"`

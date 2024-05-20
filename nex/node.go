@@ -18,6 +18,7 @@ func setConditionalCommands() {
 	nodeUp.Flag("otel_metrics_exporter", "OTel exporter for metrics").Default("file").EnumVar(&NodeOpts.OtelMetricsExporter, "file", "prometheus")
 	nodeUp.Flag("traces", "enable open telemetry traces").Default("false").UnNegatableBoolVar(&NodeOpts.OtelTraces)
 	nodeUp.Flag("otel_traces_exporter", "OTel exporter for traces").Default("file").EnumVar(&NodeOpts.OtelTracesExporter, "file", "grpc", "http")
+	nodeUp.Flag("nexus", "Name for cluster of nex nodes").Default("nexus").StringVar(&NodeOpts.NexusName)
 
 	nodePreflight = nodes.Command("preflight", "Checks system for node requirements and installs missing")
 	nodePreflight.Flag("force", "installs missing dependencies without prompt").Default("false").BoolVar(&NodeOpts.ForceDepInstall)

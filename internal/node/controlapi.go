@@ -342,6 +342,7 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 	}
 	res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
 		NodeId:          api.PublicKey(),
+		Nexus:           api.node.nexus,
 		Version:         Version(),
 		TargetXkey:      api.PublicXKey(),
 		Uptime:          myUptime(now.Sub(api.start)),
