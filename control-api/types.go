@@ -31,8 +31,10 @@ type RunResponse struct {
 	Name    string `json:"name"`
 }
 
+// TODO: remove omitempty in next version bump
 type PingResponse struct {
 	NodeId          string            `json:"node_id"`
+	Nexus           string            `json:"nexus,omitempty"`
 	Version         string            `json:"version"`
 	Uptime          string            `json:"uptime"`
 	TargetXkey      string            `json:"target_xkey"`

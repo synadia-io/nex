@@ -116,6 +116,7 @@ type NodeOptions struct {
 
 	PreflightInit string `json:"-"`
 	ListFull      bool   `json:"-"`
+	NexusName     string `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }

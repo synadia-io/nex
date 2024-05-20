@@ -59,6 +59,7 @@ type Node struct {
 
 	keypair   nkeys.KeyPair
 	publicKey string
+	nexus     string
 
 	natspub *server.Server
 	nc      *nats.Conn
@@ -101,6 +102,7 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract public key: %s", err.Error())
 	}
+	node.nexus = nodeOpts.NexusName
 
 	return node, nil
 }
@@ -462,6 +464,7 @@ func (n *Node) publishHeartbeat() error {
 
 	evt := controlapi.HeartbeatEvent{
 		NodeId:          n.publicKey,
+		Nexus:           n.nexus,
 		Version:         Version(),
 		Uptime:          myUptime(now.Sub(n.startedAt)),
 		RunningMachines: len(machines),
