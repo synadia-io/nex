@@ -140,7 +140,7 @@ func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
 	if !listFull {
 		tbl.AddHeaders("ID", "Name", "Version", "Workloads")
 	} else {
-		tbl.AddHeaders("ID", "Name", "Version", "Workloads", "Uptime", "Sandboxed", "OS", "Arch")
+		tbl.AddHeaders("Nexus", "ID", "Name", "Version", "Workloads", "Uptime", "Sandboxed", "OS", "Arch")
 	}
 
 	for _, node := range nodes {
@@ -168,10 +168,13 @@ func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
 			}
 
 			row = append(row, node.Uptime, !nUnsafe, nodeOS, nodeArch)
+			row = append([]any{node.Nexus}, row...)
 		}
+
 		tbl.AddRow(row...)
 	}
 	tbl.writer.SortBy([]table.SortBy{
+		{Name: "Nexus", Mode: table.Asc},
 		{Name: "Name", Mode: table.Asc},
 	})
 	fmt.Println(tbl.Render())
