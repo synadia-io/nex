@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"math/rand"
 	"os"
 	"path"
 	"path/filepath"
@@ -56,14 +57,11 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	// node "nearby"
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, Opts.Namespace, logger)
 
-	candidates, err := nodeClient.ListAllNodes()
+	target, err := randomNode(nodeClient)
 	if err != nil {
 		return err
 	}
-	if len(candidates) == 0 {
-		return errors.New("unable to locate candidate node - no nodes discovered")
-	}
-	target := candidates[0]
+
 	info, err := nodeClient.NodeInfo(target.NodeId)
 	if err != nil {
 		return fmt.Errorf("failed to get node info for potential execution target: %s", err)
@@ -134,6 +132,28 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	renderRunResponse(target.NodeId, runResponse)
 
 	return nil
+}
+
+func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error) {
+	candidates, err := listNodes(nodeClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return &candidates[rand.Intn(len(candidates))], nil
+}
+
+func listNodes(nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
+	candidates, err := nodeClient.ListAllNodes() // TODO- would expect "ListNodes" to return []NexNode...
+	if err != nil {
+		return nil, err
+	}
+
+	if len(candidates) == 0 {
+		return nil, errors.New("unable to locate candidate node - no nodes discovered")
+	}
+
+	return candidates, nil
 }
 
 func uploadWorkload(nc *nats.Conn, devOpts models.DevRunOptions) (string, string, string, error) {
