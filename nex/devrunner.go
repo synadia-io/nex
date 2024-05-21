@@ -49,7 +49,7 @@ func init() {
 // Attempts to "deploy a file" by finding a suitable target and publishing the workload to an ad-hoc created bucket
 // and using default issuer and publisher keys stored in ~/.nex. This should be as easy as typing "nex devrun ./amazingapp env1=foo env2=bar"
 func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
-	if RunOpts.WorkloadType == "elf" || RunOpts.WorkloadType == "native" || true {
+	if RunOpts.WorkloadType == "elf" || RunOpts.WorkloadType == "native" {
 		os, arch, err := validateBinary(DevRunOpts.Filename)
 		if err != nil {
 			logger.Error("failed to validate binary", slog.Any("err", err))
@@ -85,12 +85,12 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	}
 
 	targetPublicXkey := info.PublicXKey
-	workloadUrl, workloadName, workloadType, err := uploadWorkload(nc, *DevRunOpts)
+	workloadUrl, workloadName, err := uploadWorkload(nc, *DevRunOpts)
 	if err != nil {
 		return err
 	}
 
-	if workloadType == "v8" && len(RunOpts.TriggerSubjects) == 0 {
+	if RunOpts.WorkloadType == "v8" && len(RunOpts.TriggerSubjects) == 0 {
 		return errors.New("cannot start a function-type workload without specifying at least one trigger subject")
 	}
 
@@ -125,7 +125,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		controlapi.TargetPublicXKey(targetPublicXkey),
 		controlapi.TriggerSubjects(RunOpts.TriggerSubjects),
 		controlapi.WorkloadName(workloadName),
-		controlapi.WorkloadType(workloadType),
+		controlapi.WorkloadType(RunOpts.WorkloadType),
 		controlapi.Checksum("abc12345TODOmakethisreal"),
 		controlapi.WorkloadDescription("Workload published in devmode"),
 	)
@@ -164,7 +164,7 @@ func listNodes(nodeClient *controlapi.Client) ([]controlapi.PingResponse, error)
 	return candidates, nil
 }
 
-func uploadWorkload(nc *nats.Conn, devOpts models.DevRunOptions) (string, string, string, error) {
+func uploadWorkload(nc *nats.Conn, devOpts models.DevRunOptions) (string, string, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
@@ -182,32 +182,22 @@ func uploadWorkload(nc *nats.Conn, devOpts models.DevRunOptions) (string, string
 			MaxBytes:    int64(maxBytes),
 		})
 		if err != nil {
-			return "", "", "", err
+			return "", "", err
 		}
 	}
 	bytes, err := os.ReadFile(devOpts.Filename)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 	key := filepath.Base(devOpts.Filename)
 	key = strings.ReplaceAll(key, ".", "")
 
 	_, err = bucket.PutBytes(key, bytes)
 	if err != nil {
-		return "", "", "", err
+		return "", "", err
 	}
 
-	var workloadType string
-	switch strings.Replace(filepath.Ext(devOpts.Filename), ".", "", 1) {
-	case fileExtensionJS:
-		workloadType = agentapi.NexExecutionProviderV8
-	case fileExtensionWasm:
-		workloadType = agentapi.NexExecutionProviderWasm
-	default:
-		workloadType = defaultWorkloadType
-	}
-
-	return fmt.Sprintf("nats://%s/%s", objectStoreName, key), key, workloadType, nil
+	return fmt.Sprintf("nats://%s/%s", objectStoreName, key), key, nil
 }
 
 func readOrGenerateIssuer() (nkeys.KeyPair, error) {

@@ -114,6 +114,7 @@ func init() {
 	yeet.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
 	yeet.Flag("bucketmaxbytes", "Overrides the default max bytes if the dev object store bucket is created").UintVar(&DevRunOpts.DevBucketMaxBytes)
+	yeet.Flag("type", "Type of workload").Default("elf").EnumVar(&RunOpts.WorkloadType, "elf", "v8", "wasm")
 
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
