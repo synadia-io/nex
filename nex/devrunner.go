@@ -49,6 +49,14 @@ func init() {
 // Attempts to "deploy a file" by finding a suitable target and publishing the workload to an ad-hoc created bucket
 // and using default issuer and publisher keys stored in ~/.nex. This should be as easy as typing "nex devrun ./amazingapp env1=foo env2=bar"
 func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
+	if RunOpts.WorkloadType == "elf" || RunOpts.WorkloadType == "native" || true {
+		os, arch, err := validateBinary(DevRunOpts.Filename)
+		if err != nil {
+			logger.Error("failed to validate binary", slog.Any("err", err))
+		}
+		logger.Debug("Binary validation complete", slog.String("os", os), slog.String("arch", arch))
+	}
+
 	nc, err := models.GenerateConnectionFromOpts(Opts, logger)
 	if err != nil {
 		return err
