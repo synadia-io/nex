@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/cli/globals"
 )
 
@@ -89,7 +90,7 @@ type TokenBucket struct {
 	Size int64 `placeholder:"0" json:"token_bucket_size"`
 }
 
-func (u UpCmd) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+func (u UpCmd) Run(ctx context.Context, nc *nats.Conn, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
 		return errors.Join(cfg.Table(), u.Table())
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/cli/globals"
 )
 
@@ -14,7 +15,7 @@ type StopOptions struct {
 	ClaimsIssuerFilePath string `required:"" placeholder:"./path/to/nkey.nk" help:"Path to the claims issuer nkey file." group:"Stop Configuration" json:"stop_claims_issuer_file"`
 }
 
-func (s StopOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+func (s StopOptions) Run(ctx context.Context, nc *nats.Conn, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
 		return errors.Join(cfg.Table(), s.Table())
 	}

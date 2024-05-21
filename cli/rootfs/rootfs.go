@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/cli/globals"
 	"golang.org/x/net/context"
 )
@@ -16,7 +17,7 @@ type RootfsOptions struct {
 	RootFSSize      int    `default:"157286400" help:"Size of the rootfs in bytes" group:"RootFS Configuration" json:"rootfs_size"` //150MB default
 }
 
-func (r RootfsOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+func (r RootfsOptions) Run(ctx context.Context, nc *nats.Conn, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
 		return errors.Join(cfg.Table(), r.Table())
 	}

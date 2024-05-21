@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/cli/globals"
 )
 
@@ -12,7 +13,7 @@ type PreflightCmd struct {
 	ForceDepInstall bool `name:"force" default:"false" help:"Install missing dependencies without prompt" json:"preflight_force"`
 }
 
-func (p PreflightCmd) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+func (p PreflightCmd) Run(ctx context.Context, nc *nats.Conn, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
 		return errors.Join(cfg.Table(), p.Table())
 	}

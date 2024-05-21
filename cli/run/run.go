@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/cli/globals"
 )
@@ -30,7 +31,7 @@ type RunOptions struct {
 	SharedRunOptions
 }
 
-func (r RunOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+func (r RunOptions) Run(ctx context.Context, nc *nats.Conn, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
 		return errors.Join(cfg.Table(), r.Table())
 	}

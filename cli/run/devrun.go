@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/cli/globals"
 )
 
@@ -15,7 +16,7 @@ type DevRunOptions struct {
 	SharedRunOptions
 }
 
-func (d DevRunOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+func (d DevRunOptions) Run(ctx context.Context, nc *nats.Conn, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
 		return errors.Join(cfg.Table(), d.Table())
 	}

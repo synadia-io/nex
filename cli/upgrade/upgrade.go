@@ -5,12 +5,13 @@ import (
 	"errors"
 	"log/slog"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/cli/globals"
 )
 
 type UpgradeOptions struct{}
 
-func (u UpgradeOptions) Run(ctx context.Context, logger *slog.Logger, cfg globals.Globals) error {
+func (u UpgradeOptions) Run(ctx context.Context, nc *nats.Conn, logger *slog.Logger, cfg globals.Globals) error {
 	if cfg.Check {
 		return errors.Join(cfg.Table(), u.Table())
 	}
