@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"log/slog"
-
 	"github.com/synadia-io/nex/cli/globals"
 	"github.com/synadia-io/nex/cli/lameduck"
 	"github.com/synadia-io/nex/cli/monitor"
@@ -25,6 +23,8 @@ type NexCLI struct {
 	Upgrade upgrade.UpgradeOptions   `cmd:"" help:"Upgrade the NEX CLI to the latest version"`
 }
 
-func NewNexCLI(logger *slog.Logger) NexCLI {
-	return NexCLI{}
+func NewNexCLI(pk string) NexCLI {
+	cli := NexCLI{}
+	cli.Node.ServerPublicKey = pk
+	return cli
 }

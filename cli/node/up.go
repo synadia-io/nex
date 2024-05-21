@@ -11,24 +11,25 @@ import (
 )
 
 type UpCmd struct {
-	AgentHandshakeTimeoutMillisecond int               `default:"5000" group:"Nex Node Configuration" json:"up_agent_handshake_timeout_ms"`
-	DefaultResourceDir               string            `default:"./resources" group:"Nex Node Configuration" json:"up_default_resource_dir"`
-	InternalNodeHost                 string            `default:"192.168.127.1" group:"Nex Node Configuration" json:"up_internal_node_host"`
-	InternalNodePort                 int               `default:"9222" group:"Nex Node Configuration" json:"up_internal_node_port"`
-	MachinePoolSize                  int               `default:"1" group:"Nex Node Configuration" json:"up_machine_pool_size"`
-	NoSandbox                        bool              `default:"false" group:"Nex Node Configuration" json:"up_no_sandbox"`
-	PreserveNetwork                  bool              `default:"true" group:"Nex Node Configuration" json:"up_preserve_network"`
-	KernelFilepath                   *os.File          `group:"Nex Node Configuration" json:"up_kernel_filepath"`
-	RootFsFilepath                   *os.File          `group:"Nex Node Configuration" json:"up_rootfs_filepath"`
-	Tags                             map[string]string `placeholder:"nex:iscool;..." group:"Nex Node Configuration" json:"up_tags"`
-	ValidIssuers                     []string          `group:"Nex Node Configuration" json:"up_valid_issuers"`
-	WorkloadType                     string            `default:"daemon" enum:"daemon,function,container,wasm" group:"Nex Node Configuration" json:"up_workload_type"`
+	AgentHandshakeTimeoutMillisecond int               `default:"5000" group:"Nex Node Up Configuration" json:"up_agent_handshake_timeout_ms"`
+	DefaultResourceDir               string            `default:"./resources" group:"Nex Node Up Configuration" json:"up_default_resource_dir"`
+	InternalNodeHost                 string            `default:"192.168.127.1" group:"Nex Node Up Configuration" json:"up_internal_node_host"`
+	InternalNodePort                 int               `default:"9222" group:"Nex Node Up Configuration" json:"up_internal_node_port"`
+	MachinePoolSize                  int               `default:"1" group:"Nex Node Up Configuration" json:"up_machine_pool_size"`
+	NoSandbox                        bool              `default:"false" group:"Nex Node Up Configuration" json:"up_no_sandbox"`
+	PreserveNetwork                  bool              `default:"true" group:"Nex Node Up Configuration" json:"up_preserve_network"`
+	KernelFilepath                   *os.File          `group:"Nex Node Up Configuration" json:"up_kernel_filepath"`
+	RootFsFilepath                   *os.File          `group:"Nex Node Up Configuration" json:"up_rootfs_filepath"`
+	Tags                             map[string]string `placeholder:"nex:iscool;..." group:"Nex Node Up Configuration" json:"up_tags"`
+	ValidIssuers                     []string          `group:"Nex Node Up Configuration" json:"up_valid_issuers"`
+	WorkloadType                     string            `default:"daemon" enum:"daemon,function,container,wasm" group:"Nex Node Up Configuration" json:"up_workload_type"`
 	FunctionLanguage                 string            `default:"javascript" enum:"javascript" hidden:"" json:"-"`
+	NexusName                        string            `default:"nexus" group:"Nex Node Up Configuration" json:"up_nexus_name"`
 	CNIDefinition                    `group:"CNI Configuration"`
 	MachineTemplate                  `group:"Firecracker Machine Configuration"`
 	Limiters                         `embed:"" prefix:"limiter_" group:"Limiter Configuration"`
 	HostServicesConfig               `group:"Host Services Configuration"`
-	PublicNATSServer                 []byte `placeholder:"./path/to/nats_server.conf" type:"filecontent" help:"Path to nats server config to be used for userland NATS server. JSON format" group:"Nex Node Configuration"`
+	PublicNATSServer                 []byte `placeholder:"./path/to/nats_server.conf" type:"filecontent" help:"Path to nats server config to be used for userland NATS server. JSON format" group:"Nex Node Up Configuration"`
 
 	OtelMetrics         bool   `name:"metrics" default:"false" help:"Enables OTel Metrics" group:"OpenTelemetry Configuration" json:"up_otel_metrics_enabled"`
 	OtelMetricsPort     int    `default:"8085" group:"OpenTelemetry Configuration" json:"up_otel_metrics_port"`
