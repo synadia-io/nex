@@ -44,19 +44,19 @@ type ExecutionProviderParams struct {
 
 // DeployRequest processed by the agent
 type DeployRequest struct {
-	Argv            []string                    `json:"argv,omitempty"`
-	DecodedClaims   jwt.GenericClaims           `json:"-"`
-	Description     *string                     `json:"description"`
-	Environment     map[string]string           `json:"environment"`
-	Essential       *bool                       `json:"essential,omitempty"`
-	Hash            string                      `json:"hash,omitempty"`
-	Namespace       *string                     `json:"namespace,omitempty"`
-	RetriedAt       *time.Time                  `json:"retried_at,omitempty"`
-	RetryCount      *uint                       `json:"retry_count,omitempty"`
-	TotalBytes      int64                       `json:"total_bytes,omitempty"`
-	TriggerSubjects []string                    `json:"trigger_subjects"`
-	WorkloadName    *string                     `json:"workload_name,omitempty"`
-	WorkloadType    models.NexExecutionProvider `json:"workload_type,omitempty"`
+	Argv            []string           `json:"argv,omitempty"`
+	DecodedClaims   jwt.GenericClaims  `json:"-"`
+	Description     *string            `json:"description"`
+	Environment     map[string]string  `json:"environment"`
+	Essential       *bool              `json:"essential,omitempty"`
+	Hash            string             `json:"hash,omitempty"`
+	Namespace       *string            `json:"namespace,omitempty"`
+	RetriedAt       *time.Time         `json:"retried_at,omitempty"`
+	RetryCount      *uint              `json:"retry_count,omitempty"`
+	TotalBytes      int64              `json:"total_bytes,omitempty"`
+	TriggerSubjects []string           `json:"trigger_subjects"`
+	WorkloadName    *string            `json:"workload_name,omitempty"`
+	WorkloadType    models.NexWorkload `json:"workload_type,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`
@@ -78,14 +78,14 @@ func (request *DeployRequest) IsEssential() bool {
 
 // Returns true if the run request supports essential flag
 func (request *DeployRequest) SupportsEssential() bool {
-	return request.WorkloadType == models.NexExecutionProviderNative ||
-		request.WorkloadType == models.NexExecutionProviderOCI
+	return request.WorkloadType == models.NexWorkloadNative ||
+		request.WorkloadType == models.NexWorkloadOCI
 }
 
 // Returns true if the run request supports trigger subjects
 func (request *DeployRequest) SupportsTriggerSubjects() bool {
-	return (request.WorkloadType == models.NexExecutionProviderV8 ||
-		request.WorkloadType == models.NexExecutionProviderWasm) &&
+	return (request.WorkloadType == models.NexWorkloadV8 ||
+		request.WorkloadType == models.NexWorkloadWasm) &&
 		len(request.TriggerSubjects) > 0
 }
 
@@ -114,8 +114,8 @@ func (r *DeployRequest) Validate() error {
 
 	if r.WorkloadType == "" {
 		err = errors.Join(err, errors.New("workload type is required"))
-	} else if (r.WorkloadType == models.NexExecutionProviderV8 ||
-		r.WorkloadType == models.NexExecutionProviderWasm) &&
+	} else if (r.WorkloadType == models.NexWorkloadV8 ||
+		r.WorkloadType == models.NexWorkloadWasm) &&
 		len(r.TriggerSubjects) == 0 {
 		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
 	}

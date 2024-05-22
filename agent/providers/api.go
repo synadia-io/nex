@@ -34,14 +34,14 @@ func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionPr
 	// }
 
 	switch params.WorkloadType {
-	case models.NexExecutionProviderNative:
+	case models.NexWorkloadNative:
 		return lib.InitNexExecutionProviderNative(params)
-	case models.NexExecutionProviderV8:
+	case models.NexWorkloadV8:
 		return lib.InitNexExecutionProviderV8(params)
-	case models.NexExecutionProviderOCI:
+	case models.NexWorkloadOCI:
 		// TODO-- return lib.InitNexExecutionProviderOCI(params), nil
 		return nil, errors.New("oci execution provider not yet implemented")
-	case models.NexExecutionProviderWasm:
+	case models.NexWorkloadWasm:
 		return lib.InitNexExecutionProviderWasm(params)
 	default:
 		break

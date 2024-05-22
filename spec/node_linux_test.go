@@ -135,7 +135,7 @@ var _ = Describe("nex node", func() {
 		Context("when the specified node configuration file exists", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
-				nodeConfig.WorkloadTypes = []models.NexExecutionProvider{models.NexExecutionProviderNative, models.NexExecutionProviderV8, models.NexExecutionProviderWasm}
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 
@@ -230,7 +230,7 @@ var _ = Describe("nex node", func() {
 		Context("when the specified node configuration file exists", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
-				nodeConfig.WorkloadTypes = []models.NexExecutionProvider{models.NexExecutionProviderNative, models.NexExecutionProviderV8, models.NexExecutionProviderWasm}
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 
 				nodeConfig.NoSandbox = !sandbox
@@ -930,7 +930,7 @@ var _ = Describe("nex node", func() {
 	)
 })
 
-func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, models.NexExecutionProvider, error) {
+func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, models.NexWorkload, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
@@ -958,14 +958,14 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, mode
 		return "", "", "", err
 	}
 
-	var workloadType models.NexExecutionProvider
+	var workloadType models.NexWorkload
 	switch strings.Replace(filepath.Ext(filename), ".", "", 1) {
 	case "js":
-		workloadType = models.NexExecutionProviderV8
+		workloadType = models.NexWorkloadV8
 	case "wasm":
-		workloadType = models.NexExecutionProviderWasm
+		workloadType = models.NexWorkloadWasm
 	default:
-		workloadType = models.NexExecutionProviderNative
+		workloadType = models.NexWorkloadNative
 	}
 
 	return fmt.Sprintf("nats://%s/%s", "NEXCLIFILES", key), key, workloadType, nil

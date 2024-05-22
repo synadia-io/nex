@@ -25,7 +25,7 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 	}
 
 	if len(config.WorkloadTypes) == 0 {
-		config.WorkloadTypes = []models.NexExecutionProvider{models.NexExecutionProviderNative}
+		config.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative}
 	}
 
 	if strings.EqualFold(runtime.GOOS, "windows") && !config.NoSandbox {

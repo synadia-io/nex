@@ -70,7 +70,7 @@ type RunOptions struct {
 	TargetNode        string
 	WorkloadUrl       *url.URL
 	Name              string
-	WorkloadType      NexExecutionProvider
+	WorkloadType      NexWorkload
 	Description       string
 	PublisherXkeyFile string
 	ClaimsIssuerFile  string

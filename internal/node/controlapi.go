@@ -231,8 +231,8 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if len(request.TriggerSubjects) > 0 && (request.WorkloadType != models.NexExecutionProviderV8 &&
-		request.WorkloadType != models.NexExecutionProviderWasm) { // FIXME -- workload type comparison
+	if len(request.TriggerSubjects) > 0 && (request.WorkloadType != models.NexWorkloadV8 &&
+		request.WorkloadType != models.NexWorkloadWasm) { // FIXME -- workload type comparison
 		api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", string(request.WorkloadType)))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", string(request.WorkloadType)))
 		return

@@ -187,7 +187,7 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
 
-	if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == models.NexExecutionProviderNative {
+	if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == models.NexWorkloadNative {
 		tempFile = fmt.Sprintf("%s.exe", tempFile)
 	}
 
@@ -290,7 +290,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	a.provider = provider
 
 	shouldValidate := true
-	if !a.sandboxed && request.WorkloadType == models.NexExecutionProviderNative {
+	if !a.sandboxed && request.WorkloadType == models.NexWorkloadNative {
 		shouldValidate = false
 	}
 

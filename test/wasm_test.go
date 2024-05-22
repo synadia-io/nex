@@ -11,7 +11,7 @@ import (
 
 func TestWasmExecution(t *testing.T) {
 	file := "../examples/wasm/echofunction/echofunction.wasm"
-	typ := models.NexExecutionProviderWasm
+	typ := models.NexWorkloadWasm
 	params := &agentapi.ExecutionProviderParams{
 		DeployRequest: agentapi.DeployRequest{
 			Environment:  map[string]string{},

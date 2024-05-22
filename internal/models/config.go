@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	DefaultWorkloadTypes = []NexExecutionProvider{NexExecutionProviderNative}
+	DefaultWorkloadTypes = []NexWorkload{NexWorkloadNative}
 
 	DefaultBinPath = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
 
@@ -35,30 +35,30 @@ var (
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeConfiguration struct {
-	AgentHandshakeTimeoutMillisecond int                    `json:"agent_handshake_timeout_ms,omitempty"`
-	BinPath                          []string               `json:"bin_path"`
-	CNI                              CNIDefinition          `json:"cni"`
-	DefaultResourceDir               string                 `json:"default_resource_dir"`
-	ForceDepInstall                  bool                   `json:"-"`
-	InternalNodeHost                 *string                `json:"internal_node_host,omitempty"`
-	InternalNodePort                 *int                   `json:"internal_node_port"`
-	KernelFilepath                   string                 `json:"kernel_filepath"`
-	MachinePoolSize                  int                    `json:"machine_pool_size"`
-	MachineTemplate                  MachineTemplate        `json:"machine_template"`
-	NoSandbox                        bool                   `json:"no_sandbox,omitempty"`
-	OtlpExporterUrl                  string                 `json:"otlp_exporter_url,omitempty"`
-	OtelMetrics                      bool                   `json:"otel_metrics"`
-	OtelMetricsPort                  int                    `json:"otel_metrics_port"`
-	OtelMetricsExporter              string                 `json:"otel_metrics_exporter"`
-	OtelTraces                       bool                   `json:"otel_traces"`
-	OtelTracesExporter               string                 `json:"otel_traces_exporter"`
-	PreserveNetwork                  bool                   `json:"preserve_network,omitempty"`
-	RateLimiters                     *Limiters              `json:"rate_limiters,omitempty"`
-	RootFsFilepath                   string                 `json:"rootfs_filepath"`
-	Tags                             map[string]string      `json:"tags,omitempty"`
-	ValidIssuers                     []string               `json:"valid_issuers,omitempty"`
-	WorkloadTypes                    []NexExecutionProvider `json:"workload_types,omitempty"`
-	HostServicesConfiguration        *HostServicesConfig    `json:"host_services,omitempty"`
+	AgentHandshakeTimeoutMillisecond int                 `json:"agent_handshake_timeout_ms,omitempty"`
+	BinPath                          []string            `json:"bin_path"`
+	CNI                              CNIDefinition       `json:"cni"`
+	DefaultResourceDir               string              `json:"default_resource_dir"`
+	ForceDepInstall                  bool                `json:"-"`
+	InternalNodeHost                 *string             `json:"internal_node_host,omitempty"`
+	InternalNodePort                 *int                `json:"internal_node_port"`
+	KernelFilepath                   string              `json:"kernel_filepath"`
+	MachinePoolSize                  int                 `json:"machine_pool_size"`
+	MachineTemplate                  MachineTemplate     `json:"machine_template"`
+	NoSandbox                        bool                `json:"no_sandbox,omitempty"`
+	OtlpExporterUrl                  string              `json:"otlp_exporter_url,omitempty"`
+	OtelMetrics                      bool                `json:"otel_metrics"`
+	OtelMetricsPort                  int                 `json:"otel_metrics_port"`
+	OtelMetricsExporter              string              `json:"otel_metrics_exporter"`
+	OtelTraces                       bool                `json:"otel_traces"`
+	OtelTracesExporter               string              `json:"otel_traces_exporter"`
+	PreserveNetwork                  bool                `json:"preserve_network,omitempty"`
+	RateLimiters                     *Limiters           `json:"rate_limiters,omitempty"`
+	RootFsFilepath                   string              `json:"rootfs_filepath"`
+	Tags                             map[string]string   `json:"tags,omitempty"`
+	ValidIssuers                     []string            `json:"valid_issuers,omitempty"`
+	WorkloadTypes                    []NexWorkload       `json:"workload_types,omitempty"`
+	HostServicesConfiguration        *HostServicesConfig `json:"host_services,omitempty"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
 	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`

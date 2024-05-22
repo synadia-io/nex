@@ -25,7 +25,7 @@ var (
 
 const (
 	defaultFileMode     = os.FileMode(int(0770)) // owner and group r/w/x
-	defaultWorkloadType = models.NexExecutionProviderNative
+	defaultWorkloadType = models.NexWorkloadNative
 	fileExtensionJS     = "js"
 	fileExtensionWasm   = "wasm"
 

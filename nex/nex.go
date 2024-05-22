@@ -148,13 +148,13 @@ func main() {
 
 	switch workloadType {
 	case "native":
-		RunOpts.WorkloadType = models.NexExecutionProviderNative
+		RunOpts.WorkloadType = models.NexWorkloadNative
 	case "v8":
-		RunOpts.WorkloadType = models.NexExecutionProviderV8
+		RunOpts.WorkloadType = models.NexWorkloadV8
 	case "oci":
-		RunOpts.WorkloadType = models.NexExecutionProviderOCI
+		RunOpts.WorkloadType = models.NexWorkloadOCI
 	case "wasm":
-		RunOpts.WorkloadType = models.NexExecutionProviderWasm
+		RunOpts.WorkloadType = models.NexWorkloadWasm
 	}
 
 	ctx := context.Background()
