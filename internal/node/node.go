@@ -70,6 +70,8 @@ type Node struct {
 
 	startedAt time.Time
 	telemetry *observability.Telemetry
+
+	capabilities models.NodeCapabilities
 }
 
 func NewNode(
@@ -102,7 +104,9 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract public key: %s", err.Error())
 	}
+
 	node.nexus = nodeOpts.NexusName
+	node.capabilities = *models.GetNodeCapabilities(node.config.Tags)
 
 	return node, nil
 }
