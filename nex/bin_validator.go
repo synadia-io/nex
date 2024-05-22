@@ -7,10 +7,22 @@ import (
 )
 
 func validateBinary(inFile string) (string, string, error) {
-	buf, err := os.ReadFile(inFile)
+	f, err := os.Open(inFile)
 	if err != nil {
 		return "", "", err
 	}
+
+	buf := make([]byte, 150)
+	_, err = f.Read(buf)
+	if err != nil {
+		return "", "", err
+	}
+
+	err = f.Close()
+	if err != nil {
+		return "", "", err
+	}
+
 	switch {
 	case slices.Equal(buf[:4], []byte{0x7f, 0x45, 0x4c, 0x46}):
 		switch {
