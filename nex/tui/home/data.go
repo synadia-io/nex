@@ -163,7 +163,7 @@ func (w workload) String() string {
 	ret.WriteString("\n")
 	ret.WriteString("\tRuntime: " + w.Workload.Runtime)
 	ret.WriteString("\n")
-	ret.WriteString("\tWorkload Type: " + w.Workload.WorkloadType)
+	ret.WriteString("\tWorkload Type: " + string(w.Workload.WorkloadType))
 	ret.WriteString("\n")
 	ret.WriteString("\n")
 	return ret.String()

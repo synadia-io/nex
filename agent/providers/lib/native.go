@@ -155,7 +155,7 @@ func validateNativeBinary(path string) error {
 func verifyStatic(elf *elf.File) error {
 	for _, prog := range elf.Progs {
 		if prog.ProgHeader.Type == 3 { // PT_INTERP
-			return errors.New("elf binary contains at least one dynamically linked dependency")
+			return errors.New("native binary contains at least one dynamically linked dependency")
 		}
 	}
 	return nil

@@ -9,7 +9,6 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/splode/fname"
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 const (
@@ -25,8 +24,7 @@ const (
 )
 
 var (
-	// docker/OCI needs to be explicitly enabled in node configuration
-	DefaultWorkloadTypes = []string{"elf", "v8", "wasm"}
+	DefaultWorkloadTypes = []NexWorkload{NexWorkloadNative}
 
 	DefaultBinPath = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
 
@@ -59,7 +57,7 @@ type NodeConfiguration struct {
 	RootFsFilepath                   string              `json:"rootfs_filepath"`
 	Tags                             map[string]string   `json:"tags,omitempty"`
 	ValidIssuers                     []string            `json:"valid_issuers,omitempty"`
-	WorkloadTypes                    []string            `json:"workload_types,omitempty"`
+	WorkloadTypes                    []NexWorkload       `json:"workload_types,omitempty"`
 	HostServicesConfiguration        *HostServicesConfig `json:"host_services,omitempty"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
@@ -132,7 +130,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		BinPath:                          DefaultBinPath,
 		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the agent.
 		// This is not necessarily the address on which the internal NATS server is actually listening inside the node.
-		InternalNodeHost: agentapi.StringOrNil(DefaultInternalNodeHost),
+		InternalNodeHost: StringOrNil(DefaultInternalNodeHost),
 		InternalNodePort: &defaultNodePort,
 		MachinePoolSize:  1,
 		MachineTemplate: MachineTemplate{
@@ -171,9 +169,9 @@ func DefaultNodeConfiguration() NodeConfiguration {
 	if !config.NoSandbox {
 		config.CNI = CNIDefinition{
 			BinPath:       DefaultCNIBinPath,
-			NetworkName:   agentapi.StringOrNil(DefaultCNINetworkName),
-			InterfaceName: agentapi.StringOrNil(DefaultCNIInterfaceName),
-			Subnet:        agentapi.StringOrNil(DefaultCNISubnet),
+			NetworkName:   StringOrNil(DefaultCNINetworkName),
+			InterfaceName: StringOrNil(DefaultCNIInterfaceName),
+			Subnet:        StringOrNil(DefaultCNISubnet),
 		}
 	}
 

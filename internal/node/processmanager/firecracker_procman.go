@@ -196,8 +196,8 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	delete(f.stopMutex, workloadID)
 
 	if vm.deployRequest != nil {
-		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)))
-		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", *vm.deployRequest.WorkloadType)), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", string(vm.deployRequest.WorkloadType))))
+		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", string(vm.deployRequest.WorkloadType))), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 		f.t.DeployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1)
 		f.t.DeployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
 	}
@@ -262,7 +262,7 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 
 func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
 	return vm.setMetadata(&agentapi.MachineMetadata{
-		Message:      agentapi.StringOrNil("Host-supplied metadata"),
+		Message:      models.StringOrNil("Host-supplied metadata"),
 		NodeNatsHost: vm.config.InternalNodeHost,
 		NodeNatsPort: vm.config.InternalNodePort,
 		VmID:         &vm.vmmID,

@@ -6,21 +6,8 @@ import (
 
 	"github.com/synadia-io/nex/agent/providers/lib"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/models"
 )
-
-// TODO: change this to "native" from "elf" when appropriate
-
-// NexExecutionProviderNative Executable Linkable Format execution provider
-const NexExecutionProviderNative = "elf"
-
-// NexExecutionProviderV8 V8 execution provider
-const NexExecutionProviderV8 = "v8"
-
-// NexExecutionProviderOCI OCI execution provider
-const NexExecutionProviderOCI = "oci"
-
-// NexExecutionProviderWasm Wasm execution provider
-const NexExecutionProviderWasm = "wasm"
 
 // ExecutionProvider implementations provide support for a specific
 // execution environment pattern -- e.g., statically-linked ELF
@@ -42,19 +29,19 @@ type ExecutionProvider interface {
 
 // NewExecutionProvider initializes and returns an execution provider for a given work request
 func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
-	if params.WorkloadType == nil {
-		return nil, errors.New("execution provider factory requires a workload type parameter")
-	}
+	// if params.WorkloadType == nil {
+	// 	return nil, errors.New("execution provider factory requires a workload type parameter")
+	// }
 
-	switch *params.WorkloadType {
-	case NexExecutionProviderNative:
+	switch params.WorkloadType {
+	case models.NexWorkloadNative:
 		return lib.InitNexExecutionProviderNative(params)
-	case NexExecutionProviderV8:
+	case models.NexWorkloadV8:
 		return lib.InitNexExecutionProviderV8(params)
-	case NexExecutionProviderOCI:
+	case models.NexWorkloadOCI:
 		// TODO-- return lib.InitNexExecutionProviderOCI(params), nil
 		return nil, errors.New("oci execution provider not yet implemented")
-	case NexExecutionProviderWasm:
+	case models.NexWorkloadWasm:
 		return lib.InitNexExecutionProviderWasm(params)
 	default:
 		break

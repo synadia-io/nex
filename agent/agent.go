@@ -18,6 +18,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/agent/providers"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/models"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
@@ -186,7 +187,7 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
 
-	if strings.EqualFold(runtime.GOOS, "windows") && strings.EqualFold(*req.WorkloadType, "elf") {
+	if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == models.NexWorkloadNative {
 		tempFile = fmt.Sprintf("%s.exe", tempFile)
 	}
 
@@ -289,7 +290,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	a.provider = provider
 
 	shouldValidate := true
-	if !a.sandboxed && strings.EqualFold(*request.WorkloadType, agentapi.NexExecutionProviderELF) {
+	if !a.sandboxed && request.WorkloadType == models.NexWorkloadNative {
 		shouldValidate = false
 	}
 
@@ -469,7 +470,7 @@ func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
 func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 	ack := agentapi.DeployResponse{
 		Accepted: accepted,
-		Message:  agentapi.StringOrNil(msg),
+		Message:  models.StringOrNil(msg),
 	}
 
 	bytes, err := json.Marshal(&ack)

@@ -66,6 +66,8 @@ var (
 	WatchOpts  = &models.WatchOptions{}
 	NodeOpts   = &models.NodeOptions{}
 	RootfsOpts = &models.RootfsOptions{}
+
+	workloadType string
 )
 
 func init() {
@@ -101,7 +103,7 @@ func init() {
 	run.Flag("issuer", "Path to a seed key to sign the workload JWT as the issuer").Required().ExistingFileVar(&RunOpts.ClaimsIssuerFile)
 	run.Arg("env", "Environment variables to pass to workload").StringMapVar(&RunOpts.Env)
 	run.Flag("name", "Name of the workload. Must be alphabetic (lowercase)").Required().StringVar(&RunOpts.Name)
-	run.Flag("type", "Type of workload").EnumVar(&RunOpts.WorkloadType, "elf", "v8", "wasm")
+	run.Flag("type", "Type of workload").Default("native").EnumVar(&workloadType, "native", "v8", "wasm")
 	run.Flag("description", "Description of the workload").StringVar(&RunOpts.Description)
 	run.Flag("argv", "Arguments to pass to the workload, if applicable").StringVar(&RunOpts.Argv)
 	run.Flag("essential", "When true, workload is redeployed if it exits with a non-zero status").BoolVar(&RunOpts.Essential)
@@ -114,7 +116,7 @@ func init() {
 	yeet.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
 	yeet.Flag("bucketmaxbytes", "Overrides the default max bytes if the dev object store bucket is created").UintVar(&DevRunOpts.DevBucketMaxBytes)
-	yeet.Flag("type", "Type of workload").Default("elf").EnumVar(&RunOpts.WorkloadType, "elf", "v8", "wasm")
+	yeet.Flag("type", "Type of workload").Default("native").EnumVar(&workloadType, "native", "v8", "wasm")
 
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
@@ -143,6 +145,17 @@ func init() {
 func main() {
 	setConditionalCommands()
 	cmd := fisk.MustParse(ncli.Parse(os.Args[1:]))
+
+	switch workloadType {
+	case "native":
+		RunOpts.WorkloadType = models.NexWorkloadNative
+	case "v8":
+		RunOpts.WorkloadType = models.NexWorkloadV8
+	case "oci":
+		RunOpts.WorkloadType = models.NexWorkloadOCI
+	case "wasm":
+		RunOpts.WorkloadType = models.NexWorkloadWasm
+	}
 
 	ctx := context.Background()
 

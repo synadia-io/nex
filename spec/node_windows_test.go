@@ -87,6 +87,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeOpts.ConfigFilepath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-conf.json", _fixtures.seededRand.Int()))
 				nodeConfig.NoSandbox = true
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 			})
 
 			It("should not return an error", func(ctx SpecContext) {
@@ -100,6 +101,7 @@ var _ = Describe("nex node", func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeConfig.NoSandbox = true
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 			})
 
 			JustBeforeEach(func() {
@@ -116,6 +118,7 @@ var _ = Describe("nex node", func() {
 					Context("when the specified default_resource_dir does not exist on the host", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
+							nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 						})
 
 						It("should not return an error", func(ctx SpecContext) {
@@ -179,6 +182,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 
 				nodeConfig.NoSandbox = !sandbox
 				nodeKey, _ = nkeys.CreateServer()
@@ -474,7 +478,7 @@ var _ = Describe("nex node", func() {
 	)
 })
 
-func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, string, error) {
+func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, models.NexWorkload, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
@@ -502,16 +506,16 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, stri
 		return "", "", "", err
 	}
 
-	var workloadType string
+	var workloadType models.NexWorkload
 	switch strings.Replace(filepath.Ext(filename), ".", "", 1) {
 	case "exe":
-		workloadType = "elf"
+		workloadType = models.NexWorkloadNative
 	case "js":
-		workloadType = agentapi.NexExecutionProviderV8
+		workloadType = models.NexWorkloadV8
 	case "wasm":
-		workloadType = agentapi.NexExecutionProviderWasm
+		workloadType = models.NexWorkloadWasm
 	default:
-		workloadType = "elf"
+		workloadType = models.NexWorkloadNative
 	}
 
 	return fmt.Sprintf("nats://%s/%s", "NEXCLIFILES", key), key, workloadType, nil

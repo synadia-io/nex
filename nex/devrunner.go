@@ -16,7 +16,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 )
 
@@ -26,7 +25,7 @@ var (
 
 const (
 	defaultFileMode     = os.FileMode(int(0770)) // owner and group r/w/x
-	defaultWorkloadType = agentapi.NexExecutionProviderELF
+	defaultWorkloadType = models.NexWorkloadNative
 	fileExtensionJS     = "js"
 	fileExtensionWasm   = "wasm"
 
