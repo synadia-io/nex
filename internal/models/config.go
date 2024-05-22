@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	DefaultWorkloadTypes = []NexExecutionProvider{NexExecutionProviderNative, NexExecutionProviderV8, NexExecutionProviderWasm}
+	DefaultWorkloadTypes = []NexExecutionProvider{NexExecutionProviderNative}
 
 	DefaultBinPath = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
 

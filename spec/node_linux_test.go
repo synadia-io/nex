@@ -135,6 +135,7 @@ var _ = Describe("nex node", func() {
 		Context("when the specified node configuration file exists", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
+				nodeConfig.WorkloadTypes = []models.NexExecutionProvider{models.NexExecutionProviderNative, models.NexExecutionProviderV8, models.NexExecutionProviderWasm}
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 
@@ -229,6 +230,7 @@ var _ = Describe("nex node", func() {
 		Context("when the specified node configuration file exists", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
+				nodeConfig.WorkloadTypes = []models.NexExecutionProvider{models.NexExecutionProviderNative, models.NexExecutionProviderV8, models.NexExecutionProviderWasm}
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 
 				nodeConfig.NoSandbox = !sandbox
