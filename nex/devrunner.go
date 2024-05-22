@@ -114,8 +114,13 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		}
 	}
 
+	argv := []string{}
+	if len(RunOpts.Argv) > 0 {
+		argv = strings.Split(RunOpts.Argv, " ")
+	}
+
 	request, err := controlapi.NewDeployRequest(
-		controlapi.Argv(strings.Split(RunOpts.Argv, " ")),
+		controlapi.Argv(argv),
 		controlapi.Location(workloadUrl),
 		controlapi.Environment(RunOpts.Env),
 		controlapi.Essential(RunOpts.Essential),
