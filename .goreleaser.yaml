@@ -16,12 +16,6 @@ builds:
     goarch:
       - amd64
       - arm64
-      - arm
-    goarm:
-      - 7
-    ignore:
-      - goos: windows 
-        goarch: arm
     ldflags:
       - -s -w --X main.VERSION={{.Version}} -X main.COMMIT={{.Commit}} -X main.BUILDDATE={{.Date}} -X github.com/synadia-io/nex/internal/node.VERSION={{.Version}} -X github.com/synadia-io/nex/internal/node.COMMIT={{.Commit}} -X github.com/synadia-io/nex/internal/node.BUILDDATE={{.Date}}
       - -extldflags "-static"
