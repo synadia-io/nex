@@ -87,6 +87,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeOpts.ConfigFilepath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-conf.json", _fixtures.seededRand.Int()))
 				nodeConfig.NoSandbox = true
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 			})
 
 			It("should not return an error", func(ctx SpecContext) {
@@ -100,6 +101,7 @@ var _ = Describe("nex node", func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeConfig.NoSandbox = true
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 			})
 
 			JustBeforeEach(func() {
