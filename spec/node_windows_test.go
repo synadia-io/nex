@@ -474,7 +474,7 @@ var _ = Describe("nex node", func() {
 	)
 })
 
-func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, string, error) {
+func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, models.NexExecutionProvider, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
@@ -502,16 +502,16 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, stri
 		return "", "", "", err
 	}
 
-	var workloadType string
+	var workloadType models.NexExecutionProvider
 	switch strings.Replace(filepath.Ext(filename), ".", "", 1) {
 	case "exe":
-		workloadType = "elf"
+		workloadType = models.NexExecutionProviderNative
 	case "js":
-		workloadType = agentapi.NexExecutionProviderV8
+		workloadType = models.NexExecutionProviderV8
 	case "wasm":
-		workloadType = agentapi.NexExecutionProviderWasm
+		workloadType = models.NexExecutionProviderWasm
 	default:
-		workloadType = "elf"
+		workloadType = models.NexExecutionProviderNative
 	}
 
 	return fmt.Sprintf("nats://%s/%s", "NEXCLIFILES", key), key, workloadType, nil
