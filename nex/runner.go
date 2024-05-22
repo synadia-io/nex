@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -83,7 +84,13 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 		return errors.New("cannot start a function-type workload without specifying at least one trigger subject")
 	}
 
+	argv := []string{}
+	if len(RunOpts.Argv) > 0 {
+		argv = strings.Split(RunOpts.Argv, " ")
+	}
+
 	request, err := controlapi.NewDeployRequest(
+		controlapi.Argv(argv),
 		controlapi.Location(RunOpts.WorkloadUrl.String()),
 		controlapi.Environment(RunOpts.Env),
 		controlapi.Essential(RunOpts.Essential),
