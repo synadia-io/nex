@@ -182,6 +182,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
 
 				nodeConfig.NoSandbox = !sandbox
 				nodeKey, _ = nkeys.CreateServer()
