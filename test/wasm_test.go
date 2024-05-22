@@ -6,18 +6,19 @@ import (
 
 	"github.com/synadia-io/nex/agent/providers/lib"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 func TestWasmExecution(t *testing.T) {
 	file := "../examples/wasm/echofunction/echofunction.wasm"
-	typ := "wasm"
+	typ := models.NexExecutionProviderWasm
 	params := &agentapi.ExecutionProviderParams{
 		DeployRequest: agentapi.DeployRequest{
 			Environment:  map[string]string{},
 			Hash:         "",
 			TotalBytes:   0,
 			WorkloadName: new(string),
-			WorkloadType: new(string),
+			WorkloadType: typ,
 			Stderr:       nil,
 			Stdout:       nil,
 			TmpFilename:  &file,
@@ -33,7 +34,7 @@ func TestWasmExecution(t *testing.T) {
 
 		NATSConn: nil, // FIXME
 	}
-	params.DeployRequest.WorkloadType = &typ
+	params.DeployRequest.WorkloadType = typ
 	wasm, err := lib.InitNexExecutionProviderWasm(params)
 	if err != nil {
 		t.Fatalf("Failed to instantiate wasm provider: %s", err)

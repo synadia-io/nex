@@ -239,7 +239,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 					w.log.Error("Failed to create trigger subject subscription for deployed workload",
 						slog.String("workload_id", workloadID),
 						slog.String("trigger_subject", tsub),
-						slog.String("workload_type", *request.WorkloadType),
+						slog.String("workload_type", string(request.WorkloadType)),
 						slog.Any("err", err),
 					)
 					_ = w.StopWorkload(workloadID, true)
@@ -249,7 +249,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 				w.log.Info("Created trigger subject subscription for deployed workload",
 					slog.String("workload_id", workloadID),
 					slog.String("trigger_subject", tsub),
-					slog.String("workload_type", *request.WorkloadType),
+					slog.String("workload_type", string(request.WorkloadType)),
 				)
 
 				w.subz[workloadID] = append(w.subz[workloadID], sub)
@@ -260,8 +260,8 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 		return nil, fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	}
 
-	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_type", *request.WorkloadType)))
-	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)), metric.WithAttributes(attribute.String("workload_type", *request.WorkloadType)))
+	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_type", string(request.WorkloadType))))
+	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)), metric.WithAttributes(attribute.String("workload_type", string(request.WorkloadType))))
 	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes)
 	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 
@@ -289,7 +289,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 		agentClient, ok := w.activeAgents[p.ID]
 		if ok {
 			uptimeFriendly = myUptime(agentClient.UptimeMillis())
-			if *p.DeployRequest.WorkloadType == "v8" || *p.DeployRequest.WorkloadType == "wasm" {
+			if p.DeployRequest.WorkloadType == models.NexExecutionProviderV8 || p.DeployRequest.WorkloadType == models.NexExecutionProviderWasm {
 				nanoTime := fmt.Sprintf("%dns", agentClient.ExecTimeNanos())
 				rt, err := time.ParseDuration(nanoTime)
 				if err == nil {
@@ -317,7 +317,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 				Name:         p.Name,
 				Description:  *p.DeployRequest.Description,
 				Runtime:      runtimeFriendly,
-				WorkloadType: *p.DeployRequest.WorkloadType,
+				WorkloadType: p.DeployRequest.WorkloadType,
 				Hash:         p.DeployRequest.Hash,
 			},
 		}
@@ -496,7 +496,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			w.log.Error("Failed to request agent execution via internal trigger subject",
 				slog.Any("err", err),
 				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *request.WorkloadType),
+				slog.String("workload_type", string(request.WorkloadType)),
 				slog.String("workload_id", workloadID),
 			)
 
@@ -510,7 +510,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			w.log.Debug("Received response from execution via trigger subject",
 				slog.String("workload_id", workloadID),
 				slog.String("trigger_subject", tsub),
-				slog.String("workload_type", *request.WorkloadType),
+				slog.String("workload_type", string(request.WorkloadType)),
 				slog.String("function_run_time_nanosec", runtimeNs),
 				slog.Int("payload_size", len(resp.Data)),
 			)
@@ -538,7 +538,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 				w.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
 					slog.String("workload_id", workloadID),
 					slog.String("trigger_subject", tsub),
-					slog.String("workload_type", *request.WorkloadType),
+					slog.String("workload_type", string(request.WorkloadType)),
 					slog.Any("err", err),
 				)
 			}

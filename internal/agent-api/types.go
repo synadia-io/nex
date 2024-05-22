@@ -5,24 +5,12 @@ import (
 	"errors"
 	"io"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/synadia-io/nex/internal/models"
 )
-
-// Executable Linkable Format execution provider
-const NexExecutionProviderELF = "elf"
-
-// V8 execution provider
-const NexExecutionProviderV8 = "v8"
-
-// OCI execution provider
-const NexExecutionProviderOCI = "oci"
-
-// Wasm execution provider
-const NexExecutionProviderWasm = "wasm"
 
 // Name of the internal, non-public bucket for sharing files between host and agent
 const WorkloadCacheBucket = "NEXCACHE"
@@ -56,19 +44,19 @@ type ExecutionProviderParams struct {
 
 // DeployRequest processed by the agent
 type DeployRequest struct {
-	Argv            []string          `json:"argv,omitempty"`
-	DecodedClaims   jwt.GenericClaims `json:"-"`
-	Description     *string           `json:"description"`
-	Environment     map[string]string `json:"environment"`
-	Essential       *bool             `json:"essential,omitempty"`
-	Hash            string            `json:"hash,omitempty"`
-	Namespace       *string           `json:"namespace,omitempty"`
-	RetriedAt       *time.Time        `json:"retried_at,omitempty"`
-	RetryCount      *uint             `json:"retry_count,omitempty"`
-	TotalBytes      int64             `json:"total_bytes,omitempty"`
-	TriggerSubjects []string          `json:"trigger_subjects"`
-	WorkloadName    *string           `json:"workload_name,omitempty"`
-	WorkloadType    *string           `json:"workload_type,omitempty"`
+	Argv            []string                    `json:"argv,omitempty"`
+	DecodedClaims   jwt.GenericClaims           `json:"-"`
+	Description     *string                     `json:"description"`
+	Environment     map[string]string           `json:"environment"`
+	Essential       *bool                       `json:"essential,omitempty"`
+	Hash            string                      `json:"hash,omitempty"`
+	Namespace       *string                     `json:"namespace,omitempty"`
+	RetriedAt       *time.Time                  `json:"retried_at,omitempty"`
+	RetryCount      *uint                       `json:"retry_count,omitempty"`
+	TotalBytes      int64                       `json:"total_bytes,omitempty"`
+	TriggerSubjects []string                    `json:"trigger_subjects"`
+	WorkloadName    *string                     `json:"workload_name,omitempty"`
+	WorkloadType    models.NexExecutionProvider `json:"workload_type,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`
@@ -90,14 +78,14 @@ func (request *DeployRequest) IsEssential() bool {
 
 // Returns true if the run request supports essential flag
 func (request *DeployRequest) SupportsEssential() bool {
-	return strings.EqualFold(*request.WorkloadType, "elf") ||
-		strings.EqualFold(*request.WorkloadType, "oci")
+	return request.WorkloadType == models.NexExecutionProviderNative ||
+		request.WorkloadType == models.NexExecutionProviderOCI
 }
 
 // Returns true if the run request supports trigger subjects
 func (request *DeployRequest) SupportsTriggerSubjects() bool {
-	return (strings.EqualFold(*request.WorkloadType, "v8") ||
-		strings.EqualFold(*request.WorkloadType, "wasm")) &&
+	return (request.WorkloadType == models.NexExecutionProviderV8 ||
+		request.WorkloadType == models.NexExecutionProviderWasm) &&
 		len(request.TriggerSubjects) > 0
 }
 
@@ -124,10 +112,10 @@ func (r *DeployRequest) Validate() error {
 		err = errors.Join(err, errors.New("total bytes is required"))
 	}
 
-	if r.WorkloadType == nil {
+	if r.WorkloadType == "" {
 		err = errors.Join(err, errors.New("workload type is required"))
-	} else if (strings.EqualFold(*r.WorkloadType, NexExecutionProviderV8) ||
-		strings.EqualFold(*r.WorkloadType, NexExecutionProviderWasm)) &&
+	} else if (r.WorkloadType == models.NexExecutionProviderV8 ||
+		r.WorkloadType == models.NexExecutionProviderWasm) &&
 		len(r.TriggerSubjects) == 0 {
 		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
 	}

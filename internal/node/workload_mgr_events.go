@@ -49,7 +49,7 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 				slog.String("vmid", agentId),
 				slog.String("namespace", *deployRequest.Namespace),
 				slog.String("workload", *deployRequest.WorkloadName),
-				slog.String("workload_type", *deployRequest.WorkloadType))
+				slog.String("workload_type", string(deployRequest.WorkloadType)))
 
 			if deployRequest.RetryCount == nil {
 				retryCount := uint(0)

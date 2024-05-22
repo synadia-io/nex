@@ -466,7 +466,7 @@ var _ = Describe("nex node", func() {
 								// })
 							})
 
-							Describe("deploying an ELF binary workload", func() {
+							Describe("deploying an Native binary workload", func() {
 								var deployRequest *controlapi.DeployRequest
 								var err error
 
@@ -484,16 +484,16 @@ var _ = Describe("nex node", func() {
 									time.Sleep(time.Millisecond * 1000)
 								})
 
-								Context("when the ELF binary is not statically-linked", func() {
+								Context("when the Native binary is not statically-linked", func() {
 									BeforeEach(func() {
 										cmd := exec.Command("go", "build", "../examples/echoservice")
 										_ = cmd.Start()
 										_ = cmd.Wait()
 									})
 
-									It("should [fail to] deploy the ELF workload", func(ctx SpecContext) {
+									It("should [fail to] deploy the Native workload", func(ctx SpecContext) {
 										if sandbox {
-											Expect(err.Error()).To(ContainSubstring("elf binary contains at least one dynamically linked dependency"))
+											Expect(err.Error()).To(ContainSubstring("native binary contains at least one dynamically linked dependency"))
 										} else {
 											Expect(err).To(BeNil())
 										}
@@ -928,7 +928,7 @@ var _ = Describe("nex node", func() {
 	)
 })
 
-func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, string, error) {
+func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, models.NexExecutionProvider, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
@@ -956,14 +956,14 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, stri
 		return "", "", "", err
 	}
 
-	var workloadType string
+	var workloadType models.NexExecutionProvider
 	switch strings.Replace(filepath.Ext(filename), ".", "", 1) {
 	case "js":
-		workloadType = agentapi.NexExecutionProviderV8
+		workloadType = models.NexExecutionProviderV8
 	case "wasm":
-		workloadType = agentapi.NexExecutionProviderWasm
+		workloadType = models.NexExecutionProviderWasm
 	default:
-		workloadType = "elf"
+		workloadType = models.NexExecutionProviderNative
 	}
 
 	return fmt.Sprintf("nats://%s/%s", "NEXCLIFILES", key), key, workloadType, nil

@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/models"
 )
 
 // The API listener is the command and control interface for the node server
@@ -224,16 +225,16 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if !slices.Contains(api.node.config.WorkloadTypes, *request.WorkloadType) {
-		api.log.Error("This node does not support the given workload type", slog.String("workload_type", *request.WorkloadType))
-		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", *request.WorkloadType))
+	if !slices.Contains(api.node.config.WorkloadTypes, request.WorkloadType) {
+		api.log.Error("This node does not support the given workload type", slog.String("workload_type", string(request.WorkloadType)))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", string(request.WorkloadType)))
 		return
 	}
 
-	if len(request.TriggerSubjects) > 0 && (!strings.EqualFold(*request.WorkloadType, "v8") &&
-		!strings.EqualFold(*request.WorkloadType, "wasm")) { // FIXME -- workload type comparison
-		api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", *request.WorkloadType))
-		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", *request.WorkloadType))
+	if len(request.TriggerSubjects) > 0 && (request.WorkloadType != models.NexExecutionProviderV8 &&
+		request.WorkloadType != models.NexExecutionProviderWasm) { // FIXME -- workload type comparison
+		api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", string(request.WorkloadType)))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", string(request.WorkloadType)))
 		return
 	}
 
@@ -294,7 +295,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 			slog.String("workload", *deployRequest.WorkloadName),
 			slog.Uint64("workload_size", numBytes),
 			slog.String("workload_sha256", *workloadHash),
-			slog.String("type", *request.WorkloadType),
+			slog.String("type", string(request.WorkloadType)),
 		)
 
 	workloadID, err := api.mgr.DeployWorkload(deployRequest)
