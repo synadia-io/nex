@@ -178,7 +178,7 @@ func WorkloadName(name string) RequestOption {
 	}
 }
 
-// Type of the workload, e.g., one of "elf", "v8", "oci", "wasm" for this request
+// Type of the workload, e.g., one of "native", "v8", "oci", "wasm" for this request
 func WorkloadType(workloadType models.NexExecutionProvider) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.workloadType = workloadType
