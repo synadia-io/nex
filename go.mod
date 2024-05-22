@@ -10,7 +10,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.10.0
 	github.com/choria-io/fisk v0.6.2
 	github.com/cloudevents/sdk-go v1.2.0
-	github.com/docker/docker v26.0.0+incompatible
+	github.com/docker/docker v26.0.2+incompatible
 	github.com/fatih/color v1.16.0
 	github.com/firecracker-microvm/firecracker-go-sdk v1.0.0
 	github.com/google/uuid v1.6.0
