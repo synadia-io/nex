@@ -12,4 +12,5 @@ const (
 type NodeCapabilities struct {
 	Sandboxable        bool                   `json:"sandboxable"`
 	SupportedProviders []NexExecutionProvider `json:"supported_providers"`
+	NodeTags           map[string]string      `json:"node_tags"`
 }

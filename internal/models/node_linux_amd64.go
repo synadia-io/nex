@@ -1,6 +1,6 @@
 package models
 
-func GetNodeCapabilities() *NodeCapabilities {
+func GetNodeCapabilities(tags map[string]string) *NodeCapabilities {
 	return &NodeCapabilities{
 		Sandboxable: true,
 		SupportedProviders: []NexExecutionProvider{
@@ -9,5 +9,6 @@ func GetNodeCapabilities() *NodeCapabilities {
 			NexExecutionProviderWasm,
 			NexExecutionProviderV8,
 		},
+		NodeTags: tags,
 	}
 }
