@@ -32,6 +32,14 @@ type RunResponse struct {
 	Name    string `json:"name"`
 }
 
+type PingRequest struct {
+	Arch          *string              `json:"arch,omitempty"`
+	OS            *string              `json:"os,omitempty"`
+	Sandboxed     *bool                `json:"sandboxed,omitempty"`
+	Tags          map[string]string    `json:"tags,omitempty"`
+	WorkloadTypes []models.NexWorkload `json:"workload_types,omitempty"`
+}
+
 // TODO: remove omitempty in next version bump
 type PingResponse struct {
 	NodeId          string            `json:"node_id"`
