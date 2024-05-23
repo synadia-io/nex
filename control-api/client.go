@@ -217,8 +217,8 @@ func (api *Client) Auction(req *AuctionRequest) ([]AuctionResponse, error) {
 	return responses, nil
 }
 
-// Attempts to list all nodes. Note that any node within the Nexus will respond to this ping, regardless
-// of the namespaces of their running workloads
+// Attempts to ping all nodes. Note that any node within the Nexus will respond to this ping,
+// regardless of the namespaces of their running workloads
 func (api *Client) PingNodes() ([]PingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
@@ -250,8 +250,10 @@ func (api *Client) PingNodes() ([]PingResponse, error) {
 		api.log.Error("failed to subscribe", slog.Any("err", err))
 		return nil, err
 	}
+
 	msg := nats.NewMsg(fmt.Sprintf("%s.PING", APIPrefix))
 	msg.Reply = sub.Subject
+
 	err = api.nc.PublishMsg(msg)
 	if err != nil {
 		return nil, err

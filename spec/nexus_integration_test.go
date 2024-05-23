@@ -20,13 +20,12 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	controlapi "github.com/synadia-io/nex/control-api"
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 )
 
 const (
 	defaultFileMode     = os.FileMode(int(0770)) // owner and group r/w/x
-	defaultWorkloadType = agentapi.NexExecutionProviderELF
+	defaultWorkloadType = "elf"
 	fileExtensionJS     = "js"
 	fileExtensionWasm   = "wasm"
 
@@ -82,7 +81,7 @@ var _ = FDescribe("nexus integration", func() {
 				for i <= attempts {
 					fmt.Printf("attempting nex run %v of %v on %s/%s\n", i, attempts, arch, os)
 
-					_err := devrun(nc, path, namespace, logger, timeout, true, false, []string{}) // FIXME-- add as subtree params
+					_err := devrun(nc, arch, os, path, namespace, logger, timeout, true, false, []string{}) // FIXME-- add as subtree params
 					if _err != nil {
 						errmsg := fmt.Sprintf("❌ nex run %v of %v failed; %s\n", i, attempts, _err.Error())
 						err = errors.Join(err, errors.New(errmsg))
@@ -106,12 +105,12 @@ var _ = FDescribe("nexus integration", func() {
 })
 
 // FIXME-- drop devrun and just use the run command
-func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout time.Duration, stopIfExists, essential bool, triggerSubjects []string) error {
+func devrun(nc *nats.Conn, arch, os, path, namespace string, logger *slog.Logger, timeout time.Duration, stopIfExists, essential bool, triggerSubjects []string) error {
 	// developer mode can have a smaller discovery timeout, since we're assuming there's a NEX
 	// node "nearby"
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, timeout, namespace, logger)
 
-	target, err := randomNode(nodeClient)
+	target, err := randomNode(arch, os, nodeClient)
 	if err != nil {
 		return fmt.Errorf("failed to resolve random nexus node: %s", err)
 	}
@@ -175,7 +174,7 @@ func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout 
 		controlapi.TargetPublicXKey(targetPublicXkey),
 		controlapi.TriggerSubjects(triggerSubjects),
 		controlapi.WorkloadName(workloadName),
-		controlapi.WorkloadType(workloadType),
+		controlapi.WorkloadType(models.NexWorkload(workloadType)),
 		controlapi.Checksum("abc12345TODOmakethisreal"),
 		controlapi.WorkloadDescription("Workload published in devmode"),
 	)
@@ -191,8 +190,8 @@ func devrun(nc *nats.Conn, path, namespace string, logger *slog.Logger, timeout 
 	return nil
 }
 
-func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error) {
-	candidates, err := listNodes(nodeClient)
+func randomNode(arch, os string, nodeClient *controlapi.Client) (*controlapi.PingResponse, error) {
+	candidates, err := listNodes(arch, os, nodeClient)
 	if err != nil {
 		return nil, err
 	}
@@ -205,8 +204,11 @@ func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error)
 	return shuffled[0], nil
 }
 
-func listNodes(nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
-	candidates, err := nodeClient.ListAllNodes() // TODO- would expect "ListNodes" to return []NexNode...
+func listNodes(arch, os string, nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
+	candidates, err := nodeClient.ListAllNodes(&controlapi.PingRequest{
+		Arch: &arch,
+		OS:   &os,
+	}) // TODO- would expect "ListNodes" to return []NexNode...
 	if err != nil {
 		return nil, err
 	}
@@ -256,9 +258,9 @@ func uploadWorkload(nc *nats.Conn, devOpts models.DevRunOptions) (string, string
 	var workloadType string
 	switch strings.Replace(filepath.Ext(devOpts.Filename), ".", "", 1) {
 	case fileExtensionJS:
-		workloadType = agentapi.NexExecutionProviderV8
+		workloadType = "v8"
 	case fileExtensionWasm:
-		workloadType = agentapi.NexExecutionProviderWasm
+		workloadType = "wasm"
 	default:
 		workloadType = defaultWorkloadType
 	}
