@@ -18,6 +18,7 @@ import (
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
+	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"github.com/synadia-io/nex/internal/node/processmanager"
 
@@ -48,6 +49,8 @@ type WorkloadManager struct {
 	ctx        context.Context
 	t          *observability.Telemetry
 
+	node *Node
+
 	procMan processmanager.ProcessManager
 
 	// Any agent client in this map is one that has successfully acknowledged a deployment
@@ -75,6 +78,7 @@ type WorkloadManager struct {
 // Initialize a new workload manager instance to manage and communicate with agents
 func NewWorkloadManager(
 	ctx context.Context,
+	node *Node,
 	cancel context.CancelFunc,
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
@@ -100,6 +104,7 @@ func NewWorkloadManager(
 		nc:               nc,
 		ncInternal:       ncint,
 		poolMutex:        &sync.Mutex{},
+		node:             node,
 		publicKey:        publicKey,
 		t:                telemetry,
 
@@ -112,7 +117,7 @@ func NewWorkloadManager(
 
 	var err error
 
-	w.procMan, err = processmanager.NewProcessManager(w.log, w.config, w.t, w.ctx)
+	w.procMan, err = processmanager.NewProcessManager(node.natsint, w.log, w.config, w.t, w.ctx)
 	if err != nil {
 		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
 		return nil, err
@@ -139,7 +144,8 @@ func (w *WorkloadManager) Start() {
 	}
 }
 
-func (m *WorkloadManager) CacheWorkload(request *controlapi.DeployRequest) (uint64, *string, error) {
+func (m *WorkloadManager) CacheWorkload(natsint *internalnats.InternalNatsServer,
+	workloadID string, request *controlapi.DeployRequest) (uint64, *string, error) {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 
@@ -173,47 +179,32 @@ func (m *WorkloadManager) CacheWorkload(request *controlapi.DeployRequest) (uint
 		return 0, nil, err
 	}
 
-	jsInternal, err := m.ncInternal.JetStream()
+	err = natsint.StoreFileForWorkload(workloadID, workload)
 	if err != nil {
-		m.log.Error("Failed to acquire JetStream context for internal object store.", slog.Any("err", err))
-		panic(err)
-	}
-
-	cache, err := jsInternal.ObjectStore(agentapi.WorkloadCacheBucket)
-	if err != nil {
-		m.log.Error("Failed to get object store reference for internal cache.", slog.Any("err", err))
-		panic(err)
-	}
-
-	obj, err := cache.PutBytes(request.DecodedClaims.Subject, workload)
-	if err != nil {
-		m.log.Error("Failed to write workload to internal cache.", slog.Any("err", err))
-		panic(err)
+		m.log.Error("Failed to store bytes from source object store in cache", slog.Any("err", err), slog.String("key", key))
 	}
 
 	workloadHash := sha256.New()
 	workloadHash.Write(workload)
 	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
 
-	m.log.Info("Successfully stored workload in internal object store", slog.String("name", request.DecodedClaims.Subject), slog.Int64("bytes", int64(obj.Size)))
-	return obj.Size, &workloadHashString, nil
+	m.log.Info("Successfully stored workload in internal object store",
+		slog.String("name", request.DecodedClaims.Subject),
+		slog.Int("bytes", len(workload)))
+
+	return uint64(len(workload)), &workloadHashString, nil
 }
 
 // Deploy a workload as specified by the given deploy request to an available
 // agent in the configured pool
-func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*string, error) {
+func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *agentapi.DeployRequest) error {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
-	agentClient, err := w.selectRandomAgent()
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy workload: %s", err)
-	}
-
 	workloadID := agentClient.ID()
-	err = w.procMan.PrepareWorkload(workloadID, request)
+	err := w.procMan.PrepareWorkload(workloadID, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare agent process for workload deployment: %s", err)
+		return fmt.Errorf("failed to prepare agent process for workload deployment: %s", err)
 	}
 
 	status := w.ncInternal.Status()
@@ -224,7 +215,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit request for workload deployment: %s", err)
+		return fmt.Errorf("failed to submit request for workload deployment: %s", err)
 	}
 
 	if deployResponse.Accepted {
@@ -243,7 +234,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 						slog.Any("err", err),
 					)
 					_ = w.StopWorkload(workloadID, true)
-					return nil, err
+					return err
 				}
 
 				w.log.Info("Created trigger subject subscription for deployed workload",
@@ -257,7 +248,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 		}
 	} else {
 		_ = w.StopWorkload(workloadID, false)
-		return nil, fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
+		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	}
 
 	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_type", string(request.WorkloadType))))
@@ -265,7 +256,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes)
 	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 
-	return &workloadID, nil
+	return nil
 }
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
@@ -547,7 +538,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 }
 
 // Picks a pending agent from the pool that will receive the next deployment
-func (w *WorkloadManager) selectRandomAgent() (*agentapi.AgentClient, error) {
+func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 	if len(w.pendingAgents) == 0 {
 		return nil, errors.New("no available agent client in pool")
 	}

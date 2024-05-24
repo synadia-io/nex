@@ -88,6 +88,10 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	return &internalServer, nil
 }
 
+func (s *InternalNatsServer) Port() int {
+	return s.lastOpts.Port
+}
+
 // Returns a user keypair that can be used to log into the internal server
 // as the given workload
 func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.KeyPair, error) {
@@ -121,6 +125,10 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 	//s.lastOpts = updated
 
 	return userPair, nil
+}
+
+func (s *InternalNatsServer) ClientURL() string {
+	return s.ncInternal.ConnectedUrl()
 }
 
 func (s *InternalNatsServer) Connection() *nats.Conn {

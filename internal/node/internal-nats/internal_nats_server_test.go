@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"slices"
 	"testing"
 
@@ -18,7 +19,15 @@ func TestInternalNatsServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create internal nats server: %s", err)
 	}
-	fmt.Printf("Internal server on %s\n", server.Connection().Servers()[0])
+	serverUrl := server.Connection().Servers()[0]
+	sUrl, err := url.Parse(serverUrl)
+	if err != nil {
+		t.Fatalf("Should have a valid URL from the server but didn't: %s", err)
+	}
+	p := server.Port()
+	if fmt.Sprintf("%d", p) != sUrl.Port() {
+		t.Fatalf("Port number from options doesn't match what's running: %d %s", p, sUrl.Port())
+	}
 
 	workloadId := nuid.Next()
 
