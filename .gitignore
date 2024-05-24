@@ -37,3 +37,5 @@ pnats
 .idea
 
 _spec
+
+/internal/node/internal-nats/pnats

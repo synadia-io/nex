@@ -230,6 +230,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		// can't use the CNI host because we don't use it in no-sandbox mode
 		"NEX_NODE_NATS_HOST=0.0.0.0",
 		fmt.Sprintf("NEX_NODE_NATS_PORT=%d", *s.config.InternalNodePort),
+		// TODO: supply the nex node nkey seed for security
 	)
 
 	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: true}
