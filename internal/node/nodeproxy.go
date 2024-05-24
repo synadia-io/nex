@@ -3,9 +3,9 @@ package nexnode
 import (
 	"log/slog"
 
-	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/internal/models"
+	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"github.com/synadia-io/nex/internal/node/processmanager"
 )
@@ -38,7 +38,7 @@ func (n *NodeProxy) NodeConfiguration() *models.NodeConfiguration {
 	return n.n.config
 }
 
-func (n *NodeProxy) InternalNATS() *server.Server {
+func (n *NodeProxy) InternalNATS() *internalnats.InternalNatsServer {
 	return n.n.natsint
 }
 

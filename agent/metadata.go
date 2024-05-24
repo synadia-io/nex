@@ -21,6 +21,7 @@ const nexEnvSandbox = "NEX_SANDBOX"
 const nexEnvWorkloadID = "NEX_WORKLOADID"
 const nexEnvNodeNatsHost = "NEX_NODE_NATS_HOST"
 const nexEnvNodeNatsPort = "NEX_NODE_NATS_PORT"
+const nexEnvNodeNatsSeed = "NEX_NODE_NATS_NKEY_SEED"
 
 const metadataClientTimeoutMillis = 50
 const metadataPollingTimeoutMillis = 5000
@@ -71,6 +72,7 @@ func GetMachineMetadataFromEnv() (*agentapi.MachineMetadata, error) {
 	vmid := os.Getenv(nexEnvWorkloadID)
 	host := os.Getenv(nexEnvNodeNatsHost)
 	port := os.Getenv(nexEnvNodeNatsPort)
+	seed := os.Getenv(nexEnvNodeNatsSeed)
 	msg := "Metadata obtained from no-sandbox environment"
 	p, err := strconv.Atoi(port)
 	if err != nil {
@@ -79,10 +81,11 @@ func GetMachineMetadataFromEnv() (*agentapi.MachineMetadata, error) {
 	}
 
 	return &agentapi.MachineMetadata{
-		VmID:         &vmid,
-		NodeNatsHost: &host,
-		NodeNatsPort: &p,
-		Message:      &msg,
+		VmID:             &vmid,
+		NodeNatsHost:     &host,
+		NodeNatsPort:     &p,
+		NodeNatsNkeySeed: &seed,
+		Message:          &msg,
 	}, nil
 }
 

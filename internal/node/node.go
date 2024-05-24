@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -26,6 +25,7 @@ import (
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
+	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 )
 
@@ -66,7 +66,7 @@ type Node struct {
 	natspub *server.Server
 	nc      *nats.Conn
 
-	natsint        *server.Server
+	natsint        *internalnats.InternalNatsServer
 	ncint          *nats.Conn
 	ncHostServices *nats.Conn
 
@@ -112,7 +112,6 @@ func NewNode(
 
 	node.nexus = nodeOpts.NexusName
 	node.capabilities = *models.GetNodeCapabilities(node.config.Tags)
-
 	return node, nil
 }
 
@@ -288,7 +287,9 @@ func (n *Node) init() error {
 			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
 		}
 
-		n.manager, _err = NewWorkloadManager(n.ctx, n.cancelF,
+		n.manager, _err = NewWorkloadManager(
+			n.ctx, n,
+			n.cancelF,
 			n.keypair, n.publicKey,
 			n.nc, n.ncint, n.ncHostServices,
 			n.config, n.log, n.telemetry)
@@ -352,55 +353,13 @@ func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
 func (n *Node) startInternalNATS() error {
 	var err error
 
-	n.natsint, err = server.NewServer(&server.Options{
-		Host:      "0.0.0.0",
-		Port:      -1,
-		JetStream: true,
-		NoLog:     true,
-		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
-	})
+	n.natsint, err = internalnats.NewInternalNatsServer(n.log)
 	if err != nil {
 		return err
 	}
-	n.natsint.Start()
-
-	clientUrl, err := url.Parse(n.natsint.ClientURL())
-	if err != nil {
-		return fmt.Errorf("failed to parse internal NATS client URL: %s", err)
-	}
-
-	p, err := strconv.Atoi(clientUrl.Port())
-	if err != nil {
-		return fmt.Errorf("failed to parse internal NATS client URL: %s", err)
-	}
+	p := n.natsint.Port()
 	n.config.InternalNodePort = &p
-
-	n.ncint, err = nats.Connect("", nats.InProcessServer(n.natsint))
-	if err != nil {
-		n.log.Error("Failed to connect to internal nats", slog.Any("err", err), slog.Any("internal_url", clientUrl), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
-		return fmt.Errorf("failed to connect to internal nats: %s", err)
-	}
-
-	rtt, err := n.ncint.RTT()
-	if err != nil {
-		n.log.Warn("Failed get internal nats RTT", slog.Any("err", err), slog.Any("internal_url", clientUrl))
-	} else {
-		n.log.Debug("Internal NATS RTT", slog.String("rtt", rtt.String()), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
-	}
-
-	jsCtx, err := n.ncint.JetStream()
-	if err != nil {
-		return fmt.Errorf("failed to establish jetstream connection to internal nats: %s", err)
-	}
-
-	_, err = jsCtx.CreateObjectStore(&nats.ObjectStoreConfig{
-		Bucket:      WorkloadCacheBucketName,
-		Description: "Object store cache for nex-node workloads",
-		Storage:     nats.MemoryStorage,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create internal object store: %s", err)
-	}
+	n.ncint = n.natsint.Connection()
 
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/agent/providers"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
@@ -70,7 +71,13 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		return nil, fmt.Errorf("invalid metadata: %v", metadata.Errors)
 	}
 
-	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsHost, *metadata.NodeNatsPort))
+	url := fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsHost, *metadata.NodeNatsPort)
+	pair, err := nkeys.FromSeed([]byte(*metadata.NodeNatsNkeySeed))
+	pk, _ := pair.PublicKey()
+	nc, err := nats.Connect(url, nats.Nkey(pk, func(b []byte) ([]byte, error) {
+		return pair.Sign(b)
+	}))
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
 		return nil, err

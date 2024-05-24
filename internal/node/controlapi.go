@@ -271,9 +271,19 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
 		api.log.Error("Workload validation failed", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
+		return
 	}
 
-	numBytes, workloadHash, err := api.mgr.CacheWorkload(&request)
+	agentClient, err := api.mgr.SelectRandomAgent()
+	if err != nil {
+		api.log.Error("Failed to get agent client from pool", slog.Any("err", err))
+		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to get agent client from pool: %s", err))
+		return
+	}
+
+	workloadID := agentClient.ID()
+
+	numBytes, workloadHash, err := api.mgr.CacheWorkload(api.node.natsint, workloadID, &request)
 	if err != nil {
 		api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))
@@ -311,7 +321,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 			slog.String("type", string(request.WorkloadType)),
 		)
 
-	workloadID, err := api.mgr.DeployWorkload(deployRequest)
+	err = api.mgr.DeployWorkload(agentClient, deployRequest)
 	if err != nil {
 		api.log.Error("Failed to deploy workload",
 			slog.String("error", err.Error()),
@@ -320,22 +330,22 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if _, ok := api.mgr.handshakes[*workloadID]; !ok {
+	if _, ok := api.mgr.handshakes[workloadID]; !ok {
 		api.log.Error("Attempted to deploy workload into bad process (no handshake)",
-			slog.String("workload_id", *workloadID),
+			slog.String("workload_id", workloadID),
 		)
 		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, agent pool did not initialize properly")
 		return
 	}
 	workloadName := request.DecodedClaims.Subject
 
-	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("workload_id", *workloadID))
+	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("workload_id", workloadID))
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 		Started: true,
 		Name:    workloadName,
 		Issuer:  request.DecodedClaims.Issuer,
-		ID:      *workloadID, // FIXME-- rename to match
+		ID:      workloadID, // FIXME-- rename to match
 	}, nil)
 
 	raw, err := json.Marshal(res)

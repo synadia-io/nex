@@ -14,6 +14,7 @@ import (
 	"github.com/rs/xid"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
+	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 )
 
@@ -32,6 +33,7 @@ type SpawningProcessManager struct {
 
 	liveProcs map[string]*spawnedProcess
 	warmProcs chan *spawnedProcess
+	intNats   *internalnats.InternalNatsServer
 
 	delegate       ProcessDelegate
 	deployRequests map[string]*agentapi.DeployRequest
@@ -54,16 +56,18 @@ type spawnedProcess struct {
 }
 
 func NewSpawningProcessManager(
+	intNats *internalnats.InternalNatsServer,
 	log *slog.Logger,
 	config *models.NodeConfiguration,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
 ) (*SpawningProcessManager, error) {
 	return &SpawningProcessManager{
-		config: config,
-		t:      telemetry,
-		log:    log,
-		ctx:    ctx,
+		config:  config,
+		t:       telemetry,
+		log:     log,
+		ctx:     ctx,
+		intNats: intNats,
 
 		stopMutexes: make(map[string]*sync.Mutex),
 
@@ -223,6 +227,12 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	id := xid.New()
 	workloadID := id.String()
 
+	kp, err := s.intNats.CreateNewWorkloadUser(workloadID)
+	if err != nil {
+		return nil, err
+	}
+	seed, _ := kp.Seed()
+
 	cmd := exec.Command(nexAgentBinary)
 	cmd.Env = append(os.Environ(),
 		"NEX_SANDBOX=false",
@@ -230,7 +240,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		// can't use the CNI host because we don't use it in no-sandbox mode
 		"NEX_NODE_NATS_HOST=0.0.0.0",
 		fmt.Sprintf("NEX_NODE_NATS_PORT=%d", *s.config.InternalNodePort),
-		// TODO: supply the nex node nkey seed for security
+		fmt.Sprintf("NEX_NODE_NATS_NKEY_SEED=%s", seed),
 	)
 
 	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: true}
@@ -246,7 +256,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		Exit: make(chan int),
 	}
 
-	err := cmd.Start()
+	err = cmd.Start()
 	if err != nil {
 		s.log.Warn("Agent command failed to start", slog.Any("error", err))
 		return nil, err

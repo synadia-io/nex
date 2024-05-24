@@ -16,6 +16,7 @@ import (
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
+	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -32,16 +33,20 @@ type FirecrackerProcessManager struct {
 	allVMs  map[string]*runningFirecracker
 	warmVMs chan *runningFirecracker
 
+	intNats *internalnats.InternalNatsServer
+
 	delegate       ProcessDelegate
 	deployRequests map[string]*agentapi.DeployRequest
 }
 
 func NewFirecrackerProcessManager(
+	intnats *internalnats.InternalNatsServer,
 	log *slog.Logger,
 	config *models.NodeConfiguration,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
 ) (*FirecrackerProcessManager, error) {
+
 	return &FirecrackerProcessManager{
 		config: config,
 		t:      telemetry,
@@ -156,6 +161,11 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 				continue
 			}
 
+			_, err = f.intNats.CreateNewWorkloadUser(vm.vmmID)
+			if err != nil {
+				f.log.Error("Failed to create workload user", slog.Any("err", err))
+			}
+
 			err = f.setMetadata(vm)
 			if err != nil {
 				f.log.Warn("Failed to set metadata on VM for warming pool.", slog.Any("err", err))
@@ -261,11 +271,16 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 }
 
 func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
+	uData, err := f.intNats.FindWorkload(vm.vmmID)
+	if err != nil {
+		return err
+	}
 	return vm.setMetadata(&agentapi.MachineMetadata{
-		Message:      models.StringOrNil("Host-supplied metadata"),
-		NodeNatsHost: vm.config.InternalNodeHost,
-		NodeNatsPort: vm.config.InternalNodePort,
-		VmID:         &vm.vmmID,
+		Message:          models.StringOrNil("Host-supplied metadata"),
+		NodeNatsHost:     vm.config.InternalNodeHost,
+		NodeNatsPort:     vm.config.InternalNodePort,
+		NodeNatsNkeySeed: &uData.NkeySeed,
+		VmID:             &vm.vmmID,
 	})
 }
 
