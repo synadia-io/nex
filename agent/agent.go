@@ -76,6 +76,10 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 
 	url := fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsHost, *metadata.NodeNatsPort)
 	pair, err := nkeys.FromSeed([]byte(*metadata.NodeNatsNkeySeed))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid nkey seed: %v\n", metadata.Errors)
+		return nil, fmt.Errorf("invalid nkey seed: %v", metadata.Errors)
+	}
 	pk, _ := pair.PublicKey()
 	nc, err := nats.Connect(url, nats.Nkey(pk, func(b []byte) ([]byte, error) {
 		return pair.Sign(b)
