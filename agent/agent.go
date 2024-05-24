@@ -24,10 +24,13 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-const defaultAgentHandshakeTimeoutMillis = 500
-const runloopSleepInterval = 250 * time.Millisecond
-const runloopTickInterval = 2500 * time.Millisecond
-const workloadExecutionSleepTimeoutMillis = 1000
+const (
+	defaultAgentHandshakeTimeoutMillis  = 500
+	runloopSleepInterval                = 250 * time.Millisecond
+	runloopTickInterval                 = 2500 * time.Millisecond
+	workloadExecutionSleepTimeoutMillis = 1000
+	workloadCacheFileKey                = "workload"
+)
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
 // and the nex node by way of a configured internal NATS server. Agent instances provide
@@ -62,7 +65,7 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		metadata, err = GetMachineMetadata()
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get machien metadata: %s\n", err)
+		fmt.Fprintf(os.Stderr, "failed to get machine metadata: %s\n", err)
 		return nil, fmt.Errorf("failed to get machine metadata: %s", err)
 	}
 
@@ -82,6 +85,7 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
 		return nil, err
 	}
+	fmt.Printf("Connected to internal NATS: %s\n", url)
 
 	js, err := nc.JetStream()
 	if err != nil {
@@ -198,9 +202,9 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 		tempFile = fmt.Sprintf("%s.exe", tempFile)
 	}
 
-	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
+	err := a.cacheBucket.GetFile(workloadCacheFileKey, tempFile)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to write workload artifact to temp dir: %s", err)
+		msg := fmt.Sprintf("Failed to get and write workload artifact to temp dir: %s", err)
 		a.LogError(msg)
 		return nil, errors.New(msg)
 	}

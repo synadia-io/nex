@@ -14,7 +14,7 @@ tasks:
     sources:
       - "*.go"
     cmds:
-      - go build -tags netgo -ldflags '-extldflags "-static"'
+      - CGO_ENABLED=0 go build -tags netgo -ldflags '-extldflags "-static"'
 
   clean:
     cmds:

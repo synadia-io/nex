@@ -412,8 +412,19 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
+	ud, err := w.node.natsint.FindWorkload(id)
+	if err != nil {
+		w.log.Error("Failed to start agent client", slog.Any("err", err))
+		return
+	}
+	clientConn, err := w.node.natsint.ConnectionForUser(ud)
+	if err != nil {
+		w.log.Error("Failed to start agent client", slog.Any("err", err))
+		return
+	}
+
 	agentClient := agentapi.NewAgentClient(
-		w.ncInternal,
+		clientConn,
 		w.log,
 		w.handshakeTimeout,
 		w.agentHandshakeTimedOut,
@@ -423,7 +434,7 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 		w.agentContactLost,
 	)
 
-	err := agentClient.Start(id)
+	err = agentClient.Start(id)
 	if err != nil {
 		w.log.Error("Failed to start agent client", slog.Any("err", err))
 		return
