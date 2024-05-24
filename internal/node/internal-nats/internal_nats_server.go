@@ -95,6 +95,10 @@ func (s *InternalNatsServer) Port() int {
 	return s.lastOpts.Port
 }
 
+func (s *InternalNatsServer) Subsz(opts *server.SubszOptions) (*server.Subsz, error) {
+	return s.server.Subsz(opts)
+}
+
 // Returns a user keypair that can be used to log into the internal server
 // as the given workload
 func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.KeyPair, error) {
