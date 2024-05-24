@@ -50,6 +50,9 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	data.NexHostUserSeed = string(hostSeed)
 
 	opts, err := updateNatsOptions(opts, log, data)
+	if err != nil {
+		return nil, err
+	}
 
 	s, err := server.NewServer(opts)
 	if err != nil {
@@ -178,6 +181,7 @@ func (s *InternalNatsServer) FindWorkload(workloadId string) (*userData, error) 
 }
 
 func ensureWorkloadObjectStore(nc *nats.Conn) (jetstream.ObjectStore, error) {
+	var err error
 	ctx, cancelF := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancelF()
 
@@ -195,6 +199,9 @@ func ensureWorkloadObjectStore(nc *nats.Conn) (jetstream.ObjectStore, error) {
 				Description: "Cache for workload images to be executed by agent",
 				Storage:     jetstream.MemoryStorage,
 			})
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			return nil, err
 		}
@@ -214,6 +221,9 @@ func updateNatsOptions(opts *server.Options, log *slog.Logger, data internalServ
 		f, err = os.CreateTemp("", "internalconf")
 	} else {
 		f, err = os.Create(opts.ConfigFile)
+	}
+	if err != nil {
+		return nil, err
 	}
 	defer os.Remove(f.Name()) // clean up
 
