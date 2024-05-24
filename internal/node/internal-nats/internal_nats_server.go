@@ -101,11 +101,12 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 	}
 	pk, _ := userPair.PublicKey()
 	seed, _ := userPair.Seed()
-	s.serverConfigData.Users = append(s.serverConfigData.Users, userData{
+	ud := userData{
 		WorkloadID: workloadID,
 		NkeySeed:   string(seed),
 		NkeyPublic: pk,
-	})
+	}
+	s.serverConfigData.Users = append(s.serverConfigData.Users, ud)
 
 	opts := &server.Options{
 		JetStream:  true,
@@ -122,7 +123,16 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 	if err != nil {
 		return nil, err
 	}
-	//s.lastOpts = updated
+
+	nc, err := s.ConnectionForUser(&ud)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = ensureWorkloadObjectStore(nc)
+	if err != nil {
+		return nil, err
+	}
 
 	return userPair, nil
 }

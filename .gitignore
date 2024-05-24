@@ -38,3 +38,4 @@ test/panicker/panicker
 _spec
 
 /internal/node/internal-nats/pnats
+/nex/pnats
