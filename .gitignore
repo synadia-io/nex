@@ -36,3 +36,5 @@ test/panicker/panicker
 .idea
 
 _spec
+
+/internal/node/internal-nats/pnats
