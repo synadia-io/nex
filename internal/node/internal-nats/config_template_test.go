@@ -49,6 +49,9 @@ func TestTemplateGenerator(t *testing.T) {
 	fmt.Printf("----\n%s\n----\n", string(bytes))
 
 	f, err := os.CreateTemp("", "fooconf")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %s", err)
+	}
 	defer os.Remove(f.Name()) // clean up
 	if _, err := f.Write(bytes); err != nil {
 		t.Fatalf("%s", err)
@@ -101,6 +104,9 @@ func TestTemplateGenerator(t *testing.T) {
 		priv, _ := nkeys.FromSeed([]byte(data.Users[0].NkeySeed))
 		return priv.Sign(b)
 	}))
+	if err != nil {
+		t.Fatalf("Failed to connect as user: %s", err)
+	}
 
 	// host account should be able to see all of these
 	_ = ncUser1.Publish("agentevt.my_event", []byte{1, 2, 3})
@@ -121,24 +127,4 @@ func TestTemplateGenerator(t *testing.T) {
 
 	go s.WaitForShutdown()
 
-}
-
-func startNatsServer(t *testing.T) (func(), *nats.Conn) {
-	t.Helper()
-	opts := &server.Options{
-		JetStream: true,
-		Port:      -1,
-	}
-	s, err := server.NewServer(opts)
-	if err != nil {
-		server.PrintAndDie("nats-server: " + err.Error())
-	}
-	s.ConfigureLogger()
-	if err := server.Run(s); err != nil {
-		server.PrintAndDie(err.Error())
-	}
-
-	go s.WaitForShutdown()
-	nc, _ := nats.Connect(s.ClientURL())
-	return s.Shutdown, nc
 }
