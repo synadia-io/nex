@@ -25,7 +25,7 @@ import (
 
 const (
 	defaultFileMode     = os.FileMode(int(0770)) // owner and group r/w/x
-	defaultWorkloadType = "elf"
+	defaultWorkloadType = "native"
 	fileExtensionJS     = "js"
 	fileExtensionWasm   = "wasm"
 
