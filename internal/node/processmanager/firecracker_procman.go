@@ -161,12 +161,13 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 				continue
 			}
 
-			_, err = f.intNats.CreateNewWorkloadUser(vm.vmmID)
+			workloadKey, err := f.intNats.CreateNewWorkloadUser(vm.vmmID)
 			if err != nil {
 				f.log.Error("Failed to create workload user", slog.Any("err", err))
 			}
+			workloadSeed, _ := workloadKey.Seed()
 
-			err = f.setMetadata(vm)
+			err = f.setMetadata(vm, string(workloadSeed))
 			if err != nil {
 				f.log.Warn("Failed to set metadata on VM for warming pool.", slog.Any("err", err))
 				continue
@@ -270,16 +271,12 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 	}
 }
 
-func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
-	uData, err := f.intNats.FindWorkload(vm.vmmID)
-	if err != nil {
-		return err
-	}
+func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker, workloadSeed string) error {
 	return vm.setMetadata(&agentapi.MachineMetadata{
 		Message:          models.StringOrNil("Host-supplied metadata"),
 		NodeNatsHost:     vm.config.InternalNodeHost,
 		NodeNatsPort:     vm.config.InternalNodePort,
-		NodeNatsNkeySeed: &uData.NkeySeed,
+		NodeNatsNkeySeed: &workloadSeed,
 		VmID:             &vm.vmmID,
 	})
 }
