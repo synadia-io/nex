@@ -190,13 +190,13 @@ func devrun(nc *nats.Conn, arch, os, path, namespace string, logger *slog.Logger
 	return nil
 }
 
-func randomNode(arch, os string, nodeClient *controlapi.Client) (*controlapi.PingResponse, error) {
-	candidates, err := listNodes(arch, os, nodeClient)
+func randomNode(arch, os string, nodeClient *controlapi.Client) (*controlapi.AuctionResponse, error) {
+	candidates, err := auction(arch, os, nodeClient)
 	if err != nil {
 		return nil, err
 	}
 
-	shuffled := make([]*controlapi.PingResponse, len(candidates))
+	shuffled := make([]*controlapi.AuctionResponse, len(candidates))
 	for i, x := range rand.Perm(len(candidates)) {
 		shuffled[x] = &candidates[i]
 	}
@@ -204,8 +204,8 @@ func randomNode(arch, os string, nodeClient *controlapi.Client) (*controlapi.Pin
 	return shuffled[0], nil
 }
 
-func listNodes(arch, os string, nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
-	candidates, err := nodeClient.ListAllNodes(&controlapi.PingRequest{
+func auction(arch, os string, nodeClient *controlapi.Client) ([]controlapi.AuctionResponse, error) {
+	candidates, err := nodeClient.Auction(&controlapi.AuctionRequest{
 		Arch: &arch,
 		OS:   &os,
 	}) // TODO- would expect "ListNodes" to return []NexNode...
