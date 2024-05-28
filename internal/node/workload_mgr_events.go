@@ -110,21 +110,15 @@ func (w *WorkloadManager) agentLog(workloadId string, entry agentapi.LogEntry) {
 	_ = w.nc.Publish(subject, bytes)
 }
 
-func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload string, tsub string, origErr error) error {
-	deployRequest, err := w.procMan.Lookup(workloadId)
-	if err != nil {
-		w.log.Warn("Tried to publish function exec failed event for non-existent workload", slog.String("workload_id", workloadId))
-		return nil
-	}
-
+func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workloadName string, namespace string, tsub string, origErr error) error {
 	functionExecFailed := struct {
 		Name      string `json:"workload_name"`
 		Subject   string `json:"trigger_subject"`
 		Namespace string `json:"namespace"`
 		Error     string `json:"error"`
 	}{
-		Name:      workload,
-		Namespace: *deployRequest.Namespace,
+		Name:      workloadName,
+		Namespace: namespace,
 		Subject:   tsub,
 		Error:     origErr.Error(),
 	}
@@ -137,7 +131,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload 
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecFailed)
 
-	err = PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
+	err := PublishCloudEvent(w.nc, namespace, cloudevent, w.log)
 	if err != nil {
 		return err
 	}
@@ -149,7 +143,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workload 
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, *deployRequest.WorkloadName, workloadId)
+	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, namespace, w.publicKey, workloadName, workloadId)
 	err = w.nc.Publish(subject, logBytes)
 	if err != nil {
 		w.log.Error("Failed to publish function exec failed log", slog.Any("err", err))
