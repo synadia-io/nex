@@ -350,46 +350,6 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 func (api *ApiListener) handlePing(m *nats.Msg) {
 	now := time.Now().UTC()
 
-	filter := false
-
-	var req *controlapi.AuctionRequest
-	err := json.Unmarshal(m.Data, &req)
-	if err == nil {
-		// PING request was successfully parsed
-		if req.Arch != nil && !strings.EqualFold(api.node.config.Tags[controlapi.TagArch], *req.Arch) {
-			filter = true
-		}
-
-		if req.OS != nil && !strings.EqualFold(api.node.config.Tags[controlapi.TagOS], *req.OS) {
-			filter = true
-		}
-
-		if req.Sandboxed != nil && api.node.config.NoSandbox != !*req.Sandboxed {
-			filter = true
-		}
-
-		for tag := range req.Tags {
-			val, ok := api.node.config.Tags[tag]
-			if !ok {
-				filter = true
-			} else if !strings.EqualFold(val, req.Tags[tag]) {
-				filter = true
-			}
-		}
-
-		for _, workloadType := range req.WorkloadTypes {
-			if !slices.Contains(api.node.config.WorkloadTypes, workloadType) {
-				filter = true
-			}
-		}
-	}
-
-	if filter {
-		// ack the message but don't respond with node details, since it's filtered
-		_ = m.Ack()
-		return
-	}
-
 	machines, err := api.mgr.RunningWorkloads()
 	if err != nil {
 		api.log.Error("Failed to query running machines", slog.Any("error", err))
