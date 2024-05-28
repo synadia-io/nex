@@ -98,7 +98,7 @@ func (api *ApiListener) Start() error {
 
 	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".AUCTION", api.handleAuction)
 	if err != nil {
-		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
+		api.log.Error("Failed to subscribe to auction subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 	api.subz = append(api.subz, sub)
 
