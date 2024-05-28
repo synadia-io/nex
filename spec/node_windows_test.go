@@ -532,7 +532,7 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, mode
 func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, error) {
 	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
 
-	nodes, err := nodeClient.ListAllNodes()
+	nodes, err := nodeClient.PingNodes()
 	if err != nil {
 		return nil, err
 	}

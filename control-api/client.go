@@ -117,7 +117,7 @@ func (api *Client) EnterLameDuck(nodeId string) (*LameDuckResponse, error) {
 // A workloadId of "" will not filter by workload, and only
 // filter by the client's namespace. If a workload ID/name is supplied, the filter
 // will be for both namespace and workload. If you don't want these filters
-// then use ListAllNodes
+// then use PingNodes
 func (api *Client) PingWorkloads(workloadID string) ([]WorkloadPingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
