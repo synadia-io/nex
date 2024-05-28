@@ -156,7 +156,7 @@ func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error)
 }
 
 func listNodes(nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
-	candidates, err := nodeClient.ListAllNodes() // TODO- would expect "ListNodes" to return []NexNode...
+	candidates, err := nodeClient.PingNodes()
 	if err != nil {
 		return nil, err
 	}

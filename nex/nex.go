@@ -245,7 +245,7 @@ func main() {
 			logger.Error("Failed to start TUI", slog.Any("err", err))
 		}
 	case nodesLs.FullCommand():
-		err := ListNodes(ctx)
+		err := PingNodes(ctx)
 		if err != nil {
 			logger.Error("Failed to list nodes", slog.Any("err", err))
 		}

@@ -15,8 +15,8 @@ import (
 	"github.com/synadia-io/nex/internal/models"
 )
 
-// Uses a control API client to request a node list from a NATS environment
-func ListNodes(ctx context.Context) error {
+// Uses a control API client to ping all nodes in NATS environment
+func PingNodes(ctx context.Context) error {
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nc, err := models.GenerateConnectionFromOpts(Opts, log)
 	if err != nil {
@@ -24,7 +24,7 @@ func ListNodes(ctx context.Context) error {
 	}
 
 	nodeClient := controlapi.NewApiClient(nc, Opts.Timeout, log)
-	nodes, err := nodeClient.ListAllNodes()
+	nodes, err := nodeClient.PingNodes()
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func ListWorkloads(ctx context.Context) error {
 		return err
 	}
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, log)
-	nodes, err := nodeClient.ListWorkloads(strings.TrimSpace(RunOpts.Name))
+	nodes, err := nodeClient.PingWorkloads(strings.TrimSpace(RunOpts.Name))
 	if err != nil {
 		return err
 	}

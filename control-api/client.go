@@ -13,6 +13,7 @@ import (
 )
 
 // API subjects:
+// $NEX.AUCTION
 // $NEX.PING
 // $NEX.PING.{node}
 // $NEX.INFO.{namespace}.{node}
@@ -117,11 +118,11 @@ func (api *Client) EnterLameDuck(nodeId string) (*LameDuckResponse, error) {
 // filter by the client's namespace. If a workload ID/name is supplied, the filter
 // will be for both namespace and workload. If you don't want these filters
 // then use ListAllNodes
-func (api *Client) ListWorkloads(workloadId string) ([]WorkloadPingResponse, error) {
+func (api *Client) PingWorkloads(workloadID string) ([]WorkloadPingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
 
-	workloadId = strings.TrimSpace(workloadId)
+	workloadID = strings.TrimSpace(workloadID)
 
 	responses := make([]WorkloadPingResponse, 0)
 
@@ -146,10 +147,10 @@ func (api *Client) ListWorkloads(workloadId string) ([]WorkloadPingResponse, err
 	}
 
 	var subject string
-	if len(workloadId) == 0 {
+	if len(workloadID) == 0 {
 		subject = fmt.Sprintf("%s.WPING.%s", APIPrefix, api.namespace)
 	} else {
-		subject = fmt.Sprintf("%s.WPING.%s.%s", APIPrefix, api.namespace, workloadId)
+		subject = fmt.Sprintf("%s.WPING.%s.%s", APIPrefix, api.namespace, workloadID)
 	}
 	msg := nats.NewMsg(subject)
 	msg.Reply = sub.Subject
@@ -162,9 +163,60 @@ func (api *Client) ListWorkloads(workloadId string) ([]WorkloadPingResponse, err
 	return responses, nil
 }
 
+// Attempts to resolve viable candidate nodes where a proposed workload can be deployed
+func (api *Client) Auction(req *AuctionRequest) ([]AuctionResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
+	defer cancel()
+
+	responses := make([]AuctionResponse, 0)
+
+	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+		env, err := extractEnvelope(m.Data)
+		if err != nil {
+			api.log.Error("failed to extract envelope", slog.Any("err", err), slog.Any("nats_msg.Data", m.Data))
+			return
+		}
+
+		var resp AuctionResponse
+		bytes, err := json.Marshal(env.Data)
+		if err != nil {
+			api.log.Error("failed to marshal envelope data", slog.Any("err", err))
+			return
+		}
+
+		err = json.Unmarshal(bytes, &resp)
+		if err != nil {
+			api.log.Error("failed to unmarshal auction response", slog.Any("err", err))
+			return
+		}
+		responses = append(responses, resp)
+	})
+	if err != nil {
+		api.log.Error("failed to subscribe", slog.Any("err", err))
+		return nil, err
+	}
+
+	var payload []byte
+	if req != nil {
+		payload, _ = json.Marshal(req)
+	}
+
+	msg := nats.NewMsg(fmt.Sprintf("%s.AUCTION", APIPrefix))
+	msg.Reply = sub.Subject
+	msg.Data = payload
+
+	err = api.nc.PublishMsg(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	<-ctx.Done()
+	return responses, nil
+}
+
 // Attempts to list all nodes. Note that any node within the Nexus will respond to this ping, regardless
 // of the namespaces of their running workloads
-func (api *Client) ListAllNodes() ([]PingResponse, error) {
+func (api *Client) PingNodes() ([]PingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
 	defer cancel()
 
