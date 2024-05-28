@@ -7,7 +7,6 @@ import (
 )
 
 type internalServerData struct {
-	// workloadID -> userData
 	Users             []userData
 	NexHostUserPublic string
 	NexHostUserSeed   string

@@ -104,6 +104,7 @@ func (s *InternalNatsServer) Subsz(opts *server.SubszOptions) (*server.Subsz, er
 func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.KeyPair, error) {
 	userPair, err := nkeys.CreateUser()
 	if err != nil {
+		s.log.Error("Failed to create nkey user", slog.Any("error", err))
 		return nil, err
 	}
 	pk, _ := userPair.PublicKey()
@@ -124,20 +125,26 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 
 	updated, err := updateNatsOptions(opts, s.log, s.serverConfigData)
 	if err != nil {
+		s.log.Error("Failed to update NATS options in internal server", slog.Any("error", err))
 		return nil, err
 	}
 	err = s.server.ReloadOptions(updated)
 	if err != nil {
+		s.log.Error("Failed to reload NATS internal server options", slog.Any("error", err))
 		return nil, err
 	}
 
 	nc, err := s.ConnectionForUser(&ud)
 	if err != nil {
+		s.log.Error("Failed to obtain connection for workload-user", slog.Any("error", err))
 		return nil, err
 	}
 
 	_, err = ensureWorkloadObjectStore(nc)
 	if err != nil {
+		s.log.Error("Failed to create or locate the workload object store in internal NATS server",
+			slog.Any("error", err),
+		)
 		return nil, err
 	}
 
