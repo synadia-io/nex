@@ -134,7 +134,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			f.log.Debug(fmt.Sprintf("recovered: %s", r))
+			f.log.Debug(fmt.Sprintf("firecracker process manager recovered from failure: %s", r))
 		}
 	}()
 
@@ -164,6 +164,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 			workloadKey, err := f.intNats.CreateNewWorkloadUser(vm.vmmID)
 			if err != nil {
 				f.log.Error("Failed to create workload user", slog.Any("err", err))
+				continue
 			}
 			workloadSeed, _ := workloadKey.Seed()
 
