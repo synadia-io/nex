@@ -48,8 +48,11 @@ func init() {
 // Attempts to "deploy a file" by finding a suitable target and publishing the workload to an ad-hoc created bucket
 // and using default issuer and publisher keys stored in ~/.nex. This should be as easy as typing "nex devrun ./amazingapp env1=foo env2=bar"
 func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
-	if RunOpts.WorkloadType == "elf" || RunOpts.WorkloadType == "native" {
-		os, arch, err := validateBinary(DevRunOpts.Filename)
+	var os, arch string
+	var err error
+
+	if RunOpts.WorkloadType == "native" {
+		os, arch, err = validateBinary(DevRunOpts.Filename)
 		if err != nil {
 			logger.Error("failed to validate binary", slog.Any("err", err))
 		}
@@ -64,7 +67,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	// node "nearby"
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, Opts.Namespace, logger)
 
-	target, err := randomNode(nodeClient)
+	target, err := randomNode(nodeClient, arch, os, RunOpts.WorkloadType)
 	if err != nil {
 		return err
 	}
@@ -146,8 +149,8 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	return nil
 }
 
-func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error) {
-	candidates, err := listNodes(nodeClient)
+func randomNode(nodeClient *controlapi.Client, arch, os string, workloadType models.NexWorkload) (*controlapi.AuctionResponse, error) {
+	candidates, err := auction(nodeClient, os, arch, workloadType)
 	if err != nil {
 		return nil, err
 	}
@@ -155,8 +158,12 @@ func randomNode(nodeClient *controlapi.Client) (*controlapi.PingResponse, error)
 	return &candidates[rand.Intn(len(candidates))], nil
 }
 
-func listNodes(nodeClient *controlapi.Client) ([]controlapi.PingResponse, error) {
-	candidates, err := nodeClient.ListAllNodes() // TODO- would expect "ListNodes" to return []NexNode...
+func auction(nodeClient *controlapi.Client, os, arch string, workloadType models.NexWorkload) ([]controlapi.AuctionResponse, error) {
+	candidates, err := nodeClient.Auction(&controlapi.AuctionRequest{
+		Arch:          &arch,
+		OS:            &os,
+		WorkloadTypes: []models.NexWorkload{workloadType},
+	})
 	if err != nil {
 		return nil, err
 	}

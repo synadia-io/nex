@@ -288,6 +288,14 @@ var _ = Describe("nex node", func() {
 					})
 
 					Describe("node API listener subscriptions", func() {
+						It("should initialize a node API subscription for handling auction requests", func(ctx SpecContext) {
+							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
+								Subscriptions: true,
+								Test:          "$NEX.AUCTION",
+							})
+							Expect(subsz.Total).To(Equal(1))
+						})
+
 						It("should initialize a node API subscription for handling ping requests", func(ctx SpecContext) {
 							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
 								Subscriptions: true,
@@ -524,7 +532,7 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, mode
 func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, error) {
 	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
 
-	nodes, err := nodeClient.ListAllNodes()
+	nodes, err := nodeClient.PingNodes()
 	if err != nil {
 		return nil, err
 	}

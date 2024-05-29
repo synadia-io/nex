@@ -52,7 +52,7 @@ func NewHomeModel(h, w int, nc *nats.Conn) HomeModel {
 	if nc != nil {
 		api := controlapi.NewApiClient(nc, time.Second, slog.Default())
 		nodes := []list.Item{}
-		ns, _ := api.ListAllNodes()
+		ns, _ := api.PingNodes()
 		for _, n := range ns {
 			workloads := []list.Item{}
 			info, _ := api.NodeInfo(n.NodeId)
@@ -224,7 +224,7 @@ func (m HomeModel) refreshNodeData() tea.Model {
 	if m.nc != nil {
 		api := controlapi.NewApiClient(m.nc, time.Second, slog.Default())
 		nodes := []list.Item{}
-		ns, _ := api.ListAllNodes()
+		ns, _ := api.PingNodes()
 		for _, n := range ns {
 			workloads := []list.Item{}
 			info, _ := api.NodeInfo(n.NodeId)

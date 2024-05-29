@@ -96,6 +96,12 @@ func (api *ApiListener) Start() error {
 	var sub *nats.Subscription
 	var err error
 
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".AUCTION", api.handleAuction)
+	if err != nil {
+		api.log.Error("Failed to subscribe to auction subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
+	}
+	api.subz = append(api.subz, sub)
+
 	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".PING", api.handlePing)
 	if err != nil {
 		api.log.Error("Failed to subscribe to ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
@@ -144,61 +150,69 @@ func (api *ApiListener) Start() error {
 	return nil
 }
 
-func (api *ApiListener) handleStop(m *nats.Msg) {
-	namespace, err := extractNamespace(m.Subject)
+func (api *ApiListener) handleAuction(m *nats.Msg) {
+	now := time.Now().UTC()
+
+	filter := false
+
+	var req *controlapi.AuctionRequest
+	err := json.Unmarshal(m.Data, &req)
+	if err == nil {
+		// PING request was successfully parsed
+		if req.Arch != nil && !strings.EqualFold(api.node.config.Tags[controlapi.TagArch], *req.Arch) {
+			filter = true
+		}
+
+		if req.OS != nil && !strings.EqualFold(api.node.config.Tags[controlapi.TagOS], *req.OS) {
+			filter = true
+		}
+
+		if req.Sandboxed != nil && api.node.config.NoSandbox != !*req.Sandboxed {
+			filter = true
+		}
+
+		for tag := range req.Tags {
+			val, ok := api.node.config.Tags[tag]
+			if !ok {
+				filter = true
+			} else if !strings.EqualFold(val, req.Tags[tag]) {
+				filter = true
+			}
+		}
+
+		for _, workloadType := range req.WorkloadTypes {
+			if !slices.Contains(api.node.config.WorkloadTypes, workloadType) {
+				filter = true
+			}
+		}
+	}
+
+	if filter {
+		api.log.Debug("Node not viable for deploy request specified at auction")
+		_ = m.Ack()
+		return
+	}
+
+	machines, err := api.mgr.RunningWorkloads()
 	if err != nil {
-		api.log.Error("Invalid subject for workload stop", slog.Any("err", err))
-		respondFail(controlapi.StopResponseType, m, "Invalid subject for workload stop")
+		api.log.Error("Failed to query running machines", slog.Any("error", err))
+		respondFail(controlapi.AuctionResponseType, m, "Failed to query running machines on node")
 		return
 	}
 
-	var request controlapi.StopRequest
-	err = json.Unmarshal(m.Data, &request)
-	if err != nil {
-		api.log.Error("Failed to deserialize stop request", slog.Any("err", err))
-		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Unable to deserialize stop request: %s", err))
-		return
-	}
-
-	deployRequest, _ := api.mgr.LookupWorkload(request.WorkloadId)
-	if deployRequest == nil {
-		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadId))
-		respondFail(controlapi.StopResponseType, m, "No such workload")
-		return
-	}
-
-	err = request.Validate(&deployRequest.DecodedClaims)
-	if err != nil {
-		api.log.Error("Failed to validate stop request", slog.Any("err", err))
-		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
-		return
-	}
-
-	if *deployRequest.Namespace != namespace {
-		api.log.Error("Namespace mismatch on workload stop request",
-			slog.String("namespace", *deployRequest.Namespace),
-			slog.String("targetnamespace", namespace),
-		)
-
-		respondFail(controlapi.StopResponseType, m, "No such workload") // do not expose ID existence to avoid existence probes
-		return
-	}
-
-	err = api.mgr.StopWorkload(request.WorkloadId, true)
-	if err != nil {
-		api.log.Error("Failed to stop workload", slog.Any("err", err))
-		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
-	}
-
-	res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
-		Stopped: true,
-		Name:    deployRequest.DecodedClaims.Subject,
-		Issuer:  deployRequest.DecodedClaims.Issuer,
-		ID:      request.WorkloadId,
+	res := controlapi.NewEnvelope(controlapi.AuctionResponseType, controlapi.AuctionResponse{
+		NodeId:          api.PublicKey(),
+		Nexus:           api.node.nexus,
+		Version:         Version(),
+		TargetXkey:      api.PublicXKey(),
+		Uptime:          myUptime(now.Sub(api.start)),
+		RunningMachines: len(machines),
+		Tags:            api.node.config.Tags,
 	}, nil)
+
 	raw, err := json.Marshal(res)
 	if err != nil {
-		api.log.Error("Failed to marshal run response", slog.Any("err", err))
+		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
 	} else {
 		_ = m.Respond(raw)
 	}
@@ -335,12 +349,14 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 func (api *ApiListener) handlePing(m *nats.Msg) {
 	now := time.Now().UTC()
+
 	machines, err := api.mgr.RunningWorkloads()
 	if err != nil {
 		api.log.Error("Failed to query running machines", slog.Any("error", err))
 		respondFail(controlapi.PingResponseType, m, "Failed to query running machines on node")
 		return
 	}
+
 	res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
 		NodeId:          api.PublicKey(),
 		Nexus:           api.node.nexus,
@@ -354,6 +370,66 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 	raw, err := json.Marshal(res)
 	if err != nil {
 		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
+	} else {
+		_ = m.Respond(raw)
+	}
+}
+
+func (api *ApiListener) handleStop(m *nats.Msg) {
+	namespace, err := extractNamespace(m.Subject)
+	if err != nil {
+		api.log.Error("Invalid subject for workload stop", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, "Invalid subject for workload stop")
+		return
+	}
+
+	var request controlapi.StopRequest
+	err = json.Unmarshal(m.Data, &request)
+	if err != nil {
+		api.log.Error("Failed to deserialize stop request", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Unable to deserialize stop request: %s", err))
+		return
+	}
+
+	deployRequest, _ := api.mgr.LookupWorkload(request.WorkloadId)
+	if deployRequest == nil {
+		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadId))
+		respondFail(controlapi.StopResponseType, m, "No such workload")
+		return
+	}
+
+	err = request.Validate(&deployRequest.DecodedClaims)
+	if err != nil {
+		api.log.Error("Failed to validate stop request", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
+		return
+	}
+
+	if *deployRequest.Namespace != namespace {
+		api.log.Error("Namespace mismatch on workload stop request",
+			slog.String("namespace", *deployRequest.Namespace),
+			slog.String("targetnamespace", namespace),
+		)
+
+		respondFail(controlapi.StopResponseType, m, "No such workload") // do not expose ID existence to avoid existence probes
+		return
+	}
+
+	err = api.mgr.StopWorkload(request.WorkloadId, true)
+	if err != nil {
+		api.log.Error("Failed to stop workload", slog.Any("err", err))
+		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
+	}
+
+	res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
+		Stopped: true,
+		Name:    deployRequest.DecodedClaims.Subject,
+		Issuer:  deployRequest.DecodedClaims.Issuer,
+		ID:      request.WorkloadId,
+	}, nil)
+	raw, err := json.Marshal(res)
+	if err != nil {
+		api.log.Error("Failed to marshal run response", slog.Any("err", err))
 	} else {
 		_ = m.Respond(raw)
 	}

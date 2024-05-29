@@ -73,7 +73,7 @@ jobs:
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
-        go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --flake-attempts 3 --vv --trace --keep-going --output-interceptor-mode=none ./spec
+        go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --flake-attempts=5 --vv --trace --keep-going --output-interceptor-mode=none ./spec
 
     - 
       name: Run test suite

@@ -12,6 +12,7 @@ const (
 )
 
 const (
+	AuctionResponseType  = "io.nats.nex.v1.auction_response"
 	InfoResponseType     = "io.nats.nex.v1.info_response"
 	PingResponseType     = "io.nats.nex.v1.ping_response"
 	RunResponseType      = "io.nats.nex.v1.run_response"
@@ -31,6 +32,16 @@ type RunResponse struct {
 	Issuer  string `json:"issuer"`
 	Name    string `json:"name"`
 }
+
+type AuctionRequest struct {
+	Arch          *string              `json:"arch,omitempty"`
+	OS            *string              `json:"os,omitempty"`
+	Sandboxed     *bool                `json:"sandboxed,omitempty"`
+	Tags          map[string]string    `json:"tags,omitempty"`
+	WorkloadTypes []models.NexWorkload `json:"workload_types,omitempty"`
+}
+
+type AuctionResponse PingResponse
 
 // TODO: remove omitempty in next version bump
 type PingResponse struct {
