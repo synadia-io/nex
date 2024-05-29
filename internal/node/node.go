@@ -24,6 +24,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
+	"github.com/synadia-io/nex/internal/cli/globals"
+	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/observability"
 )
@@ -36,6 +38,15 @@ const (
 	runloopSleepInterval         = 100 * time.Millisecond
 	runloopTickInterval          = 2500 * time.Millisecond
 )
+
+type NodeOptions struct {
+	List ListCmd `cmd:"" aliases:"ls" json:"-"`
+	Info InfoCmd `cmd:"" json:"-"`
+
+	NodeExtendedCmds `json:"-"`
+
+	ServerPublicKey string `kong:"-" json:"-"`
+}
 
 // Nex node process
 type Node struct {
@@ -50,9 +61,8 @@ type Node struct {
 
 	log *slog.Logger
 
-	config      *models.NodeConfiguration
-	opts        *models.Options
-	nodeOpts    *models.NodeOptions
+	globals     *globals.Globals
+	nodeOpts    *node.NodeOptions
 	pidFilepath string
 
 	initOnce sync.Once
@@ -75,20 +85,25 @@ type Node struct {
 }
 
 func NewNode(
+	nc *nats.Conn,
 	keypair nkeys.KeyPair,
-	opts *models.Options,
-	nodeOpts *models.NodeOptions,
+	opts *globals.Globals,
+	nodeOpts *node.NodeOptions,
 	ctx context.Context,
 	cancelF context.CancelFunc,
 	log *slog.Logger) (*Node, error) {
 	node := &Node{
-		ctx:      ctx,
-		cancelF:  cancelF,
-		log:      log,
-		nodeOpts: nodeOpts,
-		opts:     opts,
+		nc:           nc,
+		ctx:          ctx,
+		cancelF:      cancelF,
+		log:          log,
+		nodeOpts:     nodeOpts,
+		globals:      opts,
+		nexus:        nodeOpts.Up.NexusName,
+		capabilities: *models.GetNodeCapabilities(nodeOpts.Up.Tags),
 	}
 
+	// TODO : this has been minimized to only run preflight
 	err := node.validateConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create node: %s", err.Error())
@@ -104,9 +119,6 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract public key: %s", err.Error())
 	}
-
-	node.nexus = nodeOpts.NexusName
-	node.capabilities = *models.GetNodeCapabilities(node.config.Tags)
 
 	return node, nil
 }
@@ -166,7 +178,7 @@ func (n *Node) Stop() {
 
 func (n *Node) EnterLameDuck() error {
 	if atomic.AddUint32(&n.lameduck, 1) == 1 {
-		n.config.Tags[controlapi.TagLameDuck] = "true"
+		n.nodeOpts.Up.Tags[controlapi.TagLameDuck] = "true"
 		err := n.manager.procMan.EnterLameDuck()
 		if err != nil {
 			return err
@@ -232,20 +244,12 @@ func (n *Node) init() error {
 	var _err error
 
 	n.initOnce.Do(func() {
-		_err = n.loadNodeConfig()
-		if _err != nil {
-			n.log.Error("Failed to load node configuration file", slog.Any("err", _err), slog.String("config_path", n.nodeOpts.ConfigFilepath))
-			err = errors.Join(err, _err)
-		} else {
-			n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
-		}
-
-		n.telemetry, _err = observability.NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
+		n.telemetry, _err = observability.NewTelemetry(n.ctx, n.log, n.nodeOpts.Up.OtelConfig, n.publicKey)
 		if _err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", _err))
 			err = errors.Join(err, _err)
 		} else {
-			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
+			n.log.Info("Telemetry status", slog.Bool("metrics", n.nodeOpts.Up.OtelConfig.OtelMetrics), slog.Bool("traces", n.nodeOpts.Up.OtelConfig.OtelTraces))
 		}
 
 		// start public NATS server
@@ -255,15 +259,6 @@ func (n *Node) init() error {
 			err = errors.Join(err, fmt.Errorf("failed to start public NATS server: %s", _err))
 		} else if n.natspub != nil {
 			n.log.Info("Public NATS server started", slog.String("client_url", n.natspub.ClientURL()))
-		}
-
-		// setup NATS connection
-		n.nc, _err = models.GenerateConnectionFromOpts(n.opts, n.log)
-		if _err != nil {
-			n.log.Error("Failed to connect to NATS server", slog.Any("err", _err))
-			err = errors.Join(err, fmt.Errorf("failed to connect to NATS server: %s", _err))
-		} else {
-			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
 		_err = n.startHostServicesConnection(n.nc)
@@ -286,7 +281,7 @@ func (n *Node) init() error {
 		n.manager, _err = NewWorkloadManager(n.ctx, n.cancelF,
 			n.keypair, n.publicKey,
 			n.nc, n.ncint, n.ncHostServices,
-			n.config, n.log, n.telemetry)
+			n.nodeOpts, n.log, n.telemetry)
 		if _err != nil {
 			n.log.Error("Failed to initialize machine manager", slog.Any("err", _err))
 			err = errors.Join(err, _err)
@@ -311,24 +306,24 @@ func (n *Node) init() error {
 }
 
 func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
-	if n.config.HostServicesConfiguration != nil {
+	if n.nodeOpts.Up.HostServicesConfig != nil {
 		natsOpts := []nats.Option{
 			nats.Name("nex-hostservices"),
 		}
-		if len(n.config.HostServicesConfiguration.NatsUserJwt) > 0 {
+		if len(n.nodeOpts.Up.HostServicesConfig.NatsUserJwt) > 0 {
 			natsOpts = append(natsOpts,
 				nats.UserJWTAndSeed(
-					n.config.HostServicesConfiguration.NatsUserJwt,
-					n.config.HostServicesConfiguration.NatsUserSeed,
+					n.nodeOpts.Up.HostServicesConfig.NatsUserJwt,
+					n.nodeOpts.Up.HostServicesConfig.NatsUserSeed,
 				),
 			)
 		}
 
-		if len(n.config.HostServicesConfiguration.NatsUrl) == 0 {
-			n.config.HostServicesConfiguration.NatsUrl = defaultConnection.Servers()[0]
+		if len(n.nodeOpts.Up.HostServicesConfig.NatsUrl) == 0 {
+			n.nodeOpts.Up.HostServicesConfig.NatsUrl = defaultConnection.Servers()[0]
 			n.ncHostServices = n.nc
 		} else {
-			nc, err := nats.Connect(n.config.HostServicesConfiguration.NatsUrl, natsOpts...)
+			nc, err := nats.Connect(n.nodeOpts.Up.HostServicesConfig.NatsUrl, natsOpts...)
 			if err != nil {
 				return err
 			}
@@ -364,7 +359,7 @@ func (n *Node) startInternalNATS() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse internal NATS client URL: %s", err)
 	}
-	n.config.InternalNodePort = &p
+	n.nodeOpts.Up.InternalNodePort = p
 
 	n.ncint, err = nats.Connect("", nats.InProcessServer(n.natsint))
 	if err != nil {
@@ -397,13 +392,17 @@ func (n *Node) startInternalNATS() error {
 }
 
 func (n *Node) startPublicNATS() error {
-	if n.config.PublicNATSServer == nil {
+	if n.nodeOpts.Up.PublicNATSServer == nil {
 		// no-op
 		return nil
 	}
 
-	var err error
-	n.natspub, err = server.NewServer(n.config.PublicNATSServer)
+	nOpts, err := server.ProcessConfigFile(string(n.nodeOpts.Up.PublicNATSServer))
+	if err != nil {
+		return err
+	}
+
+	n.natspub, err = server.NewServer(nOpts)
 	if err != nil {
 		return err
 	}
@@ -414,26 +413,6 @@ func (n *Node) startPublicNATS() error {
 	ports := n.natspub.PortsInfo(publicNATSServerStartTimeout)
 	if ports == nil {
 		return fmt.Errorf("failed to start public NATS server")
-	}
-
-	return nil
-}
-
-func (n *Node) loadNodeConfig() error {
-	if n.config == nil {
-		var err error
-
-		n.config, err = LoadNodeConfiguration(n.nodeOpts.ConfigFilepath)
-		if err != nil {
-			return err
-		}
-
-		// HACK-- copying these here... everything should ultimately be configurable via node JSON config...
-		n.config.OtelMetrics = n.nodeOpts.OtelMetrics
-		n.config.OtelMetricsExporter = n.nodeOpts.OtelMetricsExporter
-		n.config.OtelMetricsPort = n.nodeOpts.OtelMetricsPort
-		n.config.OtelTraces = n.nodeOpts.OtelTraces
-		n.config.OtelTracesExporter = n.nodeOpts.OtelTracesExporter
 	}
 
 	return nil
@@ -472,7 +451,7 @@ func (n *Node) publishHeartbeat() error {
 		Version:         Version(),
 		Uptime:          myUptime(now.Sub(n.startedAt)),
 		RunningMachines: len(machines),
-		Tags:            n.config.Tags,
+		Tags:            n.nodeOpts.Up.Tags,
 	}
 
 	cloudevent := cloudevents.NewEvent()
@@ -523,14 +502,7 @@ func (n *Node) publishNodeStopped() error {
 }
 
 func (n *Node) validateConfig() error {
-	if n.config == nil {
-		err := n.loadNodeConfig()
-		if err != nil {
-			return err
-		}
-	}
-
-	return CheckPrerequisites(n.config, true, n.log)
+	return CheckPrerequisites(n.nodeOpts, true, n.log)
 }
 
 func (n *Node) shutdown() {

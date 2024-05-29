@@ -18,7 +18,7 @@ import (
 	"text/template"
 
 	"github.com/fatih/color"
-	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/node/templates"
 
 	_ "embed"
@@ -114,7 +114,7 @@ var (
 	rootfsGzipSHA256 string
 )
 
-type initFunc func(*requirement, *models.NodeConfiguration) error
+type initFunc func(*requirement, *node.NodeOptions) error
 
 type requirement struct {
 	directories []string
@@ -137,9 +137,9 @@ type fileSpec struct {
 // When noninteractive is true, the preflight checks are run non-interactively,
 // and required prerequisites are automatically installed to configured paths
 // if they are otherwise missing when paired with config.ForceDepInstall.
-func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, logger *slog.Logger) error {
+func CheckPrerequisites(config *node.NodeOptions, noninteractive bool, logger *slog.Logger) error {
 	if strings.EqualFold(runtime.GOOS, "windows") {
-		if !config.NoSandbox {
+		if !config.Up.NoSandbox {
 			fmt.Print("\t⛔ Windows host must be configured to run in no sandbox mode\n")
 			return errors.New("windows host must be configured to run in no sandbox mode")
 		}
@@ -149,7 +149,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 		}
 
 		return nil
-	} else if config.NoSandbox {
+	} else if config.Up.NoSandbox {
 		if !noninteractive {
 			fmt.Print("\t✅ Host configured to run in no sandbox mode\n")
 		}
@@ -162,7 +162,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 
 	required := &requirements{
 		{
-			directories: config.CNI.BinPath,
+			directories: config.Up.CNIDefinition.CniBinPaths,
 			files: []*fileSpec{
 				{name: "host-local", description: "host-local CNI plugin"},
 				{name: "ptp", description: "ptp CNI plugin"},
@@ -173,7 +173,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 			initFuncs:  []initFunc{downloadCNIPlugins, downloadTCRedirectTap},
 		},
 		{
-			directories: config.BinPath,
+			directories: []string{config.Up.FirecrackerBinPath},
 			files: []*fileSpec{
 				{name: "firecracker", description: "Firecracker VM binary"},
 			},
@@ -185,7 +185,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 			//cniConfig := fmt.Sprintf("/etc/cni/conf.d/%s.conflist", config.CNI.NetworkName)
 			directories: []string{"/etc/cni/conf.d"},
 			files: []*fileSpec{
-				{name: *config.CNI.NetworkName + ".conflist", description: "CNI Configuration"},
+				{name: config.Up.CNIDefinition.CniNetworkName + ".conflist", description: "CNI Configuration"},
 			},
 			descriptor: "CNI configuration requirements",
 			satisfied:  false,
@@ -194,7 +194,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 		{
 			directories: []string{""},
 			files: []*fileSpec{
-				{name: config.KernelFilepath, description: "VMLinux Kernel"},
+				{name: config.Up.KernelFilepath, description: "VMLinux Kernel"},
 			},
 			descriptor: "VMLinux Kernel",
 			satisfied:  false,
@@ -203,7 +203,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 		{
 			directories: []string{""},
 			files: []*fileSpec{
-				{name: config.RootFsFilepath, description: "Root Filesystem Template"},
+				{name: config.Up.RootFsFilepath, description: "Root Filesystem Template"},
 			},
 			descriptor: "Root Filesystem Template",
 			satisfied:  false,
@@ -265,7 +265,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 		var input []byte
 		var err error
 
-		if !config.ForceDepInstall {
+		if !config.Preflight.ForceDepInstall {
 			if noninteractive {
 				return fmt.Errorf("configuration prerequisites not met: %s", r.descriptor)
 			}
@@ -277,7 +277,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 				return err
 			}
 		}
-		if config.ForceDepInstall || strings.ToUpper(string(input)) == "Y\n" {
+		if config.Preflight.ForceDepInstall || strings.ToUpper(string(input)) == "Y\n" {
 			var path string
 			dir := ""
 			if len(r.directories) > 0 {
@@ -309,7 +309,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 	return nil
 }
 
-func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
+func writeCniConf(r *requirement, c *node.NodeOptions) error {
 	for _, tF := range r.files {
 		f, err := os.Create(filepath.Join(r.directories[0], tF.name))
 		if err != nil {
@@ -322,7 +322,7 @@ func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
 			return err
 		}
 		var buffer bytes.Buffer
-		err = tmpl.Execute(&buffer, c.CNI)
+		err = tmpl.Execute(&buffer, c.Up.CNIDefinition)
 		if err != nil {
 			return err
 		}
@@ -336,7 +336,7 @@ func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
 	return nil
 }
 
-func downloadKernel(r *requirement, _ *models.NodeConfiguration) error {
+func downloadKernel(r *requirement, _ *node.NodeOptions) error {
 	_ = vmLinuxKernelSHA256 // TODO: implement sha verification
 	for _, f := range r.files {
 		// TODO: this is a hack for now
@@ -368,7 +368,7 @@ func downloadKernel(r *requirement, _ *models.NodeConfiguration) error {
 	return nil
 }
 
-func downloadFirecracker(_ *requirement, _ *models.NodeConfiguration) error {
+func downloadFirecracker(_ *requirement, _ *node.NodeOptions) error {
 	_ = firecrackerTarballSHA256
 	// TODO: firecracker repo made the sha difficult to use
 	rawData, err := decompressTarFromURL(firecrackerTarballURL, "")
@@ -409,7 +409,7 @@ func downloadFirecracker(_ *requirement, _ *models.NodeConfiguration) error {
 	return nil
 }
 
-func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
+func downloadCNIPlugins(r *requirement, c *node.NodeOptions) error {
 	rawData, err := decompressTarFromURL(cniPluginsTarballURL, cniPluginsTarballSHA256)
 	if err != nil {
 		return err
@@ -448,7 +448,7 @@ func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
 	return nil
 }
 
-func downloadTCRedirectTap(r *requirement, _ *models.NodeConfiguration) error {
+func downloadTCRedirectTap(r *requirement, _ *node.NodeOptions) error {
 	_ = tcRedirectCNIPluginSHA256
 	respBin, err := http.Get(tcRedirectCNIPluginURL)
 	if err != nil {
@@ -476,7 +476,7 @@ func downloadTCRedirectTap(r *requirement, _ *models.NodeConfiguration) error {
 	return nil
 }
 
-func downloadRootFS(r *requirement, _ *models.NodeConfiguration) error {
+func downloadRootFS(r *requirement, _ *node.NodeOptions) error {
 	_ = rootfsGzipSHA256
 	for _, f := range r.files {
 		// TODO: this is a hack for now

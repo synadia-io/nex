@@ -7,7 +7,7 @@ import (
 	"github.com/nats-io/nats.go"
 	hs "github.com/synadia-io/nex/host-services"
 	"github.com/synadia-io/nex/host-services/builtins"
-	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/cli/node"
 )
 
 const hostServiceHTTP = "http"
@@ -25,14 +25,14 @@ type HostServices struct {
 	ncint          *nats.Conn
 
 	hsServer *hs.HostServicesServer
-	config   *models.HostServicesConfig
+	config   *node.HostServicesConfig
 }
 
 func NewHostServices(
 	mgr *WorkloadManager,
 	ncint *nats.Conn,
 	ncHostServices *nats.Conn,
-	config *models.HostServicesConfig,
+	config *node.HostServicesConfig,
 	log *slog.Logger,
 ) *HostServices {
 	return &HostServices{

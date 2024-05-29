@@ -30,13 +30,11 @@ type ApiListener struct {
 }
 
 func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiListener {
-	config := node.config
-
-	efftags := config.Tags
+	efftags := node.nodeOpts.Up.Tags
 	efftags[controlapi.TagOS] = runtime.GOOS
 	efftags[controlapi.TagArch] = runtime.GOARCH
 	efftags[controlapi.TagCPUs] = strconv.FormatInt(int64(runtime.NumCPU()), 10)
-	if node.config.NoSandbox {
+	if node.nodeOpts.Up.NoSandbox {
 		efftags[controlapi.TagUnsafe] = "true"
 	}
 
@@ -239,7 +237,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	if !slices.Contains(api.node.config.WorkloadTypes, request.WorkloadType) {
+	if !slices.Contains(api.node.nodeOpts.Up.WorkloadTypes, request.WorkloadType) {
 		api.log.Error("This node does not support the given workload type", slog.String("workload_type", string(request.WorkloadType)))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", string(request.WorkloadType)))
 		return
@@ -268,7 +266,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	}
 
 	request.DecodedClaims = *decodedClaims
-	if !validateIssuer(request.DecodedClaims.Issuer, api.node.config.ValidIssuers) {
+	if !validateIssuer(request.DecodedClaims.Issuer, api.node.nodeOpts.Up.ValidIssuers) {
 		err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
 		api.log.Error("Workload validation failed", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
@@ -364,7 +362,7 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 		TargetXkey:      api.PublicXKey(),
 		Uptime:          myUptime(now.Sub(api.start)),
 		RunningMachines: len(machines),
-		Tags:            api.node.config.Tags,
+		Tags:            api.node.nodeOpts.Up.Tags,
 	}, nil)
 
 	raw, err := json.Marshal(res)
@@ -467,7 +465,7 @@ func (api *ApiListener) handleWorkloadPing(m *nats.Msg) {
 			Version:         Version(),
 			Uptime:          myUptime(now.Sub(api.start)),
 			RunningMachines: summaries,
-			Tags:            api.node.config.Tags,
+			Tags:            api.node.nodeOpts.Up.Tags,
 		}, nil)
 
 		raw, err := json.Marshal(res)
@@ -523,8 +521,8 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 		Version:                VERSION,
 		PublicXKey:             pubX,
 		Uptime:                 myUptime(now.Sub(api.start)),
-		Tags:                   api.node.config.Tags,
-		SupportedWorkloadTypes: api.node.config.WorkloadTypes,
+		Tags:                   api.node.nodeOpts.Up.Tags,
+		SupportedWorkloadTypes: api.node.nodeOpts.Up.WorkloadTypes,
 		Machines:               summarizeMachines(machines, namespace), // filters by namespace
 		Memory:                 stats,
 	}, nil)

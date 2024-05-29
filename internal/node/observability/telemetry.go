@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/cli/node"
 
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
@@ -51,7 +51,7 @@ type Telemetry struct {
 	Tracer trace.Tracer
 }
 
-func NewTelemetry(ctx context.Context, log *slog.Logger, config *models.NodeConfiguration, nodePubKey string) (*Telemetry, error) {
+func NewTelemetry(ctx context.Context, log *slog.Logger, config *node.OtelConfig, nodePubKey string) (*Telemetry, error) {
 	t := &Telemetry{
 		ctx:             ctx,
 		log:             log,

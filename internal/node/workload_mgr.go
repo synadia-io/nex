@@ -17,6 +17,7 @@ import (
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"github.com/synadia-io/nex/internal/node/processmanager"
@@ -39,7 +40,7 @@ const (
 // with them via the internal NATS server
 type WorkloadManager struct {
 	closing    uint32
-	config     *models.NodeConfiguration
+	config     *node.NodeOptions
 	kp         nkeys.KeyPair
 	log        *slog.Logger
 	nc         *nats.Conn
@@ -79,21 +80,17 @@ func NewWorkloadManager(
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
 	nc, ncint, ncHostServices *nats.Conn,
-	config *models.NodeConfiguration,
+	config *node.NodeOptions,
 	log *slog.Logger,
 	telemetry *observability.Telemetry,
 ) (*WorkloadManager, error) {
-	// Validate the node config
-	if !config.Validate() {
-		return nil, fmt.Errorf("failed to create new workload manager; invalid node config; %v", config.Errors)
-	}
 
 	w := &WorkloadManager{
 		config:           config,
 		cancel:           cancel,
 		ctx:              ctx,
 		handshakes:       make(map[string]string),
-		handshakeTimeout: time.Duration(config.AgentHandshakeTimeoutMillisecond) * time.Millisecond,
+		handshakeTimeout: time.Duration(config.Up.AgentHandshakeTimeoutMillisecond) * time.Millisecond,
 		kp:               nodeKeypair,
 		log:              log,
 		natsStoreDir:     defaultInternalNatsStoreDir,
@@ -118,7 +115,7 @@ func NewWorkloadManager(
 		return nil, err
 	}
 
-	w.hostServices = NewHostServices(w, ncint, ncHostServices, config.HostServicesConfiguration, w.log)
+	w.hostServices = NewHostServices(w, ncint, ncHostServices, config.Up.HostServicesConfig, w.log)
 	err = w.hostServices.init()
 	if err != nil {
 		w.log.Warn("Failed to initialize host services.", slog.Any("err", err))

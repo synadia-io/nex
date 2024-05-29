@@ -1,6 +1,6 @@
 module github.com/synadia-io/nex
 
-go 1.22.2
+go 1.22.3
 
 require (
 	dagger.io/dagger v0.11.2
@@ -44,6 +44,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.26.0
 	go.opentelemetry.io/otel/sdk/metric v1.26.0
 	go.opentelemetry.io/otel/trace v1.26.0
+	golang.org/x/net v0.24.0
 	golang.org/x/sys v0.20.0
 	golang.org/x/term v0.19.0
 	google.golang.org/grpc v1.63.2
@@ -138,7 +139,6 @@ require (
 	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f // indirect
 	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
