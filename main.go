@@ -44,7 +44,7 @@ func main() {
 		return
 	}
 
-	nCLI := cli.NewNexCLI(pk)
+	nCLI := cli.NewNexCLI(keypair)
 	cliCtx := kong.Parse(
 		&nCLI,
 		kong.Name("nex"),
@@ -70,7 +70,7 @@ func main() {
 	cliCtx.BindTo(nc, (*nats.Conn)(nil))
 	cliCtx.BindTo(ctx, (*context.Context)(nil))
 	cliCtx.BindTo(logger, (*slog.Logger)(nil))
-	err = cliCtx.Run(ctx, nc, logger, nCLI.Global)
+	err = cliCtx.Run(ctx, nc, logger, nCLI.Global, nCLI.Node)
 	cliCtx.FatalIfErrorf(err)
 }
 

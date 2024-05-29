@@ -4,8 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/synadia-io/nex/internal/cli/node"
-
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
 	metricsdk "go.opentelemetry.io/otel/sdk/metric"
@@ -15,6 +13,15 @@ import (
 )
 
 const defaultServiceName = "nex-node"
+
+type OtelConfig struct {
+	OtelMetrics         bool   `name:"metrics" default:"false" help:"Enables OTel Metrics" json:"up_otel_metrics_enabled"`
+	OtelMetricsPort     int    `default:"8085" json:"up_otel_metrics_port"`
+	OtelMetricsExporter string `default:"file" enum:"file,prometheus" json:"up_otel_metrics_exporter"`
+	OtelTraces          bool   `name:"traces" default:"false" help:"Enables OTel Traces" json:"up_otel_traces_enabled"`
+	OtelTracesExporter  string `default:"file" enum:"file,grpc,http" json:"up_otel_traces_exporter"`
+	OtlpExporterUrl     string `default:"127.0.0.1:14532" json:"up_otlp_exporter_url"`
+}
 
 type Telemetry struct {
 	ctx     context.Context
@@ -51,7 +58,7 @@ type Telemetry struct {
 	Tracer trace.Tracer
 }
 
-func NewTelemetry(ctx context.Context, log *slog.Logger, config *node.OtelConfig, nodePubKey string) (*Telemetry, error) {
+func NewTelemetry(ctx context.Context, log *slog.Logger, config OtelConfig, nodePubKey string) (*Telemetry, error) {
 	t := &Telemetry{
 		ctx:             ctx,
 		log:             log,
@@ -68,10 +75,8 @@ func NewTelemetry(ctx context.Context, log *slog.Logger, config *node.OtelConfig
 		traceProvider:   tnoop.NewTracerProvider(),
 	}
 
-	if buildData, ok := t.ctx.Value("build_data").(map[string]string); ok {
-		if _version, _ok := buildData["version"]; _ok {
-			t.version = &_version
-		}
+	if _version, ok := t.ctx.Value("VERSION").(string); ok {
+		t.version = &_version
 	}
 
 	err := t.initMetrics()

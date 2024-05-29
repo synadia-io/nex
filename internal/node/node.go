@@ -25,7 +25,6 @@ import (
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/internal/cli/globals"
-	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/observability"
 )
@@ -45,7 +44,7 @@ type NodeOptions struct {
 
 	NodeExtendedCmds `json:"-"`
 
-	ServerPublicKey string `kong:"-" json:"-"`
+	ServerPublicKey nkeys.KeyPair `kong:"-" json:"-"`
 }
 
 // Nex node process
@@ -62,7 +61,7 @@ type Node struct {
 	log *slog.Logger
 
 	globals     *globals.Globals
-	nodeOpts    *node.NodeOptions
+	nodeOpts    *NodeOptions
 	pidFilepath string
 
 	initOnce sync.Once
@@ -86,9 +85,8 @@ type Node struct {
 
 func NewNode(
 	nc *nats.Conn,
-	keypair nkeys.KeyPair,
 	opts *globals.Globals,
-	nodeOpts *node.NodeOptions,
+	nodeOpts *NodeOptions,
 	ctx context.Context,
 	cancelF context.CancelFunc,
 	log *slog.Logger) (*Node, error) {
@@ -104,17 +102,17 @@ func NewNode(
 	}
 
 	// TODO : this has been minimized to only run preflight
-	err := node.validateConfig()
+	// err := node.validateConfig()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create node: %s", err.Error())
+	// }
+
+	err := node.createPid()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create node: %s", err.Error())
 	}
 
-	err = node.createPid()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create node: %s", err.Error())
-	}
-
-	node.keypair = keypair
+	node.keypair = nodeOpts.ServerPublicKey
 	node.publicKey, err = node.keypair.PublicKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract public key: %s", err.Error())
@@ -244,7 +242,7 @@ func (n *Node) init() error {
 	var _err error
 
 	n.initOnce.Do(func() {
-		n.telemetry, _err = observability.NewTelemetry(n.ctx, n.log, n.nodeOpts.Up.OtelConfig, n.publicKey)
+		n.telemetry, _err = observability.NewTelemetry(n.ctx, n.log, *n.nodeOpts.Up.OtelConfig, n.publicKey)
 		if _err != nil {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", _err))
 			err = errors.Join(err, _err)
@@ -270,7 +268,7 @@ func (n *Node) init() error {
 		}
 
 		// start internal NATS server
-		_err = n.startInternalNATS()
+		_err = n.startInternalNATS(n.nodeOpts.Up.ProcessManagerConfig.InternalNodePort)
 		if _err != nil {
 			n.log.Error("Failed to start internal NATS server", slog.Any("err", _err))
 			err = errors.Join(err, fmt.Errorf("failed to start internal NATS server: %s", _err))
@@ -335,12 +333,12 @@ func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
 	return nil
 }
 
-func (n *Node) startInternalNATS() error {
+func (n *Node) startInternalNATS(inPort int) error {
 	var err error
 
 	n.natsint, err = server.NewServer(&server.Options{
 		Host:      "0.0.0.0",
-		Port:      -1,
+		Port:      inPort,
 		JetStream: true,
 		NoLog:     true,
 		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
@@ -354,12 +352,6 @@ func (n *Node) startInternalNATS() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse internal NATS client URL: %s", err)
 	}
-
-	p, err := strconv.Atoi(clientUrl.Port())
-	if err != nil {
-		return fmt.Errorf("failed to parse internal NATS client URL: %s", err)
-	}
-	n.nodeOpts.Up.InternalNodePort = p
 
 	n.ncint, err = nats.Connect("", nats.InProcessServer(n.natsint))
 	if err != nil {
@@ -388,6 +380,15 @@ func (n *Node) startInternalNATS() error {
 		return fmt.Errorf("failed to create internal object store: %s", err)
 	}
 
+	if inPort == -1 {
+		natsPort, err := strconv.Atoi(clientUrl.Port())
+		if err != nil {
+			n.log.Warn("failed to parse internal NATS port", slog.Any("err", err))
+			return nil
+		}
+
+		n.nodeOpts.Up.ProcessManagerConfig.InternalNodePort = natsPort
+	}
 	return nil
 }
 

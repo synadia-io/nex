@@ -13,7 +13,6 @@ import (
 
 	"github.com/rs/xid"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/node/observability"
 )
 
@@ -25,7 +24,7 @@ const (
 // spawned as children of the nex node
 type SpawningProcessManager struct {
 	closing     uint32
-	config      *node.NodeOptions
+	config      *ProcessManagerConfig
 	ctx         context.Context
 	stopMutexes map[string]*sync.Mutex
 	t           *observability.Telemetry
@@ -55,21 +54,20 @@ type spawnedProcess struct {
 
 func NewSpawningProcessManager(
 	log *slog.Logger,
-	config *node.NodeOptions,
+	config *ProcessManagerConfig,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
 ) (*SpawningProcessManager, error) {
 	return &SpawningProcessManager{
-		config: config,
-		t:      telemetry,
-		log:    log,
-		ctx:    ctx,
+		t:   telemetry,
+		log: log,
+		ctx: ctx,
 
 		stopMutexes: make(map[string]*sync.Mutex),
 
 		deployRequests: make(map[string]*agentapi.DeployRequest),
 		liveProcs:      make(map[string]*spawnedProcess),
-		warmProcs:      make(chan *spawnedProcess, config.Up.MachinePoolSize),
+		warmProcs:      make(chan *spawnedProcess, config.MachinePoolSize),
 	}, nil
 }
 
@@ -149,7 +147,7 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 		case <-s.ctx.Done():
 			return nil
 		default:
-			if len(s.warmProcs) == s.config.Up.MachinePoolSize {
+			if len(s.warmProcs) == s.config.MachinePoolSize {
 				time.Sleep(runloopSleepInterval)
 				continue
 			}
@@ -229,7 +227,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		fmt.Sprintf("NEX_WORKLOADID=%s", workloadID),
 		// can't use the CNI host because we don't use it in no-sandbox mode
 		"NEX_NODE_NATS_HOST=0.0.0.0",
-		fmt.Sprintf("NEX_NODE_NATS_PORT=%d", s.config.Up.InternalNodePort),
+		fmt.Sprintf("NEX_NODE_NATS_PORT=%d", s.config.InternalNodePort),
 	)
 
 	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: true}

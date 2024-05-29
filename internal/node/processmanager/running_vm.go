@@ -22,7 +22,6 @@ import (
 	"github.com/rs/xid"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	"github.com/synadia-io/nex/internal/cli/node"
 )
 
 // Represents an instance of a single firecracker VM containing the nex agent.
@@ -32,7 +31,7 @@ type runningFirecracker struct {
 	vmmID     string
 
 	closing         uint32
-	config          *node.NodeOptions
+	config          *ProcessManagerConfig
 	deployRequest   *agentapi.DeployRequest
 	ip              net.IP
 	log             *slog.Logger
@@ -89,7 +88,7 @@ func (vm *runningFirecracker) shutdown() {
 }
 
 // Create a VMM with a given set of options and start the VM
-func createAndStartVM(ctx context.Context, config *node.NodeOptions, log *slog.Logger) (*runningFirecracker, error) {
+func createAndStartVM(ctx context.Context, config *ProcessManagerConfig, log *slog.Logger) (*runningFirecracker, error) {
 	vmmID := xid.New().String()
 
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
@@ -98,7 +97,7 @@ func createAndStartVM(ctx context.Context, config *node.NodeOptions, log *slog.L
 		return nil, err
 	}
 
-	err = copy(config.Up.RootFsFilepath, *fcCfg.Drives[0].PathOnHost)
+	err = copy(config.RootFsFilepath, *fcCfg.Drives[0].PathOnHost)
 
 	if err != nil {
 		log.Error("Failed to copy rootfs to temp location", slog.Any("err", err))
@@ -163,8 +162,8 @@ func createAndStartVM(ctx context.Context, config *node.NodeOptions, log *slog.L
 		slog.Any("gateway", gw),
 		slog.String("netmask", mask.String()),
 		slog.String("hosttap", hosttap),
-		slog.String("nats_host", config.Up.InternalNodeHost),
-		slog.Int("nats_port", config.Up.InternalNodePort),
+		slog.String("nats_host", config.InternalNodeHost),
+		slog.Int("nats_port", config.InternalNodePort),
 	)
 
 	return &runningFirecracker{
@@ -188,7 +187,7 @@ func copy(src string, dst string) error {
 	return err
 }
 
-func generateFirecrackerConfig(id string, config *node.NodeOptions) (firecracker.Config, error) {
+func generateFirecrackerConfig(id string, config *ProcessManagerConfig) (firecracker.Config, error) {
 	socket := getSocketPath(id)
 	rootPath := getRootFsPath(id)
 
@@ -213,22 +212,22 @@ func generateFirecrackerConfig(id string, config *node.NodeOptions) (firecracker
 			// 	}),
 		}},
 		ForwardSignals:  make([]os.Signal, 0),
-		KernelImagePath: config.Up.KernelFilepath,
+		KernelImagePath: config.KernelFilepath,
 		LogPath:         fmt.Sprintf("%s.log", socket),
 		NetworkInterfaces: []firecracker.NetworkInterface{{
 			AllowMMDS: true,
 			// Use CNI to get dynamic IP
 			CNIConfiguration: &firecracker.CNIConfiguration{
-				BinPath:     config.Up.CNIDefinition.CniBinPaths,
-				IfName:      config.Up.CNIDefinition.CniInterfaceName,
-				NetworkName: config.Up.CNIDefinition.CniNetworkName,
+				BinPath:     config.CNIDefinition.CniBinPaths,
+				IfName:      config.CNIDefinition.CniInterfaceName,
+				NetworkName: config.CNIDefinition.CniNetworkName,
 			},
 			//OutRateLimiter: firecracker.NewRateLimiter(..., ...),
 			//InRateLimiter: firecracker.NewRateLimiter(..., ...),
 		}},
 		MachineCfg: models.MachineConfiguration{
-			VcpuCount:  firecracker.Int64(int64(config.Up.MachineTemplate.FirecrackerVcpuCount)),
-			MemSizeMib: firecracker.Int64(int64(config.Up.MachineTemplate.FirecrackerMemSizeMib)),
+			VcpuCount:  firecracker.Int64(int64(config.MachineTemplate.FirecrackerVcpuCount)),
+			MemSizeMib: firecracker.Int64(int64(config.MachineTemplate.FirecrackerMemSizeMib)),
 		},
 		MmdsVersion: firecracker.MMDSv2,
 		SocketPath:  socket,

@@ -17,7 +17,6 @@ import (
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"github.com/synadia-io/nex/internal/node/processmanager"
@@ -40,7 +39,7 @@ const (
 // with them via the internal NATS server
 type WorkloadManager struct {
 	closing    uint32
-	config     *node.NodeOptions
+	config     *NodeOptions
 	kp         nkeys.KeyPair
 	log        *slog.Logger
 	nc         *nats.Conn
@@ -80,7 +79,7 @@ func NewWorkloadManager(
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
 	nc, ncint, ncHostServices *nats.Conn,
-	config *node.NodeOptions,
+	config *NodeOptions,
 	log *slog.Logger,
 	telemetry *observability.Telemetry,
 ) (*WorkloadManager, error) {
@@ -109,7 +108,7 @@ func NewWorkloadManager(
 
 	var err error
 
-	w.procMan, err = processmanager.NewProcessManager(w.log, w.config, w.t, w.ctx)
+	w.procMan, err = processmanager.NewProcessManager(w.log, w.config.Up.ProcessManagerConfig, w.t, w.ctx)
 	if err != nil {
 		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
 		return nil, err

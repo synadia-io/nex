@@ -34,7 +34,7 @@ func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiList
 	efftags[controlapi.TagOS] = runtime.GOOS
 	efftags[controlapi.TagArch] = runtime.GOARCH
 	efftags[controlapi.TagCPUs] = strconv.FormatInt(int64(runtime.NumCPU()), 10)
-	if node.nodeOpts.Up.NoSandbox {
+	if node.nodeOpts.Up.ProcessManagerConfig.NoSandbox {
 		efftags[controlapi.TagUnsafe] = "true"
 	}
 

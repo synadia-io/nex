@@ -5,7 +5,6 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"github.com/synadia-io/nex/internal/node/processmanager"
 )
@@ -34,7 +33,7 @@ func (n *NodeProxy) Log() *slog.Logger {
 	return n.n.log
 }
 
-func (n *NodeProxy) NodeConfiguration() *node.NodeOptions {
+func (n *NodeProxy) NodeConfiguration() *NodeOptions {
 	return n.n.nodeOpts
 }
 
@@ -62,7 +61,7 @@ func (m *WorkloadManagerProxy) Log() *slog.Logger {
 	return m.m.log
 }
 
-func (m *WorkloadManagerProxy) NodeConfiguration() *node.NodeOptions {
+func (m *WorkloadManagerProxy) NodeConfiguration() *NodeOptions {
 	return m.m.config
 }
 

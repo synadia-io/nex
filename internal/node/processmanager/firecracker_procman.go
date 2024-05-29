@@ -15,7 +15,6 @@ import (
 	"time"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	"github.com/synadia-io/nex/internal/cli/node"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"go.opentelemetry.io/otel/attribute"
@@ -24,7 +23,7 @@ import (
 
 type FirecrackerProcessManager struct {
 	closing   uint32
-	config    *node.NodeOptions
+	config    *ProcessManagerConfig
 	ctx       context.Context
 	log       *slog.Logger
 	stopMutex map[string]*sync.Mutex
@@ -39,7 +38,7 @@ type FirecrackerProcessManager struct {
 
 func NewFirecrackerProcessManager(
 	log *slog.Logger,
-	config *node.NodeOptions,
+	config *ProcessManagerConfig,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
 ) (*FirecrackerProcessManager, error) {
@@ -50,7 +49,7 @@ func NewFirecrackerProcessManager(
 		ctx:    ctx,
 
 		allVMs:         make(map[string]*runningFirecracker),
-		warmVMs:        make(chan *runningFirecracker, config.Up.MachinePoolSize),
+		warmVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
 		stopMutex:      make(map[string]*sync.Mutex),
 		deployRequests: make(map[string]*agentapi.DeployRequest),
 	}, nil
@@ -134,7 +133,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 		}
 	}()
 
-	if !f.config.Up.PreserveNetwork {
+	if !f.config.PreserveNetwork {
 		err := f.resetCNI()
 		if err != nil {
 			f.log.Warn("Failed to reset network.", slog.Any("err", err))
@@ -146,7 +145,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 		case <-f.ctx.Done():
 			return nil
 		default:
-			if len(f.warmVMs) == f.config.Up.MachinePoolSize {
+			if len(f.warmVMs) == f.config.MachinePoolSize {
 				time.Sleep(runloopSleepInterval)
 				continue
 			}
@@ -264,8 +263,8 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
 	return vm.setMetadata(&agentapi.MachineMetadata{
 		Message:      models.StringOrNil("Host-supplied metadata"),
-		NodeNatsHost: &vm.config.Up.InternalNodeHost,
-		NodeNatsPort: &vm.config.Up.InternalNodePort,
+		NodeNatsHost: &vm.config.InternalNodeHost,
+		NodeNatsPort: &vm.config.InternalNodePort,
 		VmID:         &vm.vmmID,
 	})
 }

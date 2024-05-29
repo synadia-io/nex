@@ -8,6 +8,33 @@ import (
 
 const runloopSleepInterval = 100 * time.Millisecond
 
+type ProcessManagerConfig struct {
+	MachinePoolSize  int              `default:"1" json:"processmanager_machine_pool_size"`
+	NoSandbox        bool             `default:"false" json:"processmanager_no_sandbox"`
+	KernelFilepath   string           `placeholder:"./path/to/kernel" json:"processmanager_kernel_filepath"`
+	RootFsFilepath   string           `placeholder:"./path/to/rootfs" json:"processmanager_rootfs_filepath"`
+	InternalNodeHost string           `default:"192.168.127.1" json:"processmanager_internal_node_host"`
+	InternalNodePort int              `default:"-1" json:"processmanager_internal_node_port"`
+	PreserveNetwork  bool             `default:"true" json:"processmanager_preserve_network"`
+	CNIDefinition    *CNIDefinition   `embed:"" group:"CNI Configuration"`
+	MachineTemplate  *MachineTemplate `embed:"" group:"Firecracker Machine Configuration"`
+}
+
+// Defines the CPU and memory usage of a machine to be configured when it is added to the pool
+type MachineTemplate struct {
+	FirecrackerVcpuCount  int `default:"1" json:"machine_template_firecracker_cpu_count"`
+	FirecrackerMemSizeMib int `default:"256" json:"machine_template_firecracker_mem_size_mib"`
+}
+
+// Defines a reference to the CNI network name, which is defined and configured in a {network}.conflist file, as per
+// CNI convention
+type CNIDefinition struct {
+	CniBinPaths      []string `type:"existingdir" default:"/opt/cni/bin" json:"cni_bin_paths"`
+	CniInterfaceName string   `default:"veth0" json:"cni_interface_name"`
+	CniNetworkName   string   `default:"fcnet" json:"cni_network_name"`
+	CniSubnet        string   `default:"192.168.127.0/24" json:"cni_subnet"`
+}
+
 // Information about an agent process without regard to the implementation of the agent process manager
 type ProcessInfo struct {
 	DeployRequest *agentapi.DeployRequest
