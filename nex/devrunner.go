@@ -51,7 +51,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	var os, arch string
 	var err error
 
-	if RunOpts.WorkloadType == "elf" || RunOpts.WorkloadType == "native" {
+	if RunOpts.WorkloadType == "native" {
 		os, arch, err = validateBinary(DevRunOpts.Filename)
 		if err != nil {
 			logger.Error("failed to validate binary", slog.Any("err", err))
