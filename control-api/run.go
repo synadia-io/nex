@@ -203,9 +203,9 @@ func TriggerSubjects(triggerSubjects []string) RequestOption {
 }
 
 // Location of the workload. For files in NATS object stores, use nats://BUCKET/key
-func Location(fileUrl string) RequestOption {
+func Location(workloadUrl string) RequestOption {
 	return func(o requestOptions) requestOptions {
-		nurl, err := url.Parse(fileUrl)
+		nurl, err := url.Parse(workloadUrl)
 		if err != nil {
 			o.location = url.URL{}
 		} else {

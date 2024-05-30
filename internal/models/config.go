@@ -59,6 +59,7 @@ type NodeConfiguration struct {
 	ValidIssuers                     []string            `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []NexWorkload       `json:"workload_types,omitempty"`
 	HostServicesConfiguration        *HostServicesConfig `json:"host_services,omitempty"`
+	AutostartConfiguration           *AutostartConfig    `json:"autostart,omitempty"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
 	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`
@@ -76,6 +77,24 @@ type HostServicesConfig struct {
 type ServiceConfig struct {
 	Enabled       bool            `json:"enabled"`
 	Configuration json.RawMessage `json:"config"`
+}
+
+type AutostartConfig struct {
+	Workloads []AutostartDeployRequest `json:"workloads"`
+}
+
+type AutostartDeployRequest struct {
+	Name              string            `json:"name"`
+	Namespace         string            `json:"namespace"`
+	Argv              []string          `json:"argv,omitempty"`
+	Description       *string           `json:"description,omitempty"`
+	WorkloadType      NexWorkload       `json:"type"`
+	Location          string            `json:"location"`
+	IssuerSeed        string            `json:"issuer_seed"`
+	PublisherXKeySeed string            `json:"xkey_seed"`
+	JsDomain          *string           `json:"jsdomain,omitempty"`
+	Environment       map[string]string `json:"environment"`
+	TriggerSubjects   []string          `json:"trigger_subjects,omitempty"`
 }
 
 func (c *NodeConfiguration) Validate() bool {

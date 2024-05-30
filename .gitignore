@@ -33,6 +33,7 @@ nex/nex
 rootfs.ext4
 
 test/panicker/panicker
+pnats
 .idea
 
 _spec

@@ -1,0 +1,33 @@
+{
+    "default_resource_dir": "/tmp/wd",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "tags": {
+        "bootstrapper": "true"
+    },
+    "no_sandbox": true,
+    "autostart": {
+        "workloads": [
+            {
+                "name": "echofunctionjs",
+                "namespace": "default",
+                "description": "automatically started function",
+                "type": "v8",
+                "location": "nats://NEXCLIFILES/echofunctionjs",
+                "issuer_seed": "SAAIKXVKF7FXKVIMW4S6ILMZHH3422OI2GYAK33N6N6LLKUBU5EKMI5QKU",
+                "xkey_seed": "SXAOXATV432FNJOO7IR4D2GQI4CXVIFIVAUKVC7I5D5ANRAMLNSWD4JXTY",
+                "trigger_subjects": [
+                    "hello.function"
+                ]    
+            }
+
+        ]
+    }
+}
