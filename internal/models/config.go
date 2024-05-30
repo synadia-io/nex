@@ -21,6 +21,7 @@ const (
 	DefaultNodeVcpuCount                    = 1
 	DefaultOtelExporterUrl                  = "127.0.0.1:14532"
 	DefaultAgentHandshakeTimeoutMillisecond = 5000
+	DefaultAgentPingTimeoutMillisecond      = 750
 )
 
 var (
@@ -36,6 +37,7 @@ var (
 // as the virtual machines it produces
 type NodeConfiguration struct {
 	AgentHandshakeTimeoutMillisecond int                 `json:"agent_handshake_timeout_ms,omitempty"`
+	AgentPingTimeoutMillisecond      int                 `json:"agent_ping_timeout_ms,omitempty"`
 	BinPath                          []string            `json:"bin_path"`
 	CNI                              CNIDefinition       `json:"cni"`
 	DefaultResourceDir               string              `json:"default_resource_dir"`
@@ -127,6 +129,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 
 	config := NodeConfiguration{
 		AgentHandshakeTimeoutMillisecond: DefaultAgentHandshakeTimeoutMillisecond,
+		AgentPingTimeoutMillisecond:      DefaultAgentPingTimeoutMillisecond,
 		BinPath:                          DefaultBinPath,
 		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the agent.
 		// This is not necessarily the address on which the internal NATS server is actually listening inside the node.
