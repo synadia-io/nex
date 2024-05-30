@@ -138,9 +138,9 @@ func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
 
 	tbl := newTableWriter("NATS Execution Nodes")
 	if !listFull {
-		tbl.AddHeaders("ID", "Name", "Version", "Workloads")
+		tbl.AddHeaders("ID (* = Lameduck Mode)", "Name", "Version", "Workloads")
 	} else {
-		tbl.AddHeaders("Nexus", "ID", "Name", "Version", "Workloads", "Uptime", "Sandboxed", "OS", "Arch")
+		tbl.AddHeaders("Nexus", "ID (* = Lameduck Mode)", "Name", "Version", "Workloads", "Uptime", "Sandboxed", "OS", "Arch")
 	}
 
 	for _, node := range nodes {
@@ -149,7 +149,23 @@ func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
 			nodeName = "no-name"
 		}
 
-		row := []any{node.NodeId, nodeName, node.Version, node.RunningMachines}
+		ld, ok := node.Tags["nex.lameduck"]
+		if !ok {
+			ld = "false"
+		}
+		lameduck, err := strconv.ParseBool(ld)
+		if err != nil {
+			lameduck = false
+		}
+
+		nodeId := func() string {
+			if lameduck {
+				return node.NodeId + "*"
+			}
+			return node.NodeId
+		}()
+
+		row := []any{nodeId, nodeName, node.Version, node.RunningMachines}
 
 		if listFull {
 			nodeUnsafe, ok := node.Tags["nex.unsafe"]
@@ -173,6 +189,7 @@ func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
 
 		tbl.AddRow(row...)
 	}
+
 	tbl.writer.SortBy([]table.SortBy{
 		{Name: "Nexus", Mode: table.Asc},
 		{Name: "Name", Mode: table.Asc},
