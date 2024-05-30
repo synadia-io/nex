@@ -458,6 +458,12 @@ func (n *Node) handleAutostarts() {
 			controlapi.TriggerSubjects(autostart.TriggerSubjects),
 			controlapi.WorkloadDescription(*autostart.Description),
 		)
+		if err != nil {
+			n.log.Error("Failed to create deployment request for autostart workload",
+				slog.Any("error", err),
+			)
+			continue
+		}
 		_, err = request.Validate()
 		if err != nil {
 			n.log.Error("Failed to validate autostart deployment request",
