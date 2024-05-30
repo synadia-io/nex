@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -16,8 +17,10 @@ import (
 )
 
 const (
-	workloadCacheBucketName = "NEXCACHE"
-	workloadCacheFileKey    = "workload"
+	defaultInternalNatsConfigFile = "internalconf"
+	defaultInternalNatsStoreDir   = "pnats"
+	workloadCacheBucketName       = "NEXCACHE"
+	workloadCacheFileKey          = "workload"
 )
 
 type InternalNatsServer struct {
@@ -31,7 +34,7 @@ type InternalNatsServer struct {
 func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	opts := &server.Options{
 		JetStream: true,
-		StoreDir:  "pnats",
+		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
 		Port:      -1,
 		// Uncomment this when you want internal NATS server logs to be suppressed
 		// NoLog: true
@@ -86,7 +89,7 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 		server:           s,
 	}
 
-	go s.WaitForShutdown()
+	// go s.WaitForShutdown()
 
 	return &internalServer, nil
 }
@@ -117,10 +120,10 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 	s.serverConfigData.Users = append(s.serverConfigData.Users, ud)
 
 	opts := &server.Options{
-		JetStream:  true,
-		StoreDir:   "pnats",
-		Port:       s.lastOpts.Port,
 		ConfigFile: s.lastOpts.ConfigFile,
+		JetStream:  true,
+		Port:       s.lastOpts.Port,
+		StoreDir:   s.lastOpts.StoreDir,
 	}
 
 	updated, err := updateNatsOptions(opts, s.log, s.serverConfigData)
@@ -128,6 +131,7 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 		s.log.Error("Failed to update NATS options in internal server", slog.Any("error", err))
 		return nil, err
 	}
+
 	err = s.server.ReloadOptions(updated)
 	if err != nil {
 		s.log.Error("Failed to reload NATS internal server options", slog.Any("error", err))
@@ -250,7 +254,7 @@ func updateNatsOptions(opts *server.Options, log *slog.Logger, data internalServ
 
 	var f *os.File
 	if len(opts.ConfigFile) == 0 {
-		f, err = os.CreateTemp("", "internalconf")
+		f, err = os.CreateTemp(os.TempDir(), defaultInternalNatsConfigFile)
 	} else {
 		f, err = os.Create(opts.ConfigFile)
 	}

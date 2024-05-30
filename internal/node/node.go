@@ -352,11 +352,11 @@ func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
 
 func (n *Node) startInternalNATS() error {
 	var err error
-
 	n.natsint, err = internalnats.NewInternalNatsServer(n.log)
 	if err != nil {
 		return err
 	}
+
 	p := n.natsint.Port()
 	n.config.InternalNodePort = &p
 	n.ncint = n.natsint.Connection()
