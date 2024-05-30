@@ -61,7 +61,8 @@ type WorkloadManager struct {
 	pendingAgents map[string]*agentapi.AgentClient
 
 	handshakes       map[string]string
-	handshakeTimeout time.Duration // TODO: make configurable...
+	handshakeTimeout time.Duration
+	pingTimeout      time.Duration
 
 	hostServices *HostServices
 
@@ -71,8 +72,7 @@ type WorkloadManager struct {
 	// Subscriptions created on behalf of functions that cannot subscribe internallly
 	subz map[string][]*nats.Subscription
 
-	natsStoreDir string
-	publicKey    string
+	publicKey string
 }
 
 // Initialize a new workload manager instance to manage and communicate with agents
@@ -100,11 +100,11 @@ func NewWorkloadManager(
 		handshakeTimeout: time.Duration(config.AgentHandshakeTimeoutMillisecond) * time.Millisecond,
 		kp:               nodeKeypair,
 		log:              log,
-		natsStoreDir:     defaultInternalNatsStoreDir,
 		nc:               nc,
 		ncInternal:       ncint,
 		poolMutex:        &sync.Mutex{},
 		node:             node,
+		pingTimeout:      time.Duration(config.AgentPingTimeoutMillisecond) * time.Millisecond,
 		publicKey:        publicKey,
 		t:                telemetry,
 
@@ -149,7 +149,7 @@ func (m *WorkloadManager) CacheWorkload(natsint *internalnats.InternalNatsServer
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 
-	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.nc.Opts.Url))
+	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key))
 
 	opts := []nats.JSOpt{}
 	if request.JsDomain != nil {
@@ -427,11 +427,12 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 		clientConn,
 		w.log,
 		w.handshakeTimeout,
+		w.pingTimeout,
 		w.agentHandshakeTimedOut,
 		w.agentHandshakeSucceeded,
+		w.agentContactLost,
 		w.agentEvent,
 		w.agentLog,
-		w.agentContactLost,
 	)
 
 	err = agentClient.Start(id)

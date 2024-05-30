@@ -42,6 +42,7 @@ type AgentClient struct {
 	agentID           string
 	handshakeTimeout  time.Duration
 	handshakeReceived *atomic.Bool
+	pingTimeout       time.Duration
 	stopping          uint32
 
 	handshakeTimedOut  HandshakeCallback
@@ -59,23 +60,24 @@ type AgentClient struct {
 func NewAgentClient(
 	nc *nats.Conn,
 	log *slog.Logger,
-	handshakeTimeout time.Duration,
+	handshakeTimeout, pingTimeout time.Duration,
 	onTimedOut HandshakeCallback,
 	onSuccess HandshakeCallback,
+	onContactLost ContactLostCallback,
 	onEvent EventCallback,
 	onLog LogCallback,
-	onContactLost ContactLostCallback,
 ) *AgentClient {
 	return &AgentClient{
+		contactLost:        onContactLost,
 		eventReceived:      onEvent,
 		handshakeReceived:  &atomic.Bool{},
 		handshakeTimeout:   handshakeTimeout,
 		handshakeTimedOut:  onTimedOut,
 		handshakeSucceeded: onSuccess,
-		contactLost:        onContactLost,
 		log:                log,
 		logReceived:        onLog,
 		nc:                 nc,
+		pingTimeout:        pingTimeout,
 		subz:               make([]*nats.Subscription, 0),
 	}
 }
@@ -198,10 +200,11 @@ func (a *AgentClient) Undeploy() error {
 
 func (a *AgentClient) Ping() error {
 	subject := fmt.Sprintf("agentint.%s.ping", a.agentID)
+	a.log.Debug("pinging agent", slog.String("subject", subject))
 
-	_, err := a.nc.Request(subject, []byte{}, 750*time.Millisecond)
+	_, err := a.nc.Request(subject, []byte{}, a.pingTimeout)
 	if err != nil {
-		a.log.Warn("Agent failed to respond to ping", slog.Any("error", err))
+		a.log.Warn("agent failed to respond to ping", slog.Any("error", err))
 		return err
 	}
 
@@ -279,17 +282,16 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 }
 
 func (a *AgentClient) monitorAgent() {
-	ticker := time.NewTicker(15 * time.Second)
-	for {
+	ticker := time.NewTicker(5000 * time.Millisecond) // FIXME-- make configurable
+	defer ticker.Stop()
+
+	for !a.shuttingDown() {
 		<-ticker.C
 		err := a.Ping()
 		if err != nil {
 			if a.contactLost != nil {
 				a.contactLost(a.agentID)
 			}
-			break
-		}
-		if a.stopping > 0 {
 			break
 		}
 	}
