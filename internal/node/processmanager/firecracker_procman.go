@@ -48,10 +48,11 @@ func NewFirecrackerProcessManager(
 ) (*FirecrackerProcessManager, error) {
 
 	return &FirecrackerProcessManager{
-		config: config,
-		t:      telemetry,
-		log:    log,
-		ctx:    ctx,
+		config:  config,
+		intNats: intnats,
+		t:       telemetry,
+		log:     log,
+		ctx:     ctx,
 
 		allVMs:         make(map[string]*runningFirecracker),
 		warmVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
