@@ -345,6 +345,7 @@ func (a *Agent) handleUndeploy(m *nats.Msg) {
 }
 
 func (a *Agent) handlePing(m *nats.Msg) {
+	a.LogDebug(fmt.Sprintf("received ping on subject: %s", m.Subject))
 	_ = m.Respond([]byte("OK"))
 }
 
