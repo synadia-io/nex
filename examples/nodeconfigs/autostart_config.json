@@ -20,9 +20,7 @@
                 "namespace": "default",
                 "description": "automatically started function",
                 "type": "v8",
-                "location": "nats://NEXCLIFILES/echofunctionjs",
-                "issuer_seed": "SAAIKXVKF7FXKVIMW4S6ILMZHH3422OI2GYAK33N6N6LLKUBU5EKMI5QKU",
-                "xkey_seed": "SXAOXATV432FNJOO7IR4D2GQI4CXVIFIVAUKVC7I5D5ANRAMLNSWD4JXTY",
+                "location": "nats://NEXCLIFILES/echofunctionjs",                
                 "trigger_subjects": [
                     "hello.function"
                 ]    
