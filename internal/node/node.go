@@ -108,7 +108,7 @@ func NewNode(
 	}
 
 	// create issuer for signing ad hoc requests
-	node.issuerKeypair, err = nkeys.CreateAccount()
+	node.issuerKeypair, _ = nkeys.CreateAccount()
 
 	node.nexus = nodeOpts.NexusName
 	node.capabilities = *models.GetNodeCapabilities(node.config.Tags)
