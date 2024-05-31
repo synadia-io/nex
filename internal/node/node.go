@@ -58,9 +58,10 @@ type Node struct {
 
 	initOnce sync.Once
 
-	keypair   nkeys.KeyPair
-	publicKey string
-	nexus     string
+	keypair       nkeys.KeyPair
+	issuerKeypair nkeys.KeyPair
+	publicKey     string
+	nexus         string
 
 	natspub *server.Server
 	nc      *nats.Conn
@@ -105,6 +106,9 @@ func NewNode(
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract public key: %s", err.Error())
 	}
+
+	// create issuer for signing ad hoc requests
+	node.issuerKeypair, err = nkeys.CreateAccount()
 
 	node.nexus = nodeOpts.NexusName
 	node.capabilities = *models.GetNodeCapabilities(node.config.Tags)
@@ -428,29 +432,13 @@ func (n *Node) handleAutostarts() {
 	time.Sleep(2 * time.Second) // delay a bit before attempting autostarts
 
 	for _, autostart := range n.config.AutostartConfiguration.Workloads {
-		issuerKp, err := nkeys.FromSeed([]byte(autostart.IssuerSeed))
-		if err != nil {
-			n.log.Error("Failed to create issuer from autostart request seed",
-				slog.Any("error", err),
-				slog.String("seed", autostart.IssuerSeed),
-			)
-			continue
-		}
-		xkey, err := nkeys.FromCurveSeed([]byte(autostart.PublisherXKeySeed))
-		if err != nil {
-			n.log.Error("Failed to load publisher xkey seed",
-				slog.Any("error", err),
-				slog.String("seed", autostart.PublisherXKeySeed),
-			)
-			continue
-		}
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
 			controlapi.Environment(autostart.Environment),
 			controlapi.Essential(false), // avoid startup flapping, also not supported for funcs
-			controlapi.Issuer(issuerKp),
-			controlapi.SenderXKey(xkey),
+			controlapi.Issuer(n.issuerKeypair),
+			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),
 			controlapi.TargetPublicXKey(n.api.PublicXKey()),
 			controlapi.WorkloadName(autostart.Name),
