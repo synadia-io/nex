@@ -84,17 +84,15 @@ type AutostartConfig struct {
 }
 
 type AutostartDeployRequest struct {
-	Name              string            `json:"name"`
-	Namespace         string            `json:"namespace"`
-	Argv              []string          `json:"argv,omitempty"`
-	Description       *string           `json:"description,omitempty"`
-	WorkloadType      NexWorkload       `json:"type"`
-	Location          string            `json:"location"`
-	IssuerSeed        string            `json:"issuer_seed"`
-	PublisherXKeySeed string            `json:"xkey_seed"`
-	JsDomain          *string           `json:"jsdomain,omitempty"`
-	Environment       map[string]string `json:"environment"`
-	TriggerSubjects   []string          `json:"trigger_subjects,omitempty"`
+	Name            string            `json:"name"`
+	Namespace       string            `json:"namespace"`
+	Argv            []string          `json:"argv,omitempty"`
+	Description     *string           `json:"description,omitempty"`
+	WorkloadType    NexWorkload       `json:"type"`
+	Location        string            `json:"location"`
+	JsDomain        *string           `json:"jsdomain,omitempty"`
+	Environment     map[string]string `json:"environment"`
+	TriggerSubjects []string          `json:"trigger_subjects,omitempty"`
 }
 
 func (c *NodeConfiguration) Validate() bool {
