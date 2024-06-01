@@ -189,7 +189,6 @@ func (api *ApiListener) handleAuction(m *nats.Msg) {
 
 	if filter {
 		api.log.Debug("Node not viable for deploy request specified at auction")
-		_ = m.Ack()
 		return
 	}
 

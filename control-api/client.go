@@ -1,9 +1,9 @@
 package controlapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -172,27 +172,25 @@ func (api *Client) Auction(req *AuctionRequest) ([]AuctionResponse, error) {
 	responses := make([]AuctionResponse, 0)
 
 	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
-		if !bytes.EqualFold(m.Data, []byte{43, 65, 67, 75}) {
-			env, err := extractEnvelope(m.Data)
-			if err != nil {
-				api.log.Error("failed to extract envelope", slog.Any("err", err), slog.Any("nats_msg.Data", m.Data))
-				return
-			}
-
-			var resp AuctionResponse
-			bytes, err := json.Marshal(env.Data)
-			if err != nil {
-				api.log.Error("failed to marshal envelope data", slog.Any("err", err))
-				return
-			}
-
-			err = json.Unmarshal(bytes, &resp)
-			if err != nil {
-				api.log.Error("failed to unmarshal auction response", slog.Any("err", err))
-				return
-			}
-			responses = append(responses, resp)
+		env, err := extractEnvelope(m.Data)
+		if err != nil {
+			api.log.Error("failed to extract envelope", slog.Any("err", err), slog.Any("nats_msg.Data", m.Data))
+			return
 		}
+
+		var resp AuctionResponse
+		bytes, err := json.Marshal(env.Data)
+		if err != nil {
+			api.log.Error("failed to marshal envelope data", slog.Any("err", err))
+			return
+		}
+
+		err = json.Unmarshal(bytes, &resp)
+		if err != nil {
+			api.log.Error("failed to unmarshal auction response", slog.Any("err", err))
+			return
+		}
+		responses = append(responses, resp)
 	})
 	if err != nil {
 		api.log.Error("failed to subscribe", slog.Any("err", err))
@@ -246,6 +244,7 @@ func (api *Client) PingNodes() ([]PingResponse, error) {
 		}
 		responses = append(responses, resp)
 	})
+
 	if err != nil {
 		api.log.Error("failed to subscribe", slog.Any("err", err))
 		return nil, err
@@ -410,6 +409,9 @@ func (api *Client) performRequest(subject string, raw interface{}) ([]byte, erro
 }
 
 func extractEnvelope(data []byte) (*Envelope, error) {
+	if len(data) == 0 {
+		return nil, errors.New("no data for envelope")
+	}
 	var env Envelope
 	err := json.Unmarshal(data, &env)
 	if err != nil {
