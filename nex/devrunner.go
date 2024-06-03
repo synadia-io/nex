@@ -159,9 +159,17 @@ func randomNode(nodeClient *controlapi.Client, arch, os string, workloadType mod
 }
 
 func auction(nodeClient *controlapi.Client, os, arch string, workloadType models.NexWorkload) ([]controlapi.AuctionResponse, error) {
+	var _os, _arch *string
+	if os != "" {
+		_os = &os
+	}
+	if arch != "" {
+		_arch = &arch
+	}
+
 	candidates, err := nodeClient.Auction(&controlapi.AuctionRequest{
-		Arch:          &arch,
-		OS:            &os,
+		Arch:          _arch,
+		OS:            _os,
 		WorkloadTypes: []models.NexWorkload{workloadType},
 	})
 	if err != nil {
