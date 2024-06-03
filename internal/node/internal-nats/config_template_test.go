@@ -19,7 +19,8 @@ import (
 func TestTemplateGenerator(t *testing.T) {
 
 	data := internalServerData{
-		Users: make([]userData, 0),
+		Credentials: map[string]*credentials{},
+		Users:       make([]credentials, 0),
 	}
 
 	hostUser, _ := nkeys.CreateUser()
@@ -34,14 +35,14 @@ func TestTemplateGenerator(t *testing.T) {
 		seed, _ := userSeed.Seed()
 		seedPub, _ := userSeed.PublicKey()
 
-		data.Users = append(data.Users, userData{
+		data.Users = append(data.Users, credentials{
 			WorkloadID: nuid.Next(),
 			NkeySeed:   string(seed),
 			NkeyPublic: seedPub,
 		})
 	}
 
-	bytes, err := GenerateFile(slog.Default(), data)
+	bytes, err := GenerateTemplate(slog.Default(), data)
 	if err != nil {
 		t.Fatalf("failed to render template: %s", err)
 	}

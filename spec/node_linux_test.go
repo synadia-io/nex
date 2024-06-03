@@ -320,14 +320,6 @@ var _ = Describe("nex node", func() {
 						Expect(nodeProxy.NodeConfiguration()).ToNot(BeNil()) // FIXME-- assert that it is === to the current nex node config JSON
 					})
 
-					It("should initialize an internal NATS server for private communication between running VMs and the host", func(ctx SpecContext) {
-						Expect(nodeProxy.InternalNATS()).ToNot(BeNil())
-					})
-
-					It("should initialize a connection to the internal NATS server", func(ctx SpecContext) {
-						Expect(nodeProxy.InternalNATSConn()).ToNot(BeNil())
-					})
-
 					It("should initialize a machine manager to manage firecracker VMs and communicate with running agents", func(ctx SpecContext) {
 						Expect(nodeProxy.WorkloadManager()).ToNot(BeNil())
 					})
@@ -434,8 +426,12 @@ var _ = Describe("nex node", func() {
 							Expect(managerProxy.NodeConfiguration()).To(Equal(nodeProxy.NodeConfiguration())) // FIXME-- assert that it is === to the current nex node config JSON
 						})
 
-						It("should receive a reference to the internal NATS server connection", func(ctx SpecContext) {
-							Expect(managerProxy.InternalNATSConn()).To(Equal(nodeProxy.InternalNATSConn()))
+						It("should initialize an internal NATS server for private communication between running VMs and the host", func(ctx SpecContext) {
+							Expect(managerProxy.InternalNATS()).ToNot(BeNil())
+						})
+
+						It("should initialize a connection to the internal NATS server", func(ctx SpecContext) {
+							Expect(managerProxy.InternalNATSConn()).ToNot(BeNil())
 						})
 
 						It("should receive a reference to the telemetry instance", func(ctx SpecContext) {
@@ -447,7 +443,7 @@ var _ = Describe("nex node", func() {
 								It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
 									workloads, _ := nodeProxy.WorkloadManager().RunningWorkloads()
 									for _, workload := range workloads {
-										subsz, _ := nodeProxy.InternalNATS().Subsz(&server.SubszOptions{
+										subsz, _ := managerProxy.InternalNATS().Subsz(&server.SubszOptions{
 											Subscriptions: true,
 											Test:          fmt.Sprintf("agentint.%s.handshake", workload.Id),
 										})

@@ -29,6 +29,7 @@ type ApiListener struct {
 	subz []*nats.Subscription
 }
 
+// FIXME-- stop passing node here
 func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiListener {
 	config := node.config
 
@@ -283,7 +284,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 	workloadID := agentClient.ID()
 
-	numBytes, workloadHash, err := api.mgr.CacheWorkload(api.node.natsint, workloadID, &request)
+	numBytes, workloadHash, err := api.mgr.CacheWorkload(workloadID, &request)
 	if err != nil {
 		api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))

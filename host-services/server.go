@@ -15,18 +15,18 @@ import (
 )
 
 type HostServicesServer struct {
-	log        *slog.Logger
-	ncInternal *nats.Conn
-	services   map[string]HostService
-	tracer     trace.Tracer
+	log      *slog.Logger
+	nc       *nats.Conn
+	services map[string]HostService
+	tracer   trace.Tracer
 }
 
 func NewHostServicesServer(nc *nats.Conn, log *slog.Logger, tracer trace.Tracer) *HostServicesServer {
 	return &HostServicesServer{
-		ncInternal: nc,
-		log:        log,
-		services:   make(map[string]HostService),
-		tracer:     tracer,
+		log:      log,
+		nc:       nc,
+		services: make(map[string]HostService),
+		tracer:   tracer,
 	}
 }
 
@@ -50,7 +50,7 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config jso
 }
 
 func (h *HostServicesServer) Start() error {
-	_, err := h.ncInternal.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
+	_, err := h.nc.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
 		return err
 	}

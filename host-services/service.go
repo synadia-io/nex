@@ -43,10 +43,13 @@ func ServiceResultPass(code uint, message string, data []byte) ServiceResult {
 
 type HostService interface {
 	Initialize(json.RawMessage) error
-	HandleRequest(namespace string,
+
+	HandleRequest(
+		namespace string,
 		workloadId string,
 		method string,
 		workloadName string,
 		metadata map[string]string,
-		request []byte) (ServiceResult, error)
+		request []byte,
+	) (ServiceResult, error)
 }

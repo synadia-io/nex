@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -23,15 +22,12 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
-	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 )
 
 const (
 	systemNamespace              = "system"
-	defaultInternalNatsStoreDir  = "pnats"
 	heartbeatInterval            = 30 * time.Second
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
@@ -66,8 +62,8 @@ type Node struct {
 	natspub *server.Server
 	nc      *nats.Conn
 
-	natsint        *internalnats.InternalNatsServer
-	ncint          *nats.Conn
+	// natsint        *internalnats.InternalNatsServer
+	// ncint          *nats.Conn
 	ncHostServices *nats.Conn
 
 	startedAt time.Time
@@ -270,31 +266,18 @@ func (n *Node) init() error {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
-		_err = n.startHostServicesConnection(n.nc)
-		if _err != nil {
-			n.log.Error("Failed to start host services connection", slog.Any("error", _err))
-			err = errors.Join(err, fmt.Errorf("failed to start host services NATS connection: %s", _err))
-		} else {
-			n.log.Info("Established host services NATS connection", slog.String("server", n.ncHostServices.Servers()[0]))
-		}
-
-		// start internal NATS server
-		_err = n.startInternalNATS()
-		if _err != nil {
-			n.log.Error("Failed to start internal NATS server", slog.Any("err", _err))
-			err = errors.Join(err, fmt.Errorf("failed to start internal NATS server: %s", _err))
-		} else {
-			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
-		}
-
 		n.manager, _err = NewWorkloadManager(
-			n.ctx, n,
+			n.ctx,
 			n.cancelF,
-			n.keypair, n.publicKey,
-			n.nc, n.ncint, n.ncHostServices,
-			n.config, n.log, n.telemetry)
+			n.keypair,
+			n.publicKey,
+			n.nc,
+			n.config,
+			n.log,
+			n.telemetry,
+		)
 		if _err != nil {
-			n.log.Error("Failed to initialize machine manager", slog.Any("err", _err))
+			n.log.Error("Failed to initialize workload manager", slog.Any("err", _err))
 			err = errors.Join(err, _err)
 		}
 
@@ -318,50 +301,6 @@ func (n *Node) init() error {
 	})
 
 	return err
-}
-
-func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
-	if n.config.HostServicesConfiguration != nil {
-		natsOpts := []nats.Option{
-			nats.Name("nex-hostservices"),
-		}
-		if len(n.config.HostServicesConfiguration.NatsUserJwt) > 0 {
-			natsOpts = append(natsOpts,
-				nats.UserJWTAndSeed(
-					n.config.HostServicesConfiguration.NatsUserJwt,
-					n.config.HostServicesConfiguration.NatsUserSeed,
-				),
-			)
-		}
-
-		if len(n.config.HostServicesConfiguration.NatsUrl) == 0 {
-			n.config.HostServicesConfiguration.NatsUrl = defaultConnection.Servers()[0]
-			n.ncHostServices = n.nc
-		} else {
-			nc, err := nats.Connect(n.config.HostServicesConfiguration.NatsUrl, natsOpts...)
-			if err != nil {
-				return err
-			}
-			n.ncHostServices = nc
-		}
-	} else {
-		n.ncHostServices = n.nc
-	}
-	return nil
-}
-
-func (n *Node) startInternalNATS() error {
-	var err error
-	n.natsint, err = internalnats.NewInternalNatsServer(n.log)
-	if err != nil {
-		return err
-	}
-
-	p := n.natsint.Port()
-	n.config.InternalNodePort = &p
-	n.ncint = n.natsint.Connection()
-
-	return nil
 }
 
 func (n *Node) startPublicNATS() error {
@@ -388,84 +327,85 @@ func (n *Node) startPublicNATS() error {
 }
 
 func (n *Node) handleAutostarts() {
-	time.Sleep(2 * time.Second) // delay a bit before attempting autostarts
+	// FIXME-- the signatures here were broken...
+	// time.Sleep(2 * time.Second) // delay a bit before attempting autostarts
 
-	for _, autostart := range n.config.AutostartConfiguration.Workloads {
-		request, err := controlapi.NewDeployRequest(
-			controlapi.Argv(autostart.Argv),
-			controlapi.Location(autostart.Location),
-			controlapi.Environment(autostart.Environment),
-			controlapi.Essential(false), // avoid startup flapping, also not supported for funcs
-			controlapi.Issuer(n.issuerKeypair),
-			controlapi.SenderXKey(n.api.xk),
-			controlapi.TargetNode(n.publicKey),
-			controlapi.TargetPublicXKey(n.api.PublicXKey()),
-			controlapi.WorkloadName(autostart.Name),
-			controlapi.WorkloadType(autostart.WorkloadType),
-			controlapi.TriggerSubjects(autostart.TriggerSubjects),
-			controlapi.WorkloadDescription(*autostart.Description),
-		)
-		if err != nil {
-			n.log.Error("Failed to create deployment request for autostart workload",
-				slog.Any("error", err),
-			)
-			continue
-		}
-		_, err = request.Validate()
-		if err != nil {
-			n.log.Error("Failed to validate autostart deployment request",
-				slog.Any("error", err),
-			)
-			continue
-		}
-		agentDeployRequest := &agentapi.DeployRequest{
-			Argv:                 request.Argv,
-			DecodedClaims:        request.DecodedClaims,
-			Description:          request.Description,
-			EncryptedEnvironment: request.Environment,
-			Environment:          request.WorkloadEnvironment,
-			Essential:            request.Essential,
-			JsDomain:             request.JsDomain,
-			Location:             request.Location,
-			Namespace:            &autostart.Namespace,
-			RetryCount:           request.RetryCount,
-			RetriedAt:            request.RetriedAt,
-			SenderPublicKey:      request.SenderPublicKey,
-			TargetNode:           request.TargetNode,
-			TriggerSubjects:      request.TriggerSubjects,
-			WorkloadName:         &request.DecodedClaims.Subject,
-			WorkloadType:         request.WorkloadType,
-			WorkloadJwt:          request.WorkloadJwt,
-		}
+	// for _, autostart := range n.config.AutostartConfiguration.Workloads {
+	// 	request, err := controlapi.NewDeployRequest(
+	// 		controlapi.Argv(autostart.Argv),
+	// 		controlapi.Location(autostart.Location),
+	// 		controlapi.Environment(autostart.Environment),
+	// 		controlapi.Essential(false), // avoid startup flapping, also not supported for funcs
+	// 		controlapi.Issuer(n.issuerKeypair),
+	// 		controlapi.SenderXKey(n.api.xk),
+	// 		controlapi.TargetNode(n.publicKey),
+	// 		controlapi.TargetPublicXKey(n.api.PublicXKey()),
+	// 		controlapi.WorkloadName(autostart.Name),
+	// 		controlapi.WorkloadType(autostart.WorkloadType),
+	// 		controlapi.TriggerSubjects(autostart.TriggerSubjects),
+	// 		controlapi.WorkloadDescription(*autostart.Description),
+	// 	)
+	// 	if err != nil {
+	// 		n.log.Error("Failed to create deployment request for autostart workload",
+	// 			slog.Any("error", err),
+	// 		)
+	// 		continue
+	// 	}
+	// 	_, err = request.Validate()
+	// 	if err != nil {
+	// 		n.log.Error("Failed to validate autostart deployment request",
+	// 			slog.Any("error", err),
+	// 		)
+	// 		continue
+	// 	}
+	// 	agentDeployRequest := &agentapi.DeployRequest{
+	// 		Argv:                 request.Argv,
+	// 		DecodedClaims:        request.DecodedClaims,
+	// 		Description:          request.Description,
+	// 		EncryptedEnvironment: request.Environment,
+	// 		Environment:          request.WorkloadEnvironment,
+	// 		Essential:            request.Essential,
+	// 		JsDomain:             request.JsDomain,
+	// 		Location:             request.Location,
+	// 		Namespace:            &autostart.Namespace,
+	// 		RetryCount:           request.RetryCount,
+	// 		RetriedAt:            request.RetriedAt,
+	// 		SenderPublicKey:      request.SenderPublicKey,
+	// 		TargetNode:           request.TargetNode,
+	// 		TriggerSubjects:      request.TriggerSubjects,
+	// 		WorkloadName:         &request.DecodedClaims.Subject,
+	// 		WorkloadType:         request.WorkloadType,
+	// 		WorkloadJwt:          request.WorkloadJwt,
+	// 	}
 
-		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(request)
-		if err != nil {
-			n.api.log.Error("Failed to cache auto-start workload bytes",
-				slog.Any("err", err),
-				slog.String("name", autostart.Name),
-				slog.String("namespace", autostart.Namespace),
-				slog.String("url", autostart.Location),
-			)
-			continue
-		}
-		agentDeployRequest.TotalBytes = int64(numBytes)
-		agentDeployRequest.Hash = *workloadHash
+	// 	numBytes, workloadHash, err := n.api.mgr.CacheWorkload(request)
+	// 	if err != nil {
+	// 		n.api.log.Error("Failed to cache auto-start workload bytes",
+	// 			slog.Any("err", err),
+	// 			slog.String("name", autostart.Name),
+	// 			slog.String("namespace", autostart.Namespace),
+	// 			slog.String("url", autostart.Location),
+	// 		)
+	// 		continue
+	// 	}
+	// 	agentDeployRequest.TotalBytes = int64(numBytes)
+	// 	agentDeployRequest.Hash = *workloadHash
 
-		workloadId, err := n.api.mgr.DeployWorkload(agentDeployRequest)
-		if err != nil {
-			n.log.Error("Failed to deploy autostart workload",
-				slog.Any("error", err),
-				slog.String("name", autostart.Name),
-				slog.String("namespace", autostart.Namespace),
-			)
-			continue
-		}
-		n.log.Info("Autostart workload started",
-			slog.String("name", autostart.Name),
-			slog.String("namespace", autostart.Namespace),
-			slog.String("workload_id", *workloadId),
-		)
-	}
+	// 	workloadId, err := n.api.mgr.DeployWorkload(agentDeployRequest)
+	// 	if err != nil {
+	// 		n.log.Error("Failed to deploy autostart workload",
+	// 			slog.Any("error", err),
+	// 			slog.String("name", autostart.Name),
+	// 			slog.String("namespace", autostart.Namespace),
+	// 		)
+	// 		continue
+	// 	}
+	// 	n.log.Info("Autostart workload started",
+	// 		slog.String("name", autostart.Name),
+	// 		slog.String("namespace", autostart.Namespace),
+	// 		slog.String("workload_id", *workloadId),
+	// 	)
+	// }
 }
 
 func (n *Node) loadNodeConfig() error {
@@ -592,19 +532,10 @@ func (n *Node) shutdown() {
 			_ = n.publishNodeStopped()
 		}
 
-		_ = n.ncint.Drain()
-		for !n.ncint.IsClosed() {
-			time.Sleep(time.Millisecond * 25)
-		}
-
 		_ = n.nc.Drain()
 		for !n.nc.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
 		}
-
-		n.natsint.Shutdown()
-		n.natsint.WaitForShutdown()
-		_ = os.Remove(path.Join(os.TempDir(), defaultInternalNatsStoreDir))
 
 		if n.natspub != nil {
 			n.natspub.Shutdown()

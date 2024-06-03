@@ -41,10 +41,12 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	}
 
 	data := internalServerData{
-		Users:             make([]userData, 0),
+		Credentials:       map[string]*credentials{},
 		NexHostUserPublic: "",
 		NexHostUserSeed:   "",
+		Users:             make([]credentials, 0),
 	}
+
 	hostUser, _ := nkeys.CreateUser()
 	hostPub, _ := hostUser.PublicKey()
 	hostSeed, _ := hostUser.Seed()
@@ -90,8 +92,6 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 		server:           s,
 	}
 
-	// go s.WaitForShutdown()
-
 	return &internalServer, nil
 }
 
@@ -106,19 +106,21 @@ func (s *InternalNatsServer) Subsz(opts *server.SubszOptions) (*server.Subsz, er
 // Returns a user keypair that can be used to log into the internal server
 // as the given workload
 func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.KeyPair, error) {
-	userPair, err := nkeys.CreateUser()
+	kp, err := nkeys.CreateUser()
 	if err != nil {
 		s.log.Error("Failed to create nkey user", slog.Any("error", err))
 		return nil, err
 	}
-	pk, _ := userPair.PublicKey()
-	seed, _ := userPair.Seed()
-	ud := userData{
-		WorkloadID: workloadID,
+
+	pk, _ := kp.PublicKey()
+	seed, _ := kp.Seed()
+
+	creds := &credentials{
 		NkeySeed:   string(seed),
 		NkeyPublic: pk,
+		WorkloadID: workloadID,
 	}
-	s.serverConfigData.Users = append(s.serverConfigData.Users, ud)
+	s.serverConfigData.Credentials[workloadID] = creds
 
 	opts := &server.Options{
 		ConfigFile: s.lastOpts.ConfigFile,
@@ -139,21 +141,21 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 		return nil, err
 	}
 
-	nc, err := s.ConnectionForUser(&ud)
+	nc, err := s.ConnectionWithCredentials(creds)
 	if err != nil {
-		s.log.Error("Failed to obtain connection for workload-user", slog.Any("error", err))
+		s.log.Error("Failed to obtain connection for given credentials", slog.Any("error", err))
 		return nil, err
 	}
 
 	_, err = ensureWorkloadObjectStore(nc)
 	if err != nil {
-		s.log.Error("Failed to create or locate the workload object store in internal NATS server",
+		s.log.Error("Failed to create or locate object store in internal NATS server",
 			slog.Any("error", err),
 		)
 		return nil, err
 	}
 
-	return userPair, nil
+	return kp, nil
 }
 
 func (s *InternalNatsServer) ClientURL() string {
@@ -172,18 +174,20 @@ func (s *InternalNatsServer) WaitForShutdown() {
 	s.server.WaitForShutdown()
 }
 
-func (s *InternalNatsServer) StoreFileForWorkload(workloadId string, bytes []byte) error {
+func (s *InternalNatsServer) StoreFileForID(id string, bytes []byte) error {
 	ctx, cancelF := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancelF()
 
-	ud, err := s.FindWorkload(workloadId)
+	creds, err := s.FindCredentials(id)
 	if err != nil {
 		return err
 	}
-	nc, err := s.ConnectionForUser(ud)
+
+	nc, err := s.ConnectionWithCredentials(creds)
 	if err != nil {
 		return err
 	}
+
 	bucket, err := ensureWorkloadObjectStore(nc)
 	if err != nil {
 		return err
@@ -193,28 +197,36 @@ func (s *InternalNatsServer) StoreFileForWorkload(workloadId string, bytes []byt
 	return err
 }
 
-func (s *InternalNatsServer) ConnectionForUser(ud *userData) (*nats.Conn, error) {
-	pair, err := nkeys.FromSeed([]byte(ud.NkeySeed))
+func (s *InternalNatsServer) ConnectionWithID(id string) (*nats.Conn, error) {
+	creds, err := s.FindCredentials(id)
 	if err != nil {
 		return nil, err
 	}
 
-	nc, err := nats.Connect(s.server.ClientURL(), nats.Nkey(ud.NkeyPublic, func(b []byte) ([]byte, error) {
-		s.log.Debug("Attempting to sign NATS server nonce for internal workload user connection", slog.String("public_key", ud.NkeyPublic))
+	return s.ConnectionWithCredentials(creds)
+}
+
+func (s *InternalNatsServer) ConnectionWithCredentials(creds *credentials) (*nats.Conn, error) {
+	pair, err := nkeys.FromSeed([]byte(creds.NkeySeed))
+	if err != nil {
+		return nil, err
+	}
+
+	nc, err := nats.Connect(s.server.ClientURL(), nats.Nkey(creds.NkeyPublic, func(b []byte) ([]byte, error) {
+		s.log.Debug("Attempting to sign NATS server nonce for internal connection", slog.String("public_key", creds.NkeyPublic))
 		return pair.Sign(b)
 	}))
 	if err != nil {
-		s.log.Warn("Failed to sign NATS server nonce for internal workload user connection", slog.String("public_key", ud.NkeyPublic))
+		s.log.Warn("Failed to sign NATS server nonce for internal connection", slog.String("public_key", creds.NkeyPublic))
 		return nil, err
 	}
+
 	return nc, nil
 }
 
-func (s *InternalNatsServer) FindWorkload(workloadId string) (*userData, error) {
-	for _, v := range s.serverConfigData.Users {
-		if v.WorkloadID == workloadId {
-			return &v, nil
-		}
+func (s *InternalNatsServer) FindCredentials(id string) (*credentials, error) {
+	if creds, ok := s.serverConfigData.Credentials[id]; ok {
+		return creds, nil
 	}
 
 	return nil, errors.New("No such workload")
@@ -250,7 +262,7 @@ func ensureWorkloadObjectStore(nc *nats.Conn) (jetstream.ObjectStore, error) {
 }
 
 func updateNatsOptions(opts *server.Options, log *slog.Logger, data internalServerData) (*server.Options, error) {
-	bytes, err := GenerateFile(log, data)
+	bytes, err := GenerateTemplate(log, data)
 	if err != nil {
 		log.Error("Failed to generate internal nats server config file", slog.Any("error", err))
 		return nil, err

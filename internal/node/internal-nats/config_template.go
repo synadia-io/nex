@@ -7,12 +7,13 @@ import (
 )
 
 type internalServerData struct {
-	Users             []userData
+	Credentials       map[string]*credentials
 	NexHostUserPublic string
 	NexHostUserSeed   string
+	Users             []credentials
 }
 
-type userData struct {
+type credentials struct {
 	WorkloadID string
 	NkeySeed   string
 	NkeyPublic string
@@ -41,9 +42,9 @@ accounts: {
 			}
 		],
 		imports: [
-			{{range .Users }}
+			{{ range .Users }}
 			{
-				stream: {subject: agentevt.>, account: {{ .WorkloadID }}}, prefix: {{ .WorkloadID }} 
+				stream: {subject: agentevt.>, account: {{ .WorkloadID }}}, prefix: {{ .WorkloadID }}
 			},
 			{{ end }}
 		]	
@@ -67,71 +68,15 @@ no_sys_acc: true
 `
 )
 
-func GenerateFile(log *slog.Logger, config internalServerData) ([]byte, error) {
-	t := template.Must(template.New("natsconfig").Parse(configTemplate))
-
+func GenerateTemplate(log *slog.Logger, config internalServerData) ([]byte, error) {
 	var wr bytes.Buffer
+
+	t := template.Must(template.New("natsconfig").Parse(configTemplate))
 	err := t.Execute(&wr, config)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Debug("generated NATS config", slog.String("config", string(wr.Bytes())))
 	return wr.Bytes(), nil
 }
-
-/*
-exports: [
-			{
-				service: agentint.>
-			}
-		],
-		imports: [
-			{{range .Users }}
-			{
-				stream: {subject: agentevt.>, account: {{ .AccountPublicKey }}}, prefix: {{ .AccountPublicKey }} }
-			},
-			{{ end }}
-		]
-	},
-	{{ range .Users }}
-	{{ .AccountPublicKey }}: {
-		users: [
-			{nkey: {{ .NkeyPublic }}}
-		]
-		imports: [
-			{service: {account: nexhost, subject: agentint.{{ .AccountPublicKey }}.>}, to: agentint.>}
-		]
-		exports: [
-			{stream: agentevt.>, accounts: [nexhost]}
-		]
-	},
-	{{ end }}
-*/
-
-/*
-
-listen: 0.0.0.0:4229
-accounts: {
-    nexhost: {
-        users: [
-            {nkey: UCNGL4W5QX66CFX6A6DCBVDH5VOHMI7B2UZZU7TXAUQQSI2JPHULCKBR}
-        ],
-        exports: [
-            {service: agentint.>}
-        ]
-        imports: [
-            {stream: {subject: agentevt.>, account: PKIbeHP9gWD}, prefix: PKIbeHP9gWD}
-        ]
-    }
-    PKIbeHP9gWD: {
-        users: [
-            {nkey: UDPGQVFIWZ7Q5UH4I5E6DBCZULQS6VTVBG6CYBD7JV3G3N2GMQOMNAUH}
-        ]
-        imports: [
-            {service: {account: nexhost, subject: agentint.PKIbeHP9gWD.>}, to: agentint.>}
-        ]
-        exports: [
-            {stream: agentevt.>, accounts: [nexhost]}
-        ]
-    }
-}
-*/
