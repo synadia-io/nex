@@ -364,7 +364,6 @@ func (w *WorkloadManager) Stop() error {
 		}
 
 		w.natsint.Shutdown()
-		w.natsint.WaitForShutdown()
 		_ = os.Remove(path.Join(os.TempDir(), defaultInternalNatsStoreDir))
 	}
 
@@ -421,6 +420,9 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		if err != nil {
 			w.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("workload_id", id), slog.String("error", err.Error()))
 		}
+
+		// FIXME-- this should probably just live in workload manager
+		w.natsint.DestroyCredentials(id)
 	}
 
 	err = w.procMan.StopProcess(id)

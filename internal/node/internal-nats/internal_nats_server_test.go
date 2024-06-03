@@ -31,7 +31,7 @@ func TestInternalNatsServer(t *testing.T) {
 
 	workloadId := nuid.Next()
 
-	keypair, err := server.CreateNewWorkloadUser(workloadId)
+	keypair, err := server.CreateCredentials(workloadId)
 	if err != nil {
 		t.Fatalf("Should have been able to add a workload user but couldn't: %s", err)
 	}
@@ -49,7 +49,7 @@ func TestInternalNatsServer(t *testing.T) {
 	}
 
 	workloadId2 := nuid.Next()
-	keypair2, err := server.CreateNewWorkloadUser(workloadId2)
+	keypair2, err := server.CreateCredentials(workloadId2)
 	if err != nil {
 		t.Fatalf("Should have been able to add a workload user but couldn't: %s", err)
 	}
@@ -79,7 +79,7 @@ func TestInternalNatsServerFileCache(t *testing.T) {
 
 	workloadId := nuid.Next()
 
-	keypair, err := server.CreateNewWorkloadUser(workloadId)
+	keypair, err := server.CreateCredentials(workloadId)
 	if err != nil {
 		t.Fatalf("Should have been able to add a workload user but couldn't: %s", err)
 	}

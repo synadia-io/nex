@@ -101,8 +101,7 @@ func (s *InternalNatsServer) Subsz(opts *server.SubszOptions) (*server.Subsz, er
 }
 
 // Returns a user keypair that can be used to log into the internal server
-// as the given workload
-func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.KeyPair, error) {
+func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error) {
 	kp, err := nkeys.CreateUser()
 	if err != nil {
 		s.log.Error("Failed to create nkey user", slog.Any("error", err))
@@ -115,9 +114,9 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 	creds := &credentials{
 		NkeySeed:   string(seed),
 		NkeyPublic: pk,
-		ID:         workloadID,
+		ID:         id,
 	}
-	s.serverConfigData.Credentials[workloadID] = creds
+	s.serverConfigData.Credentials[id] = creds
 
 	opts := &server.Options{
 		ConfigFile: s.lastOpts.ConfigFile,
@@ -155,6 +154,30 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 	return kp, nil
 }
 
+// Destroy previously-created credentials
+func (s *InternalNatsServer) DestroyCredentials(id string) error {
+	delete(s.serverConfigData.Credentials, id)
+
+	updated, err := updateNatsOptions(&server.Options{
+		ConfigFile: s.lastOpts.ConfigFile,
+		JetStream:  true,
+		Port:       s.lastOpts.Port,
+		StoreDir:   s.lastOpts.StoreDir,
+	}, s.log, s.serverConfigData)
+	if err != nil {
+		s.log.Error("Failed to update NATS options in internal server", slog.Any("error", err))
+		return err
+	}
+
+	err = s.server.ReloadOptions(updated)
+	if err != nil {
+		s.log.Error("Failed to reload NATS internal server options", slog.Any("error", err))
+		return err
+	}
+
+	return nil
+}
+
 func (s *InternalNatsServer) ClientURL() string {
 	return s.ncInternal.ConnectedUrl()
 }
@@ -164,10 +187,11 @@ func (s *InternalNatsServer) Connection() *nats.Conn {
 }
 
 func (s *InternalNatsServer) Shutdown() {
-	s.server.Shutdown()
-}
+	for id, _ := range s.serverConfigData.Credentials {
+		delete(s.serverConfigData.Credentials, id)
+	}
 
-func (s *InternalNatsServer) WaitForShutdown() {
+	s.server.Shutdown()
 	s.server.WaitForShutdown()
 }
 

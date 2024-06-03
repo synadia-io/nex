@@ -144,6 +144,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		a.log.Error("Failed to deserialize deployment response", slog.Any("error", err))
 		return nil, err
 	}
+
 	a.workloadStartedAt = time.Now().UTC()
 	return &deployResponse, nil
 }
@@ -183,6 +184,8 @@ func (a *AgentClient) Stop() error {
 }
 
 func (a *AgentClient) Undeploy() error {
+	_ = a.Stop()
+
 	subject := fmt.Sprintf("agentint.%s.undeploy", a.agentID)
 
 	a.log.Debug("sending undeploy request to agent via internal NATS connection",
@@ -195,6 +198,7 @@ func (a *AgentClient) Undeploy() error {
 		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("agent_id", a.agentID), slog.String("error", err.Error()))
 		return err
 	}
+
 	return nil
 }
 

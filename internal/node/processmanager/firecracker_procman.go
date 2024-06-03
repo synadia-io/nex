@@ -162,7 +162,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 				continue
 			}
 
-			workloadKey, err := f.intNats.CreateNewWorkloadUser(vm.vmmID)
+			workloadKey, err := f.intNats.CreateCredentials(vm.vmmID)
 			if err != nil {
 				f.log.Error("Failed to create workload user", slog.Any("err", err))
 				continue

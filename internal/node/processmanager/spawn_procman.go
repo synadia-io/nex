@@ -227,7 +227,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	id := xid.New()
 	workloadID := id.String()
 
-	kp, err := s.intNats.CreateNewWorkloadUser(workloadID)
+	kp, err := s.intNats.CreateCredentials(workloadID)
 	if err != nil {
 		return nil, err
 	}
