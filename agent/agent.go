@@ -82,6 +82,7 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	}
 	pk, _ := pair.PublicKey()
 	nc, err := nats.Connect(url, nats.Nkey(pk, func(b []byte) ([]byte, error) {
+		fmt.Fprintf(os.Stdout, "Attempting to sign NATS server nonce for internal workload connection; public key: %s", pk)
 		return pair.Sign(b)
 	}))
 

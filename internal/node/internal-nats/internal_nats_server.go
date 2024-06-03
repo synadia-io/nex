@@ -73,6 +73,7 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 
 	// This connection uses the `nexhost` account, specifically provisioned for the node
 	ncInternal, err := nats.Connect(s.ClientURL(), nats.Nkey(data.NexHostUserPublic, func(b []byte) ([]byte, error) {
+		log.Debug("Attempting to sign NATS server nonce for internal workload user connection", slog.String("public_key", data.NexHostUserPublic))
 		return hostUser.Sign(b)
 	}))
 	if err != nil {
@@ -197,10 +198,13 @@ func (s *InternalNatsServer) ConnectionForUser(ud *userData) (*nats.Conn, error)
 	if err != nil {
 		return nil, err
 	}
+
 	nc, err := nats.Connect(s.server.ClientURL(), nats.Nkey(ud.NkeyPublic, func(b []byte) ([]byte, error) {
+		s.log.Debug("Attempting to sign NATS server nonce for internal workload user connection", slog.String("public_key", ud.NkeyPublic))
 		return pair.Sign(b)
 	}))
 	if err != nil {
+		s.log.Warn("Failed to sign NATS server nonce for internal workload user connection", slog.String("public_key", ud.NkeyPublic))
 		return nil, err
 	}
 	return nc, nil
