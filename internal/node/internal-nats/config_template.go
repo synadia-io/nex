@@ -41,21 +41,21 @@ accounts: {
 			}
 		],
 		imports: [
-			{{ range .Users }}
+			{{ range .Credentials }}
 			{
-				stream: {subject: agentevt.>, account: {{ .WorkloadID }}}, prefix: {{ .WorkloadID }}
+				stream: {subject: agentevt.>, account: {{ .ID }}}, prefix: {{ .ID }}
 			},
 			{{ end }}
 		]	
 	},
-	{{ range .Users }}
-	{{ .WorkloadID }}: {
+	{{ range .Credentials }}
+	{{ .ID }}: {
 		jetstream: true
 		users: [
 			{nkey: "{{ .NkeyPublic }}"}
 		]
 		imports: [
-			{service: {account: nexhost, subject: agentint.{{ .WorkloadID }}.>}, to: agentint.>}
+			{service: {account: nexhost, subject: agentint.{{ .ID }}.>}, to: agentint.>}
 		]
 		exports: [
 			{stream: agentevt.>, accounts: [nexhost]}
