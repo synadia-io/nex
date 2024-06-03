@@ -25,10 +25,10 @@ const (
 
 type InternalNatsServer struct {
 	ncInternal       *nats.Conn
-	serverConfigData internalServerData
 	log              *slog.Logger
 	lastOpts         *server.Options
 	server           *server.Server
+	serverConfigData internalServerData
 }
 
 func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
@@ -41,10 +41,7 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	}
 
 	data := internalServerData{
-		Credentials:       map[string]*credentials{},
-		NexHostUserPublic: "",
-		NexHostUserSeed:   "",
-		Users:             make([]credentials, 0),
+		Credentials: map[string]*credentials{},
 	}
 
 	hostUser, _ := nkeys.CreateUser()
@@ -118,7 +115,7 @@ func (s *InternalNatsServer) CreateNewWorkloadUser(workloadID string) (nkeys.Key
 	creds := &credentials{
 		NkeySeed:   string(seed),
 		NkeyPublic: pk,
-		WorkloadID: workloadID,
+		ID:         workloadID,
 	}
 	s.serverConfigData.Credentials[workloadID] = creds
 

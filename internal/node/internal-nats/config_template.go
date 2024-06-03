@@ -10,11 +10,10 @@ type internalServerData struct {
 	Credentials       map[string]*credentials
 	NexHostUserPublic string
 	NexHostUserSeed   string
-	Users             []credentials
 }
 
 type credentials struct {
-	WorkloadID string
+	ID         string
 	NkeySeed   string
 	NkeyPublic string
 }

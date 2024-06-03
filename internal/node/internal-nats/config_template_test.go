@@ -20,7 +20,6 @@ func TestTemplateGenerator(t *testing.T) {
 
 	data := internalServerData{
 		Credentials: map[string]*credentials{},
-		Users:       make([]credentials, 0),
 	}
 
 	hostUser, _ := nkeys.CreateUser()
@@ -35,11 +34,13 @@ func TestTemplateGenerator(t *testing.T) {
 		seed, _ := userSeed.Seed()
 		seedPub, _ := userSeed.PublicKey()
 
-		data.Users = append(data.Users, credentials{
-			WorkloadID: nuid.Next(),
+		id := nuid.Next()
+
+		data.Credentials[id] = &credentials{
 			NkeySeed:   string(seed),
 			NkeyPublic: seedPub,
-		})
+			ID:         id,
+		}
 	}
 
 	bytes, err := GenerateTemplate(slog.Default(), data)
@@ -86,9 +87,15 @@ func TestTemplateGenerator(t *testing.T) {
 	var eventWg sync.WaitGroup
 	eventWg.Add(1)
 
+	var id string
+	for k := range data.Credentials {
+		id = k
+		break
+	}
+
 	_, _ = ncHost.Subscribe("*.agentevt.>", func(msg *nats.Msg) {
 		tokens := strings.Split(msg.Subject, ".")
-		if tokens[0] == data.Users[0].WorkloadID && tokens[2] == "my_event" {
+		if tokens[0] == data.Credentials[id].ID && tokens[2] == "my_event" {
 			eventWg.Done()
 		}
 	})
@@ -96,13 +103,13 @@ func TestTemplateGenerator(t *testing.T) {
 	_, _ = ncHost.Subscribe("agentint.>", func(msg *nats.Msg) {
 		tokens := strings.Split(msg.Subject, ".")
 		fmt.Printf("-- Replying to %s\n", msg.Subject)
-		if tokens[1] == data.Users[0].WorkloadID {
+		if tokens[1] == data.Credentials[id].ID {
 			_ = msg.Respond([]byte{42, 42, 42})
 		}
 	})
 
-	ncUser1, err := nats.Connect(s.ClientURL(), nats.Nkey(data.Users[0].NkeyPublic, func(b []byte) ([]byte, error) {
-		priv, _ := nkeys.FromSeed([]byte(data.Users[0].NkeySeed))
+	ncUser1, err := nats.Connect(s.ClientURL(), nats.Nkey(data.Credentials[id].NkeyPublic, func(b []byte) ([]byte, error) {
+		priv, _ := nkeys.FromSeed([]byte(data.Credentials[id].NkeySeed))
 		return priv.Sign(b)
 	}))
 	if err != nil {
@@ -125,7 +132,4 @@ func TestTemplateGenerator(t *testing.T) {
 	if err == nil {
 		t.Fatal("Was supposed to fail to connect with unauthorized user but didn't")
 	}
-
-	go s.WaitForShutdown()
-
 }
