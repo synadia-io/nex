@@ -8,7 +8,7 @@ command -v jq >/dev/null 2>&1 || {
 }
 
 with_agent=false
-while getopts ":with_agent:" opt; do
+while getopts "a" opt; do
 	case ${opt} in
 	a)
 		with_agent=true
