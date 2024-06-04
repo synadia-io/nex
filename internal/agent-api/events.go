@@ -12,10 +12,8 @@ const (
 	AgentStoppedEventType          = "agent_stopped"
 	FunctionExecutionFailedType    = "function_exec_failed"
 	FunctionExecutionSucceededType = "function_exec_succeeded"
-	WorkloadStartedEventType       = "workload_started" // FIXME-- should this be WorkloadDeployed?
-	WorkloadStoppedEventType       = "workload_stopped" // FIXME-- should this be in addition to WorkloadUndeployed (likely yes, in case of something bad happening...)
-	// FIXME-- where is WorkloadDeployedEventType? (likely just need to rename WorkloadStartedEventType -> WorkloadDeployedEventType)
-	// FIXME-- where is WorkloadStoppedEventType?
+	WorkloadDeployedEventType      = "workload_deployed"
+	WorkloadUndeployedEventType    = "workload_undeployed"
 )
 
 type AgentStartedEvent struct {

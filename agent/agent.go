@@ -212,7 +212,7 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 func (a *Agent) dispatchEvents() {
 	for !a.shuttingDown() {
 		entry := <-a.eventLogs
-		bytes, err := json.Marshal(entry)
+		bytes, err := entry.MarshalJSON()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to marshal event log to json: %s", err.Error())
 			continue
