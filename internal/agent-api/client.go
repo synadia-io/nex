@@ -301,7 +301,7 @@ func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
 	agentID := tokens[1]
 
 	var evt cloudevents.Event
-	err := json.Unmarshal(msg.Data, &evt)
+	err := evt.UnmarshalJSON(msg.Data)
 	if err != nil {
 		a.log.Error("Failed to deserialize cloudevent from agent", slog.Any("err", err))
 		return

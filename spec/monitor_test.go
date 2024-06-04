@@ -42,7 +42,7 @@ var _ = Describe("event monitor", func() {
 		Expect(err).To(BeNil())
 
 		evt := cloudevents.NewEvent()
-		evt.SetType("workload_started")
+		evt.SetType("workload_deployed")
 		evt.SetID("1")
 		evt.SetSource("testing")
 		_ = evt.SetData(testStruct{
@@ -51,7 +51,7 @@ var _ = Describe("event monitor", func() {
 		})
 
 		bytes, _ := json.Marshal(evt)
-		_ = nc.Publish("$NEX.events.default.workload_started", bytes)
+		_ = nc.Publish("$NEX.events.default.workload_deployed", bytes)
 
 		subject = <-ch
 	})
@@ -61,7 +61,7 @@ var _ = Describe("event monitor", func() {
 	})
 
 	It("maintains event type", func(ctx SpecContext) {
-		Expect(subject.EventType).To(Equal("workload_started"))
+		Expect(subject.EventType).To(Equal("workload_deployed"))
 	})
 
 	Describe("DataAs", func() {

@@ -1,28 +1,26 @@
 package controlapi
 
 const (
-	AgentStartedEventType    = "agent_started"
-	AgentStoppedEventType    = "agent_stopped"
-	NodeStartedEventType     = "node_started"
-	NodeStoppedEventType     = "node_stopped"
-	LameDuckEnteredEventType = "node_entered_lameduck"
-	HeartbeatEventType       = "heartbeat"
-	WorkloadStartedEventType = "workload_started" // FIXME-- should this be WorkloadDeployed?
-	WorkloadStoppedEventType = "workload_stopped" // FIXME-- should this be in addition to WorkloadUndeployed (likely yes, in case of something bad happening...)
-	// FIXME-- where is WorkloadDeployedEventType? (likely just need to rename WorkloadStartedEventType -> WorkloadDeployedEventType)
-	// FIXME-- where is WorkloadStoppedEventType?
+	AgentStartedEventType       = "agent_started"
+	AgentStoppedEventType       = "agent_stopped"
+	NodeStartedEventType        = "node_started"
+	NodeStoppedEventType        = "node_stopped"
+	LameDuckEnteredEventType    = "node_entered_lameduck"
+	HeartbeatEventType          = "heartbeat"
+	WorkloadDeployedEventType   = "workload_deployed"
+	WorkloadUndeployedEventType = "workload_undeployed"
 )
 
 type AgentStartedEvent struct {
 	AgentVersion string `json:"agent_version"`
 }
 
-type WorkloadStartedEvent struct {
+type WorkloadDeployedEvent struct {
 	Name       string `json:"workload_name"`
 	TotalBytes int    `json:"total_bytes"`
 }
 
-type WorkloadStoppedEvent struct {
+type WorkloadUndeployedEvent struct {
 	Name    string `json:"workload_name"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`

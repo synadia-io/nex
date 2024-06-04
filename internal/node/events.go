@@ -17,13 +17,18 @@ type emittedLog struct {
 
 // publish the given $NEX event to an arbitrary namespace using the given NATS connection
 func PublishCloudEvent(nc *nats.Conn, namespace string, event cloudevents.Event, log *slog.Logger) error {
-	raw, _ := event.MarshalJSON()
+
+	raw, err := event.MarshalJSON()
+	if err != nil {
+		log.Error("Failed to marshal cloudevent as JSON", slog.Any("error", err))
+		return err
+	}
 
 	// $NEX.events.{namespace}.{event_type}
 	subject := fmt.Sprintf("%s.%s.%s", EventSubjectPrefix, namespace, event.Type())
-	err := nc.Publish(subject, raw)
+	err = nc.Publish(subject, raw)
 	if err != nil {
-		log.Error("Failed to publish cloud event", slog.Any("err", err))
+		log.Error("Failed to publish cloud event", slog.Any("error", err))
 		return err
 	}
 

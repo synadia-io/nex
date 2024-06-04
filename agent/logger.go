@@ -66,7 +66,7 @@ func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes in
 		Text:   fmt.Sprintf("Workload %s deployed", workloadName),
 	}
 
-	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStartedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName})
+	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadDeployedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName})
 	a.eventLogs <- &evt
 }
 
@@ -90,6 +90,6 @@ func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bo
 		Text:   txt,
 	}
 
-	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadStoppedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
+	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadUndeployedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
 	a.eventLogs <- &evt
 }

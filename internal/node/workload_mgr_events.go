@@ -21,6 +21,7 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 		// with it
 		return
 	}
+	evt.SetSource(fmt.Sprintf("%s-%s", *deployRequest.TargetNode, agentId))
 
 	err := PublishCloudEvent(w.nc, *deployRequest.Namespace, evt, w.log)
 	if err != nil {
@@ -28,7 +29,7 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 		return
 	}
 
-	if evt.Type() == agentapi.WorkloadStoppedEventType {
+	if evt.Type() == agentapi.WorkloadUndeployedEventType {
 		_ = w.StopWorkload(agentId, false)
 
 		evtData, err := evt.DataBytes()
@@ -233,7 +234,7 @@ func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
 		cloudevent.SetSource(w.publicKey)
 		cloudevent.SetID(uuid.NewString())
 		cloudevent.SetTime(time.Now().UTC())
-		cloudevent.SetType(agentapi.WorkloadStoppedEventType)
+		cloudevent.SetType(agentapi.WorkloadUndeployedEventType)
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 		_ = cloudevent.SetData(workloadStopped)
 
