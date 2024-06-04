@@ -33,6 +33,7 @@ accounts: {
 	nexhost: {
 		jetstream: true		
 		users: [
+			{user: nex, password: pass}
 			{nkey: "{{ .NexHostUserPublic }}"}
 		]
 		exports: [
@@ -42,6 +43,9 @@ accounts: {
 		],
 		imports: [
 			{{ range .Credentials }}
+			{
+				stream: {subject: agentint.>, account: {{ .ID }}}
+			},
 			{
 				stream: {subject: agentevt.>, account: {{ .ID }}}, prefix: {{ .ID }}
 			},
@@ -58,6 +62,7 @@ accounts: {
 			{service: {account: nexhost, subject: agentint.{{ .ID }}.>}, to: agentint.>}
 		]
 		exports: [
+			{stream: agentint.>, accounts: [nexhost]}
 			{stream: agentevt.>, accounts: [nexhost]}
 		]
 	},
