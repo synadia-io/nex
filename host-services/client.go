@@ -30,7 +30,7 @@ func NewHostServicesClient(nc *nats.Conn, timeout time.Duration, namespace, work
 }
 
 func (c *HostServicesClient) PerformRPC(ctx context.Context, service string, method string, payload []byte, metadata map[string]string) (ServiceResult, error) {
-	subject := fmt.Sprintf("agentint.%s.rpc.%s.%s.%s.%s",
+	subject := fmt.Sprintf("hostint.%s.rpc.%s.%s.%s.%s",
 		c.workloadId,
 		c.namespace,
 		c.workloadName,

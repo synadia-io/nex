@@ -36,8 +36,9 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 		JetStream: true,
 		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
 		Port:      -1,
-		// Uncomment this when you want internal NATS server logs to be suppressed
-		// NoLog: true
+		// Debug:     true,
+		// Trace:     true,
+		// NoLog:     true,
 	}
 
 	data := internalServerData{

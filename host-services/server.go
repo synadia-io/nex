@@ -49,8 +49,13 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config jso
 	return nil
 }
 
+// Host services server instances subscribe to the following `hostint.>` subjects,
+// which are exported by the `nexnode` account on the configured internal
+// NATS connection for consumption by agents:
+//
+// - hostint.<agent_id>.rpc.<namespace>.<workloadName>.<service>.<method>
 func (h *HostServicesServer) Start() error {
-	_, err := h.nc.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
+	_, err := h.nc.Subscribe("hostint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
 		h.log.Warn("Failed to create Host services rpc subscription", slog.String("error", err.Error()))
 		return err

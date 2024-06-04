@@ -22,7 +22,7 @@ type credentials struct {
  * In the below template, the nexhost (the account used by the host) will
  * be able to import the following:
  * *.agentevt.> - agent events streamed from workloads
- * agentint.> - where the first token after agentint is the account ID from the workload
+ * hostint.> - where the first token after agentint is the account ID from the workload
  */
 
 const (
@@ -37,19 +37,19 @@ accounts: {
 		]
 		exports: [
 			{
-				service: agentint.>
+				service: hostint.>
 			}
 		],
 		imports: [
 			{{ range .Credentials }}
 			{
-				stream: {subject: agentint.>, account: {{ .ID }}}
+				service: {subject: agentint.{{ .ID }}.>, account: {{ .ID }}}
 			},
 			{
 				stream: {subject: agentevt.>, account: {{ .ID }}}, prefix: {{ .ID }}
 			},
 			{{ end }}
-		]	
+		]
 	},
 	{{ range .Credentials }}
 	{{ .ID }}: {
@@ -57,17 +57,26 @@ accounts: {
 		users: [
 			{nkey: "{{ .NkeyPublic }}"}
 		]
-		imports: [
-			{service: {account: nexhost, subject: agentint.{{ .ID }}.>}, to: agentint.>}
-		]
 		exports: [
-			{stream: agentint.>, accounts: [nexhost]}
-			{stream: agentevt.>, accounts: [nexhost]}
+			{
+				service: agentint.{{ .ID }}.>, accounts: [nexhost]
+			}
+			{
+				stream: agentevt.>, accounts: [nexhost]
+			}
 		]
+		imports: [
+			{
+				service: {account: nexhost, subject: hostint.{{ .ID }}.>}
+			}
+		]
+
 	},
-	{{ end }}	
+	{{ end }}
 }
 no_sys_acc: true
+debug: false
+trace: false
 `
 )
 

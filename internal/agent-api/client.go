@@ -87,6 +87,13 @@ func (a *AgentClient) ID() string {
 	return a.agentID
 }
 
+// Agent client instances subscribe to the following `hostint.>` subjects,
+// which are exported by the `nexnode` account on the configured internal
+// NATS connection for consumption by agents:
+//
+// - hostint.<agent_id>.handshake
+// - hostint.<agent_id>.events
+// - hostint.<agent_id>.logs
 func (a *AgentClient) Start(agentID string) error {
 	a.log.Info("Agent client starting", slog.String("agent_id", agentID))
 	a.agentID = agentID
@@ -94,19 +101,19 @@ func (a *AgentClient) Start(agentID string) error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.handshake", agentID), a.handleHandshake)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("hostint.%s.handshake", agentID), a.handleHandshake)
 	if err != nil {
 		return err
 	}
 	a.subz = append(a.subz, sub)
 
-	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.events.*", agentID), a.handleAgentEvent)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("hostint.%s.events.*", agentID), a.handleAgentEvent)
 	if err != nil {
 		return err
 	}
 	a.subz = append(a.subz, sub)
 
-	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.logs", agentID), a.handleAgentLog)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("hostint.%s.logs", agentID), a.handleAgentLog)
 	if err != nil {
 		return err
 	}
@@ -302,7 +309,6 @@ func (a *AgentClient) monitorAgent() {
 }
 
 func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
-	// agentint.{agentID}.events.{type}
 	tokens := strings.Split(msg.Subject, ".")
 	agentID := tokens[1]
 

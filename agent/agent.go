@@ -135,11 +135,11 @@ func (a *Agent) requestHandshake() error {
 	}
 	raw, _ := json.Marshal(msg)
 
-	resp, err := a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+	resp, err := a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
 		if errors.Is(err, nats.ErrNoResponders) {
 			time.Sleep(time.Millisecond * 50)
-			resp, err = a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+			resp, err = a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 		}
 
 		if err != nil {
@@ -202,7 +202,7 @@ func (a *Agent) dispatchEvents() {
 			continue
 		}
 
-		subject := fmt.Sprintf("agentint.%s.events.%s", *a.md.VmID, entry.Type())
+		subject := fmt.Sprintf("hostint.%s.events.%s", *a.md.VmID, entry.Type())
 		err = a.nc.Publish(subject, bytes)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to publish event: %s", err.Error())
@@ -223,7 +223,7 @@ func (a *Agent) dispatchLogs() {
 			continue
 		}
 
-		subject := fmt.Sprintf("agentint.%s.logs", *a.md.VmID)
+		subject := fmt.Sprintf("hostint.%s.logs", *a.md.VmID)
 		err = a.nc.Publish(subject, bytes)
 		if err != nil {
 			continue
@@ -318,6 +318,13 @@ func (a *Agent) handlePing(m *nats.Msg) {
 	_ = m.Respond([]byte("OK"))
 }
 
+// Agent instances subscribe to the following `agentint.>` subjects,
+// which are exported dynamically by each `<agent_id>` account on the
+// configured internal NATS connection for consumption by the nex node:
+//
+// - agentint.<agent_id>.deploy
+// - agentint.<agent_id>.undeploy
+// - agentint.<agent_id>.ping
 func (a *Agent) init() error {
 	a.installSignalHandlers()
 
