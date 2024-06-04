@@ -52,9 +52,11 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config jso
 func (h *HostServicesServer) Start() error {
 	_, err := h.nc.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
+		h.log.Warn("Failed to create Host services rpc subscription", slog.String("error", err.Error()))
 		return err
 	}
 
+	h.log.Debug("Host services rpc subscription created", slog.String("address", h.nc.ConnectedAddr()))
 	return nil
 }
 
