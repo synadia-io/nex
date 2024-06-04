@@ -110,15 +110,15 @@ func handleEventEntry(log *slog.Logger, emittedEvent controlapi.EmittedEvent) {
 		} else {
 			attrs = append(attrs, slog.String("message", evt.Message), slog.Int("code", evt.Code))
 		}
-	case controlapi.WorkloadStartedEventType:
-		evt := &controlapi.WorkloadStartedEvent{}
+	case controlapi.WorkloadDeployedEventType:
+		evt := &controlapi.WorkloadDeployedEvent{}
 		if err := event.DataAs(evt); err != nil {
 			attrs = append(attrs, slog.Any("err", err))
 		} else {
 			attrs = append(attrs, slog.String("workload_name", evt.Name))
 		}
-	case controlapi.WorkloadStoppedEventType:
-		evt := &controlapi.WorkloadStoppedEvent{}
+	case controlapi.WorkloadUndeployedEventType:
+		evt := &controlapi.WorkloadUndeployedEvent{}
 		if err := event.DataAs(evt); err != nil {
 			attrs = append(attrs, slog.Any("err", err))
 		} else {
