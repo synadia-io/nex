@@ -33,7 +33,6 @@ accounts: {
 	nexhost: {
 		jetstream: true		
 		users: [
-			{user: nex, password: pass}
 			{nkey: "{{ .NexHostUserPublic }}"}
 		]
 		exports: [
