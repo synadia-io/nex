@@ -183,6 +183,7 @@ func (v *V8) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 			return
 		}
 
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("calling js function via trigger subject: %s", subject)))
 		val, err = fn.Call(v8ctx.Global(), argv1, argv2)
 		if err != nil {
 			errs <- err
@@ -543,6 +544,8 @@ func (v *V8) newMessagingObjectTemplate(ctx context.Context) *v8.ObjectTemplate 
 	messaging := v8.NewObjectTemplate(v.iso)
 
 	_ = messaging.Set(hostServicesMessagingPublishFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		_, _ = v.stdout.Write([]byte(fmt.Sprintf("attempting to publish msg via %s", v.nc.Servers()[0])))
+
 		args := info.Args()
 		if len(args) != 2 {
 			val, _ := v8.NewValue(v.iso, "subject and payload are required")
@@ -847,7 +850,7 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 
 	hsclient := hostservices.NewHostServicesClient(
 		params.NATSConn,
-		time.Second*2,
+		time.Second*5, // FIXME-- make configurable
 		*params.Namespace,
 		*params.WorkloadName,
 		params.VmID,

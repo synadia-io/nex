@@ -204,7 +204,7 @@ func (a *AgentClient) Undeploy() error {
 
 func (a *AgentClient) Ping() error {
 	subject := fmt.Sprintf("agentint.%s.ping", a.agentID)
-	a.log.Debug("pinging agent", slog.String("subject", subject))
+	// a.log.Debug("pinging agent", slog.String("subject", subject))
 
 	_, err := a.nc.Request(subject, []byte{}, a.pingTimeout)
 	if err != nil {

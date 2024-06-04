@@ -139,7 +139,7 @@ func NewWorkloadManager(
 	w.hostServices = NewHostServices(w.ncint, w.ncHostServices, config.HostServicesConfiguration, w.log, w.t.Tracer)
 	err = w.hostServices.init()
 	if err != nil {
-		w.log.Warn("Failed to initialize host services.", slog.Any("err", err))
+		w.log.Warn("Failed to initialize host services", slog.Any("err", err))
 		return nil, err
 	}
 

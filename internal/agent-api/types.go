@@ -38,7 +38,7 @@ type ExecutionProviderParams struct {
 	TmpFilename *string `json:"-"`
 	VmID        string  `json:"-"`
 
-	// NATS connection which be injected into the execution provider
+	// NATS connections which be injected into the execution provider
 	NATSConn *nats.Conn `json:"-"`
 }
 
@@ -180,10 +180,9 @@ type HostServicesMessagingResponse struct {
 }
 
 type MachineMetadata struct {
-	VmID         *string `json:"vmid"`
-	NodeNatsHost *string `json:"node_nats_host"`
-	NodeNatsPort *int    `json:"node_nats_port"`
-	// To be used when agents use the new internal nats security
+	VmID             *string `json:"vmid"`
+	NodeNatsHost     *string `json:"node_nats_host"`
+	NodeNatsPort     *int    `json:"node_nats_port"`
 	NodeNatsNkeySeed *string `json:"node_nats_nkey"`
 	Message          *string `json:"message"`
 

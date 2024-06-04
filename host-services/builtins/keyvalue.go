@@ -60,8 +60,8 @@ func (k *KeyValueService) HandleRequest(
 	method string,
 	workloadName string,
 	metadata map[string]string,
-	request []byte) (hostservices.ServiceResult, error) {
-
+	request []byte,
+) (hostservices.ServiceResult, error) {
 	switch method {
 	case kvServiceMethodGet:
 		return k.handleGet(workloadId, workloadName, request, metadata, namespace)
@@ -208,5 +208,6 @@ func (k *KeyValueService) resolveKeyValueStore(namespace, workload string) (nats
 		}
 	}
 
+	k.log.Debug("Resolved key/value store for KV host service", slog.String("name", kvStoreName), slog.String("bucket", kvStore.Bucket()))
 	return kvStore, nil
 }

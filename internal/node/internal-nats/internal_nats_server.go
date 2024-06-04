@@ -63,7 +63,7 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	}
 
 	// uncomment this if you want internal NATS logs emitted
-	//s.ConfigureLogger()
+	// s.ConfigureLogger()
 
 	if err := server.Run(s); err != nil {
 		server.PrintAndDie(err.Error())
@@ -72,7 +72,7 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 
 	// This connection uses the `nexhost` account, specifically provisioned for the node
 	ncInternal, err := nats.Connect(s.ClientURL(), nats.Nkey(data.NexHostUserPublic, func(b []byte) ([]byte, error) {
-		log.Debug("Attempting to sign NATS server nonce for internal workload user connection", slog.String("public_key", data.NexHostUserPublic))
+		log.Debug("Attempting to sign NATS server nonce for internal host connection", slog.String("public_key", data.NexHostUserPublic))
 		return hostUser.Sign(b)
 	}))
 	if err != nil {

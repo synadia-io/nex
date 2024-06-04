@@ -62,10 +62,6 @@ type Node struct {
 	natspub *server.Server
 	nc      *nats.Conn
 
-	// natsint        *internalnats.InternalNatsServer
-	// ncint          *nats.Conn
-	ncHostServices *nats.Conn
-
 	startedAt time.Time
 	telemetry *observability.Telemetry
 
