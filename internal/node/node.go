@@ -324,18 +324,18 @@ func (n *Node) startPublicNATS() error {
 }
 
 func (n *Node) handleAutostarts() {
-	var agentClient *agentapi.AgentClient
-	var err error
-
-	for agentClient == nil {
-		agentClient, err = n.manager.SelectRandomAgent()
-		if err != nil {
-			n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
-			time.Sleep(25 * time.Millisecond)
-		}
-	}
-
 	for _, autostart := range n.config.AutostartConfiguration.Workloads {
+		var agentClient *agentapi.AgentClient
+		var err error
+
+		for agentClient == nil {
+			agentClient, err = n.manager.SelectRandomAgent()
+			if err != nil {
+				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
+				time.Sleep(25 * time.Millisecond)
+			}
+		}
+
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
