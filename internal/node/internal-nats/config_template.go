@@ -89,6 +89,6 @@ func GenerateTemplate(log *slog.Logger, config internalServerData) ([]byte, erro
 		return nil, err
 	}
 
-	log.Debug("generated NATS config", slog.String("config", string(wr.Bytes())))
+	log.Debug("generated NATS config", slog.String("config", wr.String()))
 	return wr.Bytes(), nil
 }
