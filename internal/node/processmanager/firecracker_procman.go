@@ -16,6 +16,7 @@ import (
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
+	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -32,21 +33,26 @@ type FirecrackerProcessManager struct {
 	allVMs  map[string]*runningFirecracker
 	warmVMs chan *runningFirecracker
 
+	intNats *internalnats.InternalNatsServer
+
 	delegate       ProcessDelegate
 	deployRequests map[string]*agentapi.DeployRequest
 }
 
 func NewFirecrackerProcessManager(
+	intnats *internalnats.InternalNatsServer,
 	log *slog.Logger,
 	config *models.NodeConfiguration,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
 ) (*FirecrackerProcessManager, error) {
+
 	return &FirecrackerProcessManager{
-		config: config,
-		t:      telemetry,
-		log:    log,
-		ctx:    ctx,
+		config:  config,
+		intNats: intnats,
+		t:       telemetry,
+		log:     log,
+		ctx:     ctx,
 
 		allVMs:         make(map[string]*runningFirecracker),
 		warmVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
@@ -129,7 +135,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 
 	defer func() {
 		if r := recover(); r != nil {
-			f.log.Debug(fmt.Sprintf("recovered: %s", r))
+			f.log.Debug(fmt.Sprintf("firecracker process manager recovered from failure: %s", r))
 		}
 	}()
 
@@ -156,7 +162,14 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 				continue
 			}
 
-			err = f.setMetadata(vm)
+			workloadKey, err := f.intNats.CreateCredentials(vm.vmmID)
+			if err != nil {
+				f.log.Error("Failed to create workload user", slog.Any("err", err))
+				continue
+			}
+			workloadSeed, _ := workloadKey.Seed()
+
+			err = f.setMetadata(vm, string(workloadSeed))
 			if err != nil {
 				f.log.Warn("Failed to set metadata on VM for warming pool.", slog.Any("err", err))
 				continue
@@ -260,12 +273,13 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 	}
 }
 
-func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker) error {
+func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker, workloadSeed string) error {
 	return vm.setMetadata(&agentapi.MachineMetadata{
-		Message:      models.StringOrNil("Host-supplied metadata"),
-		NodeNatsHost: vm.config.InternalNodeHost,
-		NodeNatsPort: vm.config.InternalNodePort,
-		VmID:         &vm.vmmID,
+		Message:          models.StringOrNil("Host-supplied metadata"),
+		NodeNatsHost:     vm.config.InternalNodeHost,
+		NodeNatsPort:     vm.config.InternalNodePort,
+		NodeNatsNkeySeed: &workloadSeed,
+		VmID:             &vm.vmmID,
 	})
 }
 

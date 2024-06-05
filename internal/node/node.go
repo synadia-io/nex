@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -31,7 +29,6 @@ import (
 
 const (
 	systemNamespace              = "system"
-	defaultInternalNatsStoreDir  = "pnats"
 	heartbeatInterval            = 30 * time.Second
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
@@ -65,10 +62,6 @@ type Node struct {
 
 	natspub *server.Server
 	nc      *nats.Conn
-
-	natsint        *server.Server
-	ncint          *nats.Conn
-	ncHostServices *nats.Conn
 
 	startedAt time.Time
 	telemetry *observability.Telemetry
@@ -112,7 +105,6 @@ func NewNode(
 
 	node.nexus = nodeOpts.NexusName
 	node.capabilities = *models.GetNodeCapabilities(node.config.Tags)
-
 	return node, nil
 }
 
@@ -271,29 +263,18 @@ func (n *Node) init() error {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
-		_err = n.startHostServicesConnection(n.nc)
+		n.manager, _err = NewWorkloadManager(
+			n.ctx,
+			n.cancelF,
+			n.keypair,
+			n.publicKey,
+			n.nc,
+			n.config,
+			n.log,
+			n.telemetry,
+		)
 		if _err != nil {
-			n.log.Error("Failed to start host services connection", slog.Any("error", _err))
-			err = errors.Join(err, fmt.Errorf("failed to start host services NATS connection: %s", _err))
-		} else {
-			n.log.Info("Established host services NATS connection", slog.String("server", n.ncHostServices.Servers()[0]))
-		}
-
-		// start internal NATS server
-		_err = n.startInternalNATS()
-		if _err != nil {
-			n.log.Error("Failed to start internal NATS server", slog.Any("err", _err))
-			err = errors.Join(err, fmt.Errorf("failed to start internal NATS server: %s", _err))
-		} else {
-			n.log.Info("Internal NATS server started", slog.String("client_url", n.natsint.ClientURL()))
-		}
-
-		n.manager, _err = NewWorkloadManager(n.ctx, n.cancelF,
-			n.keypair, n.publicKey,
-			n.nc, n.ncint, n.ncHostServices,
-			n.config, n.log, n.telemetry)
-		if _err != nil {
-			n.log.Error("Failed to initialize machine manager", slog.Any("err", _err))
+			n.log.Error("Failed to initialize workload manager", slog.Any("err", _err))
 			err = errors.Join(err, _err)
 		}
 
@@ -317,92 +298,6 @@ func (n *Node) init() error {
 	})
 
 	return err
-}
-
-func (n *Node) startHostServicesConnection(defaultConnection *nats.Conn) error {
-	if n.config.HostServicesConfiguration != nil {
-		natsOpts := []nats.Option{
-			nats.Name("nex-hostservices"),
-		}
-		if len(n.config.HostServicesConfiguration.NatsUserJwt) > 0 {
-			natsOpts = append(natsOpts,
-				nats.UserJWTAndSeed(
-					n.config.HostServicesConfiguration.NatsUserJwt,
-					n.config.HostServicesConfiguration.NatsUserSeed,
-				),
-			)
-		}
-
-		if len(n.config.HostServicesConfiguration.NatsUrl) == 0 {
-			n.config.HostServicesConfiguration.NatsUrl = defaultConnection.Servers()[0]
-			n.ncHostServices = n.nc
-		} else {
-			nc, err := nats.Connect(n.config.HostServicesConfiguration.NatsUrl, natsOpts...)
-			if err != nil {
-				return err
-			}
-			n.ncHostServices = nc
-		}
-	} else {
-		n.ncHostServices = n.nc
-	}
-	return nil
-}
-
-func (n *Node) startInternalNATS() error {
-	var err error
-
-	n.natsint, err = server.NewServer(&server.Options{
-		Host:      "0.0.0.0",
-		Port:      -1,
-		JetStream: true,
-		NoLog:     true,
-		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
-	})
-	if err != nil {
-		return err
-	}
-	n.natsint.Start()
-
-	clientUrl, err := url.Parse(n.natsint.ClientURL())
-	if err != nil {
-		return fmt.Errorf("failed to parse internal NATS client URL: %s", err)
-	}
-
-	p, err := strconv.Atoi(clientUrl.Port())
-	if err != nil {
-		return fmt.Errorf("failed to parse internal NATS client URL: %s", err)
-	}
-	n.config.InternalNodePort = &p
-
-	n.ncint, err = nats.Connect("", nats.InProcessServer(n.natsint))
-	if err != nil {
-		n.log.Error("Failed to connect to internal nats", slog.Any("err", err), slog.Any("internal_url", clientUrl), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
-		return fmt.Errorf("failed to connect to internal nats: %s", err)
-	}
-
-	rtt, err := n.ncint.RTT()
-	if err != nil {
-		n.log.Warn("Failed get internal nats RTT", slog.Any("err", err), slog.Any("internal_url", clientUrl))
-	} else {
-		n.log.Debug("Internal NATS RTT", slog.String("rtt", rtt.String()), slog.Bool("with_jetstream", n.natsint.JetStreamEnabled()))
-	}
-
-	jsCtx, err := n.ncint.JetStream()
-	if err != nil {
-		return fmt.Errorf("failed to establish jetstream connection to internal nats: %s", err)
-	}
-
-	_, err = jsCtx.CreateObjectStore(&nats.ObjectStoreConfig{
-		Bucket:      WorkloadCacheBucketName,
-		Description: "Object store cache for nex-node workloads",
-		Storage:     nats.MemoryStorage,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create internal object store: %s", err)
-	}
-
-	return nil
 }
 
 func (n *Node) startPublicNATS() error {
@@ -429,9 +324,18 @@ func (n *Node) startPublicNATS() error {
 }
 
 func (n *Node) handleAutostarts() {
-	time.Sleep(2 * time.Second) // delay a bit before attempting autostarts
-
 	for _, autostart := range n.config.AutostartConfiguration.Workloads {
+		var agentClient *agentapi.AgentClient
+		var err error
+
+		for agentClient == nil {
+			agentClient, err = n.manager.SelectRandomAgent()
+			if err != nil {
+				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
+				time.Sleep(25 * time.Millisecond)
+			}
+		}
+
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
@@ -452,6 +356,7 @@ func (n *Node) handleAutostarts() {
 			)
 			continue
 		}
+
 		_, err = request.Validate()
 		if err != nil {
 			n.log.Error("Failed to validate autostart deployment request",
@@ -459,6 +364,7 @@ func (n *Node) handleAutostarts() {
 			)
 			continue
 		}
+
 		agentDeployRequest := &agentapi.DeployRequest{
 			Argv:                 request.Argv,
 			DecodedClaims:        request.DecodedClaims,
@@ -479,7 +385,7 @@ func (n *Node) handleAutostarts() {
 			WorkloadJwt:          request.WorkloadJwt,
 		}
 
-		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(request)
+		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(agentClient.ID(), request)
 		if err != nil {
 			n.api.log.Error("Failed to cache auto-start workload bytes",
 				slog.Any("err", err),
@@ -492,7 +398,7 @@ func (n *Node) handleAutostarts() {
 		agentDeployRequest.TotalBytes = int64(numBytes)
 		agentDeployRequest.Hash = *workloadHash
 
-		workloadId, err := n.api.mgr.DeployWorkload(agentDeployRequest)
+		err = n.api.mgr.DeployWorkload(agentClient, agentDeployRequest)
 		if err != nil {
 			n.log.Error("Failed to deploy autostart workload",
 				slog.Any("error", err),
@@ -504,7 +410,7 @@ func (n *Node) handleAutostarts() {
 		n.log.Info("Autostart workload started",
 			slog.String("name", autostart.Name),
 			slog.String("namespace", autostart.Namespace),
-			slog.String("workload_id", *workloadId),
+			slog.String("workload_id", agentClient.ID()),
 		)
 	}
 }
@@ -626,26 +532,22 @@ func (n *Node) validateConfig() error {
 func (n *Node) shutdown() {
 	if atomic.AddUint32(&n.closing, 1) == 1 {
 		n.log.Debug("shutting down")
-		_ = n.api.Drain()
-		_ = n.manager.Stop()
+		if n.api != nil {
+			_ = n.api.Drain()
+		}
+
+		if n.manager != nil {
+			_ = n.manager.Stop()
+		}
 
 		if !n.startedAt.IsZero() {
 			_ = n.publishNodeStopped()
-		}
-
-		_ = n.ncint.Drain()
-		for !n.ncint.IsClosed() {
-			time.Sleep(time.Millisecond * 25)
 		}
 
 		_ = n.nc.Drain()
 		for !n.nc.IsClosed() {
 			time.Sleep(time.Millisecond * 25)
 		}
-
-		n.natsint.Shutdown()
-		n.natsint.WaitForShutdown()
-		_ = os.Remove(path.Join(os.TempDir(), defaultInternalNatsStoreDir))
 
 		if n.natspub != nil {
 			n.natspub.Shutdown()

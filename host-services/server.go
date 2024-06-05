@@ -15,18 +15,18 @@ import (
 )
 
 type HostServicesServer struct {
-	log        *slog.Logger
-	ncInternal *nats.Conn
-	services   map[string]HostService
-	tracer     trace.Tracer
+	log      *slog.Logger
+	nc       *nats.Conn
+	services map[string]HostService
+	tracer   trace.Tracer
 }
 
 func NewHostServicesServer(nc *nats.Conn, log *slog.Logger, tracer trace.Tracer) *HostServicesServer {
 	return &HostServicesServer{
-		ncInternal: nc,
-		log:        log,
-		services:   make(map[string]HostService),
-		tracer:     tracer,
+		log:      log,
+		nc:       nc,
+		services: make(map[string]HostService),
+		tracer:   tracer,
 	}
 }
 
@@ -49,12 +49,19 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config jso
 	return nil
 }
 
+// Host services server instances subscribe to the following `hostint.>` subjects,
+// which are exported by the `nexnode` account on the configured internal
+// NATS connection for consumption by agents:
+//
+// - hostint.<agent_id>.rpc.<namespace>.<workloadName>.<service>.<method>
 func (h *HostServicesServer) Start() error {
-	_, err := h.ncInternal.Subscribe("agentint.*.rpc.*.*.*.*", h.handleRPC)
+	_, err := h.nc.Subscribe("hostint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
+		h.log.Warn("Failed to create Host services rpc subscription", slog.String("error", err.Error()))
 		return err
 	}
 
+	h.log.Debug("Host services rpc subscription created", slog.String("address", h.nc.ConnectedAddr()))
 	return nil
 }
 

@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,6 +20,7 @@ import (
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
+	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
 	"github.com/synadia-io/nex/internal/node/processmanager"
 
@@ -28,6 +31,8 @@ import (
 )
 
 const (
+	defaultInternalNatsStoreDir = "pnats"
+
 	EventSubjectPrefix      = "$NEX.events"
 	LogSubjectPrefix        = "$NEX.logs"
 	WorkloadCacheBucketName = "NEXCACHE"
@@ -38,15 +43,18 @@ const (
 // those processes. The workload manager does not know how the agent processes are created, only how to communicate
 // with them via the internal NATS server
 type WorkloadManager struct {
-	closing    uint32
-	config     *models.NodeConfiguration
-	kp         nkeys.KeyPair
-	log        *slog.Logger
-	nc         *nats.Conn
-	ncInternal *nats.Conn
-	cancel     context.CancelFunc
-	ctx        context.Context
-	t          *observability.Telemetry
+	closing uint32
+	config  *models.NodeConfiguration
+	kp      nkeys.KeyPair
+	log     *slog.Logger
+	cancel  context.CancelFunc
+	ctx     context.Context
+	t       *observability.Telemetry
+
+	nc             *nats.Conn
+	natsint        *internalnats.InternalNatsServer
+	ncint          *nats.Conn
+	ncHostServices *nats.Conn
 
 	procMan processmanager.ProcessManager
 
@@ -58,7 +66,8 @@ type WorkloadManager struct {
 	pendingAgents map[string]*agentapi.AgentClient
 
 	handshakes       map[string]string
-	handshakeTimeout time.Duration // TODO: make configurable...
+	handshakeTimeout time.Duration
+	pingTimeout      time.Duration
 
 	hostServices *HostServices
 
@@ -68,8 +77,7 @@ type WorkloadManager struct {
 	// Subscriptions created on behalf of functions that cannot subscribe internallly
 	subz map[string][]*nats.Subscription
 
-	natsStoreDir string
-	publicKey    string
+	publicKey string
 }
 
 // Initialize a new workload manager instance to manage and communicate with agents
@@ -78,7 +86,7 @@ func NewWorkloadManager(
 	cancel context.CancelFunc,
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
-	nc, ncint, ncHostServices *nats.Conn,
+	nc *nats.Conn,
 	config *models.NodeConfiguration,
 	log *slog.Logger,
 	telemetry *observability.Telemetry,
@@ -96,10 +104,9 @@ func NewWorkloadManager(
 		handshakeTimeout: time.Duration(config.AgentHandshakeTimeoutMillisecond) * time.Millisecond,
 		kp:               nodeKeypair,
 		log:              log,
-		natsStoreDir:     defaultInternalNatsStoreDir,
 		nc:               nc,
-		ncInternal:       ncint,
 		poolMutex:        &sync.Mutex{},
+		pingTimeout:      time.Duration(config.AgentPingTimeoutMillisecond) * time.Millisecond,
 		publicKey:        publicKey,
 		t:                telemetry,
 
@@ -112,16 +119,33 @@ func NewWorkloadManager(
 
 	var err error
 
-	w.procMan, err = processmanager.NewProcessManager(w.log, w.config, w.t, w.ctx)
+	// start internal NATS server
+	err = w.startInternalNATS()
 	if err != nil {
-		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
+		w.log.Error("Failed to start internal NATS server", slog.Any("err", err))
+		return nil, err
+	} else {
+		w.log.Info("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
+	}
+
+	err = w.startHostServicesNATSConnection()
+	if err != nil {
+		w.log.Error("Failed to start host services NATS connection", slog.Any("error", err))
+		return nil, err
+	} else {
+		w.log.Info("Established host services NATS connection", slog.String("server", w.ncHostServices.Servers()[0]))
+	}
+
+	w.hostServices = NewHostServices(w.ncint, w.ncHostServices, config.HostServicesConfiguration, w.log, w.t.Tracer)
+	err = w.hostServices.init()
+	if err != nil {
+		w.log.Warn("Failed to initialize host services", slog.Any("err", err))
 		return nil, err
 	}
 
-	w.hostServices = NewHostServices(w, ncint, ncHostServices, config.HostServicesConfiguration, w.log)
-	err = w.hostServices.init()
+	w.procMan, err = processmanager.NewProcessManager(w.natsint, w.log, w.config, w.t, w.ctx)
 	if err != nil {
-		w.log.Warn("Failed to initialize host services.", slog.Any("err", err))
+		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -139,11 +163,11 @@ func (w *WorkloadManager) Start() {
 	}
 }
 
-func (m *WorkloadManager) CacheWorkload(request *controlapi.DeployRequest) (uint64, *string, error) {
+func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.DeployRequest) (uint64, *string, error) {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 
-	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key), slog.String("url", m.nc.Opts.Url))
+	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key))
 
 	opts := []nats.JSOpt{}
 	if request.JsDomain != nil {
@@ -173,50 +197,35 @@ func (m *WorkloadManager) CacheWorkload(request *controlapi.DeployRequest) (uint
 		return 0, nil, err
 	}
 
-	jsInternal, err := m.ncInternal.JetStream()
+	err = m.natsint.StoreFileForID(workloadID, workload)
 	if err != nil {
-		m.log.Error("Failed to acquire JetStream context for internal object store.", slog.Any("err", err))
-		panic(err)
-	}
-
-	cache, err := jsInternal.ObjectStore(agentapi.WorkloadCacheBucket)
-	if err != nil {
-		m.log.Error("Failed to get object store reference for internal cache.", slog.Any("err", err))
-		panic(err)
-	}
-
-	obj, err := cache.PutBytes(request.DecodedClaims.Subject, workload)
-	if err != nil {
-		m.log.Error("Failed to write workload to internal cache.", slog.Any("err", err))
-		panic(err)
+		m.log.Error("Failed to store bytes from source object store in cache", slog.Any("err", err), slog.String("key", key))
 	}
 
 	workloadHash := sha256.New()
 	workloadHash.Write(workload)
 	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
 
-	m.log.Info("Successfully stored workload in internal object store", slog.String("name", request.DecodedClaims.Subject), slog.Int64("bytes", int64(obj.Size)))
-	return obj.Size, &workloadHashString, nil
+	m.log.Info("Successfully stored workload in internal object store",
+		slog.String("name", request.DecodedClaims.Subject),
+		slog.Int("bytes", len(workload)))
+
+	return uint64(len(workload)), &workloadHashString, nil
 }
 
 // Deploy a workload as specified by the given deploy request to an available
 // agent in the configured pool
-func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*string, error) {
+func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *agentapi.DeployRequest) error {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
-	agentClient, err := w.selectRandomAgent()
-	if err != nil {
-		return nil, fmt.Errorf("failed to deploy workload: %s", err)
-	}
-
 	workloadID := agentClient.ID()
-	err = w.procMan.PrepareWorkload(workloadID, request)
+	err := w.procMan.PrepareWorkload(workloadID, request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare agent process for workload deployment: %s", err)
+		return fmt.Errorf("failed to prepare agent process for workload deployment: %s", err)
 	}
 
-	status := w.ncInternal.Status()
+	status := w.ncint.Status()
 
 	w.log.Debug("Workload manager deploying workload",
 		slog.String("workload_id", workloadID),
@@ -224,7 +233,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit request for workload deployment: %s", err)
+		return fmt.Errorf("failed to submit request for workload deployment: %s", err)
 	}
 
 	if deployResponse.Accepted {
@@ -243,7 +252,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 						slog.Any("err", err),
 					)
 					_ = w.StopWorkload(workloadID, true)
-					return nil, err
+					return err
 				}
 
 				w.log.Info("Created trigger subject subscription for deployed workload",
@@ -257,7 +266,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 		}
 	} else {
 		_ = w.StopWorkload(workloadID, false)
-		return nil, fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
+		return fmt.Errorf("workload rejected by agent: %s", *deployResponse.Message)
 	}
 
 	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_type", string(request.WorkloadType))))
@@ -265,7 +274,7 @@ func (w *WorkloadManager) DeployWorkload(request *agentapi.DeployRequest) (*stri
 	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes)
 	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 
-	return &workloadID, nil
+	return nil
 }
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
@@ -348,6 +357,14 @@ func (w *WorkloadManager) Stop() error {
 			w.log.Error("failed to stop agent process manager", slog.Any("error", err))
 			return err
 		}
+
+		_ = w.ncint.Drain()
+		for !w.ncint.IsClosed() {
+			time.Sleep(time.Millisecond * 25)
+		}
+
+		w.natsint.Shutdown()
+		_ = os.Remove(path.Join(os.TempDir(), defaultInternalNatsStoreDir))
 	}
 
 	return nil
@@ -403,6 +420,9 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		if err != nil {
 			w.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("workload_id", id), slog.String("error", err.Error()))
 		}
+
+		// FIXME-- this should probably just live in workload manager
+		_ = w.natsint.DestroyCredentials(id)
 	}
 
 	err = w.procMan.StopProcess(id)
@@ -421,18 +441,25 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
+	clientConn, err := w.natsint.ConnectionWithID(id)
+	if err != nil {
+		w.log.Error("Failed to start agent client", slog.Any("err", err))
+		return
+	}
+
 	agentClient := agentapi.NewAgentClient(
-		w.ncInternal,
+		clientConn,
 		w.log,
 		w.handshakeTimeout,
+		w.pingTimeout,
 		w.agentHandshakeTimedOut,
 		w.agentHandshakeSucceeded,
+		w.agentContactLost,
 		w.agentEvent,
 		w.agentLog,
-		w.agentContactLost,
 	)
 
-	err := agentClient.Start(id)
+	err = agentClient.Start(id)
 	if err != nil {
 		w.log.Error("Failed to start agent client", slog.Any("err", err))
 		return
@@ -503,7 +530,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1)
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
-			_ = w.publishFunctionExecFailed(workloadID, *request.WorkloadName, tsub, err)
+			_ = w.publishFunctionExecFailed(workloadID, *request.WorkloadName, *request.Namespace, tsub, err)
 		} else if resp != nil {
 			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
 			runtimeNs := resp.Header.Get(agentapi.NexRuntimeNs)
@@ -546,8 +573,54 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 	}
 }
 
+func (w *WorkloadManager) startInternalNATS() error {
+	var err error
+	w.natsint, err = internalnats.NewInternalNatsServer(w.log)
+	if err != nil {
+		return err
+	}
+
+	p := w.natsint.Port()
+	w.config.InternalNodePort = &p
+	w.ncint = w.natsint.Connection()
+
+	return nil
+}
+
+func (w *WorkloadManager) startHostServicesNATSConnection() error {
+	if w.config.HostServicesConfiguration != nil {
+		if w.config.HostServicesConfiguration.NatsUrl == "" {
+			w.config.HostServicesConfiguration.NatsUrl = w.nc.Servers()[0]
+			w.ncHostServices = w.nc
+		} else {
+			natsOpts := []nats.Option{
+				nats.Name("nex-hostservices"),
+			}
+			if w.config.HostServicesConfiguration.NatsUserJwt == "" {
+				natsOpts = append(natsOpts,
+					nats.UserJWTAndSeed(
+						w.config.HostServicesConfiguration.NatsUserJwt,
+						w.config.HostServicesConfiguration.NatsUserSeed,
+					),
+				)
+			}
+
+			var err error
+			w.ncHostServices, err = nats.Connect(w.config.HostServicesConfiguration.NatsUrl, natsOpts...)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		w.ncHostServices = w.nc
+	}
+
+	w.log.Debug("Configured NATS connection for host services", slog.String("url", w.ncHostServices.Servers()[0]))
+	return nil
+}
+
 // Picks a pending agent from the pool that will receive the next deployment
-func (w *WorkloadManager) selectRandomAgent() (*agentapi.AgentClient, error) {
+func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 	if len(w.pendingAgents) == 0 {
 		return nil, errors.New("no available agent client in pool")
 	}

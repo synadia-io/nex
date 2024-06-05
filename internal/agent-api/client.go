@@ -42,6 +42,7 @@ type AgentClient struct {
 	agentID           string
 	handshakeTimeout  time.Duration
 	handshakeReceived *atomic.Bool
+	pingTimeout       time.Duration
 	stopping          uint32
 
 	handshakeTimedOut  HandshakeCallback
@@ -59,23 +60,24 @@ type AgentClient struct {
 func NewAgentClient(
 	nc *nats.Conn,
 	log *slog.Logger,
-	handshakeTimeout time.Duration,
+	handshakeTimeout, pingTimeout time.Duration,
 	onTimedOut HandshakeCallback,
 	onSuccess HandshakeCallback,
+	onContactLost ContactLostCallback,
 	onEvent EventCallback,
 	onLog LogCallback,
-	onContactLost ContactLostCallback,
 ) *AgentClient {
 	return &AgentClient{
+		contactLost:        onContactLost,
 		eventReceived:      onEvent,
 		handshakeReceived:  &atomic.Bool{},
 		handshakeTimeout:   handshakeTimeout,
 		handshakeTimedOut:  onTimedOut,
 		handshakeSucceeded: onSuccess,
-		contactLost:        onContactLost,
 		log:                log,
 		logReceived:        onLog,
 		nc:                 nc,
+		pingTimeout:        pingTimeout,
 		subz:               make([]*nats.Subscription, 0),
 	}
 }
@@ -85,6 +87,13 @@ func (a *AgentClient) ID() string {
 	return a.agentID
 }
 
+// Agent client instances subscribe to the following `hostint.>` subjects,
+// which are exported by the `nexnode` account on the configured internal
+// NATS connection for consumption by agents:
+//
+// - hostint.<agent_id>.handshake
+// - hostint.<agent_id>.events
+// - hostint.<agent_id>.logs
 func (a *AgentClient) Start(agentID string) error {
 	a.log.Info("Agent client starting", slog.String("agent_id", agentID))
 	a.agentID = agentID
@@ -92,19 +101,19 @@ func (a *AgentClient) Start(agentID string) error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.handshake", agentID), a.handleHandshake)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("hostint.%s.handshake", agentID), a.handleHandshake)
 	if err != nil {
 		return err
 	}
 	a.subz = append(a.subz, sub)
 
-	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.events.*", agentID), a.handleAgentEvent)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("hostint.%s.events.*", agentID), a.handleAgentEvent)
 	if err != nil {
 		return err
 	}
 	a.subz = append(a.subz, sub)
 
-	sub, err = a.nc.Subscribe(fmt.Sprintf("agentint.%s.logs", agentID), a.handleAgentLog)
+	sub, err = a.nc.Subscribe(fmt.Sprintf("hostint.%s.logs", agentID), a.handleAgentLog)
 	if err != nil {
 		return err
 	}
@@ -142,6 +151,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		a.log.Error("Failed to deserialize deployment response", slog.Any("error", err))
 		return nil, err
 	}
+
 	a.workloadStartedAt = time.Now().UTC()
 	return &deployResponse, nil
 }
@@ -181,6 +191,8 @@ func (a *AgentClient) Stop() error {
 }
 
 func (a *AgentClient) Undeploy() error {
+	_ = a.Stop()
+
 	subject := fmt.Sprintf("agentint.%s.undeploy", a.agentID)
 
 	a.log.Debug("sending undeploy request to agent via internal NATS connection",
@@ -193,15 +205,17 @@ func (a *AgentClient) Undeploy() error {
 		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("agent_id", a.agentID), slog.String("error", err.Error()))
 		return err
 	}
+
 	return nil
 }
 
 func (a *AgentClient) Ping() error {
 	subject := fmt.Sprintf("agentint.%s.ping", a.agentID)
+	// a.log.Debug("pinging agent", slog.String("subject", subject))
 
-	_, err := a.nc.Request(subject, []byte{}, 750*time.Millisecond)
+	_, err := a.nc.Request(subject, []byte{}, a.pingTimeout)
 	if err != nil {
-		a.log.Warn("Agent failed to respond to ping", slog.Any("error", err))
+		a.log.Warn("agent failed to respond to ping", slog.Any("error", err))
 		return err
 	}
 
@@ -279,8 +293,10 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 }
 
 func (a *AgentClient) monitorAgent() {
-	ticker := time.NewTicker(15 * time.Second)
-	for {
+	ticker := time.NewTicker(5000 * time.Millisecond) // FIXME-- make configurable
+	defer ticker.Stop()
+
+	for !a.shuttingDown() {
 		<-ticker.C
 		err := a.Ping()
 		if err != nil {
@@ -289,14 +305,10 @@ func (a *AgentClient) monitorAgent() {
 			}
 			break
 		}
-		if a.stopping > 0 {
-			break
-		}
 	}
 }
 
 func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
-	// agentint.{agentID}.events.{type}
 	tokens := strings.Split(msg.Subject, ".")
 	agentID := tokens[1]
 

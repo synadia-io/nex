@@ -16,6 +16,7 @@ import (
 
 	"github.com/cloudevents/sdk-go/pkg/cloudevents"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/agent/providers"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
@@ -23,10 +24,13 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-const defaultAgentHandshakeTimeoutMillis = 500
-const runloopSleepInterval = 250 * time.Millisecond
-const runloopTickInterval = 2500 * time.Millisecond
-const workloadExecutionSleepTimeoutMillis = 1000
+const (
+	defaultAgentHandshakeTimeoutMillis  = 500
+	runloopSleepInterval                = 250 * time.Millisecond
+	runloopTickInterval                 = 2500 * time.Millisecond
+	workloadExecutionSleepTimeoutMillis = 1000
+	workloadCacheFileKey                = "workload"
+)
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
 // and the nex node by way of a configured internal NATS server. Agent instances provide
@@ -61,7 +65,7 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		metadata, err = GetMachineMetadata()
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get machien metadata: %s\n", err)
+		fmt.Fprintf(os.Stderr, "failed to get machine metadata: %s\n", err)
 		return nil, fmt.Errorf("failed to get machine metadata: %s", err)
 	}
 
@@ -70,35 +74,15 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		return nil, fmt.Errorf("invalid metadata: %v", metadata.Errors)
 	}
 
-	nc, err := nats.Connect(fmt.Sprintf("nats://%s:%d", *metadata.NodeNatsHost, *metadata.NodeNatsPort))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
-		return nil, err
-	}
-
-	js, err := nc.JetStream()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get JetStream context from shared NATS: %s", err)
-		return nil, err
-	}
-
-	bucket, err := js.ObjectStore(agentapi.WorkloadCacheBucket)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to get reference to shared object store: %s", err)
-		return nil, err
-	}
-
 	return &Agent{
 		agentLogs: make(chan *agentapi.LogEntry, 64),
 		eventLogs: make(chan *cloudevents.Event, 64),
 		// sandbox defaults to true, only way to override that is with an explicit 'false'
-		cancelF:     cancelF,
-		ctx:         ctx,
-		sandboxed:   isSandboxed(),
-		cacheBucket: bucket,
-		md:          metadata,
-		nc:          nc,
-		started:     time.Now().UTC(),
+		cancelF:   cancelF,
+		ctx:       ctx,
+		sandboxed: isSandboxed(),
+		md:        metadata,
+		started:   time.Now().UTC(),
 	}, nil
 }
 
@@ -151,11 +135,11 @@ func (a *Agent) requestHandshake() error {
 	}
 	raw, _ := json.Marshal(msg)
 
-	resp, err := a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+	resp, err := a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 	if err != nil {
 		if errors.Is(err, nats.ErrNoResponders) {
 			time.Sleep(time.Millisecond * 50)
-			resp, err = a.nc.Request(fmt.Sprintf("agentint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
+			resp, err = a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 		}
 
 		if err != nil {
@@ -191,9 +175,9 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 		tempFile = fmt.Sprintf("%s.exe", tempFile)
 	}
 
-	err := a.cacheBucket.GetFile(*req.WorkloadName, tempFile)
+	err := a.cacheBucket.GetFile(workloadCacheFileKey, tempFile)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to write workload artifact to temp dir: %s", err)
+		msg := fmt.Sprintf("Failed to get and write workload artifact to temp dir: %s", err)
 		a.LogError(msg)
 		return nil, errors.New(msg)
 	}
@@ -218,7 +202,7 @@ func (a *Agent) dispatchEvents() {
 			continue
 		}
 
-		subject := fmt.Sprintf("agentint.%s.events.%s", *a.md.VmID, entry.Type())
+		subject := fmt.Sprintf("hostint.%s.events.%s", *a.md.VmID, entry.Type())
 		err = a.nc.Publish(subject, bytes)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to publish event: %s", err.Error())
@@ -239,7 +223,7 @@ func (a *Agent) dispatchLogs() {
 			continue
 		}
 
-		subject := fmt.Sprintf("agentint.%s.logs", *a.md.VmID)
+		subject := fmt.Sprintf("hostint.%s.logs", *a.md.VmID)
 		err = a.nc.Publish(subject, bytes)
 		if err != nil {
 			continue
@@ -330,9 +314,17 @@ func (a *Agent) handleUndeploy(m *nats.Msg) {
 }
 
 func (a *Agent) handlePing(m *nats.Msg) {
+	// a.LogDebug(fmt.Sprintf("received ping on subject: %s", m.Subject))
 	_ = m.Respond([]byte("OK"))
 }
 
+// Agent instances subscribe to the following `agentint.>` subjects,
+// which are exported dynamically by each `<agent_id>` account on the
+// configured internal NATS connection for consumption by the nex node:
+//
+// - agentint.<agent_id>.deploy
+// - agentint.<agent_id>.undeploy
+// - agentint.<agent_id>.ping
 func (a *Agent) init() error {
 	a.installSignalHandlers()
 
@@ -341,7 +333,13 @@ func (a *Agent) init() error {
 		propagation.Baggage{},
 	))
 
-	err := a.requestHandshake()
+	err := a.initNATS()
+	if err != nil {
+		a.LogError(fmt.Sprintf("Failed to initialize NATS connection: %s", err))
+		return err
+	}
+
+	err = a.requestHandshake()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
 		return err
@@ -369,6 +367,40 @@ func (a *Agent) init() error {
 
 	go a.dispatchEvents()
 	go a.dispatchLogs()
+
+	return nil
+}
+
+func (a *Agent) initNATS() error {
+	url := fmt.Sprintf("nats://%s:%d", *a.md.NodeNatsHost, *a.md.NodeNatsPort)
+	pair, err := nkeys.FromSeed([]byte(*a.md.NodeNatsNkeySeed))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid nkey seed: %v\n", *a.md.NodeNatsNkeySeed)
+		return fmt.Errorf("invalid nkey seed: %v", *a.md.NodeNatsNkeySeed)
+	}
+
+	pk, _ := pair.PublicKey()
+	a.nc, err = nats.Connect(url, nats.Nkey(pk, func(b []byte) ([]byte, error) {
+		fmt.Fprintf(os.Stdout, "Attempting to sign NATS server nonce for internal NATS connection; public key: %s", pk)
+		return pair.Sign(b)
+	}))
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
+		return err
+	}
+	fmt.Printf("Connected to internal NATS: %s\n", url)
+
+	js, err := a.nc.JetStream()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get JetStream context from shared NATS: %s", err)
+		return err
+	}
+
+	a.cacheBucket, err = js.ObjectStore(agentapi.WorkloadCacheBucket)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get reference to shared object store: %s", err)
+		return err
+	}
 
 	return nil
 }
