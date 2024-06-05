@@ -22,6 +22,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/observability"
 )
@@ -323,85 +324,95 @@ func (n *Node) startPublicNATS() error {
 }
 
 func (n *Node) handleAutostarts() {
-	// FIXME-- the signatures here were broken...
-	// time.Sleep(2 * time.Second) // delay a bit before attempting autostarts
+	var agentClient *agentapi.AgentClient
+	var err error
 
-	// for _, autostart := range n.config.AutostartConfiguration.Workloads {
-	// 	request, err := controlapi.NewDeployRequest(
-	// 		controlapi.Argv(autostart.Argv),
-	// 		controlapi.Location(autostart.Location),
-	// 		controlapi.Environment(autostart.Environment),
-	// 		controlapi.Essential(false), // avoid startup flapping, also not supported for funcs
-	// 		controlapi.Issuer(n.issuerKeypair),
-	// 		controlapi.SenderXKey(n.api.xk),
-	// 		controlapi.TargetNode(n.publicKey),
-	// 		controlapi.TargetPublicXKey(n.api.PublicXKey()),
-	// 		controlapi.WorkloadName(autostart.Name),
-	// 		controlapi.WorkloadType(autostart.WorkloadType),
-	// 		controlapi.TriggerSubjects(autostart.TriggerSubjects),
-	// 		controlapi.WorkloadDescription(*autostart.Description),
-	// 	)
-	// 	if err != nil {
-	// 		n.log.Error("Failed to create deployment request for autostart workload",
-	// 			slog.Any("error", err),
-	// 		)
-	// 		continue
-	// 	}
-	// 	_, err = request.Validate()
-	// 	if err != nil {
-	// 		n.log.Error("Failed to validate autostart deployment request",
-	// 			slog.Any("error", err),
-	// 		)
-	// 		continue
-	// 	}
-	// 	agentDeployRequest := &agentapi.DeployRequest{
-	// 		Argv:                 request.Argv,
-	// 		DecodedClaims:        request.DecodedClaims,
-	// 		Description:          request.Description,
-	// 		EncryptedEnvironment: request.Environment,
-	// 		Environment:          request.WorkloadEnvironment,
-	// 		Essential:            request.Essential,
-	// 		JsDomain:             request.JsDomain,
-	// 		Location:             request.Location,
-	// 		Namespace:            &autostart.Namespace,
-	// 		RetryCount:           request.RetryCount,
-	// 		RetriedAt:            request.RetriedAt,
-	// 		SenderPublicKey:      request.SenderPublicKey,
-	// 		TargetNode:           request.TargetNode,
-	// 		TriggerSubjects:      request.TriggerSubjects,
-	// 		WorkloadName:         &request.DecodedClaims.Subject,
-	// 		WorkloadType:         request.WorkloadType,
-	// 		WorkloadJwt:          request.WorkloadJwt,
-	// 	}
+	for agentClient == nil {
+		agentClient, err = n.manager.SelectRandomAgent()
+		if err != nil {
+			n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
+			time.Sleep(25 * time.Millisecond)
+		}
+	}
 
-	// 	numBytes, workloadHash, err := n.api.mgr.CacheWorkload(request)
-	// 	if err != nil {
-	// 		n.api.log.Error("Failed to cache auto-start workload bytes",
-	// 			slog.Any("err", err),
-	// 			slog.String("name", autostart.Name),
-	// 			slog.String("namespace", autostart.Namespace),
-	// 			slog.String("url", autostart.Location),
-	// 		)
-	// 		continue
-	// 	}
-	// 	agentDeployRequest.TotalBytes = int64(numBytes)
-	// 	agentDeployRequest.Hash = *workloadHash
+	for _, autostart := range n.config.AutostartConfiguration.Workloads {
+		request, err := controlapi.NewDeployRequest(
+			controlapi.Argv(autostart.Argv),
+			controlapi.Location(autostart.Location),
+			controlapi.Environment(autostart.Environment),
+			controlapi.Essential(false), // avoid startup flapping, also not supported for funcs
+			controlapi.Issuer(n.issuerKeypair),
+			controlapi.SenderXKey(n.api.xk),
+			controlapi.TargetNode(n.publicKey),
+			controlapi.TargetPublicXKey(n.api.PublicXKey()),
+			controlapi.WorkloadName(autostart.Name),
+			controlapi.WorkloadType(autostart.WorkloadType),
+			controlapi.TriggerSubjects(autostart.TriggerSubjects),
+			controlapi.WorkloadDescription(*autostart.Description),
+		)
+		if err != nil {
+			n.log.Error("Failed to create deployment request for autostart workload",
+				slog.Any("error", err),
+			)
+			continue
+		}
 
-	// 	workloadId, err := n.api.mgr.DeployWorkload(agentDeployRequest)
-	// 	if err != nil {
-	// 		n.log.Error("Failed to deploy autostart workload",
-	// 			slog.Any("error", err),
-	// 			slog.String("name", autostart.Name),
-	// 			slog.String("namespace", autostart.Namespace),
-	// 		)
-	// 		continue
-	// 	}
-	// 	n.log.Info("Autostart workload started",
-	// 		slog.String("name", autostart.Name),
-	// 		slog.String("namespace", autostart.Namespace),
-	// 		slog.String("workload_id", *workloadId),
-	// 	)
-	// }
+		_, err = request.Validate()
+		if err != nil {
+			n.log.Error("Failed to validate autostart deployment request",
+				slog.Any("error", err),
+			)
+			continue
+		}
+
+		agentDeployRequest := &agentapi.DeployRequest{
+			Argv:                 request.Argv,
+			DecodedClaims:        request.DecodedClaims,
+			Description:          request.Description,
+			EncryptedEnvironment: request.Environment,
+			Environment:          request.WorkloadEnvironment,
+			Essential:            request.Essential,
+			JsDomain:             request.JsDomain,
+			Location:             request.Location,
+			Namespace:            &autostart.Namespace,
+			RetryCount:           request.RetryCount,
+			RetriedAt:            request.RetriedAt,
+			SenderPublicKey:      request.SenderPublicKey,
+			TargetNode:           request.TargetNode,
+			TriggerSubjects:      request.TriggerSubjects,
+			WorkloadName:         &request.DecodedClaims.Subject,
+			WorkloadType:         request.WorkloadType,
+			WorkloadJwt:          request.WorkloadJwt,
+		}
+
+		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(agentClient.ID(), request)
+		if err != nil {
+			n.api.log.Error("Failed to cache auto-start workload bytes",
+				slog.Any("err", err),
+				slog.String("name", autostart.Name),
+				slog.String("namespace", autostart.Namespace),
+				slog.String("url", autostart.Location),
+			)
+			continue
+		}
+		agentDeployRequest.TotalBytes = int64(numBytes)
+		agentDeployRequest.Hash = *workloadHash
+
+		err = n.api.mgr.DeployWorkload(agentClient, agentDeployRequest)
+		if err != nil {
+			n.log.Error("Failed to deploy autostart workload",
+				slog.Any("error", err),
+				slog.String("name", autostart.Name),
+				slog.String("namespace", autostart.Namespace),
+			)
+			continue
+		}
+		n.log.Info("Autostart workload started",
+			slog.String("name", autostart.Name),
+			slog.String("namespace", autostart.Namespace),
+			slog.String("workload_id", agentClient.ID()),
+		)
+	}
 }
 
 func (n *Node) loadNodeConfig() error {
