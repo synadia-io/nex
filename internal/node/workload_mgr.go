@@ -422,7 +422,7 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		}
 
 		// FIXME-- this should probably just live in workload manager
-		w.natsint.DestroyCredentials(id)
+		_ = w.natsint.DestroyCredentials(id)
 	}
 
 	err = w.procMan.StopProcess(id)

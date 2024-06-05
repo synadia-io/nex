@@ -188,10 +188,6 @@ func (s *InternalNatsServer) Connection() *nats.Conn {
 }
 
 func (s *InternalNatsServer) Shutdown() {
-	for id, _ := range s.serverConfigData.Credentials {
-		delete(s.serverConfigData.Credentials, id)
-	}
-
 	s.server.Shutdown()
 	s.server.WaitForShutdown()
 }
