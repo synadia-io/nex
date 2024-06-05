@@ -100,7 +100,7 @@ func TestTemplateGenerator(t *testing.T) {
 		}
 	})
 
-	_, _ = ncHost.Subscribe("agentint.>", func(msg *nats.Msg) {
+	_, _ = ncHost.Subscribe("hostint.>", func(msg *nats.Msg) {
 		tokens := strings.Split(msg.Subject, ".")
 		fmt.Printf("-- Replying to %s\n", msg.Subject)
 		if tokens[1] == data.Credentials[id].ID {
@@ -120,7 +120,7 @@ func TestTemplateGenerator(t *testing.T) {
 	_ = ncUser1.Publish("agentevt.my_event", []byte{1, 2, 3})
 	eventWg.Wait()
 
-	res, err := ncUser1.Request("agentint.my.service", []byte{1, 1, 1}, 1*time.Second)
+	res, err := ncUser1.Request(fmt.Sprintf("hostint.%s.service", id), []byte{1, 1, 1}, 1*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
