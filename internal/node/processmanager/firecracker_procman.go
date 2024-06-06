@@ -33,26 +33,28 @@ type FirecrackerProcessManager struct {
 	allVMs  map[string]*runningFirecracker
 	warmVMs chan *runningFirecracker
 
-	intNats *internalnats.InternalNatsServer
-
 	delegate       ProcessDelegate
 	deployRequests map[string]*agentapi.DeployRequest
+
+	intNats    *internalnats.InternalNatsServer
+	nameserver *string
 }
 
 func NewFirecrackerProcessManager(
+	ctx context.Context,
+	config *models.NodeConfiguration,
 	intnats *internalnats.InternalNatsServer,
 	log *slog.Logger,
-	config *models.NodeConfiguration,
+	nameserver *string,
 	telemetry *observability.Telemetry,
-	ctx context.Context,
 ) (*FirecrackerProcessManager, error) {
-
 	return &FirecrackerProcessManager{
-		config:  config,
-		intNats: intnats,
-		t:       telemetry,
-		log:     log,
-		ctx:     ctx,
+		config:     config,
+		ctx:        ctx,
+		intNats:    intnats,
+		log:        log,
+		nameserver: nameserver,
+		t:          telemetry,
 
 		allVMs:         make(map[string]*runningFirecracker),
 		warmVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
@@ -81,7 +83,6 @@ func (f *FirecrackerProcessManager) ListProcesses() ([]ProcessInfo, error) {
 }
 
 func (f *FirecrackerProcessManager) EnterLameDuck() error {
-
 	nope := false
 	for _, req := range f.deployRequests {
 		req.Essential = &nope
@@ -274,8 +275,16 @@ func (f *FirecrackerProcessManager) cleanSockets() {
 }
 
 func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker, workloadSeed string) error {
+	var nameserver *string
+	if f.nameserver != nil {
+		udpAddr := strings.Split(*f.nameserver, ":")
+		ns := fmt.Sprintf("%s:%s", vm.machine.Cfg.NetworkInterfaces[0].StaticConfiguration.IPConfiguration.Gateway, udpAddr[len(udpAddr)-1])
+		nameserver = &ns
+	}
+
 	return vm.setMetadata(&agentapi.MachineMetadata{
 		Message:          models.StringOrNil("Host-supplied metadata"),
+		Nameserver:       nameserver,
 		NodeNatsHost:     vm.config.InternalNodeHost,
 		NodeNatsPort:     vm.config.InternalNodePort,
 		NodeNatsNkeySeed: &workloadSeed,

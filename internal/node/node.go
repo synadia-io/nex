@@ -60,6 +60,7 @@ type Node struct {
 	publicKey     string
 	nexus         string
 
+	dns     *DNS
 	natspub *server.Server
 	nc      *nats.Conn
 
@@ -241,6 +242,15 @@ func (n *Node) init() error {
 			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
 
+		// setup DNS nameserver
+		n.dns, err = NewDNS(n.log)
+		if err != nil {
+			n.log.Error("Failed to initialize DNS nameserver", slog.Any("err", err))
+			err = fmt.Errorf("failed to initialize DNS nameserver: %s", err)
+		} else {
+			n.log.Info("Initialized DNS nameserver")
+		}
+
 		// start public NATS server
 		_err = n.startPublicNATS()
 		if _err != nil {
@@ -264,6 +274,7 @@ func (n *Node) init() error {
 			n.cancelF,
 			n.keypair,
 			n.publicKey,
+			n.dns,
 			n.nc,
 			n.config,
 			n.log,
@@ -542,9 +553,11 @@ func (n *Node) shutdown() {
 			_ = n.publishNodeStopped()
 		}
 
-		_ = n.nc.Drain()
-		for !n.nc.IsClosed() {
-			time.Sleep(time.Millisecond * 25)
+		if n.nc != nil {
+			_ = n.nc.Drain()
+			for !n.nc.IsClosed() {
+				time.Sleep(time.Millisecond * 25)
+			}
 		}
 
 		if n.natspub != nil {
@@ -553,6 +566,7 @@ func (n *Node) shutdown() {
 		}
 
 		_ = n.telemetry.Shutdown()
+		_ = n.dns.Stop()
 
 		_ = os.Remove(n.pidFilepath)
 
