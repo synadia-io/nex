@@ -83,6 +83,7 @@ func init() {
 	ncli.Flag("tlsca", "TLS certificate authority chain file").Envar("NATS_CA").PlaceHolder("FILE").ExistingFileVar(&Opts.TlsCA)
 	ncli.Flag("tlsfirst", "Perform TLS handshake before expecting the server greeting").BoolVar(&Opts.TlsFirst)
 	ncli.Flag("timeout", "Time to wait on responses from NATS").Default("2s").Envar("NATS_TIMEOUT").PlaceHolder("DURATION").DurationVar(&Opts.Timeout)
+	ncli.Flag("jsdomain", "Jetsteam domain to use in nats connection").PlaceHolder("nex").StringVar(&Opts.JsDomain)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
 	ncli.Flag("logger", "How to log").Default("std").Envar("NEX_LOGGER").StringsVar(&Opts.Logger) // Valid options: "std", "file", "nats"
 	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "debug", "info", "warn", "error")

@@ -99,6 +99,7 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 		controlapi.TargetNode(RunOpts.TargetNode),
 		controlapi.TargetPublicXKey(targetPublicXkey),
 		controlapi.WorkloadName(RunOpts.Name),
+		controlapi.JsDomain(Opts.JsDomain),
 		controlapi.WorkloadType(RunOpts.WorkloadType),
 		controlapi.TriggerSubjects(RunOpts.TriggerSubjects),
 		controlapi.Checksum("abc12345TODOmakethisreal"),
