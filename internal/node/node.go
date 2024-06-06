@@ -486,6 +486,7 @@ func (n *Node) publishNodeStarted() error {
 	nodeStart := controlapi.NodeStartedEvent{
 		Version: VERSION,
 		Id:      n.publicKey,
+		Tags:    n.config.Tags,
 	}
 
 	cloudevent := cloudevents.NewEvent()

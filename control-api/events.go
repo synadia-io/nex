@@ -32,8 +32,9 @@ type AgentStoppedEvent struct {
 }
 
 type NodeStartedEvent struct {
-	Version string `json:"version"`
-	Id      string `json:"id"`
+	Version string            `json:"version"`
+	Id      string            `json:"id"`
+	Tags    map[string]string `json:"tags,omitempty"`
 }
 
 type LameDuckEnteredEvent struct {
