@@ -191,6 +191,8 @@ func main() {
 		handlerOpts = append(handlerOpts, shandler.WithColor())
 	}
 
+	handlerOpts = append(handlerOpts, shandler.WithShortLevels())
+
 	logger := slog.New(shandler.NewHandler(handlerOpts...))
 	keypair, err := nkeys.CreateServer()
 	if err != nil {

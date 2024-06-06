@@ -183,8 +183,13 @@ func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
 				nodeArch = "unknown"
 			}
 
+			nodeNexus, ok := node.Tags["nexus"]
+			if !ok {
+				nodeNexus = ""
+			}
+
 			row = append(row, node.Uptime, !nUnsafe, nodeOS, nodeArch)
-			row = append([]any{node.Nexus}, row...)
+			row = append([]any{nodeNexus}, row...)
 		}
 
 		tbl.AddRow(row...)
