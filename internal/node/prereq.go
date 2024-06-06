@@ -159,7 +159,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 	}
 
 	var sb strings.Builder
-	var required *requirements
+	required := &requirements{}
 
 	if !config.NoSandbox {
 		required = &requirements{
