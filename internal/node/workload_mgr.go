@@ -171,6 +171,7 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 
 	opts := []nats.JSOpt{}
 	if request.JsDomain != nil {
+		opts = append(opts, nats.Domain(*request.JsDomain))
 		opts = append(opts, nats.APIPrefix(*request.JsDomain))
 	}
 

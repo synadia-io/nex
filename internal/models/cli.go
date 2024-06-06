@@ -43,6 +43,8 @@ type Options struct {
 	Password string
 	// Nkey is the file holding a nkey to connect with
 	Nkey string
+	// JsDomain is the domain to use for JetStream
+	JsDomain string
 	// Trace enables verbose debug logging
 	Trace bool
 	// SocksProxy is a SOCKS5 proxy to use for NATS connections
