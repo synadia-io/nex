@@ -7,7 +7,7 @@ require (
 	github.com/cdfmlr/ellipsis v0.0.1
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.25.0
-	github.com/charmbracelet/lipgloss v0.10.0
+	github.com/charmbracelet/lipgloss v0.11.0
 	github.com/choria-io/fisk v0.6.2
 	github.com/cloudevents/sdk-go v1.2.0
 	github.com/docker/docker v26.0.2+incompatible
@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/jedib0t/go-pretty/v6 v6.5.8
-	github.com/jordan-rash/slog-handler v0.0.0-20240514154657-1f72d9d2d911
+	github.com/jordan-rash/slog-handler v0.0.0-20240523140048-9e8ba2d5eb3d
 	github.com/nats-io/jsm.go v0.1.1
 	github.com/nats-io/jwt/v2 v2.5.6
 	github.com/nats-io/nats-server/v2 v2.10.14
@@ -42,7 +42,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.26.0
 	go.opentelemetry.io/otel/sdk/metric v1.26.0
 	go.opentelemetry.io/otel/trace v1.26.0
-	golang.org/x/sys v0.20.0
+	golang.org/x/sys v0.21.0
 	golang.org/x/term v0.19.0
 	google.golang.org/grpc v1.63.2
 	rogchap.com/v8go v0.9.0
@@ -60,6 +60,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/charmbracelet/x/ansi v0.1.2 // indirect
 	github.com/containerd/console v1.0.4 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
