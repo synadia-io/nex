@@ -379,7 +379,7 @@ var _ = Describe("nex node", func() {
 								})
 							})
 
-							Describe("deploying an ELF binary workload", func() {
+							Describe("deploying a native binary workload", func() {
 								var deployRequest *controlapi.DeployRequest
 								var err error
 
@@ -397,19 +397,19 @@ var _ = Describe("nex node", func() {
 									time.Sleep(time.Millisecond * 1000)
 								})
 
-								Context("when the ELF binary is not statically-linked", func() {
+								Context("when the native binary is not statically-linked", func() {
 									BeforeEach(func() {
 										cmd := exec.Command("go", "build", "../examples/echoservice")
 										_ = cmd.Start()
 										_ = cmd.Wait()
 									})
 
-									It("should deploy the ELF workload", func(ctx SpecContext) {
+									It("should deploy the native workload", func(ctx SpecContext) {
 										Expect(err).To(BeNil())
 									})
 								})
 
-								Context("when the ELF binary is statically-linked", func() {
+								Context("when the native binary is statically-linked", func() {
 									BeforeEach(func() {
 										cmd := exec.Command("go", "build", "-tags", "netgo", "-ldflags", "-extldflags -static", "../examples/echoservice")
 										_ = cmd.Start()
@@ -418,7 +418,7 @@ var _ = Describe("nex node", func() {
 										time.Sleep(time.Millisecond * 1000)
 									})
 
-									It("should deploy the ELF workload", func(ctx SpecContext) {
+									It("should deploy the native workload", func(ctx SpecContext) {
 										Expect(err).To(BeNil())
 									})
 								})
@@ -540,7 +540,7 @@ func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, erro
 
 	for _, candidate := range nodes {
 		if strings.EqualFold(candidate.NodeId, nodeID) {
-			info, err := nodeClient.NodeInfo(nodes[0].NodeId)
+			info, err := nodeClient.NodeInfo(nodeID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get node info for potential execution target: %s", err)
 			}
