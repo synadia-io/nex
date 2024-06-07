@@ -253,8 +253,13 @@ var _ = Describe("nex node", func() {
 
 					It("should [not] return an error", func(ctx SpecContext) {
 						err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, keypair, log)
-						Expect(err).ToNot(BeNil())
-						Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
+
+						if sandbox {
+							Expect(err).ToNot(BeNil())
+							Expect(err.Error()).To(ContainSubstring("failed to initialize node"))
+						} else {
+							Expect(err).To(BeNil())
+						}
 					})
 				})
 
@@ -472,7 +477,7 @@ var _ = Describe("nex node", func() {
 								// })
 							})
 
-							Describe("deploying an Native binary workload", func() {
+							Describe("deploying a native binary workload", func() {
 								var deployRequest *controlapi.DeployRequest
 								var err error
 
@@ -490,14 +495,14 @@ var _ = Describe("nex node", func() {
 									time.Sleep(time.Millisecond * 1000)
 								})
 
-								Context("when the Native binary is not statically-linked", func() {
+								Context("when the native binary is not statically-linked", func() {
 									BeforeEach(func() {
 										cmd := exec.Command("go", "build", "../examples/echoservice")
 										_ = cmd.Start()
 										_ = cmd.Wait()
 									})
 
-									It("should [fail to] deploy the Native workload", func(ctx SpecContext) {
+									It("should [fail to] deploy the native workload", func(ctx SpecContext) {
 										if sandbox {
 											Expect(err.Error()).To(ContainSubstring("native binary contains at least one dynamically linked dependency"))
 										} else {
@@ -514,7 +519,7 @@ var _ = Describe("nex node", func() {
 									// })
 								})
 
-								Context("when the ELF binary is statically-linked", func() {
+								Context("when the native binary is statically-linked", func() {
 									BeforeEach(func() {
 										cmd := exec.Command("go", "build", "-tags", "netgo", "-ldflags", "-extldflags -static", "../examples/echoservice")
 										_ = cmd.Start()
@@ -523,7 +528,7 @@ var _ = Describe("nex node", func() {
 										time.Sleep(time.Millisecond * 1000)
 									})
 
-									It("should deploy the ELF workload", func(ctx SpecContext) {
+									It("should deploy the native workload", func(ctx SpecContext) {
 										Expect(err).To(BeNil())
 									})
 
@@ -978,28 +983,13 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, cont
 func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, error) {
 	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
 
-	nodes, err := nodeClient.PingNodes()
-	if err != nil {
-		return nil, err
+	var info *controlapi.InfoResponse
+	for info == nil {
+		info, _ = nodeClient.NodeInfo(nodeID)
+		time.Sleep(time.Millisecond * 25)
 	}
 
-	if len(nodes) == 0 {
-		log.Error("no nodes discovered", slog.Any("nc_server", _fixtures.natsConn.Servers()))
-		return nil, errors.New("no nodes discovered")
-	}
-
-	for _, candidate := range nodes {
-		if strings.EqualFold(candidate.NodeId, nodeID) {
-			info, err := nodeClient.NodeInfo(nodes[0].NodeId)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get node info for potential execution target: %s", err)
-			}
-
-			return &info.PublicXKey, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no node discovered which matched %s", nodeID)
+	return &info.PublicXKey, nil
 }
 
 // newDeployRequest() generates a new deploy request given the workload name, description, and file path

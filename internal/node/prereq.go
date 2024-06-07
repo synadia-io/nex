@@ -159,56 +159,59 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 	}
 
 	var sb strings.Builder
+	required := &requirements{}
 
-	required := &requirements{
-		{
-			directories: config.CNI.BinPath,
-			files: []*fileSpec{
-				{name: "host-local", description: "host-local CNI plugin"},
-				{name: "ptp", description: "ptp CNI plugin"},
-				{name: "tc-redirect-tap", description: "tc-redirect-tap CNI plugin"},
+	if !config.NoSandbox {
+		required = &requirements{
+			{
+				directories: config.CNI.BinPath,
+				files: []*fileSpec{
+					{name: "host-local", description: "host-local CNI plugin"},
+					{name: "ptp", description: "ptp CNI plugin"},
+					{name: "tc-redirect-tap", description: "tc-redirect-tap CNI plugin"},
+				},
+				descriptor: "Required CNI Plugins",
+				satisfied:  false,
+				initFuncs:  []initFunc{downloadCNIPlugins, downloadTCRedirectTap},
 			},
-			descriptor: "Required CNI Plugins",
-			satisfied:  false,
-			initFuncs:  []initFunc{downloadCNIPlugins, downloadTCRedirectTap},
-		},
-		{
-			directories: config.BinPath,
-			files: []*fileSpec{
-				{name: "firecracker", description: "Firecracker VM binary"},
+			{
+				directories: config.BinPath,
+				files: []*fileSpec{
+					{name: "firecracker", description: "Firecracker VM binary"},
+				},
+				descriptor: "Required binaries",
+				satisfied:  false,
+				initFuncs:  []initFunc{downloadFirecracker},
 			},
-			descriptor: "Required binaries",
-			satisfied:  false,
-			initFuncs:  []initFunc{downloadFirecracker},
-		},
-		{
-			//cniConfig := fmt.Sprintf("/etc/cni/conf.d/%s.conflist", config.CNI.NetworkName)
-			directories: []string{"/etc/cni/conf.d"},
-			files: []*fileSpec{
-				{name: *config.CNI.NetworkName + ".conflist", description: "CNI Configuration"},
+			{
+				//cniConfig := fmt.Sprintf("/etc/cni/conf.d/%s.conflist", config.CNI.NetworkName)
+				directories: []string{"/etc/cni/conf.d"},
+				files: []*fileSpec{
+					{name: *config.CNI.NetworkName + ".conflist", description: "CNI Configuration"},
+				},
+				descriptor: "CNI configuration requirements",
+				satisfied:  false,
+				initFuncs:  []initFunc{writeCniConf},
 			},
-			descriptor: "CNI configuration requirements",
-			satisfied:  false,
-			initFuncs:  []initFunc{writeCniConf},
-		},
-		{
-			directories: []string{""},
-			files: []*fileSpec{
-				{name: config.KernelFilepath, description: "VMLinux Kernel"},
+			{
+				directories: []string{""},
+				files: []*fileSpec{
+					{name: config.KernelFilepath, description: "VMLinux Kernel"},
+				},
+				descriptor: "VMLinux Kernel",
+				satisfied:  false,
+				initFuncs:  []initFunc{downloadKernel},
 			},
-			descriptor: "VMLinux Kernel",
-			satisfied:  false,
-			initFuncs:  []initFunc{downloadKernel},
-		},
-		{
-			directories: []string{""},
-			files: []*fileSpec{
-				{name: config.RootFsFilepath, description: "Root Filesystem Template"},
+			{
+				directories: []string{""},
+				files: []*fileSpec{
+					{name: config.RootFsFilepath, description: "Root Filesystem Template"},
+				},
+				descriptor: "Root Filesystem Template",
+				satisfied:  false,
+				initFuncs:  []initFunc{downloadRootFS},
 			},
-			descriptor: "Root Filesystem Template",
-			satisfied:  false,
-			initFuncs:  []initFunc{downloadRootFS},
-		},
+		}
 	}
 
 	// Verify all directories are present
