@@ -5,7 +5,6 @@ package spec
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -528,28 +527,13 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, mode
 func resolveNodeTargetPublicXKey(nodeID string, log *slog.Logger) (*string, error) {
 	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
 
-	nodes, err := nodeClient.PingNodes()
-	if err != nil {
-		return nil, err
+	var info *controlapi.InfoResponse
+	for info == nil {
+		info, _ = nodeClient.NodeInfo(nodeID)
+		time.Sleep(time.Millisecond * 25)
 	}
 
-	if len(nodes) == 0 {
-		log.Error("no nodes discovered", slog.Any("nc_server", _fixtures.natsConn.Servers()))
-		return nil, errors.New("no nodes discovered")
-	}
-
-	for _, candidate := range nodes {
-		if strings.EqualFold(candidate.NodeId, nodeID) {
-			info, err := nodeClient.NodeInfo(nodeID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get node info for potential execution target: %s", err)
-			}
-
-			return &info.PublicXKey, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no node discovered which matched %s", nodeID)
+	return &info.PublicXKey, nil
 }
 
 // newDeployRequest() generates a new deploy request given the workload name, description, and file path
