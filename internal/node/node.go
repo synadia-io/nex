@@ -535,6 +535,7 @@ func (n *Node) shutdown() {
 		n.log.Debug("shutting down")
 		if n.api != nil {
 			_ = n.api.Drain()
+			_ = n.nc.Flush()
 		}
 
 		if n.manager != nil {
