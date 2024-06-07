@@ -22,6 +22,7 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 		return
 	}
 	evt.SetSource(fmt.Sprintf("%s-%s", *deployRequest.TargetNode, agentId))
+	evt.SetExtension(controlapi.EventExtensionNamespace, *deployRequest.Namespace)
 
 	err := PublishCloudEvent(w.nc, *deployRequest.Namespace, evt, w.log)
 	if err != nil {

@@ -39,6 +39,9 @@ const (
 	NexWorkloadV8     NexWorkload = "v8"
 	NexWorkloadOCI    NexWorkload = "oci"
 	NexWorkloadWasm   NexWorkload = "wasm"
+
+	// cloud events can't have - in extensions
+	EventExtensionNamespace = "namespace"
 )
 
 type NodeCapabilities struct {
