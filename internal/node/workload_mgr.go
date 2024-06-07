@@ -299,7 +299,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 		agentClient, ok := w.activeAgents[p.ID]
 		if ok {
 			uptimeFriendly = myUptime(agentClient.UptimeMillis())
-			if p.DeployRequest.WorkloadType == models.NexWorkloadV8 || p.DeployRequest.WorkloadType == models.NexWorkloadWasm {
+			if p.DeployRequest.WorkloadType == controlapi.NexWorkloadV8 || p.DeployRequest.WorkloadType == controlapi.NexWorkloadWasm {
 				nanoTime := fmt.Sprintf("%dns", agentClient.ExecTimeNanos())
 				rt, err := time.ParseDuration(nanoTime)
 				if err == nil {

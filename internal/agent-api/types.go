@@ -9,7 +9,7 @@ import (
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nex/internal/models"
+	controlapi "github.com/synadia-io/nex/control-api"
 )
 
 // Name of the internal, non-public bucket for sharing files between host and agent
@@ -44,19 +44,19 @@ type ExecutionProviderParams struct {
 
 // DeployRequest processed by the agent
 type DeployRequest struct {
-	Argv            []string           `json:"argv,omitempty"`
-	DecodedClaims   jwt.GenericClaims  `json:"-"`
-	Description     *string            `json:"description"`
-	Environment     map[string]string  `json:"environment"`
-	Essential       *bool              `json:"essential,omitempty"`
-	Hash            string             `json:"hash,omitempty"`
-	Namespace       *string            `json:"namespace,omitempty"`
-	RetriedAt       *time.Time         `json:"retried_at,omitempty"`
-	RetryCount      *uint              `json:"retry_count,omitempty"`
-	TotalBytes      int64              `json:"total_bytes,omitempty"`
-	TriggerSubjects []string           `json:"trigger_subjects"`
-	WorkloadName    *string            `json:"workload_name,omitempty"`
-	WorkloadType    models.NexWorkload `json:"workload_type,omitempty"`
+	Argv            []string               `json:"argv,omitempty"`
+	DecodedClaims   jwt.GenericClaims      `json:"-"`
+	Description     *string                `json:"description"`
+	Environment     map[string]string      `json:"environment"`
+	Essential       *bool                  `json:"essential,omitempty"`
+	Hash            string                 `json:"hash,omitempty"`
+	Namespace       *string                `json:"namespace,omitempty"`
+	RetriedAt       *time.Time             `json:"retried_at,omitempty"`
+	RetryCount      *uint                  `json:"retry_count,omitempty"`
+	TotalBytes      int64                  `json:"total_bytes,omitempty"`
+	TriggerSubjects []string               `json:"trigger_subjects"`
+	WorkloadName    *string                `json:"workload_name,omitempty"`
+	WorkloadType    controlapi.NexWorkload `json:"workload_type,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`
@@ -78,14 +78,14 @@ func (request *DeployRequest) IsEssential() bool {
 
 // Returns true if the run request supports essential flag
 func (request *DeployRequest) SupportsEssential() bool {
-	return request.WorkloadType == models.NexWorkloadNative ||
-		request.WorkloadType == models.NexWorkloadOCI
+	return request.WorkloadType == controlapi.NexWorkloadNative ||
+		request.WorkloadType == controlapi.NexWorkloadOCI
 }
 
 // Returns true if the run request supports trigger subjects
 func (request *DeployRequest) SupportsTriggerSubjects() bool {
-	return (request.WorkloadType == models.NexWorkloadV8 ||
-		request.WorkloadType == models.NexWorkloadWasm) &&
+	return (request.WorkloadType == controlapi.NexWorkloadV8 ||
+		request.WorkloadType == controlapi.NexWorkloadWasm) &&
 		len(request.TriggerSubjects) > 0
 }
 
@@ -114,8 +114,8 @@ func (r *DeployRequest) Validate() error {
 
 	if r.WorkloadType == "" {
 		err = errors.Join(err, errors.New("workload type is required"))
-	} else if (r.WorkloadType == models.NexWorkloadV8 ||
-		r.WorkloadType == models.NexWorkloadWasm) &&
+	} else if (r.WorkloadType == controlapi.NexWorkloadV8 ||
+		r.WorkloadType == controlapi.NexWorkloadWasm) &&
 		len(r.TriggerSubjects) == 0 {
 		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
 	}

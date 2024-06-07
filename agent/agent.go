@@ -18,6 +18,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/agent/providers"
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	"go.opentelemetry.io/otel"
@@ -171,7 +172,7 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
 
-	if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == models.NexWorkloadNative {
+	if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == controlapi.NexWorkloadNative {
 		tempFile = fmt.Sprintf("%s.exe", tempFile)
 	}
 
@@ -274,7 +275,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	a.provider = provider
 
 	shouldValidate := true
-	if !a.sandboxed && request.WorkloadType == models.NexWorkloadNative {
+	if !a.sandboxed && request.WorkloadType == controlapi.NexWorkloadNative {
 		shouldValidate = false
 	}
 

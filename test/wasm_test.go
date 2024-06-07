@@ -5,13 +5,13 @@ import (
 	"testing"
 
 	"github.com/synadia-io/nex/agent/providers/lib"
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	"github.com/synadia-io/nex/internal/models"
 )
 
 func TestWasmExecution(t *testing.T) {
 	file := "../examples/wasm/echofunction/echofunction.wasm"
-	typ := models.NexWorkloadWasm
+	typ := controlapi.NexWorkloadWasm
 	params := &agentapi.ExecutionProviderParams{
 		DeployRequest: agentapi.DeployRequest{
 			Environment:  map[string]string{},

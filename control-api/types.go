@@ -4,7 +4,6 @@ import (
 	"log/slog"
 
 	cloudevents "github.com/cloudevents/sdk-go"
-	"github.com/synadia-io/nex/internal/models"
 )
 
 const (
@@ -33,12 +32,27 @@ type RunResponse struct {
 	Name    string `json:"name"`
 }
 
+type NexWorkload string
+
+const (
+	NexWorkloadNative NexWorkload = "native"
+	NexWorkloadV8     NexWorkload = "v8"
+	NexWorkloadOCI    NexWorkload = "oci"
+	NexWorkloadWasm   NexWorkload = "wasm"
+)
+
+type NodeCapabilities struct {
+	Sandboxable        bool              `json:"sandboxable"`
+	SupportedProviders []NexWorkload     `json:"supported_providers"`
+	NodeTags           map[string]string `json:"node_tags"`
+}
+
 type AuctionRequest struct {
-	Arch          *string              `json:"arch,omitempty"`
-	OS            *string              `json:"os,omitempty"`
-	Sandboxed     *bool                `json:"sandboxed,omitempty"`
-	Tags          map[string]string    `json:"tags,omitempty"`
-	WorkloadTypes []models.NexWorkload `json:"workload_types,omitempty"`
+	Arch          *string           `json:"arch,omitempty"`
+	OS            *string           `json:"os,omitempty"`
+	Sandboxed     *bool             `json:"sandboxed,omitempty"`
+	Tags          map[string]string `json:"tags,omitempty"`
+	WorkloadTypes []NexWorkload     `json:"workload_types,omitempty"`
 }
 
 type AuctionResponse PingResponse
@@ -64,10 +78,10 @@ type WorkloadPingResponse struct {
 }
 
 type WorkloadPingMachineSummary struct {
-	Id           string             `json:"id"`
-	Namespace    string             `json:"namespace"`
-	Name         string             `json:"name"`
-	WorkloadType models.NexWorkload `json:"type"`
+	Id           string      `json:"id"`
+	Namespace    string      `json:"namespace"`
+	Name         string      `json:"name"`
+	WorkloadType NexWorkload `json:"type"`
 }
 
 type LameDuckResponse struct {
@@ -82,13 +96,13 @@ type MemoryStat struct {
 }
 
 type InfoResponse struct {
-	Version                string               `json:"version"`
-	Uptime                 string               `json:"uptime"`
-	PublicXKey             string               `json:"public_xkey"`
-	Tags                   map[string]string    `json:"tags,omitempty"`
-	Memory                 *MemoryStat          `json:"memory,omitempty"`
-	Machines               []MachineSummary     `json:"machines"`
-	SupportedWorkloadTypes []models.NexWorkload `json:"supported_workload_types,omitempty"`
+	Version                string            `json:"version"`
+	Uptime                 string            `json:"uptime"`
+	PublicXKey             string            `json:"public_xkey"`
+	Tags                   map[string]string `json:"tags,omitempty"`
+	Memory                 *MemoryStat       `json:"memory,omitempty"`
+	Machines               []MachineSummary  `json:"machines"`
+	SupportedWorkloadTypes []NexWorkload     `json:"supported_workload_types,omitempty"`
 }
 
 type MachineSummary struct {
@@ -100,11 +114,11 @@ type MachineSummary struct {
 }
 
 type WorkloadSummary struct {
-	Name         string             `json:"name"`
-	Description  string             `json:"description,omitempty"`
-	Runtime      string             `json:"runtime"`
-	WorkloadType models.NexWorkload `json:"type"`
-	Hash         string             `json:"hash"`
+	Name         string      `json:"name"`
+	Description  string      `json:"description,omitempty"`
+	Runtime      string      `json:"runtime"`
+	WorkloadType NexWorkload `json:"type"`
+	Hash         string      `json:"hash"`
 }
 
 type Envelope struct {

@@ -15,6 +15,7 @@ import (
 	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/internal/models"
 	natslogger "github.com/synadia-io/nex/internal/nats-logger"
 	nextui "github.com/synadia-io/nex/nex/tui"
@@ -149,13 +150,13 @@ func main() {
 
 	switch workloadType {
 	case "native":
-		RunOpts.WorkloadType = models.NexWorkloadNative
+		RunOpts.WorkloadType = controlapi.NexWorkloadNative
 	case "v8":
-		RunOpts.WorkloadType = models.NexWorkloadV8
+		RunOpts.WorkloadType = controlapi.NexWorkloadV8
 	case "oci":
-		RunOpts.WorkloadType = models.NexWorkloadOCI
+		RunOpts.WorkloadType = controlapi.NexWorkloadOCI
 	case "wasm":
-		RunOpts.WorkloadType = models.NexWorkloadWasm
+		RunOpts.WorkloadType = controlapi.NexWorkloadWasm
 	}
 
 	ctx := context.Background()

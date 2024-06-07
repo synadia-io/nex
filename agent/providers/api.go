@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/synadia-io/nex/agent/providers/lib"
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
-	"github.com/synadia-io/nex/internal/models"
 )
 
 // ExecutionProvider implementations provide support for a specific
@@ -34,14 +34,14 @@ func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionPr
 	// }
 
 	switch params.WorkloadType {
-	case models.NexWorkloadNative:
+	case controlapi.NexWorkloadNative:
 		return lib.InitNexExecutionProviderNative(params)
-	case models.NexWorkloadV8:
+	case controlapi.NexWorkloadV8:
 		return lib.InitNexExecutionProviderV8(params)
-	case models.NexWorkloadOCI:
+	case controlapi.NexWorkloadOCI:
 		// TODO-- return lib.InitNexExecutionProviderOCI(params), nil
 		return nil, errors.New("oci execution provider not yet implemented")
-	case models.NexWorkloadWasm:
+	case controlapi.NexWorkloadWasm:
 		return lib.InitNexExecutionProviderWasm(params)
 	default:
 		break
