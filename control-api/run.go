@@ -11,15 +11,14 @@ import (
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nex/internal/models"
 )
 
 type DeployRequest struct {
-	Argv         []string           `json:"argv,omitempty"`
-	Description  *string            `json:"description,omitempty"`
-	WorkloadType models.NexWorkload `json:"type"`
-	Location     *url.URL           `json:"location"`
-	Essential    *bool              `json:"essential,omitempty"`
+	Argv         []string    `json:"argv,omitempty"`
+	Description  *string     `json:"description,omitempty"`
+	WorkloadType NexWorkload `json:"type"`
+	Location     *url.URL    `json:"location"`
+	Essential    *bool       `json:"essential,omitempty"`
 
 	// Contains claims for the workload: name, hash
 	WorkloadJwt *string `json:"workload_jwt"`
@@ -146,7 +145,7 @@ func (request *DeployRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyP
 type requestOptions struct {
 	argv                []string
 	workloadName        string
-	workloadType        models.NexWorkload
+	workloadType        NexWorkload
 	workloadDescription string
 	location            url.URL
 	env                 map[string]string
@@ -179,7 +178,7 @@ func WorkloadName(name string) RequestOption {
 }
 
 // Type of the workload, e.g., one of "native", "v8", "oci", "wasm" for this request
-func WorkloadType(workloadType models.NexWorkload) RequestOption {
+func WorkloadType(workloadType NexWorkload) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.workloadType = workloadType
 		return o

@@ -8,6 +8,7 @@ import (
 
 	"github.com/nats-io/jsm.go/natscontext"
 	"github.com/nats-io/nats.go"
+	controlapi "github.com/synadia-io/nex/control-api"
 )
 
 type UiOptions struct {
@@ -72,7 +73,7 @@ type RunOptions struct {
 	TargetNode        string
 	WorkloadUrl       *url.URL
 	Name              string
-	WorkloadType      NexWorkload
+	WorkloadType      controlapi.NexWorkload
 	Description       string
 	PublisherXkeyFile string
 	ClaimsIssuerFile  string

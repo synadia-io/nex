@@ -87,7 +87,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeOpts.ConfigFilepath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-conf.json", _fixtures.seededRand.Int()))
 				nodeConfig.NoSandbox = true
-				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
+				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
 			})
 
 			It("should not return an error", func(ctx SpecContext) {
@@ -101,7 +101,7 @@ var _ = Describe("nex node", func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeConfig.NoSandbox = true
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
-				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
+				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
 			})
 
 			JustBeforeEach(func() {
@@ -118,7 +118,7 @@ var _ = Describe("nex node", func() {
 					Context("when the specified default_resource_dir does not exist on the host", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
-							nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
+							nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
 						})
 
 						It("should not return an error", func(ctx SpecContext) {
@@ -182,7 +182,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
-				nodeConfig.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative, models.NexWorkloadV8, models.NexWorkloadWasm}
+				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
 
 				nodeConfig.NoSandbox = !sandbox
 				nodeKey, _ = nkeys.CreateServer()
@@ -482,7 +482,7 @@ var _ = Describe("nex node", func() {
 	)
 })
 
-func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, models.NexWorkload, error) {
+func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, controlapi.NexWorkload, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		panic(err)
@@ -510,16 +510,16 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, mode
 		return "", "", "", err
 	}
 
-	var workloadType models.NexWorkload
+	var workloadType controlapi.NexWorkload
 	switch strings.Replace(filepath.Ext(filename), ".", "", 1) {
 	case "exe":
-		workloadType = models.NexWorkloadNative
+		workloadType = controlapi.NexWorkloadNative
 	case "js":
-		workloadType = models.NexWorkloadV8
+		workloadType = controlapi.NexWorkloadV8
 	case "wasm":
-		workloadType = models.NexWorkloadWasm
+		workloadType = controlapi.NexWorkloadWasm
 	default:
-		workloadType = models.NexWorkloadNative
+		workloadType = controlapi.NexWorkloadNative
 	}
 
 	return fmt.Sprintf("nats://%s/%s", "NEXCLIFILES", key), key, workloadType, nil

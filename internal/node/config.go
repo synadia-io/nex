@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 
+	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/internal/models"
 )
 
@@ -25,7 +26,7 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 	}
 
 	if len(config.WorkloadTypes) == 0 {
-		config.WorkloadTypes = []models.NexWorkload{models.NexWorkloadNative}
+		config.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 	}
 
 	if strings.EqualFold(runtime.GOOS, "windows") && !config.NoSandbox {

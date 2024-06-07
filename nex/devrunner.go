@@ -25,7 +25,7 @@ var (
 
 const (
 	defaultFileMode     = os.FileMode(int(0770)) // owner and group r/w/x
-	defaultWorkloadType = models.NexWorkloadNative
+	defaultWorkloadType = controlapi.NexWorkloadNative
 	fileExtensionJS     = "js"
 	fileExtensionWasm   = "wasm"
 
@@ -149,7 +149,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	return nil
 }
 
-func randomNode(nodeClient *controlapi.Client, arch, os string, workloadType models.NexWorkload) (*controlapi.AuctionResponse, error) {
+func randomNode(nodeClient *controlapi.Client, arch, os string, workloadType controlapi.NexWorkload) (*controlapi.AuctionResponse, error) {
 	candidates, err := auction(nodeClient, os, arch, workloadType)
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func randomNode(nodeClient *controlapi.Client, arch, os string, workloadType mod
 	return &candidates[rand.Intn(len(candidates))], nil
 }
 
-func auction(nodeClient *controlapi.Client, os, arch string, workloadType models.NexWorkload) ([]controlapi.AuctionResponse, error) {
+func auction(nodeClient *controlapi.Client, os, arch string, workloadType controlapi.NexWorkload) ([]controlapi.AuctionResponse, error) {
 	var _os, _arch *string
 	if os != "" {
 		_os = &os
@@ -170,7 +170,7 @@ func auction(nodeClient *controlapi.Client, os, arch string, workloadType models
 	candidates, err := nodeClient.Auction(&controlapi.AuctionRequest{
 		Arch:          _arch,
 		OS:            _os,
-		WorkloadTypes: []models.NexWorkload{workloadType},
+		WorkloadTypes: []controlapi.NexWorkload{workloadType},
 	})
 	if err != nil {
 		return nil, err

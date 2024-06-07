@@ -1,13 +1,15 @@
 package models
 
-func GetNodeCapabilities(tags map[string]string) *NodeCapabilities {
-	return &NodeCapabilities{
+import controlapi "github.com/synadia-io/nex/control-api"
+
+func GetNodeCapabilities(tags map[string]string) *controlapi.NodeCapabilities {
+	return &controlapi.NodeCapabilities{
 		Sandboxable: true,
-		SupportedProviders: []NexWorkload{
-			NexWorkloadNative,
-			NexWorkloadOCI,
-			NexWorkloadWasm,
-			NexWorkloadV8,
+		SupportedProviders: []controlapi.NexWorkload{
+			controlapi.NexWorkloadNative,
+			controlapi.NexWorkloadOCI,
+			controlapi.NexWorkloadWasm,
+			controlapi.NexWorkloadV8,
 		},
 		NodeTags: tags,
 	}

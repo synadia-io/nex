@@ -66,7 +66,7 @@ type Node struct {
 	startedAt time.Time
 	telemetry *observability.Telemetry
 
-	capabilities models.NodeCapabilities
+	capabilities controlapi.NodeCapabilities
 }
 
 func NewNode(
