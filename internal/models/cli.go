@@ -81,6 +81,10 @@ type RunOptions struct {
 	Essential         bool
 	DevMode           bool
 	TriggerSubjects   []string
+
+	HsUrl      string
+	HsUserJwt  string
+	HsUserSeed string
 }
 
 type StopOptions struct {

@@ -20,25 +20,22 @@ const hostServiceObjectStore = "objectstore"
 // exposed to workloads by way of the agent which makes RPC calls
 // via the internal NATS connection
 type HostServices struct {
-	config         *models.HostServicesConfig
-	log            *slog.Logger
-	ncHostServices *nats.Conn
-	ncint          *nats.Conn
-	server         *hs.HostServicesServer
+	config *models.HostServicesConfig
+	log    *slog.Logger
+	ncint  *nats.Conn
+	server *hs.HostServicesServer
 }
 
 func NewHostServices(
 	ncint *nats.Conn,
-	ncHostServices *nats.Conn,
 	config *models.HostServicesConfig,
 	log *slog.Logger,
 	tracer trace.Tracer,
 ) *HostServices {
 	return &HostServices{
-		config:         config,
-		log:            log,
-		ncHostServices: ncHostServices,
-		ncint:          ncint,
+		config: config,
+		log:    log,
+		ncint:  ncint,
 		// ‼️ It cannot be overstated how important it is that the host services server
 		// be given the -internal- NATS connection and -not- the external/control one
 		//
@@ -51,7 +48,7 @@ func NewHostServices(
 func (h *HostServices) init() error {
 	if httpConfig, ok := h.config.Services[hostServiceHTTP]; ok {
 		if httpConfig.Enabled {
-			http, err := builtins.NewHTTPService(h.ncHostServices, h.log)
+			http, err := builtins.NewHTTPService(h.log)
 			if err != nil {
 				h.log.Error(fmt.Sprintf("failed to initialize http host service: %s", err.Error()))
 				return err
@@ -68,7 +65,7 @@ func (h *HostServices) init() error {
 
 	if kvConfig, ok := h.config.Services[hostServiceKeyValue]; ok {
 		if kvConfig.Enabled {
-			kv, err := builtins.NewKeyValueService(h.ncHostServices, h.log)
+			kv, err := builtins.NewKeyValueService(h.log)
 			if err != nil {
 				h.log.Error(fmt.Sprintf("failed to initialize key/value host service: %s", err.Error()))
 				return err
@@ -85,7 +82,7 @@ func (h *HostServices) init() error {
 
 	if messagingConfig, ok := h.config.Services[hostServiceMessaging]; ok {
 		if messagingConfig.Enabled {
-			messaging, err := builtins.NewMessagingService(h.ncHostServices, h.log)
+			messaging, err := builtins.NewMessagingService(h.log)
 			if err != nil {
 				h.log.Error(fmt.Sprintf("failed to initialize messaging host service: %s", err.Error()))
 				return err
@@ -102,7 +99,7 @@ func (h *HostServices) init() error {
 
 	if objectConfig, ok := h.config.Services[hostServiceObjectStore]; ok {
 		if objectConfig.Enabled {
-			object, err := builtins.NewObjectStoreService(h.ncHostServices, h.log)
+			object, err := builtins.NewObjectStoreService(h.log)
 			if err != nil {
 				h.log.Error(fmt.Sprintf("failed to initialize object store host service: %s", err.Error()))
 				return err

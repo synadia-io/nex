@@ -36,8 +36,16 @@ type DeployRequest struct {
 	RetryCount *uint      `json:"retry_count,omitempty"`
 	RetriedAt  *time.Time `json:"retried_at,omitempty"`
 
+	HostServicesConfig *HostServicesConfiguration `json:"host_services,omitempty"`
+
 	WorkloadEnvironment map[string]string `json:"-"`
 	DecodedClaims       jwt.GenericClaims `json:"-"`
+}
+
+type HostServicesConfiguration struct {
+	NatsUrl      string `json:"nats_url"`
+	NatsUserJwt  string `json:"nats_user_jwt"`
+	NatsUserSeed string `json:"nats_user_seed"`
 }
 
 var (
@@ -67,17 +75,18 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 	senderPublic, _ := reqOpts.senderXkey.PublicKey()
 
 	req := &DeployRequest{
-		Argv:            reqOpts.argv,
-		Description:     &reqOpts.workloadDescription,
-		WorkloadType:    reqOpts.workloadType,
-		Location:        &reqOpts.location,
-		WorkloadJwt:     &workloadJwt,
-		Environment:     &encryptedEnv,
-		Essential:       &reqOpts.essential,
-		SenderPublicKey: &senderPublic,
-		TargetNode:      &reqOpts.targetNode,
-		TriggerSubjects: reqOpts.triggerSubjects,
-		JsDomain:        &reqOpts.jsDomain,
+		Argv:               reqOpts.argv,
+		Description:        &reqOpts.workloadDescription,
+		WorkloadType:       reqOpts.workloadType,
+		Location:           &reqOpts.location,
+		WorkloadJwt:        &workloadJwt,
+		Environment:        &encryptedEnv,
+		Essential:          &reqOpts.essential,
+		SenderPublicKey:    &senderPublic,
+		TargetNode:         &reqOpts.targetNode,
+		TriggerSubjects:    reqOpts.triggerSubjects,
+		JsDomain:           &reqOpts.jsDomain,
+		HostServicesConfig: reqOpts.hostServicesConfiguration,
 	}
 
 	return req, nil
@@ -143,20 +152,21 @@ func (request *DeployRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyP
 }
 
 type requestOptions struct {
-	argv                []string
-	workloadName        string
-	workloadType        NexWorkload
-	workloadDescription string
-	location            url.URL
-	env                 map[string]string
-	essential           bool
-	senderXkey          nkeys.KeyPair
-	claimsIssuer        nkeys.KeyPair
-	targetPublicXKey    string
-	jsDomain            string
-	hash                string
-	targetNode          string
-	triggerSubjects     []string
+	argv                      []string
+	workloadName              string
+	workloadType              NexWorkload
+	workloadDescription       string
+	location                  url.URL
+	env                       map[string]string
+	essential                 bool
+	senderXkey                nkeys.KeyPair
+	claimsIssuer              nkeys.KeyPair
+	targetPublicXKey          string
+	jsDomain                  string
+	hash                      string
+	targetNode                string
+	triggerSubjects           []string
+	hostServicesConfiguration *HostServicesConfiguration
 }
 
 type RequestOption func(o requestOptions) requestOptions
@@ -165,6 +175,13 @@ type RequestOption func(o requestOptions) requestOptions
 func Argv(argv []string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.argv = argv
+		return o
+	}
+}
+
+func HostServicesConfig(config HostServicesConfiguration) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.hostServicesConfiguration = &config
 		return o
 	}
 }

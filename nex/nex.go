@@ -110,6 +110,9 @@ func init() {
 	run.Flag("argv", "Arguments to pass to the workload, if applicable").StringVar(&RunOpts.Argv)
 	run.Flag("essential", "When true, workload is redeployed if it exits with a non-zero status").BoolVar(&RunOpts.Essential)
 	run.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
+	run.Flag("hs_url", "Override the URL used for host services for this workload").StringVar(&RunOpts.HsUrl)
+	run.Flag("hs_jwt", "Set the user JWT for override host services connection").StringVar(&RunOpts.HsUserJwt)
+	run.Flag("hs_seed", "Set the user seed for override host services connection").StringVar(&RunOpts.HsUserSeed)
 
 	yeet.Arg("file", "File to run").Required().ExistingFileVar(&DevRunOpts.Filename)
 	yeet.Arg("env", "Environment variables to pass to workload").StringMapVar(&RunOpts.Env)

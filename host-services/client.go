@@ -12,16 +12,16 @@ import (
 )
 
 type HostServicesClient struct {
-	nc           *nats.Conn
+	ncInternal   *nats.Conn
 	namespace    string
 	workloadName string
 	workloadId   string
 	timeout      time.Duration
 }
 
-func NewHostServicesClient(nc *nats.Conn, timeout time.Duration, namespace, workloadName, workloadId string) *HostServicesClient {
+func NewHostServicesClient(ncInternal *nats.Conn, timeout time.Duration, namespace, workloadName, workloadId string) *HostServicesClient {
 	return &HostServicesClient{
-		nc:           nc,
+		ncInternal:   ncInternal,
 		namespace:    namespace,
 		workloadName: workloadName,
 		workloadId:   workloadId,
@@ -47,7 +47,7 @@ func (c *HostServicesClient) PerformRPC(ctx context.Context, service string, met
 
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(msg.Header))
 
-	result, err := c.nc.RequestMsg(msg, c.timeout)
+	result, err := c.ncInternal.RequestMsg(msg, c.timeout)
 	if err != nil {
 		return ServiceResult{}, err
 	}

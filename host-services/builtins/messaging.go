@@ -22,7 +22,6 @@ const (
 
 type MessagingService struct {
 	log *slog.Logger
-	nc  *nats.Conn
 
 	config messagingConfig
 }
@@ -32,10 +31,9 @@ type messagingConfig struct {
 	RequestManyTimeoutMs int64 `json:"request_many_timeout_ms"`
 }
 
-func NewMessagingService(nc *nats.Conn, log *slog.Logger) (*MessagingService, error) {
+func NewMessagingService(log *slog.Logger) (*MessagingService, error) {
 	messaging := &MessagingService{
 		log: log,
-		nc:  nc,
 	}
 
 	return messaging, nil
@@ -56,7 +54,9 @@ func (m *MessagingService) Initialize(config json.RawMessage) error {
 	return nil
 }
 
-func (m *MessagingService) HandleRequest(namespace string,
+func (m *MessagingService) HandleRequest(
+	nc *nats.Conn,
+	namespace string,
 	workloadId string,
 	method string,
 	workloadName string,
@@ -65,11 +65,11 @@ func (m *MessagingService) HandleRequest(namespace string,
 
 	switch method {
 	case messagingServiceMethodPublish:
-		return m.handlePublish(workloadId, workloadName, request, metadata, namespace)
+		return m.handlePublish(nc, workloadId, workloadName, request, metadata, namespace)
 	case messagingServiceMethodRequest:
-		return m.handleRequest(workloadId, workloadName, request, metadata, namespace)
+		return m.handleRequest(nc, workloadId, workloadName, request, metadata, namespace)
 	case messagingServiceMethodRequestMany:
-		return m.handleRequestMany(workloadId, workloadName, request, metadata, namespace)
+		return m.handleRequestMany(nc, workloadId, workloadName, request, metadata, namespace)
 	default:
 		m.log.Warn("Received invalid host services RPC request",
 			slog.String("service", "messaging"),
@@ -79,7 +79,9 @@ func (m *MessagingService) HandleRequest(namespace string,
 	}
 }
 
-func (m *MessagingService) handlePublish(_, _ string,
+func (m *MessagingService) handlePublish(
+	nc *nats.Conn,
+	_, _ string,
 	data []byte, metadata map[string]string,
 	_ string,
 ) (hostservices.ServiceResult, error) {
@@ -88,7 +90,7 @@ func (m *MessagingService) handlePublish(_, _ string,
 		return hostservices.ServiceResultFail(500, "subject is required"), nil
 	}
 
-	err := m.nc.Publish(subject, data)
+	err := nc.Publish(subject, data)
 	if err != nil {
 		m.log.Warn(fmt.Sprintf("failed to publish %d-byte message on subject %s: %s", len(data), subject, err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to publish message"), nil
@@ -100,7 +102,9 @@ func (m *MessagingService) handlePublish(_, _ string,
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-func (m *MessagingService) handleRequest(_, _ string,
+func (m *MessagingService) handleRequest(
+	nc *nats.Conn,
+	_, _ string,
 	data []byte, metadata map[string]string,
 	_ string,
 ) (hostservices.ServiceResult, error) {
@@ -109,7 +113,7 @@ func (m *MessagingService) handleRequest(_, _ string,
 		return hostservices.ServiceResultFail(400, "subject is required"), nil
 	}
 
-	resp, err := m.nc.Request(subject, data, time.Duration(m.config.RequestTimeoutMs*int64(time.Millisecond)))
+	resp, err := nc.Request(subject, data, time.Duration(m.config.RequestTimeoutMs*int64(time.Millisecond)))
 	if err != nil {
 		m.log.Debug(fmt.Sprintf("failed to send %d-byte request on subject %s: %s", len(data), subject, err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to send request"), nil
@@ -119,7 +123,9 @@ func (m *MessagingService) handleRequest(_, _ string,
 	return hostservices.ServiceResultPass(200, "", resp.Data), nil
 }
 
-func (m *MessagingService) handleRequestMany(_, _ string,
+func (m *MessagingService) handleRequestMany(
+	_ *nats.Conn,
+	_, _ string,
 	_ []byte, metadata map[string]string,
 	_ string,
 ) (hostservices.ServiceResult, error) {

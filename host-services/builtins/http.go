@@ -23,13 +23,11 @@ const defaultHTTPRequestTimeoutMillis = 2500
 
 type HTTPService struct {
 	log *slog.Logger
-	nc  *nats.Conn
 }
 
-func NewHTTPService(nc *nats.Conn, log *slog.Logger) (*HTTPService, error) {
+func NewHTTPService(log *slog.Logger) (*HTTPService, error) {
 	http := &HTTPService{
 		log: log,
-		nc:  nc,
 	}
 
 	return http, nil
@@ -39,7 +37,9 @@ func (h *HTTPService) Initialize(_ json.RawMessage) error {
 	return nil
 }
 
-func (h *HTTPService) HandleRequest(namespace string,
+func (h *HTTPService) HandleRequest(
+	_ *nats.Conn,
+	namespace string,
 	workloadId string,
 	method string,
 	workloadName string,

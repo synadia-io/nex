@@ -3,6 +3,8 @@ package hostservices
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/nats-io/nats.go"
 )
 
 const (
@@ -45,6 +47,7 @@ type HostService interface {
 	Initialize(json.RawMessage) error
 
 	HandleRequest(
+		connection *nats.Conn,
 		namespace string,
 		workloadId string,
 		method string,
