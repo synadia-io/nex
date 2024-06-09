@@ -223,7 +223,7 @@ var _ = Describe("nex node", func() {
 					})
 
 					AfterEach(func() {
-						node.Stop()
+						os.Process.Signal(os.Interrupt)
 
 						node = nil
 						nodeID = nil
