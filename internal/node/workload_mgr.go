@@ -407,6 +407,10 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 			)
 		}
 
+		for sub.IsDraining() {
+			time.Sleep(time.Millisecond * 10)
+		}
+
 		w.log.Debug("drained subscription associated with workload",
 			slog.String("subject", sub.Subject),
 			slog.String("workload_id", id),

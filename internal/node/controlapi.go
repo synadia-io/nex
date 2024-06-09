@@ -75,6 +75,10 @@ func (api *ApiListener) Drain() error {
 			// no-op for now, try the next one...
 		}
 
+		for sub.IsDraining() {
+			time.Sleep(time.Millisecond * 10)
+		}
+
 		api.log.Debug("drained subscription associated with api listener",
 			slog.String("subject", sub.Subject),
 		)
