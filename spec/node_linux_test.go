@@ -278,7 +278,7 @@ var _ = Describe("nex node", func() {
 					})
 
 					AfterEach(func() {
-						syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+						_ = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 
 						node = nil
 						nodeID = nil
