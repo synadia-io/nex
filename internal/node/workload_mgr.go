@@ -614,7 +614,7 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployR
 		if w.config.HostServicesConfiguration.NatsUrl != "" {
 			url = w.config.HostServicesConfiguration.NatsUrl
 		} else {
-			url = w.nc.Opts.Url
+			url = w.nc.Servers()[0]
 		}
 	} else {
 		if w.nc.Opts.UserJWT != nil {
