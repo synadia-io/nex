@@ -223,7 +223,8 @@ var _ = Describe("nex node", func() {
 					})
 
 					AfterEach(func() {
-						os.Process.Signal(os.Interrupt)
+						p, _ := os.FindProcess(os.Getpid())
+						_ = p.Signal(os.Interrupt)
 
 						node = nil
 						nodeID = nil
@@ -242,7 +243,7 @@ var _ = Describe("nex node", func() {
 
 						nodeID, _ = node.PublicKey()
 						nodeProxy = nexnode.NewNodeProxyWith(node)
-						time.Sleep(time.Millisecond * 500)
+						time.Sleep(time.Millisecond * 1000)
 					})
 
 					It("should generate a keypair for the node", func(ctx SpecContext) {
