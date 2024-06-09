@@ -36,6 +36,7 @@ func NewHostServicesServer(ncInternal *nats.Conn, log *slog.Logger, tracer trace
 }
 
 func (h *HostServicesServer) SetHostServicesConnection(workloadId string, nc *nats.Conn) {
+	h.RemoveHostServicesConnection(workloadId)
 	h.hsClientConnections[workloadId] = nc
 }
 

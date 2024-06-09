@@ -591,37 +591,57 @@ func (w *WorkloadManager) startInternalNATS() error {
 }
 
 func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployRequest) (*nats.Conn, error) {
-
 	natsOpts := []nats.Option{
 		nats.Name("nex-hostservices"),
 	}
 
 	var url string
 	if request.HostServicesConfig != nil {
+		// FIXME-- check to ensure NATS user JWT and seed are present
 		natsOpts = append(natsOpts,
 			nats.UserJWTAndSeed(request.HostServicesConfig.NatsUserJwt,
 				request.HostServicesConfig.NatsUserSeed,
 			))
+
 		url = request.HostServicesConfig.NatsUrl
 	} else if w.config.HostServicesConfiguration != nil {
+		// FIXME-- check to ensure NATS user JWT and seed are present
 		natsOpts = append(natsOpts,
 			nats.UserJWTAndSeed(w.config.HostServicesConfiguration.NatsUserJwt,
 				w.config.HostServicesConfiguration.NatsUserSeed,
 			))
-		url = w.config.HostServicesConfiguration.NatsUrl
+
+		if w.config.HostServicesConfiguration.NatsUrl != "" {
+			url = w.config.HostServicesConfiguration.NatsUrl
+		} else {
+			url = w.nc.Opts.Url
+		}
 	} else {
 		if w.nc.Opts.UserJWT != nil {
 			natsOpts = append(natsOpts,
 				nats.UserJWT(w.nc.Opts.UserJWT, w.nc.Opts.SignatureCB),
 			)
 		}
+
 		url = w.nc.Opts.Url
 	}
 
+	w.log.Debug("Attempting to establish host services connection for workload",
+		slog.String("workload_name", *request.WorkloadName),
+		slog.String("url", url),
+	)
+
 	nc, err := nats.Connect(url, natsOpts...)
 	if err != nil {
+		w.log.Warn("Failed to establish host services connection for workload",
+			slog.String("workload_name", *request.WorkloadName),
+			slog.String("url", url),
+			slog.String("error", err.Error()),
+		)
+
 		return nil, err
 	}
+
 	w.log.Info("Established host services connection for workload",
 		slog.String("workload_name", *request.WorkloadName),
 		slog.String("url", nc.ConnectedUrl()),

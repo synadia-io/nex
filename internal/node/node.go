@@ -75,7 +75,8 @@ func NewNode(
 	nodeOpts *models.NodeOptions,
 	ctx context.Context,
 	cancelF context.CancelFunc,
-	log *slog.Logger) (*Node, error) {
+	log *slog.Logger,
+) (*Node, error) {
 	node := &Node{
 		ctx:      ctx,
 		cancelF:  cancelF,
