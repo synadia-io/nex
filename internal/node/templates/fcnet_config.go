@@ -1,7 +1,7 @@
 package templates
 
 var FcnetConfig string = `{
-  "name": "fcnet",
+  "name": "{{.NetworkName}}",
   "cniVersion": "0.4.0",
   "plugins": [
     {
