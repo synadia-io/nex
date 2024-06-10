@@ -13,11 +13,12 @@ import (
 
 // Initialize an appropriate agent process manager instance based on the sandbox config value
 func NewProcessManager(
-	intNats *internalnats.InternalNatsServer,
-	log *slog.Logger,
-	config *models.NodeConfiguration,
-	telemetry *observability.Telemetry,
 	ctx context.Context,
+	config *models.NodeConfiguration,
+	intnats *internalnats.InternalNatsServer,
+	log *slog.Logger,
+	_ *string,
+	telemetry *observability.Telemetry,
 ) (ProcessManager, error) {
-	return NewSpawningProcessManager(intNats, log, config, telemetry, ctx)
+	return NewSpawningProcessManager(ctx, config, intnats, log, telemetry)
 }
