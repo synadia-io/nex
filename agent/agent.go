@@ -335,10 +335,14 @@ func (a *Agent) init() error {
 		propagation.Baggage{},
 	))
 
-	err := a.setNameservers()
-	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to set nameservers: %s", err))
-		return err
+	var err error
+
+	if a.sandboxed {
+		err = a.setNameservers()
+		if err != nil {
+			a.LogError(fmt.Sprintf("Failed to set nameservers: %s", err))
+			return err
+		}
 	}
 
 	err = a.initNATS()
@@ -486,7 +490,7 @@ func (a *Agent) setNameservers() error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to update iptables for nameserver: %s", err))
-		// return err
+		return err
 	}
 	a.LogDebug(string(out))
 
@@ -494,7 +498,7 @@ func (a *Agent) setNameservers() error {
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		a.LogError(fmt.Sprintf("Failed to update iptables for nameserver: %s", err))
-		// return err
+		return err
 	}
 	a.LogDebug(string(out))
 
