@@ -430,7 +430,7 @@ func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
 
 		f := strings.TrimPrefix(strings.TrimSpace(header.Name), "./")
 
-		if f == "ptp" || f == "bridge" || f == "host-local" {
+		if f == "bridge" || f == "host-local" || f == "ptp" {
 			outFile, err := os.Create(filepath.Join(r.directories[0], f))
 			if err != nil {
 				fmt.Println(err)
