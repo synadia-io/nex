@@ -157,11 +157,6 @@ func (n *Node) Start() {
 	n.cancelF()
 }
 
-func (n *Node) Stop() {
-	n.log.Debug("stopping node")
-	n.shutdown()
-}
-
 func (n *Node) EnterLameDuck() error {
 	if atomic.AddUint32(&n.lameduck, 1) == 1 {
 		n.config.Tags[controlapi.TagLameDuck] = "true"

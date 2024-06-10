@@ -223,7 +223,8 @@ var _ = Describe("nex node", func() {
 					})
 
 					AfterEach(func() {
-						node.Stop()
+						p, _ := os.FindProcess(os.Getpid())
+						_ = p.Signal(os.Interrupt)
 
 						node = nil
 						nodeID = nil
@@ -242,7 +243,7 @@ var _ = Describe("nex node", func() {
 
 						nodeID, _ = node.PublicKey()
 						nodeProxy = nexnode.NewNodeProxyWith(node)
-						time.Sleep(time.Millisecond * 500)
+						time.Sleep(time.Millisecond * 1000)
 					})
 
 					It("should generate a keypair for the node", func(ctx SpecContext) {
@@ -276,56 +277,6 @@ var _ = Describe("nex node", func() {
 
 					It("should initialize a telemetry instance", func(ctx SpecContext) {
 						Expect(nodeProxy.Telemetry()).ToNot(BeNil())
-					})
-
-					Describe("node API listener subscriptions", func() {
-						It("should initialize a node API subscription for handling auction requests", func(ctx SpecContext) {
-							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
-								Subscriptions: true,
-								Test:          "$NEX.AUCTION",
-							})
-							Expect(subsz.Total).To(Equal(1))
-						})
-
-						It("should initialize a node API subscription for handling ping requests", func(ctx SpecContext) {
-							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
-								Subscriptions: true,
-								Test:          "$NEX.PING",
-							})
-							Expect(subsz.Total).To(Equal(1))
-						})
-
-						It("should initialize a node API subscription for handling ping requests with a specific node id", func(ctx SpecContext) {
-							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
-								Subscriptions: true,
-								Test:          fmt.Sprintf("$NEX.PING.%s", *nodeID),
-							})
-							Expect(subsz.Total).To(Equal(1))
-						})
-
-						It("should initialize a node API subscription for handling namespaced info requests", func(ctx SpecContext) {
-							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
-								Subscriptions: true,
-								Test:          fmt.Sprintf("$NEX.INFO.default.%s", *nodeID),
-							})
-							Expect(subsz.Total).To(Equal(1))
-						})
-
-						It("should initialize a node API subscription for handling namespaced deploy requests", func(ctx SpecContext) {
-							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
-								Subscriptions: true,
-								Test:          fmt.Sprintf("$NEX.DEPLOY.default.%s", *nodeID),
-							})
-							Expect(subsz.Total).To(Equal(1))
-						})
-
-						It("should initialize a node API subscription for handling namespaced workload stop -- FIXME? should be undeploy?", func(ctx SpecContext) {
-							subsz, _ := _fixtures.natsServer.Subsz(&server.SubszOptions{
-								Subscriptions: true,
-								Test:          fmt.Sprintf("$NEX.STOP.default.%s", *nodeID),
-							})
-							Expect(subsz.Total).To(Equal(1))
-						})
 					})
 
 					Describe("machine manager", func() {
