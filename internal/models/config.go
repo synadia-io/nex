@@ -27,7 +27,7 @@ const (
 
 var (
 	DefaultBinPath       = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
-	DefaultCNIBinPath    = "/opt/cni/bin"
+	DefaultCNIBinPath    = []string{"/opt/cni/bin"}
 	DefaultWorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 )
 
