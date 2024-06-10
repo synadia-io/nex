@@ -171,10 +171,6 @@ func (a *AgentClient) Drain() error {
 			// no-op for now, try the next one... perhaps we should return the error here in the future?
 		}
 
-		for sub.IsDraining() {
-			time.Sleep(time.Millisecond * 10)
-		}
-
 		a.log.Debug("drained subscription associated with agent client",
 			slog.String("subject", sub.Subject),
 			slog.String("agent_id", a.agentID),
