@@ -137,7 +137,12 @@ func NewWorkloadManager(
 		return nil, err
 	}
 
-	w.procMan, err = processmanager.NewProcessManager(w.ctx, w.config, w.natsint, w.log, w.dns.udpAddr, w.t)
+	var nameserver *string
+	if w.dns != nil {
+		nameserver = w.dns.udpAddr
+	}
+
+	w.procMan, err = processmanager.NewProcessManager(w.ctx, w.config, w.natsint, w.log, nameserver, w.t)
 	if err != nil {
 		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
 		return nil, err

@@ -242,13 +242,15 @@ func (n *Node) init() error {
 			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
 
-		// setup DNS nameserver
-		n.dns, err = NewDNS(n.log)
-		if err != nil {
-			n.log.Error("Failed to initialize DNS nameserver", slog.Any("err", err))
-			err = fmt.Errorf("failed to initialize DNS nameserver: %s", err)
-		} else {
-			n.log.Info("Initialized DNS nameserver")
+		if !n.config.NoSandbox {
+			// setup DNS nameserver
+			n.dns, err = NewDNS(n.log)
+			if err != nil {
+				n.log.Error("Failed to initialize DNS nameserver", slog.Any("err", err))
+				err = fmt.Errorf("failed to initialize DNS nameserver: %s", err)
+			} else {
+				n.log.Info("Initialized DNS nameserver")
+			}
 		}
 
 		// start public NATS server
@@ -566,7 +568,10 @@ func (n *Node) shutdown() {
 		}
 
 		_ = n.telemetry.Shutdown()
-		_ = n.dns.Stop()
+
+		if n.dns != nil {
+			_ = n.dns.Stop()
+		}
 
 		_ = os.Remove(n.pidFilepath)
 
