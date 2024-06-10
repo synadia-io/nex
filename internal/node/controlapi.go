@@ -306,6 +306,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		SenderPublicKey:      request.SenderPublicKey,
 		TargetNode:           request.TargetNode,
 		TotalBytes:           int64(numBytes),
+		HostServicesConfig:   request.HostServicesConfig,
 		TriggerSubjects:      request.TriggerSubjects,
 		WorkloadName:         &request.DecodedClaims.Subject,
 		WorkloadType:         request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...

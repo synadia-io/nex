@@ -43,8 +43,9 @@ func TestKvBuiltin(t *testing.T) {
 	server := hostservices.NewHostServicesServer(nc, slog.Default(), noop.NewTracerProvider().Tracer("nex-node"))
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
+	server.SetHostServicesConnection(testWorkloadId, nc)
 
-	service, _ := NewKeyValueService(nc, slog.Default())
+	service, _ := NewKeyValueService(slog.Default())
 	err := server.AddService("kv", service, nil)
 	if err != nil {
 		t.Fatalf("Failed to add service: %s", err)
@@ -84,8 +85,9 @@ func TestMessagingBuiltin(t *testing.T) {
 	server := hostservices.NewHostServicesServer(nc, slog.Default(), noop.NewTracerProvider().Tracer("nex-node"))
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
+	server.SetHostServicesConnection(testWorkloadId, nc)
 
-	service, _ := NewMessagingService(nc, slog.Default())
+	service, _ := NewMessagingService(slog.Default())
 	_ = server.AddService("messaging", service, nil)
 	_ = server.Start()
 
@@ -110,8 +112,9 @@ func TestObjectBuiltin(t *testing.T) {
 	server := hostservices.NewHostServicesServer(nc, slog.Default(), noop.NewTracerProvider().Tracer("nex-node"))
 	client := hostservices.NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 	bClient := NewBuiltinServicesClient(client)
+	server.SetHostServicesConnection(testWorkloadId, nc)
 
-	service, _ := NewObjectStoreService(nc, slog.Default())
+	service, _ := NewObjectStoreService(slog.Default())
 	_ = server.AddService("objectstore", service, []byte{})
 	_ = server.Start()
 

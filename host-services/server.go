@@ -15,18 +15,35 @@ import (
 )
 
 type HostServicesServer struct {
-	log      *slog.Logger
-	nc       *nats.Conn
-	services map[string]HostService
-	tracer   trace.Tracer
+	log        *slog.Logger
+	ncInternal *nats.Conn
+	services   map[string]HostService
+	// Every single workload gets its own private host services connection,
+	// even if it's reusing defaults for config
+	hsClientConnections map[string]*nats.Conn
+
+	tracer trace.Tracer
 }
 
-func NewHostServicesServer(nc *nats.Conn, log *slog.Logger, tracer trace.Tracer) *HostServicesServer {
+func NewHostServicesServer(ncInternal *nats.Conn, log *slog.Logger, tracer trace.Tracer) *HostServicesServer {
 	return &HostServicesServer{
-		log:      log,
-		nc:       nc,
-		services: make(map[string]HostService),
-		tracer:   tracer,
+		log:                 log,
+		ncInternal:          ncInternal,
+		services:            make(map[string]HostService),
+		hsClientConnections: make(map[string]*nats.Conn),
+		tracer:              tracer,
+	}
+}
+
+func (h *HostServicesServer) SetHostServicesConnection(workloadId string, nc *nats.Conn) {
+	h.RemoveHostServicesConnection(workloadId)
+	h.hsClientConnections[workloadId] = nc
+}
+
+func (h *HostServicesServer) RemoveHostServicesConnection(workloadId string) {
+	if c, ok := h.hsClientConnections[workloadId]; ok {
+		_ = c.Drain()
+		delete(h.hsClientConnections, workloadId)
 	}
 }
 
@@ -55,13 +72,13 @@ func (h *HostServicesServer) AddService(name string, svc HostService, config jso
 //
 // - hostint.<agent_id>.rpc.<namespace>.<workloadName>.<service>.<method>
 func (h *HostServicesServer) Start() error {
-	_, err := h.nc.Subscribe("hostint.*.rpc.*.*.*.*", h.handleRPC)
+	_, err := h.ncInternal.Subscribe("hostint.*.rpc.*.*.*.*", h.handleRPC)
 	if err != nil {
 		h.log.Warn("Failed to create Host services rpc subscription", slog.String("error", err.Error()))
 		return err
 	}
 
-	h.log.Debug("Host services rpc subscription created", slog.String("address", h.nc.ConnectedAddr()))
+	h.log.Debug("Host services rpc subscription created", slog.String("address", h.ncInternal.ConnectedAddr()))
 	return nil
 }
 
@@ -107,7 +124,9 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 
 	span.AddEvent("RPC Request Began")
 
-	result, err := service.HandleRequest(namespace, vmID, method, workloadName, metadata, msg.Data)
+	requestConnection := h.hsClientConnections[vmID]
+
+	result, err := service.HandleRequest(requestConnection, namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
 		h.log.Warn("Failed to handle host service RPC request",
 			slog.String("workload_id", vmID),

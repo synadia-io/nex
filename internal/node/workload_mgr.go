@@ -51,10 +51,9 @@ type WorkloadManager struct {
 	ctx     context.Context
 	t       *observability.Telemetry
 
-	nc             *nats.Conn
-	natsint        *internalnats.InternalNatsServer
-	ncint          *nats.Conn
-	ncHostServices *nats.Conn
+	nc      *nats.Conn
+	natsint *internalnats.InternalNatsServer
+	ncint   *nats.Conn
 
 	procMan processmanager.ProcessManager
 
@@ -128,15 +127,7 @@ func NewWorkloadManager(
 		w.log.Info("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
 	}
 
-	err = w.startHostServicesNATSConnection()
-	if err != nil {
-		w.log.Error("Failed to start host services NATS connection", slog.Any("error", err))
-		return nil, err
-	} else {
-		w.log.Info("Established host services NATS connection", slog.String("server", w.ncHostServices.Servers()[0]))
-	}
-
-	w.hostServices = NewHostServices(w.ncint, w.ncHostServices, config.HostServicesConfiguration, w.log, w.t.Tracer)
+	w.hostServices = NewHostServices(w.ncint, config.HostServicesConfiguration, w.log, w.t.Tracer)
 	err = w.hostServices.init()
 	if err != nil {
 		w.log.Warn("Failed to initialize host services", slog.Any("err", err))
@@ -242,9 +233,19 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		w.activeAgents[workloadID] = agentClient
 		delete(w.pendingAgents, workloadID)
 
+		ncHostServices, err := w.createHostServicesConnection(request)
+		if err != nil {
+			w.log.Error("Failed to establish host services connection for workload",
+				slog.Any("error", err),
+			)
+			return err
+		}
+
+		w.hostServices.server.SetHostServicesConnection(workloadID, ncHostServices)
+
 		if request.SupportsTriggerSubjects() {
 			for _, tsub := range request.TriggerSubjects {
-				sub, err := w.nc.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
+				sub, err := ncHostServices.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
 				if err != nil {
 					w.log.Error("Failed to create trigger subject subscription for deployed workload",
 						slog.String("workload_id", workloadID),
@@ -377,6 +378,7 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		delete(w.activeAgents, id)
 		delete(w.pendingAgents, id)
 		delete(w.stopMutex, id)
+		w.hostServices.server.RemoveHostServicesConnection(id)
 
 		_ = w.publishWorkloadStopped(id)
 	}()
@@ -588,36 +590,65 @@ func (w *WorkloadManager) startInternalNATS() error {
 	return nil
 }
 
-func (w *WorkloadManager) startHostServicesNATSConnection() error {
-	if w.config.HostServicesConfiguration != nil {
-		if w.config.HostServicesConfiguration.NatsUrl == "" {
-			w.config.HostServicesConfiguration.NatsUrl = w.nc.Servers()[0]
-			w.ncHostServices = w.nc
-		} else {
-			natsOpts := []nats.Option{
-				nats.Name("nex-hostservices"),
-			}
-			if w.config.HostServicesConfiguration.NatsUserJwt == "" {
-				natsOpts = append(natsOpts,
-					nats.UserJWTAndSeed(
-						w.config.HostServicesConfiguration.NatsUserJwt,
-						w.config.HostServicesConfiguration.NatsUserSeed,
-					),
-				)
-			}
-
-			var err error
-			w.ncHostServices, err = nats.Connect(w.config.HostServicesConfiguration.NatsUrl, natsOpts...)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		w.ncHostServices = w.nc
+func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployRequest) (*nats.Conn, error) {
+	natsOpts := []nats.Option{
+		nats.Name("nex-hostservices"),
 	}
 
-	w.log.Debug("Configured NATS connection for host services", slog.String("url", w.ncHostServices.Servers()[0]))
-	return nil
+	var url string
+	if request.HostServicesConfig != nil {
+		// FIXME-- check to ensure NATS user JWT and seed are present
+		natsOpts = append(natsOpts,
+			nats.UserJWTAndSeed(request.HostServicesConfig.NatsUserJwt,
+				request.HostServicesConfig.NatsUserSeed,
+			))
+
+		url = request.HostServicesConfig.NatsUrl
+	} else if w.config.HostServicesConfiguration != nil {
+		// FIXME-- check to ensure NATS user JWT and seed are present
+		natsOpts = append(natsOpts,
+			nats.UserJWTAndSeed(w.config.HostServicesConfiguration.NatsUserJwt,
+				w.config.HostServicesConfiguration.NatsUserSeed,
+			))
+
+		if w.config.HostServicesConfiguration.NatsUrl != "" {
+			url = w.config.HostServicesConfiguration.NatsUrl
+		} else {
+			url = w.nc.Servers()[0]
+		}
+	} else {
+		if w.nc.Opts.UserJWT != nil {
+			natsOpts = append(natsOpts,
+				nats.UserJWT(w.nc.Opts.UserJWT, w.nc.Opts.SignatureCB),
+			)
+		}
+
+		url = w.nc.Opts.Url
+	}
+
+	w.log.Debug("Attempting to establish host services connection for workload",
+		slog.String("workload_name", *request.WorkloadName),
+		slog.String("url", url),
+	)
+
+	nc, err := nats.Connect(url, natsOpts...)
+	if err != nil {
+		w.log.Warn("Failed to establish host services connection for workload",
+			slog.String("workload_name", *request.WorkloadName),
+			slog.String("url", url),
+			slog.String("error", err.Error()),
+		)
+
+		return nil, err
+	}
+
+	w.log.Info("Established host services connection for workload",
+		slog.String("workload_name", *request.WorkloadName),
+		slog.String("url", nc.ConnectedUrl()),
+	)
+
+	return nc, nil
+
 }
 
 // Picks a pending agent from the pool that will receive the next deployment

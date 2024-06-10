@@ -39,10 +39,12 @@ var (
 type NodeConfiguration struct {
 	AgentHandshakeTimeoutMillisecond int                      `json:"agent_handshake_timeout_ms,omitempty"`
 	AgentPingTimeoutMillisecond      int                      `json:"agent_ping_timeout_ms,omitempty"`
+	AutostartConfiguration           *AutostartConfig         `json:"autostart,omitempty"`
 	BinPath                          []string                 `json:"bin_path"`
 	CNI                              CNIDefinition            `json:"cni"`
 	DefaultResourceDir               string                   `json:"default_resource_dir"`
 	ForceDepInstall                  bool                     `json:"-"`
+	HostServicesConfiguration        *HostServicesConfig      `json:"host_services,omitempty"`
 	InternalNodeHost                 *string                  `json:"internal_node_host,omitempty"`
 	InternalNodePort                 *int                     `json:"internal_node_port"`
 	KernelFilepath                   string                   `json:"kernel_filepath"`
@@ -61,8 +63,6 @@ type NodeConfiguration struct {
 	Tags                             map[string]string        `json:"tags,omitempty"`
 	ValidIssuers                     []string                 `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []controlapi.NexWorkload `json:"workload_types,omitempty"`
-	HostServicesConfiguration        *HostServicesConfig      `json:"host_services,omitempty"`
-	AutostartConfiguration           *AutostartConfig         `json:"autostart,omitempty"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
 	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`
@@ -70,6 +70,7 @@ type NodeConfiguration struct {
 	Errors []error `json:"errors,omitempty"`
 }
 
+// FIXME-- these properties should probably be *string 👀
 type HostServicesConfig struct {
 	NatsUrl      string                   `json:"nats_url"`
 	NatsUserJwt  string                   `json:"nats_user_jwt"`
