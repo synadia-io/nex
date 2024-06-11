@@ -4,6 +4,7 @@ go 1.22.2
 
 require (
 	dagger.io/dagger v0.11.2
+	github.com/3th1nk/cidr v0.2.0
 	github.com/cdfmlr/ellipsis v0.0.1
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.25.0
