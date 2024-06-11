@@ -69,18 +69,6 @@ func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
 	return d, nil
 }
 
-func (d *DNS) initServer() error {
-	d.server = &dns.Server{
-		Handler:      d.handler,
-		Listener:     nil, // FIXME-- to support TCP, set Listener
-		PacketConn:   d.udp,
-		ReadTimeout:  time.Hour,
-		WriteTimeout: time.Hour,
-	}
-
-	return d.Start()
-}
-
 func (d *DNS) Add(pattern string, ipaddr string) {
 	d.handler.HandleFunc(pattern, func(w dns.ResponseWriter, r *dns.Msg) {
 		d.log.Debug("Received DNS query for matching pattern", slog.String("msg", r.String()), slog.String("a", ipaddr))
