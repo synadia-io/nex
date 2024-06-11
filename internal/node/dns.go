@@ -8,9 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/3th1nk/cidr"
 	"github.com/miekg/dns"
-	"github.com/synadia-io/nex/internal/models"
 )
 
 const defaultNameserver = "127.0.0.53:53"
@@ -31,17 +29,8 @@ type DNS struct {
 	udpAddr *string
 }
 
-func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
-	ips, err := cidr.Parse(*config.CNI.Subnet)
-	if err != nil {
-		return nil, err
-	}
-
-	var addr net.IP
-	addr, _ = ips.IPRange()
-	cidr.IPIncr(addr)
-
-	udp, err := net.ListenPacket("udp", fmt.Sprintf("%s:0", addr.String()))
+func NewDNS(log *slog.Logger) (*DNS, error) {
+	udp, err := net.ListenPacket("udp", ":0")
 	if err != nil {
 		return nil, err
 	}

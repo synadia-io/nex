@@ -244,7 +244,7 @@ func (n *Node) init() error {
 
 		if !n.config.NoSandbox {
 			// setup DNS nameserver
-			n.dns, err = NewDNS(n.log, n.config)
+			n.dns, err = NewDNS(n.log)
 			if err != nil {
 				n.log.Error("Failed to initialize DNS nameserver", slog.Any("err", err))
 				err = fmt.Errorf("failed to initialize DNS nameserver: %s", err)
