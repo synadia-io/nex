@@ -166,6 +166,7 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 			{
 				directories: config.CNI.BinPath,
 				files: []*fileSpec{
+					{name: "bridge", description: "bridge CNI plugin"},
 					{name: "host-local", description: "host-local CNI plugin"},
 					{name: "ptp", description: "ptp CNI plugin"},
 					{name: "tc-redirect-tap", description: "tc-redirect-tap CNI plugin"},
@@ -429,7 +430,7 @@ func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
 
 		f := strings.TrimPrefix(strings.TrimSpace(header.Name), "./")
 
-		if f == "ptp" || f == "host-local" {
+		if f == "bridge" || f == "host-local" || f == "ptp" {
 			outFile, err := os.Create(filepath.Join(r.directories[0], f))
 			if err != nil {
 				fmt.Println(err)

@@ -1,7 +1,5 @@
-package templates
-
-var FcnetConfig string = `{
-  "name": "{{.NetworkName}}",
+{
+  "name": "fcnet",
   "cniVersion": "0.4.0",
   "plugins": [
     {
@@ -11,7 +9,7 @@ var FcnetConfig string = `{
       "ipMasq": true,
       "ipam": {
         "type": "host-local",
-        "subnet": "{{.Subnet}}",
+        "subnet": "192.168.127.0/24",
         "resolvConf": "/etc/resolv.conf",
         "routes": [
           {
@@ -29,4 +27,4 @@ var FcnetConfig string = `{
       "type": "tc-redirect-tap"
     }
   ]
-}`
+}
