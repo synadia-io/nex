@@ -57,16 +57,6 @@ func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
 
 	d.handler.Handle(".", d) // recursive resolver
 
-	// d.server = &dns.Server{
-	// 	Handler:      d.handler,
-	// 	Listener:     nil, // FIXME-- to support TCP, set Listener
-	// 	PacketConn:   d.udp,
-	// 	ReadTimeout:  time.Hour,
-	// 	WriteTimeout: time.Hour,
-	// }
-
-	// d.handler.Handle(".", d) // recursive resolver
-
 	err = d.Start()
 	if err != nil {
 		return nil, err
@@ -211,7 +201,7 @@ func (d *DNS) lockdown(subnet string) error {
 
 	err = d.Stop()
 	if err != nil {
-		d.log.Warn("failed to stop DNS", slog.String("error", err.Error()))
+		d.log.Warn("Failed to lockdown DNS server", slog.String("error", err.Error()))
 		return err
 	}
 
@@ -251,6 +241,8 @@ func (d *DNS) lockdown(subnet string) error {
 
 		// TODO? -- currently only udp is implemented -- reuse the ephemeral UDP port for a second TCP listener...
 		// tcpAddr := tcp.Addr().String() -- this will actually be == udpAddr if implemented
+
+		time.Sleep(time.Millisecond * 25)
 	}
 
 	d.log.Debug("Locked down DNS server")
