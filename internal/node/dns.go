@@ -63,7 +63,9 @@ func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
 	}
 
 	if config.CNI.Subnet != nil {
-		go d.lockdown(*config.CNI.Subnet)
+		go func() {
+			_ = d.lockdown(*config.CNI.Subnet)
+		}()
 	}
 
 	return d, nil
