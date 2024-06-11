@@ -173,6 +173,11 @@ var _ = Describe("nex node", func() {
 							Expect(err).To(BeNil())
 						})
 
+						It("should install the bridge CNI plugin", func(ctx SpecContext) {
+							_, err := os.Stat(filepath.Join(defaultCNIPluginBinPath, "bridge"))
+							Expect(err).To(BeNil())
+						})
+
 						It("should install the host-local CNI plugin", func(ctx SpecContext) {
 							_, err := os.Stat(filepath.Join(defaultCNIPluginBinPath, "host-local"))
 							Expect(err).To(BeNil())
