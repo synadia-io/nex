@@ -257,6 +257,16 @@ func (f *FirecrackerProcessManager) resetCNI() error {
 		return err
 	}
 
+	cmd = exec.Command("bash", "-c", "for name in $(ifconfig -a | sed 's/[ \t].*//;/^\\(lo\\|\\)$/d' | grep br); do ip link delete $name; done")
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+	err = cmd.Wait()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
