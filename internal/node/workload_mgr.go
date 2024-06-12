@@ -51,7 +51,6 @@ type WorkloadManager struct {
 	ctx     context.Context
 	t       *observability.Telemetry
 
-	dns     *DNS
 	nc      *nats.Conn
 	natsint *internalnats.InternalNatsServer
 	ncint   *nats.Conn
@@ -86,7 +85,6 @@ func NewWorkloadManager(
 	cancel context.CancelFunc,
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
-	dns *DNS,
 	nc *nats.Conn,
 	config *models.NodeConfiguration,
 	log *slog.Logger,
@@ -101,7 +99,6 @@ func NewWorkloadManager(
 		config:           config,
 		cancel:           cancel,
 		ctx:              ctx,
-		dns:              dns,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(config.AgentHandshakeTimeoutMillisecond) * time.Millisecond,
 		kp:               nodeKeypair,
@@ -137,12 +134,7 @@ func NewWorkloadManager(
 		return nil, err
 	}
 
-	var nameserver *string
-	if w.dns != nil {
-		nameserver = w.dns.udpAddr
-	}
-
-	w.procMan, err = processmanager.NewProcessManager(w.ctx, w.config, w.natsint, w.log, nameserver, w.t)
+	w.procMan, err = processmanager.NewProcessManager(w.natsint, w.log, w.config, w.t, w.ctx)
 	if err != nil {
 		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
 		return nil, err

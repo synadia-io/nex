@@ -56,11 +56,11 @@ type spawnedProcess struct {
 }
 
 func NewSpawningProcessManager(
-	ctx context.Context,
-	config *models.NodeConfiguration,
 	intNats *internalnats.InternalNatsServer,
 	log *slog.Logger,
+	config *models.NodeConfiguration,
 	telemetry *observability.Telemetry,
+	ctx context.Context,
 ) (*SpawningProcessManager, error) {
 	return &SpawningProcessManager{
 		config:  config,

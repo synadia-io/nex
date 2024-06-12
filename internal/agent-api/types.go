@@ -181,12 +181,11 @@ type HostServicesMessagingResponse struct {
 }
 
 type MachineMetadata struct {
-	Nameserver       *string `json:"nameserver"`
+	VmID             *string `json:"vmid"`
 	NodeNatsHost     *string `json:"node_nats_host"`
 	NodeNatsPort     *int    `json:"node_nats_port"`
 	NodeNatsNkeySeed *string `json:"node_nats_nkey"`
 	Message          *string `json:"message"`
-	VmID             *string `json:"vmid"`
 
 	Errors []error `json:"errors,omitempty"`
 }

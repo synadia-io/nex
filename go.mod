@@ -17,7 +17,6 @@ require (
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/jedib0t/go-pretty/v6 v6.5.8
 	github.com/jordan-rash/slog-handler v0.0.0-20240523140048-9e8ba2d5eb3d
-	github.com/miekg/dns v1.1.59
 	github.com/nats-io/jsm.go v0.1.1
 	github.com/nats-io/jwt/v2 v2.5.6
 	github.com/nats-io/nats-server/v2 v2.10.14

@@ -12,6 +12,8 @@ StandardError=file:/home/user/err.log
 Type=simple
 Restart=always
 
+
 [Install]
 WantedBy=default.target
 RequiredBy=network.target
+
