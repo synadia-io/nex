@@ -166,7 +166,6 @@ func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, l
 			{
 				directories: config.CNI.BinPath,
 				files: []*fileSpec{
-					{name: "bridge", description: "bridge CNI plugin"},
 					{name: "host-local", description: "host-local CNI plugin"},
 					{name: "ptp", description: "ptp CNI plugin"},
 					{name: "tc-redirect-tap", description: "tc-redirect-tap CNI plugin"},
@@ -321,7 +320,11 @@ func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
 		}
 		defer f.Close()
 
-		tmpl, err := template.New("fcnet_conf").Parse(templates.FcnetConfig)
+		tmpl, err := template.New("fcnet_conf").
+			Funcs(template.FuncMap{
+				"AddQuotes": addQuotes,
+			}).
+			Parse(templates.FcnetConfig)
 		if err != nil {
 			return err
 		}
@@ -430,7 +433,7 @@ func downloadCNIPlugins(r *requirement, c *models.NodeConfiguration) error {
 
 		f := strings.TrimPrefix(strings.TrimSpace(header.Name), "./")
 
-		if f == "bridge" || f == "host-local" || f == "ptp" {
+		if f == "ptp" || f == "host-local" {
 			outFile, err := os.Create(filepath.Join(r.directories[0], f))
 			if err != nil {
 				fmt.Println(err)
@@ -528,4 +531,17 @@ func decompressTarFromURL(url string, _ string) (*tar.Reader, error) {
 
 	rawData := tar.NewReader(uncompressedTar)
 	return rawData, nil
+}
+
+func addQuotes(urls []string) string {
+	ret := strings.Builder{}
+	ret.WriteRune('[')
+	for i, url := range urls {
+		ret.WriteString(fmt.Sprintf("\"%s\"", url))
+		if i < len(urls)-1 {
+			ret.WriteRune(',')
+		}
+	}
+	ret.WriteRune(']')
+	return ret.String()
 }

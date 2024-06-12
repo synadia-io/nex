@@ -13,6 +13,7 @@ type CNIDefinition struct {
 	InterfaceName *string  `json:"interface_name"`
 	NetworkName   *string  `json:"network_name"`
 	Subnet        *string  `json:"subnet"`
+	Nameservers   []string `json:"nameservers"`
 }
 
 // Defines the CPU and memory usage of a machine to be configured when it is added to the pool

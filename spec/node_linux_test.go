@@ -100,7 +100,7 @@ var _ = Describe("nex node", func() {
 			os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), agentPath))
 
 			snapshotAgentRootFSPath = filepath.Join(os.TempDir(), fmt.Sprintf("%d-rootfs.ext4", _fixtures.seededRand.Int()))
-			cmd := exec.Command("sudo", "go", "run", "../nex", "fs", "--agent", "../agent/cmd/nex-agent/nex-agent", "--script", "../_scripts/docker/alpine-iptables.sh")
+			cmd := exec.Command("sudo", "go", "run", "../nex", "fs", "--agent", "../agent/cmd/nex-agent/nex-agent")
 			_, err = cmd.CombinedOutput()
 			Expect(err).To(BeNil())
 			Expect(cmd.ProcessState.ExitCode()).To(BeZero())
@@ -170,11 +170,6 @@ var _ = Describe("nex node", func() {
 
 						JustBeforeEach(func() {
 							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-							Expect(err).To(BeNil())
-						})
-
-						It("should install the bridge CNI plugin", func(ctx SpecContext) {
-							_, err := os.Stat(filepath.Join(defaultCNIPluginBinPath, "bridge"))
 							Expect(err).To(BeNil())
 						})
 

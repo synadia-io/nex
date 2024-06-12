@@ -181,6 +181,16 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg, outname string, wi
 		return err
 	}
 
+	err = os.Remove(filepath.Join(mountPoint, "/etc/resolv.conf"))
+	if err != nil {
+		return err
+	}
+
+	err = os.Symlink("/proc/net/pnp", filepath.Join(mountPoint, "/etc/resolv.conf"))
+	if err != nil {
+		return err
+	}
+
 	_, err = c.Stdout(ctx)
 	if err != nil {
 		return err

@@ -24,6 +24,7 @@ func setConditionalCommands() {
 	nodePreflight.Flag("force", "installs missing dependencies without prompt").Default("false").BoolVar(&NodeOpts.ForceDepInstall)
 	nodePreflight.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
 	nodePreflight.Flag("init", "creates the configuration file if it does not exist").EnumVar(&NodeOpts.PreflightInit, "sandbox", "nosandbox")
+	nodePreflight.Flag("cni_ns", "nameservers to use in CNI configuration file").StringsVar(&NodeOpts.CniNS)
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger, keypair nkeys.KeyPair) error {
