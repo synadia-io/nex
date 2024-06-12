@@ -320,7 +320,11 @@ func writeCniConf(r *requirement, c *models.NodeConfiguration) error {
 		}
 		defer f.Close()
 
-		tmpl, err := template.New("fcnet_conf").Parse(templates.FcnetConfig)
+		tmpl, err := template.New("fcnet_conf").
+			Funcs(template.FuncMap{
+				"AddQuotes": addQuotes,
+			}).
+			Parse(templates.FcnetConfig)
 		if err != nil {
 			return err
 		}
@@ -527,4 +531,17 @@ func decompressTarFromURL(url string, _ string) (*tar.Reader, error) {
 
 	rawData := tar.NewReader(uncompressedTar)
 	return rawData, nil
+}
+
+func addQuotes(urls []string) string {
+	ret := strings.Builder{}
+	ret.WriteRune('[')
+	for i, url := range urls {
+		ret.WriteString(fmt.Sprintf("\"%s\"", url))
+		if i < len(urls)-1 {
+			ret.WriteRune(',')
+		}
+	}
+	ret.WriteRune(']')
+	return ret.String()
 }

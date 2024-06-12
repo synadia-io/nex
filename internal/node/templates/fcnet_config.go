@@ -7,6 +7,7 @@ var FcnetConfig string = `{
     {
       "type": "ptp",
       "ipMasq": true,
+      {{ if .Nameservers }}"dns": { "nameservers": {{ AddQuotes .Nameservers }} },{{ end }}
       "ipam": {
         "type": "host-local",
         "subnet": "{{.Subnet}}",

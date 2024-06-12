@@ -112,8 +112,9 @@ type RootfsOptions struct {
 // Node configuration is used to configure the node process as well
 // as the virtual machines it produces
 type NodeOptions struct {
-	ConfigFilepath  string `json:"-"`
-	ForceDepInstall bool   `json:"-"`
+	ConfigFilepath  string   `json:"-"`
+	ForceDepInstall bool     `json:"-"`
+	CniNS           []string `json:"-"`
 
 	OtelMetrics         bool   `json:"-"`
 	OtelMetricsPort     int    `json:"-"`
