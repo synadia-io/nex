@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,25 +14,27 @@ import (
 	"github.com/3th1nk/cidr"
 	"github.com/miekg/dns"
 	"github.com/synadia-io/nex/internal/models"
+	"tailscale.com/net/dns/resolvconffile"
 )
 
-const defaultNameserver = "127.0.0.53:53"
 const defaultDNSListenTimeoutMillis = 5000
+const defaultResolvConfPath = "/etc/resolv.conf"
 
 // DNS manages the lifecycle of a local nameserver that functions as
 // a resolver for local DNS names and a recursive resolver when a DNS
 // query does not match
 type DNS struct {
-	client  *dns.Client
-	closers []io.Closer
-	exit    chan error
-	handler *dns.ServeMux
-	log     *slog.Logger
-	server  *dns.Server
-	tcp     net.Listener
-	tcpAddr *string
-	udp     net.PacketConn
-	udpAddr *string
+	client     *dns.Client
+	closers    []io.Closer
+	exit       chan error
+	handler    *dns.ServeMux
+	log        *slog.Logger
+	nameserver string
+	server     *dns.Server
+	tcp        net.Listener
+	tcpAddr    *string
+	udp        net.PacketConn
+	udpAddr    *string
 }
 
 func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
@@ -45,14 +48,22 @@ func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
 	// TODO? -- currently only udp is implemented -- reuse the ephemeral UDP port for a second TCP listener...
 	// tcpAddr := tcp.Addr().String() -- this will actually be == udpAddr if implemented
 
+	nameserver, err := defaultNameserver()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug("Found default host nameserver in /etc/resolv.conf", slog.String("nameserver", *nameserver))
+
 	d := &DNS{
-		client:  new(dns.Client),
-		exit:    make(chan error, 1),
-		handler: dns.NewServeMux(),
-		log:     log,
-		tcp:     nil,
-		udp:     udp,
-		udpAddr: &udpAddr,
+		client:     new(dns.Client),
+		exit:       make(chan error, 1),
+		handler:    dns.NewServeMux(),
+		log:        log,
+		nameserver: *nameserver,
+		tcp:        nil,
+		udp:        udp,
+		udpAddr:    &udpAddr,
 	}
 
 	d.handler.Handle(".", d) // recursive resolver
@@ -106,7 +117,7 @@ func (d *DNS) Remove(pattern string) {
 func (d *DNS) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	d.log.Debug("Received DNS message and will perform recursive lookup", slog.String("msg", r.String()))
 
-	resp, rtt, err := d.client.Exchange(r, defaultNameserver)
+	resp, rtt, err := d.client.Exchange(r, d.nameserver)
 	if err != nil {
 		d.log.Warn("Failed to perform recursive DNS lookup", slog.String("error", err.Error()))
 		return
@@ -210,7 +221,7 @@ func (d *DNS) lockdown(subnet string) error {
 
 		udp, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", addr.String(), port))
 		if err != nil {
-			d.log.Warn("Failed to lockdown DNS server", slog.String("error", err.Error()))
+			d.log.Debug("Attempt to lockdown DNS server", slog.String("error", err.Error()))
 		}
 
 		if err == nil {
@@ -238,4 +249,24 @@ func (d *DNS) lockdown(subnet string) error {
 	d.log.Debug("Locked down DNS server")
 
 	return nil
+}
+
+func defaultNameserver() (*string, error) {
+	f, err := os.Open(defaultResolvConfPath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	conf, err := resolvconffile.Parse(f)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ns := range conf.Nameservers {
+		nameserver := fmt.Sprintf("%s:53", ns.String())
+		return &nameserver, nil
+	}
+
+	return nil, fmt.Errorf("no nameserver resolved")
 }

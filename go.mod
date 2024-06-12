@@ -48,6 +48,7 @@ require (
 	golang.org/x/term v0.19.0
 	google.golang.org/grpc v1.63.2
 	rogchap.com/v8go v0.9.0
+	tailscale.com v1.66.4
 )
 
 require (
@@ -115,7 +116,7 @@ require (
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.2 // indirect
+	github.com/opencontainers/image-spec v1.1.0-rc6 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
