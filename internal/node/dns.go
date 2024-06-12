@@ -5,18 +5,13 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/3th1nk/cidr"
 	"github.com/miekg/dns"
-	"github.com/synadia-io/nex/internal/models"
 )
 
 const defaultNameserver = "127.0.0.53:53"
-const defaultDNSListenTimeoutMillis = 5000
 
 // DNS manages the lifecycle of a local nameserver that functions as
 // a resolver for local DNS names and a recursive resolver when a DNS
@@ -34,7 +29,7 @@ type DNS struct {
 	udpAddr *string
 }
 
-func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
+func NewDNS(log *slog.Logger) (*DNS, error) {
 	udp, err := net.ListenPacket("udp", ":0")
 	if err != nil {
 		return nil, err
@@ -55,17 +50,19 @@ func NewDNS(log *slog.Logger, config *models.NodeConfiguration) (*DNS, error) {
 		udpAddr: &udpAddr,
 	}
 
+	d.server = &dns.Server{
+		Handler:      d.handler,
+		Listener:     nil, // FIXME-- to support TCP, set Listener
+		PacketConn:   d.udp,
+		ReadTimeout:  time.Hour,
+		WriteTimeout: time.Hour,
+	}
+
 	d.handler.Handle(".", d) // recursive resolver
 
 	err = d.Start()
 	if err != nil {
 		return nil, err
-	}
-
-	if config.CNI.Subnet != nil {
-		go func() {
-			_ = d.lockdown(*config.CNI.Subnet)
-		}()
 	}
 
 	return d, nil
@@ -134,14 +131,6 @@ func (d *DNS) Start() error {
 	mutex := sync.Mutex{}
 	mutex.Lock()
 
-	d.server = &dns.Server{
-		Handler:      d.handler,
-		Listener:     nil, // FIXME-- to support TCP, set Listener
-		PacketConn:   d.udp,
-		ReadTimeout:  time.Hour,
-		WriteTimeout: time.Hour,
-	}
-
 	d.server.NotifyStartedFunc = mutex.Unlock
 
 	if d.tcp != nil {
@@ -170,72 +159,5 @@ func (d *DNS) Start() error {
 
 func (d *DNS) Stop() error {
 	d.log.Info("DNS nameserver stopping")
-
-	err := d.server.Shutdown()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (d *DNS) lockdown(subnet string) error {
-	ips, err := cidr.Parse(subnet)
-	if err != nil {
-		return err
-	}
-
-	var addr net.IP
-	addr, _ = ips.IPRange()
-	cidr.IPIncr(addr)
-
-	err = d.Stop()
-	if err != nil {
-		d.log.Warn("Failed to lockdown DNS server", slog.String("error", err.Error()))
-		return err
-	}
-
-	d.closers = make([]io.Closer, 0)
-	d.exit = make(chan error, 1)
-	d.server = nil
-
-	deadline := time.Now().Add(time.Millisecond * defaultDNSListenTimeoutMillis)
-	for time.Now().Before(deadline) {
-		udpAddr := strings.Split(*d.udpAddr, ":")
-		port, err := strconv.Atoi(udpAddr[len(udpAddr)-1])
-		if err != nil {
-			d.log.Warn("Failed to lockdown DNS server; failed to parse port", slog.String("error", err.Error()))
-			return err
-		}
-
-		udp, err := net.ListenPacket("udp", fmt.Sprintf("%s:%d", addr.String(), port))
-		if err != nil {
-			d.log.Warn("Failed to lockdown DNS server", slog.String("error", err.Error()))
-		}
-
-		if err == nil {
-			d.log.Debug("UDP listener bound for lockdown", slog.String("addr", udp.LocalAddr().String()))
-
-			d.udp = udp
-			udpAddr := d.udp.LocalAddr().String()
-			d.udpAddr = &udpAddr
-
-			err = d.Start()
-			if err != nil {
-				d.log.Warn("Failed to lockdown DNS server", slog.String("error", err.Error()))
-				return err
-			}
-
-			break
-		}
-
-		// TODO? -- currently only udp is implemented -- reuse the ephemeral UDP port for a second TCP listener...
-		// tcpAddr := tcp.Addr().String() -- this will actually be == udpAddr if implemented
-
-		time.Sleep(time.Millisecond * 25)
-	}
-
-	d.log.Debug("Locked down DNS server")
-
-	return nil
+	return d.server.Shutdown()
 }
