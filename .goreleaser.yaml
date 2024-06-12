@@ -62,6 +62,8 @@ checksum:
   split: true
 
 release:
+  make_latest: false
+  prerelease: auto
   extra_files:
     - glob: ./rootfs.linux.amd64.ext4.gz
     - glob: ./rootfs.linux.arm64.ext4.gz
