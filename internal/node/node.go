@@ -353,6 +353,10 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
+		if autostart.JsDomain != nil {
+			request.JsDomain = autostart.JsDomain
+		}
+
 		_, err = request.Validate()
 		if err != nil {
 			n.log.Error("Failed to validate autostart deployment request",

@@ -158,13 +158,15 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 
-	m.log.Info("Attempting object store download", slog.String("bucket", bucket), slog.String("key", key))
-
+	jsLogAttr := []any{slog.String("bucket", bucket), slog.String("key", key)}
 	opts := []nats.JSOpt{}
 	if request.JsDomain != nil {
 		opts = append(opts, nats.Domain(*request.JsDomain))
-		opts = append(opts, nats.APIPrefix(*request.JsDomain))
+
+		jsLogAttr = append(jsLogAttr, slog.String("jsdomain", *request.JsDomain))
 	}
+
+	m.log.Info("Attempting object store download", jsLogAttr...)
 
 	js, err := m.nc.JetStream(opts...)
 	if err != nil {
