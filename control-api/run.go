@@ -49,7 +49,7 @@ type HostServicesConfiguration struct {
 }
 
 var (
-	validWorkloadName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+	validWorkloadName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 )
 
 // Creates a new deploy request based on the supplied options. Note that there is a fluent API function
