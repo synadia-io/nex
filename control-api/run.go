@@ -49,7 +49,7 @@ type HostServicesConfiguration struct {
 }
 
 var (
-	validWorkloadName = regexp.MustCompile(`^[a-z]+$`)
+	validWorkloadName = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 )
 
 // Creates a new deploy request based on the supplied options. Note that there is a fluent API function
@@ -102,7 +102,7 @@ func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
 
 	request.DecodedClaims = *claims
 	if !validWorkloadName.MatchString(claims.Subject) {
-		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements of all lowercase letters", claims.Subject)
+		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements (alphanumeric or underscore)", claims.Subject)
 	}
 
 	var vr jwt.ValidationResults
