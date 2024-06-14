@@ -58,9 +58,6 @@ jobs:
       run: |
         go test $(go list ./... | grep -v spec)
         go test -v -race $(go list ./... | grep -v spec)
-    -
-      name: Print runner
-      run: echo ${{ runner.os }}
     - 
       name: Run spec suite | Linux
       working-directory: .
@@ -80,7 +77,7 @@ jobs:
     - 
       name: Run spec suite | Darwin
       working-directory: .
-      if: runner.os == 'Darwin'
+      if: runner.os == 'macOS'
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
