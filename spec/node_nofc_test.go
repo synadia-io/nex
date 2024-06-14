@@ -13,6 +13,7 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -70,9 +71,15 @@ var _ = Describe("nex node", func() {
 		})
 
 		snapshotAgentRootFSPathOnce.Do(func() {
-			// require the nex-agent binary to be built... FIXME-- build it here insteaad of relying on the Taskfile
-			_, err := os.Stat(filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent.exe"))
-			Expect(err).To(BeNil())
+			// require the nex-agent binary to be built... FIXME-- build it here instead of relying on the Taskfile
+			switch runtime.GOOS {
+			case "windows":
+				_, err := os.Stat(filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent.exe"))
+				Expect(err).To(BeNil())
+			case "darwin":
+				_, err := os.Stat(filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent"))
+				Expect(err).To(BeNil())
+			}
 
 			agentPath, err := filepath.Abs(filepath.Join("..", "agent", "cmd", "nex-agent"))
 			Expect(err).To(BeNil())
@@ -334,12 +341,23 @@ var _ = Describe("nex node", func() {
 								var err error
 
 								AfterEach(func() {
-									os.Remove("./echoservice.exe")
+									switch runtime.GOOS {
+									case "windows":
+										os.Remove("./echoservice.exe")
+									case "darwin":
+										os.Remove("./echoservice")
+									}
 								})
 
 								JustBeforeEach(func() {
-									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice.exe", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
-									Expect(err).To(BeNil())
+									switch runtime.GOOS {
+									case "windows":
+										deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice.exe", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+										Expect(err).To(BeNil())
+									case "darwin":
+										deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+										Expect(err).To(BeNil())
+									}
 
 									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
 									_, err = nodeClient.StartWorkload(deployRequest)
