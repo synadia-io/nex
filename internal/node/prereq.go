@@ -140,8 +140,8 @@ type fileSpec struct {
 func CheckPrerequisites(config *models.NodeConfiguration, noninteractive bool, logger *slog.Logger) error {
 	if strings.EqualFold(runtime.GOOS, "windows") || strings.EqualFold(runtime.GOOS, "darwin") {
 		if !config.NoSandbox {
-			fmt.Print("\t⛔ Windows host must be configured to run in no sandbox mode\n")
-			return errors.New("windows host must be configured to run in no sandbox mode")
+			fmt.Print("\t⛔ Host must be configured to run in no sandbox mode\n")
+			return errors.New("host must be configured to run in no sandbox mode")
 		}
 
 		if !noninteractive {

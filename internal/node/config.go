@@ -29,8 +29,8 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 		config.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 	}
 
-	if strings.EqualFold(runtime.GOOS, "windows") && !config.NoSandbox {
-		return nil, errors.New("windows host must be configured to run in no sandbox mode")
+	if (strings.EqualFold(runtime.GOOS, "windows") || strings.EqualFold(runtime.GOOS, "darwin")) && !config.NoSandbox {
+		return nil, errors.New("host must be configured to run in no sandbox mode")
 	}
 
 	if config.KernelFilepath == "" && config.DefaultResourceDir != "" {

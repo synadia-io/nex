@@ -102,8 +102,14 @@ var _ = Describe("nex node", func() {
 			})
 
 			It("should not return an error", func(ctx SpecContext) {
-				err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: The system cannot find the file specified", nodeOpts.ConfigFilepath)))
+				switch runtime.GOOS {
+				case "windows":
+					err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+					Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: The system cannot find the file specified", nodeOpts.ConfigFilepath)))
+				case "darwin":
+					err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+					Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("failed to load configuration file: open %s: no such file or directory", nodeOpts.ConfigFilepath)))
+				}
 			})
 		})
 
@@ -167,7 +173,7 @@ var _ = Describe("nex node", func() {
 						It("should return an error", func(ctx SpecContext) {
 							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 							Expect(err).ToNot(BeNil())
-							Expect(err.Error()).To(ContainSubstring("windows host must be configured to run in no sandbox mode"))
+							Expect(err.Error()).To(ContainSubstring("host must be configured to run in no sandbox mode"))
 						})
 					})
 				})
