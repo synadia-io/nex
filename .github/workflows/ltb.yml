@@ -58,6 +58,9 @@ jobs:
       run: |
         go test $(go list ./... | grep -v spec)
         go test -v -race $(go list ./... | grep -v spec)
+    -
+      name: Print runner
+      run: echo ${{ runner.os }}
     - 
       name: Run spec suite | Linux
       working-directory: .
