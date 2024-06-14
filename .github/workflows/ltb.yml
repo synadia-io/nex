@@ -36,7 +36,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
@@ -51,37 +51,37 @@ jobs:
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
-    -
-      name: Run unit tests
-      if: runner.os != 'Windows'
-      working-directory: .
-      run: |        
-        go test $(go list ./... | grep -v spec)
-        
     - 
-      name: Run spec suite
+      name: Run test suite
       working-directory: .
-      if: runner.os != 'Windows'
+      if: runner.os == 'Linux'
+      run: |
+        go test $(go list ./... | grep -v spec)
+        go test -v -race $(go list ./... | grep -v spec)
+    - 
+      name: Run spec suite | Linux
+      working-directory: .
+      if: runner.os == 'Linux'
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
         sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
-      name: Run spec suite
+      name: Run spec suite | Windows
       working-directory: .
       if: runner.os == 'Windows'
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
         go mod tidy
         go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --flake-attempts=5 --vv --trace --keep-going --output-interceptor-mode=none ./spec
-
     - 
-      name: Run test suite
+      name: Run spec suite | Darwin
       working-directory: .
-      if: runner.os != 'Windows'
+      if: runner.os == 'macOS'
       run: |
-        mv spec _spec
-        go test -v -race ./...
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+        go mod tidy
+        sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
 
   build:
     timeout-minutes: 10
