@@ -84,7 +84,12 @@ var _ = Describe("nex node", func() {
 			agentPath, err := filepath.Abs(filepath.Join("..", "agent", "cmd", "nex-agent"))
 			Expect(err).To(BeNil())
 
-			_ = os.Setenv("PATH", fmt.Sprintf("%s;%s", os.Getenv("PATH"), agentPath))
+			switch runtime.GOOS {
+			case "windows":
+				_ = os.Setenv("PATH", fmt.Sprintf("%s;%s", os.Getenv("PATH"), agentPath))
+			case "darwin":
+				_ = os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), agentPath))
+			}
 		})
 	})
 
