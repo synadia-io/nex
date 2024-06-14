@@ -184,8 +184,14 @@ var _ = Describe("nex node", func() {
 
 			It("should return an error", func(ctx SpecContext) {
 				err := nexnode.CmdUp(opts, nodeOpts, ctxx, cancel, nodeKey, log)
-				Expect(err).ToNot(BeNil())
-				Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: The system cannot find the file specified", nodeOpts.ConfigFilepath)))
+				switch runtime.GOOS {
+				case "windows":
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("open %s: The system cannot find the file specified", nodeOpts.ConfigFilepath)))
+				case "darwin":
+					Expect(err).ToNot(BeNil())
+					Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("failed to initialize node: failed to create node: open %s: no such file or directory", nodeOpts.ConfigFilepath)))
+				}
 			})
 		})
 
