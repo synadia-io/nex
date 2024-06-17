@@ -30,7 +30,7 @@ func (t *Telemetry) initTrace() error {
 		switch t.tracesExporter {
 		case "grpc":
 			t.log.Debug("GRPC exporter", slog.String("url", t.otelExporterUrl))
-			conn, err := grpc.DialContext(t.ctx, t.otelExporterUrl, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+			conn, err := grpc.NewClient(t.otelExporterUrl, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				return err
 			}
