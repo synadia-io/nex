@@ -28,10 +28,8 @@ const (
 var (
 	DefaultWorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 
-	DefaultBinPath = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
-
-	// check the default cni bin path first, otherwise look in the rest of the PATH
-	DefaultCNIBinPath = append([]string{"/opt/cni/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
+	DefaultBinPath    = filepath.SplitList(os.Getenv("PATH"))
+	DefaultCNIBinPath = filepath.SplitList(os.Getenv("PATH"))
 )
 
 // Node configuration is used to configure the node process as well
