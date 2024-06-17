@@ -36,7 +36,6 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 		JetStream: true,
 		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
 		Port:      -1,
-		Host:      "0.0.0.0",
 		// Debug:     true,
 		// Trace:     true,
 		// NoLog:     true,
