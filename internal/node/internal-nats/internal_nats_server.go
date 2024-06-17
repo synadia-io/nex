@@ -3,7 +3,6 @@ package internalnats
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
@@ -59,8 +58,6 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 		return nil, err
 	}
 
-	fmt.Printf("%s %d\n\n", opts.Host, opts.Port)
-
 	s, err := server.NewServer(opts)
 	if err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
@@ -70,10 +67,10 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	// uncomment this if you want internal NATS logs emitted
 	// s.ConfigureLogger()
 
-	s.Start()
-
-	time.Sleep(500 * time.Millisecond)
-	fmt.Println(s.ClientURL())
+	if err := server.Run(s); err != nil {
+		server.PrintAndDie("nats-server: " + err.Error())
+		return nil, err
+	}
 
 	// This connection uses the `nexhost` account, specifically provisioned for the node
 	ncInternal, err := nats.Connect(s.ClientURL(), nats.Nkey(data.NexHostUserPublic, func(b []byte) ([]byte, error) {
