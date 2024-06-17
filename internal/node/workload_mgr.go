@@ -246,8 +246,20 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		w.hostServices.server.SetHostServicesConnection(workloadID, ncHostServices)
 
 		if request.SupportsTriggerSubjects() {
+			ncTrigger := ncHostServices
+			if request.TriggerConnection != nil {
+				ncTrigger, err = createJwtConnection(request.TriggerConnection)
+				if err != nil {
+					w.log.Error("Failed to create trigger connection",
+						slog.Any("error", err),
+						slog.String("url", request.TriggerConnection.NatsUrl),
+					)
+					_ = w.StopWorkload(workloadID, true)
+					return err
+				}
+			}
 			for _, tsub := range request.TriggerSubjects {
-				sub, err := ncHostServices.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
+				sub, err := ncTrigger.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
 				if err != nil {
 					w.log.Error("Failed to create trigger subject subscription for deployed workload",
 						slog.String("workload_id", workloadID),
@@ -259,8 +271,9 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 					return err
 				}
 
-				w.log.Info("Created trigger subject subscription for deployed workload",
+				w.log.Debug("Created trigger subject subscription for deployed workload",
 					slog.String("workload_id", workloadID),
+					slog.String("nats_url", ncTrigger.ConnectedAddr()),
 					slog.String("trigger_subject", tsub),
 					slog.String("workload_type", string(request.WorkloadType)),
 				)
@@ -666,4 +679,16 @@ func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 	}
 
 	return nil, nil
+}
+
+func createJwtConnection(info *controlapi.NatsJwtConnectionInfo) (*nats.Conn, error) {
+	natsOpts := []nats.Option{
+		nats.Name("workload-trigger-subscription"),
+	}
+	natsOpts = append(natsOpts,
+		nats.UserJWTAndSeed(info.NatsUserJwt,
+			info.NatsUserSeed,
+		))
+
+	return nats.Connect(info.NatsUrl, natsOpts...)
 }
