@@ -70,7 +70,7 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 	config.PreflightVerify = nodeopts.PreflightVerify
 	config.PreflightVerbose = nodeopts.PreflightVerbose
 
-	err = preflight.Preflight(config, log)
+	err = preflight.Preflight(ctx, config, log)
 	if err != nil {
 		return fmt.Errorf("preflight checks failed: %s", err)
 	}

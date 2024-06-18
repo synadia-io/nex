@@ -1,6 +1,7 @@
 package preflight
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,17 +11,17 @@ import (
 )
 
 var (
-	VERSION = "development"
-
 	cyan    = color.New(color.FgCyan).SprintFunc()
 	red     = color.New(color.FgRed).SprintFunc()
 	magenta = color.New(color.FgMagenta).SprintFunc()
 	green   = color.New(color.FgHiGreen).SprintFunc()
-)
 
-func init() {
-	nexLatestVersion = func() string {
-		if VERSION == "development" {
+	nexLatestVersion = func(ctx context.Context) string {
+		version, ok := ctx.Value("version").(string)
+		if !ok {
+			version = "development"
+		}
+		if version == "development" {
 			res, err := http.Get("https://api.github.com/repos/synadia-io/nex/releases/latest")
 			if err != nil {
 				fmt.Printf("error making http request: %s\n", err)
@@ -48,11 +49,7 @@ func init() {
 			}
 			return latestTag
 		} else {
-			return VERSION
+			return version
 		}
-	}()
-}
-
-var (
-	nexLatestVersion string
+	}
 )

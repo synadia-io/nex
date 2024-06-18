@@ -2,9 +2,9 @@ package preflight
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -21,10 +21,6 @@ import (
 	"github.com/synadia-io/nex/internal/node/templates"
 )
 
-var (
-// TODO: move this to flag
-)
-
 type requirement struct {
 	name        string
 	path        []string
@@ -37,8 +33,11 @@ type requirement struct {
 	iF          func(*requirement, bool, *models.NodeConfiguration, *slog.Logger) PreflightError
 }
 
-func Preflight(config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
-	required, err := preflightInit(config, logger)
+func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
+	nexVer := nexLatestVersion(ctx)
+	logger.Debug("using nex version", slog.String("version", nexVer))
+
+	required, err := preflightInit(nexVer, config, logger)
 	if errors.Is(err, ErrNoSandboxRequired) {
 		logger.Error("Host must be configured to run in no-sandbox mode")
 		return err
@@ -87,29 +86,23 @@ func Preflight(config *models.NodeConfiguration, logger *slog.Logger) PreflightE
 			continue
 		}
 
-		var input []byte
-		var err error
-
 		if !config.ForceDepInstall {
-			fmt.Printf("⛔ You are missing required dependencies for [%s], do you want to install? [y/N] ", red(r.description))
-			inputReader := bufio.NewReader(os.Stdin)
-			input, err = inputReader.ReadSlice('\n')
-			if err != nil {
+			err := checkContinue(fmt.Sprintf("You are missing required dependencies for [%s], do you want to install?", red(r.description)))
+			if errors.Is(err, ErrUserCanceledPreflight) {
 				return err
 			}
 		}
 
-		if config.ForceDepInstall || strings.ToUpper(string(input)) == "Y\n" {
-			err = os.MkdirAll(r.path[0], 0755)
+		err := os.MkdirAll(r.path[0], 0755)
+		if err != nil {
+			return err
+		}
+
+		if r.iF != nil {
+			err := r.iF(r, config.PreflightVerify, config, logger)
 			if err != nil {
+				logger.Debug("Failed to run initialize function", slog.String("step", r.description), slog.Any("err", err))
 				return err
-			}
-			if r.iF != nil {
-				err := r.iF(r, config.PreflightVerify, config, logger)
-				if err != nil {
-					logger.Error("Failed to run initialize function", slog.String("step", r.description), slog.Any("err", err))
-					return err
-				}
 			}
 		}
 	}
@@ -151,7 +144,7 @@ func downloadDirect(r *requirement, validate bool, config *models.NodeConfigurat
 	if validate && r.shaUrl != "" {
 		respSha, err := http.Get(r.shaUrl)
 		if err != nil || respSha.StatusCode != 200 {
-			logger.Warn("failed to download sha", slog.String("artifact", r.name), slog.Any("err", err))
+			logger.Debug("failed to download sha", slog.String("artifact", r.name), slog.Any("err", err))
 			errs = errors.Join(errs, ErrFailedToDownloadKnownGoodSha)
 			err := checkContinue("Failed to download SHA file for verification; continue?")
 			if errors.Is(err, ErrUserCanceledPreflight) {
@@ -162,7 +155,7 @@ func downloadDirect(r *requirement, validate bool, config *models.NodeConfigurat
 
 		dlSha, err := io.ReadAll(respSha.Body)
 		if err != nil {
-			logger.Warn("failed to read sha response body", slog.String("artifact", r.name), slog.Any("err", err))
+			logger.Debug("failed to read sha response body", slog.String("artifact", r.name), slog.Any("err", err))
 			errs = errors.Join(errs, err)
 			err := checkContinue("Failed to download SHA file for verification; continue?")
 			if errors.Is(err, ErrUserCanceledPreflight) {
@@ -172,7 +165,7 @@ func downloadDirect(r *requirement, validate bool, config *models.NodeConfigurat
 
 		h := sha256.New()
 		if _, err := io.Copy(h, &hashBuff); err != nil {
-			logger.Warn("failed to calculate sha256", slog.String("artifact", r.name), slog.Any("err", err))
+			logger.Debug("failed to calculate sha256", slog.String("artifact", r.name), slog.Any("err", err))
 			errs = errors.Join(errs, ErrFailedToCalculateSha256)
 			err := checkContinue("Failed to calculate shasum to verify downloaded file; continue?")
 			if errors.Is(err, ErrUserCanceledPreflight) {
@@ -182,7 +175,7 @@ func downloadDirect(r *requirement, validate bool, config *models.NodeConfigurat
 
 		shasum := hex.EncodeToString(h.Sum(nil))
 		if shasum != strings.TrimSpace(string(dlSha)) {
-			logger.Warn("sha256 mismatch", slog.String("expected", string(dlSha)), slog.String("actual", shasum), slog.String("artifact", r.name))
+			logger.Debug("sha256 mismatch", slog.String("expected", string(dlSha)), slog.String("actual", shasum), slog.String("artifact", r.name))
 			errs = errors.Join(errs, ErrSha256Mismatch)
 			err := checkContinue("Downloaded file shasum does not match provided shasum; continue?")
 			if errors.Is(err, ErrUserCanceledPreflight) {
@@ -191,7 +184,7 @@ func downloadDirect(r *requirement, validate bool, config *models.NodeConfigurat
 		}
 	}
 	if validate && r.shaUrl == "" {
-		logger.Warn("validate is true but shaUrl is empty", slog.String("artifact", r.name))
+		logger.Debug("validate is true but shaUrl is empty", slog.String("artifact", r.name))
 		err := checkContinue("Validate set to true but no shasum provided for comparision; continue?")
 		if errors.Is(err, ErrUserCanceledPreflight) {
 			return errs
@@ -221,7 +214,7 @@ func downloadTarGz(r *requirement, validate bool, _ *models.NodeConfiguration, l
 	var err error
 
 	if validate && r.shaUrl == "" {
-		logger.Warn("validate is true but shaUrl is empty", slog.String("artifact", r.name))
+		logger.Debug("validate is true but shaUrl is empty", slog.String("artifact", r.name))
 		err := checkContinue("Validate set to true but no shasum provided for comparision; continue?")
 		if errors.Is(err, ErrUserCanceledPreflight) {
 			return errs
@@ -233,14 +226,14 @@ func downloadTarGz(r *requirement, validate bool, _ *models.NodeConfiguration, l
 	}
 	rawTar, _, err = decompressAndValidateTarFromURL(r.dlUrl, r.shaUrl)
 	if errors.Is(err, ErrSha256Mismatch) || errors.Is(err, ErrFailedToDownloadKnownGoodSha) {
-		logger.Warn("failed to verify tarball; skipping", slog.String("artifact", r.name))
+		logger.Debug("failed to verify tarball", slog.String("artifact", r.name))
 		err := checkContinue("Validate set to true but no shasum provided for comparision; continue?")
 		if errors.Is(err, ErrUserCanceledPreflight) {
 			return errs
 		}
 	}
 	if err != nil {
-		logger.Error("failed to decompress tarball", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to decompress tarball", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 
@@ -250,26 +243,26 @@ func downloadTarGz(r *requirement, validate bool, _ *models.NodeConfiguration, l
 			break
 		}
 		if err != nil {
-			logger.Error("failed to read header in artifact tar", slog.Any("artifact", r.name), slog.Any("err", err))
+			logger.Debug("failed to read header in artifact tar", slog.Any("artifact", r.name), slog.Any("err", err))
 			return ErrFailedToSatifyDependency
 		}
 
 		if header.Name == r.tarHeader {
 			outFile, err := os.Create(filepath.Join(r.path[0], r.name))
 			if err != nil {
-				logger.Error("failed to create artifact binary", slog.Any("artifact", r.name), slog.Any("err", err))
+				logger.Debug("failed to create artifact binary", slog.Any("artifact", r.name), slog.Any("err", err))
 				return ErrFailedToSatifyDependency
 			}
 
 			_, err = io.Copy(outFile, rawTar)
 			if err != nil {
-				logger.Error("failed to copy artifact binary", slog.Any("artifact", r.name), slog.Any("err", err))
+				logger.Debug("failed to copy artifact binary", slog.Any("artifact", r.name), slog.Any("err", err))
 				return ErrFailedToSatifyDependency
 			}
 			outFile.Close()
 			err = os.Chmod(outFile.Name(), 0755)
 			if err != nil {
-				logger.Error("failed to change permissions on artifact binary", slog.Any("artifact", r.name), slog.Any("err", err))
+				logger.Debug("failed to change permissions on artifact binary", slog.Any("artifact", r.name), slog.Any("err", err))
 				return ErrFailedToSatifyDependency
 			}
 		}
@@ -281,12 +274,12 @@ func downloadGz(r *requirement, validate bool, _ *models.NodeConfiguration, logg
 	var errs PreflightError
 	respGZ, err := http.Get(r.dlUrl)
 	if err != nil {
-		logger.Error("failed to download artifact gzip", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to download artifact gzip", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToDownload
 	}
 	defer respGZ.Body.Close()
 	if respGZ.StatusCode != 200 {
-		logger.Error("failed to download rootfs gzip", slog.Any("status", respGZ.StatusCode))
+		logger.Debug("failed to download rootfs gzip", slog.Any("status", respGZ.StatusCode))
 		return ErrFailedToDownload
 	}
 
@@ -294,14 +287,14 @@ func downloadGz(r *requirement, validate bool, _ *models.NodeConfiguration, logg
 	gzipReader := io.TeeReader(respGZ.Body, &hashBuffer)
 	uncompressedFile, err := gzip.NewReader(gzipReader)
 	if err != nil {
-		logger.Error("failed to decompress gzip", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to decompress gzip", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 
 	if validate {
 		kgSha, err := getKnownGoodSha256FromURL(r.shaUrl)
 		if err != nil {
-			logger.Warn("failed to download known good shasum", slog.Any("err", err))
+			logger.Debug("failed to download known good shasum", slog.Any("err", err))
 			err := checkContinue("Failed to download known good shasum for comparasion; continue?")
 			if errors.Is(err, ErrUserCanceledPreflight) {
 				return errs
@@ -309,7 +302,7 @@ func downloadGz(r *requirement, validate bool, _ *models.NodeConfiguration, logg
 		}
 		sha, err := validateSha256(&hashBuffer, kgSha)
 		if err != nil {
-			logger.Error("sha256 mismatch", slog.String("expected", vmLinuxKernelSHA256), slog.String("actual", sha))
+			logger.Debug("sha256 mismatch", slog.String("expected", vmLinuxKernelSHA256), slog.String("actual", sha))
 			err := checkContinue("Failed to download known good shasum for comparasion; continue?")
 			if errors.Is(err, ErrUserCanceledPreflight) {
 				return errors.Join(errs, ErrFailedToSatifyDependency)
@@ -319,12 +312,12 @@ func downloadGz(r *requirement, validate bool, _ *models.NodeConfiguration, logg
 
 	outFile, err := os.Create(filepath.Join(r.path[0], r.name))
 	if err != nil {
-		logger.Error("failed to create uncompressed file", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to create uncompressed file", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 	_, err = io.Copy(outFile, uncompressedFile)
 	if err != nil {
-		logger.Error("failed to copy uncompressed file", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to copy uncompressed file", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 	outFile.Close()
@@ -335,7 +328,7 @@ func downloadGz(r *requirement, validate bool, _ *models.NodeConfiguration, logg
 func writeCniConf(r *requirement, _ bool, c *models.NodeConfiguration, logger *slog.Logger) PreflightError {
 	f, err := os.Create(filepath.Join(r.path[0], r.name))
 	if err != nil {
-		logger.Error("failed to create cni config file", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to create cni config file", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 	defer f.Close()
@@ -346,19 +339,19 @@ func writeCniConf(r *requirement, _ bool, c *models.NodeConfiguration, logger *s
 		}).
 		Parse(templates.FcnetConfig)
 	if err != nil {
-		logger.Error("failed to parse fcnet config template", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to parse fcnet config template", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 	var buffer bytes.Buffer
 	err = tmpl.Execute(&buffer, c.CNI)
 	if err != nil {
-		logger.Error("failed to execute fcnet config template", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to execute fcnet config template", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 
 	_, err = f.Write(buffer.Bytes())
 	if err != nil {
-		logger.Error("failed to write fcnet config to file", slog.String("artifact", r.name), slog.Any("err", err))
+		logger.Debug("failed to write fcnet config to file", slog.String("artifact", r.name), slog.Any("err", err))
 		return ErrFailedToSatifyDependency
 	}
 	return nil

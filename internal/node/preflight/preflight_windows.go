@@ -7,7 +7,7 @@ import (
 	"github.com/synadia-io/nex/internal/models"
 )
 
-func preflightInit(config *models.NodeConfiguration, _ *slog.Logger) ([]*requirement, PreflightError) {
+func preflightInit(nexVer string, config *models.NodeConfiguration, _ *slog.Logger) ([]*requirement, PreflightError) {
 	if !config.NoSandbox {
 		return nil, ErrNoSandboxRequired
 	}
@@ -16,8 +16,8 @@ func preflightInit(config *models.NodeConfiguration, _ *slog.Logger) ([]*require
 		{
 			name: "nex-agent", path: config.BinPath, nosandbox: true,
 			description: "Nex-agent binary",
-			dlUrl:       fmt.Sprintf(nexAgentWindowsTemplate, nexLatestVersion, nexLatestVersion),
-			shaUrl:      fmt.Sprintf(nexAgentWindowsURLTemplateSHA256, nexLatestVersion, nexLatestVersion),
+			dlUrl:       fmt.Sprintf(nexAgentWindowsTemplate, nexVer, nexVer),
+			shaUrl:      fmt.Sprintf(nexAgentWindowsURLTemplateSHA256, nexVer, nexVer),
 			iF:          downloadDirect,
 		},
 	}
