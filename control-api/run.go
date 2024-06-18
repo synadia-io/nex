@@ -29,20 +29,21 @@ type DeployRequest struct {
 	// If the payload indicates an object store bucket & key, JS domain can be supplied
 	JsDomain *string `json:"jsdomain,omitempty"`
 
-	SenderPublicKey *string  `json:"sender_public_key"`
-	TargetNode      *string  `json:"target_node"`
-	TriggerSubjects []string `json:"trigger_subjects,omitempty"`
+	SenderPublicKey   *string                `json:"sender_public_key"`
+	TargetNode        *string                `json:"target_node"`
+	TriggerSubjects   []string               `json:"trigger_subjects,omitempty"`
+	TriggerConnection *NatsJwtConnectionInfo `json:"trigger_connection,omitempty"`
 
 	RetryCount *uint      `json:"retry_count,omitempty"`
 	RetriedAt  *time.Time `json:"retried_at,omitempty"`
 
-	HostServicesConfig *HostServicesConfiguration `json:"host_services,omitempty"`
+	HostServicesConfig *NatsJwtConnectionInfo `json:"host_services,omitempty"`
 
 	WorkloadEnvironment map[string]string `json:"-"`
 	DecodedClaims       jwt.GenericClaims `json:"-"`
 }
 
-type HostServicesConfiguration struct {
+type NatsJwtConnectionInfo struct {
 	NatsUrl      string `json:"nats_url"`
 	NatsUserJwt  string `json:"nats_user_jwt"`
 	NatsUserSeed string `json:"nats_user_seed"`
@@ -91,6 +92,7 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		TriggerSubjects:    reqOpts.triggerSubjects,
 		JsDomain:           &reqOpts.jsDomain,
 		HostServicesConfig: reqOpts.hostServicesConfiguration,
+		TriggerConnection:  reqOpts.triggerConnection,
 	}
 
 	return req, nil
@@ -170,7 +172,8 @@ type requestOptions struct {
 	hash                      string
 	targetNode                string
 	triggerSubjects           []string
-	hostServicesConfiguration *HostServicesConfiguration
+	hostServicesConfiguration *NatsJwtConnectionInfo
+	triggerConnection         *NatsJwtConnectionInfo
 }
 
 type RequestOption func(o requestOptions) requestOptions
@@ -183,9 +186,18 @@ func Argv(argv []string) RequestOption {
 	}
 }
 
-func HostServicesConfig(config HostServicesConfiguration) RequestOption {
+// When set, overrides the node's host services configuration
+func HostServicesConfig(config NatsJwtConnectionInfo) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.hostServicesConfiguration = &config
+		return o
+	}
+}
+
+// When set, uses this connection to subscribe to function trigger subjects
+func TriggerConnection(config NatsJwtConnectionInfo) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.triggerConnection = &config
 		return o
 	}
 }

@@ -365,26 +365,6 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		agentDeployRequest := &agentapi.DeployRequest{
-			Argv:                 request.Argv,
-			DecodedClaims:        request.DecodedClaims,
-			Description:          request.Description,
-			EncryptedEnvironment: request.Environment,
-			Environment:          request.WorkloadEnvironment,
-			Essential:            request.Essential,
-			JsDomain:             request.JsDomain,
-			Location:             request.Location,
-			Namespace:            &autostart.Namespace,
-			RetryCount:           request.RetryCount,
-			RetriedAt:            request.RetriedAt,
-			SenderPublicKey:      request.SenderPublicKey,
-			TargetNode:           request.TargetNode,
-			TriggerSubjects:      request.TriggerSubjects,
-			WorkloadName:         &request.DecodedClaims.Subject,
-			WorkloadType:         request.WorkloadType,
-			WorkloadJwt:          request.WorkloadJwt,
-		}
-
 		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(agentClient.ID(), request)
 		if err != nil {
 			n.api.log.Error("Failed to cache auto-start workload bytes",
@@ -395,6 +375,8 @@ func (n *Node) handleAutostarts() {
 			)
 			continue
 		}
+		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
+
 		agentDeployRequest.TotalBytes = int64(numBytes)
 		agentDeployRequest.Hash = *workloadHash
 
@@ -567,4 +549,32 @@ func (n *Node) shutdown() {
 
 func (n *Node) shuttingDown() bool {
 	return (atomic.LoadUint32(&n.closing) > 0)
+}
+
+// For the curious - I tried a number of ways of making a common/shared deploy request and only modeling the differences
+// here, but it made all the code that creates deployment requests look hideous. Will look into cleaning this up again.
+func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.DeployRequest {
+	return &agentapi.DeployRequest{
+		Argv:                 request.Argv,
+		DecodedClaims:        request.DecodedClaims,
+		Description:          request.Description,
+		EncryptedEnvironment: request.Environment,
+		Environment:          request.WorkloadEnvironment,
+		Essential:            request.Essential,
+		Hash:                 hash,
+		JsDomain:             request.JsDomain,
+		Location:             request.Location,
+		Namespace:            &namespace,
+		RetryCount:           request.RetryCount,
+		RetriedAt:            request.RetriedAt,
+		SenderPublicKey:      request.SenderPublicKey,
+		TargetNode:           request.TargetNode,
+		TotalBytes:           int64(numBytes),
+		HostServicesConfig:   request.HostServicesConfig,
+		TriggerSubjects:      request.TriggerSubjects,
+		TriggerConnection:    request.TriggerConnection,
+		WorkloadName:         &request.DecodedClaims.Subject,
+		WorkloadType:         request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
+		WorkloadJwt:          request.WorkloadJwt,
+	}
 }
