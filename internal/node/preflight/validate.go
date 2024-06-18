@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/synadia-io/nex/internal/models"
 )
@@ -80,7 +81,7 @@ func Validate(config *models.NodeConfiguration, logger *slog.Logger) PreflightEr
 		logger.Debug("vmlinux file found", slog.String("path", config.KernelFilepath))
 	}
 
-	_, err = os.Stat("/etc/cni/conf.d" + *config.CNI.NetworkName + ".conflist")
+	_, err = os.Stat(filepath.Join("/etc/cni/conf.d", *config.CNI.NetworkName+".conflist"))
 	if errors.Is(err, os.ErrNotExist) {
 		errs = errors.Join(errs, ErrCNIConfigNotFound)
 	} else {
