@@ -304,7 +304,7 @@ func main() {
 	case nodePreflight.FullCommand():
 		err := RunNodePreflight(ctx, logger)
 		if err != nil {
-			logger.Error("failed to start node", slog.Any("err", err))
+			logger.Error("failed to run preflight", slog.Any("err", err))
 		}
 	case rootfs.FullCommand():
 		err := CreateRootFS(ctx, logger)

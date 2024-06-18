@@ -26,13 +26,16 @@ var (
 	ErrVmlinuxNotFound             = errors.New("vmlinux file not found")
 	ErrCNIConfigNotFound           = errors.New("cni config file not found")
 
-	ErrNoSandboxRequired           = errors.New("no sandbox required for os")
-	ErrFailedToDownloadNexAgent    = errors.New("failed to download nex-agent")
-	ErrFailedToDownloadNexAgentSha = errors.New("failed to download nex-agent")
-	ErrFailedToCreateTempFile      = errors.New("failed to create temp binary file")
-	ErrFailedToWriteTempFile       = errors.New("failed to write temp binary file")
-	ErrFailedToCalculateSha256     = errors.New("failed to calculate sha256")
-	ErrSha256Mismatch              = errors.New("sha256 mismatch")
+	ErrNoSandboxRequired            = errors.New("no sandbox required for os")
+	ErrFailedToSatifyDependency     = errors.New("failed to satisfy dependency")
+	ErrFailedToDownload             = errors.New("failed to download file")
+	ErrFailedToDownloadKnownGoodSha = errors.New("failed to download known good shasum")
+	ErrFailedToCreateFile           = errors.New("failed to create new binary file")
+	ErrFailedToWriteTempFile        = errors.New("failed to write temp binary file")
+	ErrFailedToCalculateSha256      = errors.New("failed to calculate sha256")
+	ErrSha256Mismatch               = errors.New("sha256 mismatch")
+	ErrFailedToUncompress           = errors.New("failed to uncompress file")
+	ErrUserCanceledPreflight        = errors.New("user canceled preflight")
 
 	binVerify = []BinaryVerify{
 		{BinName: "firecracker", Error: ErrFirecrackerNotFound},
@@ -86,7 +89,7 @@ func Validate(config *models.NodeConfiguration, logger *slog.Logger) PreflightEr
 
 	if errs != nil {
 		logger.Warn("⛔ preflight validation failed")
-		logger.Debug("\tPreflight requirement missing", slog.Any("err", err))
+		logger.Debug("\tPreflight requirement missing", slog.Any("err", errs))
 	}
 
 	return errs

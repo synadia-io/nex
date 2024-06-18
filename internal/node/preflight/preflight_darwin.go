@@ -1,16 +1,26 @@
 package preflight
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/synadia-io/nex/internal/models"
 )
 
-func preflightInit(config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
+func preflightInit(config *models.NodeConfiguration, _ *slog.Logger) ([]*requirement, PreflightError) {
 	if !config.NoSandbox {
-		logger.Error("Darwin host must be configured to run in no-sandbox mode")
-		return ErrNoSandboxRequired
+		return nil, ErrNoSandboxRequired
 	}
 
-	return nil
+	required := []*requirement{
+		{
+			name: "nex-agent", path: config.BinPath, nosandbox: true,
+			description: "Nex-agent binary",
+			dlUrl:       fmt.Sprintf(nexAgentDarwinTemplate, nexLatestVersion, nexLatestVersion),
+			shaUrl:      fmt.Sprintf(nexAgentDarwinURLTemplateSHA256, nexLatestVersion, nexLatestVersion),
+			iF:          downloadDirect,
+		},
+	}
+
+	return required, nil
 }

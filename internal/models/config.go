@@ -62,6 +62,10 @@ type NodeConfiguration struct {
 	ValidIssuers                     []string                 `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []controlapi.NexWorkload `json:"workload_types,omitempty"`
 
+	PreflightVerbose bool `json:"-"`
+	PreflightVerify  bool `json:"-"`
+	PreflightCheck   bool `json:"-"`
+
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
 	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`
 

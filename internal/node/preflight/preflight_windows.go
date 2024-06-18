@@ -1,38 +1,26 @@
 package preflight
 
 import (
-	"bufio"
 	"fmt"
 	"log/slog"
-	"os"
-	"os/exec"
-	"strings"
 
 	"github.com/synadia-io/nex/internal/models"
 )
 
-func Preflight(config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
+func preflightInit(config *models.NodeConfiguration, _ *slog.Logger) ([]*requirement, PreflightError) {
 	if !config.NoSandbox {
-		logger.Error("Windows host must be configured to run in no-sandbox mode")
-		return ErrNoSandboxRequired
+		return nil, ErrNoSandboxRequired
 	}
 
-	if config.ForceDepInstall {
-		return installNexAgent(config, logger)
+	required := []*requirement{
+		{
+			name: "nex-agent", path: config.BinPath, nosandbox: true,
+			description: "Nex-agent binary",
+			dlUrl:       fmt.Sprintf(nexAgentWindowsTemplate, nexLatestVersion, nexLatestVersion),
+			shaUrl:      fmt.Sprintf(nexAgentWindowsURLTemplateSHA256, nexLatestVersion, nexLatestVersion),
+			iF:          downloadDirect,
+		},
 	}
 
-	_, err := exec.LookPath("nex-agent")
-	if err != nil {
-		fmt.Printf("⛔ You are missing required dependencies for [%s], do you want to install? [y/N] ", red("nex-agent"))
-		inputReader := bufio.NewReader(os.Stdin)
-		input, err := inputReader.ReadSlice('\n')
-		if err != nil {
-			return err
-		}
-		if strings.ToUpper(string(input)) == "Y\n" {
-			return installNexAgent(config, logger)
-		}
-	}
-
-	return nil
+	return required, nil
 }
