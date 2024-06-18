@@ -7,6 +7,25 @@ import (
 	controlapi "github.com/synadia-io/nex/control-api"
 )
 
+func TestDenyList(t *testing.T) {
+	denyList := []string{
+		"$SYS.>",
+		"$JS.>",
+	}
+
+	if !inDenyList("$SYS.this.is.a.test", denyList) {
+		t.Fatal("Should have subject collision in deny list but didn't")
+	}
+
+	if !inDenyList("$JS.foo.bar", denyList) {
+		t.Fatal("Should have subject collision in deny list but didn't")
+	}
+
+	if inDenyList("bob.test", denyList) {
+		t.Fatalf("Allowed subject was denied incorrectly")
+	}
+}
+
 func TestSummarizeMachinesForPing(t *testing.T) {
 	workloads := []controlapi.MachineSummary{
 		{

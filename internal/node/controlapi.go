@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/pkg/errors"
@@ -248,6 +249,16 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", string(request.WorkloadType)))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", string(request.WorkloadType)))
 		return
+	}
+
+	if len(request.TriggerSubjects) > 0 && len(api.node.config.DenyTriggerSubjects) > 0 {
+		for _, subject := range request.TriggerSubjects {
+			if inDenyList(subject, api.node.config.DenyTriggerSubjects) {
+				respondFail(controlapi.RunResponseType, m,
+					fmt.Sprintf("The trigger subject %s overlaps with subject(s) in this node's deny list", subject))
+				return
+			}
+		}
 	}
 
 	err = request.DecryptRequestEnvironment(api.xk)
@@ -599,6 +610,15 @@ func myUptime(d time.Duration) string {
 		return fmt.Sprintf("%dm%ds", tmins, tsecs%60)
 	}
 	return fmt.Sprintf("%ds", tsecs)
+}
+
+func inDenyList(subject string, denyList []string) bool {
+	for _, target := range denyList {
+		if server.SubjectsCollide(subject, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func respondFail(responseType string, m *nats.Msg, reason string) {
