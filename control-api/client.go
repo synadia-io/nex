@@ -128,6 +128,9 @@ func (api *Client) PingWorkloads(workloadID string) ([]WorkloadPingResponse, err
 	responses := make([]WorkloadPingResponse, 0)
 
 	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+		if len(m.Data) == 0 {
+			return
+		}
 		env, err := extractEnvelope(m.Data)
 		if err != nil {
 			return
@@ -172,6 +175,9 @@ func (api *Client) Auction(req *AuctionRequest) ([]AuctionResponse, error) {
 	responses := make([]AuctionResponse, 0)
 
 	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+		if len(m.Data) == 0 {
+			return
+		}
 		env, err := extractEnvelope(m.Data)
 		if err != nil {
 			api.log.Error("failed to extract envelope", slog.Any("err", err), slog.Any("nats_msg.Data", m.Data))
@@ -224,6 +230,9 @@ func (api *Client) PingNodes() ([]PingResponse, error) {
 	responses := make([]PingResponse, 0)
 
 	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+		if len(m.Data) == 0 {
+			return
+		}
 		env, err := extractEnvelope(m.Data)
 		if err != nil {
 			api.log.Error("failed to extract envelope", slog.Any("err", err), slog.Any("nats_msg.Data", m.Data))
