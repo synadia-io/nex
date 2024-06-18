@@ -136,6 +136,8 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
+				nodeConfig.BinPath = []string{"/usr/local/bin"}
+				nodeConfig.CNI.BinPath = []string{"/opt/cni/bin"}
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 
