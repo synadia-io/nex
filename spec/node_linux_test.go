@@ -240,6 +240,7 @@ var _ = Describe("nex node", func() {
 
 				nodeConfig.BinPath = []string{"/usr/local/bin"}
 				nodeConfig.CNI.BinPath = []string{"/opt/cni/bin"}
+				os.Setenv("PATH", fmt.Sprintf("%s:%s:%s", "/usr/local/bin", "/opt/cni/bin", os.Getenv("PATH")))
 
 				nodeConfig.NoSandbox = !sandbox
 			})
