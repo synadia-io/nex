@@ -63,8 +63,8 @@ var _ = Describe("nex node", func() {
 
 	BeforeEach(func() {
 		initData := map[string]string{
-			"version":    "spec",
-			"commit":     "abc123",
+			"version":    "development",
+			"commit":     "spec",
 			"build_date": "2021-01-01T00:00:00Z",
 		}
 
