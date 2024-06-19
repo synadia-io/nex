@@ -206,6 +206,7 @@ func downloadDirect(r *requirement, validate bool, config *models.NodeConfigurat
 		errs = errors.Join(errs, err)
 	}
 
+	logger.Debug("binary successfully installed", slog.String("path", savePath), slog.String("download_url", r.dlUrl))
 	return errs
 }
 
