@@ -17,9 +17,13 @@ var (
 	green   = color.New(color.FgHiGreen).SprintFunc()
 
 	nexLatestVersion = func(ctx context.Context) string {
-		version, ok := ctx.Value("version").(string)
-		if !ok {
-			version = "development"
+		version := "development"
+		build_data, ok := ctx.Value("build_data").(map[string]interface{})
+		if ok {
+			version, ok = build_data["version"].(string)
+			if !ok {
+				fmt.Println("error parsing version from build data")
+			}
 		}
 		if version == "development" {
 			res, err := http.Get("https://api.github.com/repos/synadia-io/nex/releases/latest")

@@ -71,7 +71,7 @@ var _ = Describe("nex node", func() {
 		keypair, _ = nkeys.CreateServer()
 
 		ctxx, cancel = context.WithCancel(context.WithValue(context.Background(), "build_data", initData)) //nolint:all
-		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
+		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithStdErr(os.Stdout), shandler.WithColor()))
 
 		opts = &models.Options{
 			Servers: _fixtures.natsServer.ClientURL(),
