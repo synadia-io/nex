@@ -158,12 +158,11 @@ var _ = Describe("nex node", func() {
 							Expect(err).To(Not(BeNil()))
 						})
 
-						It("should not error", func(ctx SpecContext) {
+						JustBeforeEach(func() {
 							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 							Expect(err).To(BeNil())
-							_, err = os.Stat(nodeConfig.DefaultResourceDir)
-							Expect(err).To(BeNil())
 						})
+
 						It("should create the default_resource_dir", func(ctx SpecContext) {
 							_, err := os.Stat(nodeConfig.DefaultResourceDir)
 							Expect(err).To(BeNil())
