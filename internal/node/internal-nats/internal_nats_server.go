@@ -67,7 +67,7 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 	// s.ConfigureLogger()
 
 	if err := server.Run(s); err != nil {
-		server.PrintAndDie(err.Error())
+		server.PrintAndDie("nats-server: " + err.Error())
 		return nil, err
 	}
 
@@ -77,6 +77,7 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 		return hostUser.Sign(b)
 	}))
 	if err != nil {
+		server.PrintAndDie(err.Error())
 		return nil, err
 	}
 

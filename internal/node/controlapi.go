@@ -14,7 +14,6 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/pkg/errors"
 	controlapi "github.com/synadia-io/nex/control-api"
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 // The API listener is the command and control interface for the node server
@@ -290,28 +289,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	deployRequest := &agentapi.DeployRequest{
-		Argv:                 request.Argv,
-		DecodedClaims:        request.DecodedClaims,
-		Description:          request.Description,
-		EncryptedEnvironment: request.Environment,
-		Environment:          request.WorkloadEnvironment,
-		Essential:            request.Essential,
-		Hash:                 *workloadHash,
-		JsDomain:             request.JsDomain,
-		Location:             request.Location,
-		Namespace:            &namespace,
-		RetryCount:           request.RetryCount,
-		RetriedAt:            request.RetriedAt,
-		SenderPublicKey:      request.SenderPublicKey,
-		TargetNode:           request.TargetNode,
-		TotalBytes:           int64(numBytes),
-		HostServicesConfig:   request.HostServicesConfig,
-		TriggerSubjects:      request.TriggerSubjects,
-		WorkloadName:         &request.DecodedClaims.Subject,
-		WorkloadType:         request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
-		WorkloadJwt:          request.WorkloadJwt,
-	}
+	deployRequest := agentDeployRequestFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
 
 	api.log.
 		Info("Submitting workload to agent",
