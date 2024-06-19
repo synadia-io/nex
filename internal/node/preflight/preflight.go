@@ -67,14 +67,14 @@ func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *sl
 				if _, err := os.Stat(path); err == nil {
 					r.satisfied = true
 					sb.WriteString(fmt.Sprintf("✅ Dependency Satisfied - %s [%s]\n", green(filepath.Join(dir, r.name)), cyan(r.description)))
-				} else {
-					sb.WriteString(fmt.Sprintf("⛔ Dependency Missing - %s\n", cyan(r.description)))
 				}
 			} else {
 				// Satisfied by not being required
 				r.satisfied = true
-				continue
 			}
+		}
+		if !r.satisfied {
+			sb.WriteString(fmt.Sprintf("⛔ Dependency Missing - %s\n", cyan(r.description)))
 		}
 	}
 
