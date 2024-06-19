@@ -155,17 +155,14 @@ var _ = Describe("nex node", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
 							_, err := os.Stat(nodeConfig.DefaultResourceDir)
-							Expect(err).To(Not(BeNil()))
+							Expect(os.IsNotExist(err)).To(BeTrue())
 						})
 
-						JustBeforeEach(func() {
+						It("should run preflight and create the default_resource_dir", func(ctx SpecContext) {
 							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
 							Expect(err).To(BeNil())
-						})
-
-						It("should create the default_resource_dir", func(ctx SpecContext) {
-							_, err := os.Stat(nodeConfig.DefaultResourceDir)
-							Expect(err).To(BeNil())
+							_, err = os.Stat(nodeConfig.DefaultResourceDir)
+							Expect(os.IsNotExist(err)).To(BeFalse())
 						})
 					})
 
