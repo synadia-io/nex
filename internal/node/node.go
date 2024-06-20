@@ -231,7 +231,7 @@ func (n *Node) init() error {
 			err = errors.Join(err, _err)
 		} else {
 			n.log.Info("Loaded node configuration",
-				slog.String("config_path", n.nodeOpts.ConfigFilepath)				
+				slog.String("config_path", n.nodeOpts.ConfigFilepath),
 			)
 		}
 
