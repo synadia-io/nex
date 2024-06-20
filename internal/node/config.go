@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -47,6 +48,12 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 
 	if config.Tags == nil {
 		config.Tags = make(map[string]string)
+	}
+
+	for _, sub := range models.RequiredTriggerSubjectDenyList {
+		if !slices.Contains(config.DenyTriggerSubjects, sub) {
+			config.DenyTriggerSubjects = append(config.DenyTriggerSubjects, sub)
+		}
 	}
 
 	return &config, nil

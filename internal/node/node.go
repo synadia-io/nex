@@ -230,7 +230,9 @@ func (n *Node) init() error {
 			n.log.Error("Failed to load node configuration file", slog.Any("err", _err), slog.String("config_path", n.nodeOpts.ConfigFilepath))
 			err = errors.Join(err, _err)
 		} else {
-			n.log.Info("Loaded node configuration", slog.String("config_path", n.nodeOpts.ConfigFilepath))
+			n.log.Info("Loaded node configuration",
+				slog.String("config_path", n.nodeOpts.ConfigFilepath),
+			)
 		}
 
 		n.telemetry, _err = observability.NewTelemetry(n.ctx, n.log, n.config, n.publicKey)
