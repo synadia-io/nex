@@ -26,7 +26,8 @@ const (
 )
 
 var (
-	DefaultWorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
+	RequiredTriggerSubjectDenyList = []string{"$SYS.>", "$JS.>", "$NEX.>"}
+	DefaultWorkloadTypes           = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 
 	DefaultBinPath    = filepath.SplitList(os.Getenv("PATH"))
 	DefaultCNIBinPath = filepath.SplitList(os.Getenv("PATH"))
@@ -61,6 +62,7 @@ type NodeConfiguration struct {
 	Tags                             map[string]string        `json:"tags,omitempty"`
 	ValidIssuers                     []string                 `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []controlapi.NexWorkload `json:"workload_types,omitempty"`
+	DenyTriggerSubjects              []string                 `json:"deny_trigger_subjects,omitempty"`
 
 	PreflightVerbose bool `json:"-"`
 	PreflightVerify  bool `json:"-"`
