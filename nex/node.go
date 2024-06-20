@@ -19,9 +19,12 @@ func setConditionalCommands() {
 	nodeUp.Flag("nexus", "Name for cluster of nex nodes").Default("nexus").StringVar(&NodeOpts.NexusName)
 
 	nodePreflight = nodes.Command("preflight", "Checks system for node requirements and installs missing")
-	nodePreflight.Flag("force", "installs missing dependencies without prompt").Default("false").BoolVar(&NodeOpts.ForceDepInstall)
+	nodePreflight.Flag("force", "(re)installs all dependencies without prompt").Default("false").BoolVar(&NodeOpts.ForceDepInstall)
 	nodePreflight.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
 	nodePreflight.Flag("init", "creates the configuration file if it does not exist").EnumVar(&NodeOpts.PreflightInit, "sandbox", "nosandbox")
+	nodePreflight.Flag("verify", "does binary verification on download").Default("false").BoolVar(&NodeOpts.PreflightVerify)
+	nodePreflight.Flag("verbose", "prints additional information during install").Default("false").BoolVar(&NodeOpts.PreflightVerbose)
+	nodePreflight.Flag("check", "checks status of requirements without attempting to install").Default("false").BoolVar(&NodeOpts.PreflightCheck)
 	nodePreflight.Flag("cni_ns", "nameservers to use in CNI configuration file").StringsVar(&NodeOpts.CniNS)
 }
 

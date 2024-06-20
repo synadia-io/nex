@@ -7,7 +7,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -64,15 +63,15 @@ var _ = Describe("nex node", func() {
 
 	BeforeEach(func() {
 		initData := map[string]string{
-			"version":    "spec",
-			"commit":     "abc123",
+			"version":    "development",
+			"commit":     "spec",
 			"build_date": "2021-01-01T00:00:00Z",
 		}
 
 		keypair, _ = nkeys.CreateServer()
 
 		ctxx, cancel = context.WithCancel(context.WithValue(context.Background(), "build_data", initData)) //nolint:all
-		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithColor()))
+		log = slog.New(shandler.NewHandler(shandler.WithLogLevel(slog.LevelDebug), shandler.WithStdErr(os.Stdout), shandler.WithColor()))
 
 		opts = &models.Options{
 			Servers: _fixtures.natsServer.ClientURL(),
@@ -136,6 +135,8 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
+				nodeConfig.BinPath = []string{"/usr/local/bin"}
+				nodeConfig.CNI.BinPath = []string{"/opt/cni/bin"}
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
 			})
 
@@ -153,11 +154,15 @@ var _ = Describe("nex node", func() {
 					Context("when the specified default_resource_dir does not exist on the host", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-non-existent-nex-resource-dir", _fixtures.seededRand.Int()))
+							_, err := os.Stat(nodeConfig.DefaultResourceDir)
+							Expect(os.IsNotExist(err)).To(BeTrue())
 						})
 
-						It("should [not] return an error", func(ctx SpecContext) {
+						It("should run preflight and create the default_resource_dir", func(ctx SpecContext) {
 							err := nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-							Expect(err).To(MatchError(errors.New("preflight checks failed: EOF")))
+							Expect(err).To(BeNil())
+							_, err = os.Stat(nodeConfig.DefaultResourceDir)
+							Expect(os.IsNotExist(err)).To(BeFalse())
 						})
 					})
 
@@ -232,6 +237,10 @@ var _ = Describe("nex node", func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+
+				nodeConfig.BinPath = []string{"/usr/local/bin"}
+				nodeConfig.CNI.BinPath = []string{"/opt/cni/bin"}
+				os.Setenv("PATH", fmt.Sprintf("%s:%s:%s", "/usr/local/bin", "/opt/cni/bin", os.Getenv("PATH")))
 
 				nodeConfig.NoSandbox = !sandbox
 			})

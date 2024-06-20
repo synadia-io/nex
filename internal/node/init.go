@@ -8,6 +8,7 @@ import (
 
 	"github.com/nats-io/nkeys"
 	nexmodels "github.com/synadia-io/nex/internal/models"
+	"github.com/synadia-io/nex/internal/node/preflight"
 )
 
 func CmdUp(
@@ -65,8 +66,11 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 
 	config.ForceDepInstall = nodeopts.ForceDepInstall
 	config.CNI.Nameservers = nodeopts.CniNS
+	config.PreflightCheck = nodeopts.PreflightCheck
+	config.PreflightVerify = nodeopts.PreflightVerify
+	config.PreflightVerbose = nodeopts.PreflightVerbose
 
-	err = CheckPrerequisites(config, false, log)
+	err = preflight.Preflight(ctx, config, log)
 	if err != nil {
 		return fmt.Errorf("preflight checks failed: %s", err)
 	}

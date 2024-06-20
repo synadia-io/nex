@@ -29,10 +29,8 @@ var (
 	RequiredTriggerSubjectDenyList = []string{"$SYS.>", "$JS.>", "$NEX.>"}
 	DefaultWorkloadTypes           = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 
-	DefaultBinPath = append([]string{"/usr/local/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
-
-	// check the default cni bin path first, otherwise look in the rest of the PATH
-	DefaultCNIBinPath = append([]string{"/opt/cni/bin"}, filepath.SplitList(os.Getenv("PATH"))...)
+	DefaultBinPath    = filepath.SplitList(os.Getenv("PATH"))
+	DefaultCNIBinPath = filepath.SplitList(os.Getenv("PATH"))
 )
 
 // Node configuration is used to configure the node process as well
@@ -65,6 +63,10 @@ type NodeConfiguration struct {
 	ValidIssuers                     []string                 `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []controlapi.NexWorkload `json:"workload_types,omitempty"`
 	DenyTriggerSubjects              []string                 `json:"deny_trigger_subjects,omitempty"`
+
+	PreflightVerbose bool `json:"-"`
+	PreflightVerify  bool `json:"-"`
+	PreflightCheck   bool `json:"-"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
 	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`

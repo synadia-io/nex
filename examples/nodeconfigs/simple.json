@@ -1,8 +1,13 @@
 {
-    "kernel_filepath": "/path/to/vmlinux-5.10",
-    "rootfs_filepath": "/path/to/rootfs.ext4",
+    "default_resource_dir": "/tmp/nex_resources",
+    "bin_path": [
+        "/usr/local/bin"
+    ],
     "machine_pool_size": 1,
     "cni": {
+        "bin_path": [
+            "/opt/cni/bin"
+        ],
         "network_name": "fcnet",
         "interface_name": "veth0"
     },
@@ -12,5 +17,6 @@
     },
     "tags": {
         "simple": "true"
-    }
+    },
+    "no_sandbox": false
 }

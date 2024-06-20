@@ -63,7 +63,7 @@ jobs:
       working-directory: .
       if: runner.os == 'Linux'
       run: |
-        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.19.0
         go mod tidy
         sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
@@ -71,7 +71,7 @@ jobs:
       working-directory: .
       if: runner.os == 'Windows'
       run: |
-        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.19.0
         go mod tidy
         go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --flake-attempts=5 --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
@@ -79,7 +79,7 @@ jobs:
       working-directory: .
       if: runner.os == 'macOS'
       run: |
-        go install github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+        go install github.com/onsi/ginkgo/v2/ginkgo@v2.19.0
         go mod tidy
         sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
 

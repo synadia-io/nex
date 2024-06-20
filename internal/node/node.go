@@ -25,6 +25,7 @@ import (
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	"github.com/synadia-io/nex/internal/node/observability"
+	"github.com/synadia-io/nex/internal/node/preflight"
 )
 
 const (
@@ -511,7 +512,7 @@ func (n *Node) validateConfig() error {
 		}
 	}
 
-	return CheckPrerequisites(n.config, true, n.log)
+	return preflight.Validate(n.config, n.log)
 }
 
 func (n *Node) shutdown() {

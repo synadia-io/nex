@@ -24,7 +24,7 @@ require (
 	github.com/nats-io/natscli v0.1.4
 	github.com/nats-io/nkeys v0.4.7
 	github.com/nats-io/nuid v1.0.1
-	github.com/onsi/ginkgo/v2 v2.17.3
+	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.19.1
