@@ -231,8 +231,7 @@ func (n *Node) init() error {
 			err = errors.Join(err, _err)
 		} else {
 			n.log.Info("Loaded node configuration",
-				slog.String("config_path", n.nodeOpts.ConfigFilepath),
-				slog.Any("deny_trigger_subjects", n.config.DenyTriggerSubjects),
+				slog.String("config_path", n.nodeOpts.ConfigFilepath)				
 			)
 		}
 
