@@ -211,8 +211,8 @@ func main() {
 		}
 	}
 	if slices.Contains(Opts.Logger, "nats") {
-		natsLogSubject := fmt.Sprintf("$NEX.logs.%s.stdout", pk)
-		natsErrLogSubject := fmt.Sprintf("$NEX.logs.%s.stderr", pk)
+		natsLogSubject := fmt.Sprintf("$NEX.logs.system.%s.stdout", pk)
+		natsErrLogSubject := fmt.Sprintf("$NEX.logs.system.%s.stderr", pk)
 		nc, err := models.GenerateConnectionFromOpts(Opts, logger)
 		if err == nil {
 			defer func() {
