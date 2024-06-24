@@ -115,7 +115,9 @@ func TestObjectBuiltin(t *testing.T) {
 	server.SetHostServicesConnection(testWorkloadId, nc)
 
 	service, _ := NewObjectStoreService(slog.Default())
+	msgService, _ := NewMessagingService(slog.Default())
 	_ = server.AddService("objectstore", service, []byte{})
+	_ = server.AddService("messaging", msgService, []byte{})
 	_ = server.Start()
 
 	res, err := bClient.ObjectPut(context.Background(), "objecttest", []byte{100, 101, 102})
@@ -153,5 +155,11 @@ func TestObjectBuiltin(t *testing.T) {
 	res3, err := bClient.ObjectGet(context.Background(), "objecttest")
 	if err == nil {
 		t.Fatalf("Expected to get an error for non-existing object but didn't: %+v", res3)
+	}
+
+	server.AddHostServicesConnection(testWorkloadId, hostservices.TriggerConnection, nc)
+	err = bClient.MessagingPublish(context.Background(), "foo", []byte{1, 2, 3})
+	if err != nil {
+		t.Fatalf("Failed to use trigger connection for messaging publish: %s", err.Error())
 	}
 }

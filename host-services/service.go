@@ -47,7 +47,7 @@ type HostService interface {
 	Initialize(json.RawMessage) error
 
 	HandleRequest(
-		connection *nats.Conn,
+		connections map[string]*nats.Conn,
 		namespace string,
 		workloadId string,
 		method string,
@@ -56,3 +56,8 @@ type HostService interface {
 		request []byte,
 	) (ServiceResult, error)
 }
+
+const (
+	DefaultConnection = "default"
+	TriggerConnection = "trigger"
+)
