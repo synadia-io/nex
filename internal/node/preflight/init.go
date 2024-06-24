@@ -3,9 +3,10 @@ package preflight
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/fatih/color"
 )
@@ -16,39 +17,51 @@ var (
 	magenta = color.New(color.FgMagenta).SprintFunc()
 	green   = color.New(color.FgHiGreen).SprintFunc()
 
-	nexLatestVersion = func(ctx context.Context) string {
+	nexLatestVersion = func(ctx context.Context, logger *slog.Logger) string {
 		version := "development"
 		build_data, ok := ctx.Value("build_data").(map[string]interface{})
 		if ok {
 			version, ok = build_data["version"].(string)
 			if !ok {
-				fmt.Println("error parsing version from build data")
+				logger.Warn("error parsing version from build data")
 			}
 		}
 		if version == "development" {
+			backoff := 0
+
+		RETRY:
 			res, err := http.Get("https://api.github.com/repos/synadia-io/nex/releases/latest")
 			if err != nil {
-				fmt.Printf("error making http request: %s\n", err)
+				logger.Error("error making http request", slog.Any("err", err))
 				return ""
 			}
 			defer res.Body.Close()
+			if res.StatusCode != 200 && backoff < 5 {
+				slog.Warn("failed to get latest version, incrementing backoff", slog.String("status_code", res.Status), slog.Int("backoff", backoff))
+				backoff++
+				time.Sleep(time.Duration(backoff) * time.Second)
+				goto RETRY
+			} else if res.StatusCode != 200 {
+				logger.Error("error getting latest version", slog.String("status_code", res.Status))
+				return ""
+			}
 
 			b, err := io.ReadAll(res.Body)
 			if err != nil {
-				fmt.Printf("error reading body: %s\n", err)
+				logger.Error("error reading body", slog.Any("err", err))
 				return ""
 			}
 
 			payload := make(map[string]interface{})
 			err = json.Unmarshal(b, &payload)
 			if err != nil {
-				fmt.Printf("error parsing json: %s\n", err)
+				slog.Error("error parsing json", slog.Any("err", err))
 				return ""
 			}
 
 			latestTag, ok := payload["tag_name"].(string)
 			if !ok {
-				fmt.Println("error parsing tag_name")
+				slog.Error("error parsing tag_name")
 				return ""
 			}
 			return latestTag

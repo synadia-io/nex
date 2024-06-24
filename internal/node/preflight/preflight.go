@@ -34,8 +34,12 @@ type requirement struct {
 }
 
 func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
-	nexVer := nexLatestVersion(ctx)
-	logger.Debug("using nex version", slog.String("version", nexVer))
+	nexVer := nexLatestVersion(ctx, logger)
+	if nexVer == "" {
+		logger.Warn("failed to determine latest version of nex")
+	} else {
+		logger.Debug("using nex version", slog.String("version", nexVer))
+	}
 
 	required, err := preflightInit(nexVer, config, logger)
 	if errors.Is(err, ErrNoSandboxRequired) {
@@ -79,7 +83,7 @@ func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *sl
 	}
 
 	fmt.Print(sb.String())
-	if config.PreflightCheck {
+	if config.PreflightCheck || nexVer == "" {
 		return nil
 	}
 
