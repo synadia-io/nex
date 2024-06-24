@@ -20,7 +20,7 @@ type HostServicesServer struct {
 	services   map[string]HostService
 	// Every single workload gets its own private host services connection,
 	// even if it's reusing defaults for config
-	hsClientConnections map[string]*nats.Conn
+	hsClientConnections map[string][]*nats.Conn
 
 	tracer trace.Tracer
 }
@@ -30,19 +30,36 @@ func NewHostServicesServer(ncInternal *nats.Conn, log *slog.Logger, tracer trace
 		log:                 log,
 		ncInternal:          ncInternal,
 		services:            make(map[string]HostService),
-		hsClientConnections: make(map[string]*nats.Conn),
+		hsClientConnections: make(map[string][]*nats.Conn),
 		tracer:              tracer,
 	}
 }
 
+// Sets the connection used by host services implementations, e.g. key value, object store, etc
 func (h *HostServicesServer) SetHostServicesConnection(workloadId string, nc *nats.Conn) {
 	h.RemoveHostServicesConnection(workloadId)
-	h.hsClientConnections[workloadId] = nc
+	h.hsClientConnections[workloadId] = []*nats.Conn{nc}
+}
+
+// Adds a secondary host services client used by providers like messaging to connect to the same subject
+// space as the workload's corresponding triggers
+func (h *HostServicesServer) AddHostServicesConnection(workloadId string, nc *nats.Conn) {
+	var cs []*nats.Conn
+	if conns, ok := h.hsClientConnections[workloadId]; ok {
+		cs = append(conns, nc)
+	} else {
+		cs = []*nats.Conn{nc}
+	}
+
+	h.hsClientConnections[workloadId] = cs
+
 }
 
 func (h *HostServicesServer) RemoveHostServicesConnection(workloadId string) {
-	if c, ok := h.hsClientConnections[workloadId]; ok {
-		_ = c.Drain()
+	if conns, ok := h.hsClientConnections[workloadId]; ok {
+		for _, c := range conns {
+			_ = c.Drain()
+		}
 		delete(h.hsClientConnections, workloadId)
 	}
 }
@@ -124,9 +141,9 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 
 	span.AddEvent("RPC Request Began")
 
-	requestConnection := h.hsClientConnections[vmID]
+	conns := h.hsClientConnections[vmID]
 
-	result, err := service.HandleRequest(requestConnection, namespace, vmID, method, workloadName, metadata, msg.Data)
+	result, err := service.HandleRequest(conns, namespace, vmID, method, workloadName, metadata, msg.Data)
 	if err != nil {
 		h.log.Warn("Failed to handle host service RPC request",
 			slog.String("workload_id", vmID),

@@ -55,7 +55,7 @@ func (m *MessagingService) Initialize(config json.RawMessage) error {
 }
 
 func (m *MessagingService) HandleRequest(
-	nc *nats.Conn,
+	conns []*nats.Conn,
 	namespace string,
 	workloadId string,
 	method string,
@@ -63,13 +63,19 @@ func (m *MessagingService) HandleRequest(
 	metadata map[string]string,
 	request []byte) (hostservices.ServiceResult, error) {
 
+	conn := conns[0]
+	// if there's a separate "trigger" connection, we use that to ensure consistency
+	if len(conns) > 1 {
+		conn = conns[1]
+	}
+
 	switch method {
 	case messagingServiceMethodPublish:
-		return m.handlePublish(nc, workloadId, workloadName, request, metadata, namespace)
+		return m.handlePublish(conn, workloadId, workloadName, request, metadata, namespace)
 	case messagingServiceMethodRequest:
-		return m.handleRequest(nc, workloadId, workloadName, request, metadata, namespace)
+		return m.handleRequest(conn, workloadId, workloadName, request, metadata, namespace)
 	case messagingServiceMethodRequestMany:
-		return m.handleRequestMany(nc, workloadId, workloadName, request, metadata, namespace)
+		return m.handleRequestMany(conn, workloadId, workloadName, request, metadata, namespace)
 	default:
 		m.log.Warn("Received invalid host services RPC request",
 			slog.String("service", "messaging"),

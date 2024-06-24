@@ -257,6 +257,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 					_ = w.StopWorkload(workloadID, true)
 					return err
 				}
+				w.hostServices.server.AddHostServicesConnection(workloadID, ncTrigger)
 			}
 			for _, tsub := range request.TriggerSubjects {
 				sub, err := ncTrigger.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))

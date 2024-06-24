@@ -53,7 +53,7 @@ func (k *KeyValueService) Initialize(config json.RawMessage) error {
 }
 
 func (k *KeyValueService) HandleRequest(
-	nc *nats.Conn,
+	conns []*nats.Conn,
 	namespace string,
 	workloadId string,
 	method string,
@@ -61,6 +61,7 @@ func (k *KeyValueService) HandleRequest(
 	metadata map[string]string,
 	request []byte,
 ) (hostservices.ServiceResult, error) {
+	nc := conns[0]
 	switch method {
 	case kvServiceMethodGet:
 		return k.handleGet(nc, workloadId, workloadName, request, metadata, namespace)

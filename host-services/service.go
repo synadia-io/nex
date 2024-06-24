@@ -47,7 +47,7 @@ type HostService interface {
 	Initialize(json.RawMessage) error
 
 	HandleRequest(
-		connection *nats.Conn,
+		connections []*nats.Conn,
 		namespace string,
 		workloadId string,
 		method string,
