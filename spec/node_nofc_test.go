@@ -50,6 +50,7 @@ var _ = Describe("nex node", func() {
 
 	var snapshotAgentRootFSPath string
 	var snapshotAgentRootFSPathOnce sync.Once
+	var preflightForceOnce sync.Once
 
 	BeforeEach(func() {
 		initData := map[string]string{
@@ -91,6 +92,13 @@ var _ = Describe("nex node", func() {
 				_ = os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), agentPath))
 			}
 		})
+
+		preflightForceOnce.Do(func() {
+			// only force install once so there isnt multiple downloads
+			nodeOpts.ForceDepInstall = true
+			_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+		})
+
 	})
 
 	Describe("preflight", func() {
@@ -147,7 +155,6 @@ var _ = Describe("nex node", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = validResourceDir
 							_ = os.Mkdir(nodeConfig.DefaultResourceDir, 0755)
-							nodeOpts.ForceDepInstall = true
 						})
 
 						JustBeforeEach(func() {
@@ -241,7 +248,6 @@ var _ = Describe("nex node", func() {
 						nodeConfig.DefaultResourceDir = validResourceDir
 						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
 						_ = os.Mkdir(validResourceDir, 0755)
-						nodeOpts.ForceDepInstall = true
 
 						nodeConfig.MachinePoolSize = 1
 					})
