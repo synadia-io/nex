@@ -126,7 +126,7 @@ func (b *bogusService) Initialize(config json.RawMessage) error {
 }
 
 func (b *bogusService) HandleRequest(
-	_ []*nats.Conn,
+	_ map[string]*nats.Conn,
 	namespace string,
 	workloadId string,
 	method string,

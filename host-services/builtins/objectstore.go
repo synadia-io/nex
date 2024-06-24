@@ -62,7 +62,7 @@ func (o *ObjectStoreService) Initialize(config json.RawMessage) error {
 }
 
 func (o *ObjectStoreService) HandleRequest(
-	conns []*nats.Conn,
+	conns map[string]*nats.Conn,
 	namespace string,
 	workloadId string,
 	method string,
@@ -70,7 +70,7 @@ func (o *ObjectStoreService) HandleRequest(
 	metadata map[string]string,
 	request []byte) (hostservices.ServiceResult, error) {
 
-	nc := conns[0]
+	nc := conns[hostservices.DefaultConnection]
 
 	switch method {
 	case objectStoreServiceMethodGet:

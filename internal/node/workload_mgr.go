@@ -18,6 +18,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
+	hostservices "github.com/synadia-io/nex/host-services"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -257,7 +258,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 					_ = w.StopWorkload(workloadID, true)
 					return err
 				}
-				w.hostServices.server.AddHostServicesConnection(workloadID, ncTrigger)
+				w.hostServices.server.AddHostServicesConnection(workloadID, hostservices.TriggerConnection, ncTrigger)
 			}
 			for _, tsub := range request.TriggerSubjects {
 				sub, err := ncTrigger.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))

@@ -38,7 +38,7 @@ func (h *HTTPService) Initialize(_ json.RawMessage) error {
 }
 
 func (h *HTTPService) HandleRequest(
-	_ []*nats.Conn,
+	_ map[string]*nats.Conn,
 	namespace string,
 	workloadId string,
 	method string,

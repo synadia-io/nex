@@ -20,7 +20,7 @@ type HostServicesServer struct {
 	services   map[string]HostService
 	// Every single workload gets its own private host services connection,
 	// even if it's reusing defaults for config
-	hsClientConnections map[string][]*nats.Conn
+	hsClientConnections map[string]map[string]*nats.Conn
 
 	tracer trace.Tracer
 }
@@ -30,7 +30,7 @@ func NewHostServicesServer(ncInternal *nats.Conn, log *slog.Logger, tracer trace
 		log:                 log,
 		ncInternal:          ncInternal,
 		services:            make(map[string]HostService),
-		hsClientConnections: make(map[string][]*nats.Conn),
+		hsClientConnections: make(map[string]map[string]*nats.Conn),
 		tracer:              tracer,
 	}
 }
@@ -38,21 +38,23 @@ func NewHostServicesServer(ncInternal *nats.Conn, log *slog.Logger, tracer trace
 // Sets the connection used by host services implementations, e.g. key value, object store, etc
 func (h *HostServicesServer) SetHostServicesConnection(workloadId string, nc *nats.Conn) {
 	h.RemoveHostServicesConnection(workloadId)
-	h.hsClientConnections[workloadId] = []*nats.Conn{nc}
+	if conns, ok := h.hsClientConnections[workloadId]; ok {
+		conns[DefaultConnection] = nc
+	} else {
+		conns = map[string]*nats.Conn{DefaultConnection: nc}
+		h.hsClientConnections[workloadId] = conns
+	}
 }
 
 // Adds a secondary host services client used by providers like messaging to connect to the same subject
 // space as the workload's corresponding triggers
-func (h *HostServicesServer) AddHostServicesConnection(workloadId string, nc *nats.Conn) {
-	var cs []*nats.Conn
+func (h *HostServicesServer) AddHostServicesConnection(workloadId string, purpose string, nc *nats.Conn) {
 	if conns, ok := h.hsClientConnections[workloadId]; ok {
-		cs = append(conns, nc)
+		conns[purpose] = nc
 	} else {
-		cs = []*nats.Conn{nc}
+		h.log.Warn("Attempted to add a host service connection without a default connection")
+		return
 	}
-
-	h.hsClientConnections[workloadId] = cs
-
 }
 
 func (h *HostServicesServer) RemoveHostServicesConnection(workloadId string) {

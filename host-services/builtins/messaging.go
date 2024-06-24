@@ -55,7 +55,7 @@ func (m *MessagingService) Initialize(config json.RawMessage) error {
 }
 
 func (m *MessagingService) HandleRequest(
-	conns []*nats.Conn,
+	conns map[string]*nats.Conn,
 	namespace string,
 	workloadId string,
 	method string,
@@ -63,10 +63,10 @@ func (m *MessagingService) HandleRequest(
 	metadata map[string]string,
 	request []byte) (hostservices.ServiceResult, error) {
 
-	conn := conns[0]
+	conn := conns[hostservices.DefaultConnection]
 	// if there's a separate "trigger" connection, we use that to ensure consistency
-	if len(conns) > 1 {
-		conn = conns[1]
+	if c, ok := conns[hostservices.TriggerConnection]; ok {
+		conn = c
 	}
 
 	switch method {
