@@ -331,15 +331,24 @@ func (n *Node) handleAutostarts() {
 			agentClient, err = n.manager.SelectRandomAgent()
 			if err != nil {
 				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
-				time.Sleep(25 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 			}
+			agentClient, err = n.manager.SelectRandomAgent()
 		}
+		if err != nil {
+			n.log.Error("No warm workload machine in pool for autostart. Node is in a bad state, will shut down",
+				slog.Any("error", err),
+			)
+		}
+
+		// functions cannot be essential
+		essential := autostart.Essential && autostart.WorkloadType == controlapi.NexWorkloadNative
 
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
 			controlapi.Environment(autostart.Environment),
-			controlapi.Essential(false), // avoid startup flapping, also not supported for funcs
+			controlapi.Essential(essential),
 			controlapi.Issuer(n.issuerKeypair),
 			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),
@@ -353,7 +362,7 @@ func (n *Node) handleAutostarts() {
 			n.log.Error("Failed to create deployment request for autostart workload",
 				slog.Any("error", err),
 			)
-			continue
+			n.shutdown()
 		}
 
 		if autostart.JsDomain != nil {
@@ -365,9 +374,10 @@ func (n *Node) handleAutostarts() {
 			n.log.Error("Failed to validate autostart deployment request",
 				slog.Any("error", err),
 			)
-			continue
+			n.shutdown()
 		}
 
+		// TODO: add potential backoff and retry to cacheworkload
 		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(agentClient.ID(), request)
 		if err != nil {
 			n.api.log.Error("Failed to cache auto-start workload bytes",
@@ -376,7 +386,7 @@ func (n *Node) handleAutostarts() {
 				slog.String("namespace", autostart.Namespace),
 				slog.String("url", autostart.Location),
 			)
-			continue
+			n.shutdown()
 		}
 		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 
@@ -390,7 +400,7 @@ func (n *Node) handleAutostarts() {
 				slog.String("name", autostart.Name),
 				slog.String("namespace", autostart.Namespace),
 			)
-			continue
+			n.shutdown()
 		}
 		n.log.Info("Autostart workload started",
 			slog.String("name", autostart.Name),

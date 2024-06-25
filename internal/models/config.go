@@ -96,6 +96,7 @@ type AutostartDeployRequest struct {
 	Namespace       string                 `json:"namespace"`
 	Argv            []string               `json:"argv,omitempty"`
 	Description     *string                `json:"description,omitempty"`
+	Essential       bool                   `json:"essential,omitempty"`
 	WorkloadType    controlapi.NexWorkload `json:"type"`
 	Location        string                 `json:"location"`
 	JsDomain        *string                `json:"jsdomain,omitempty"`
