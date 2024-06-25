@@ -54,7 +54,8 @@ type AgentClient struct {
 	execTotalNanos    int64
 	workloadStartedAt time.Time
 
-	subz []*nats.Subscription
+	workloadBytes uint64
+	subz          []*nats.Subscription
 }
 
 func NewAgentClient(
@@ -153,7 +154,12 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 	}
 
 	a.workloadStartedAt = time.Now().UTC()
+	a.workloadBytes = uint64(request.TotalBytes)
 	return &deployResponse, nil
+}
+
+func (a *AgentClient) WorkloadBytes() uint64 {
+	return a.workloadBytes
 }
 
 // Draining subscriptions and release other resources associated

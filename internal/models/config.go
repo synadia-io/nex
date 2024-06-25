@@ -63,6 +63,7 @@ type NodeConfiguration struct {
 	ValidIssuers                     []string                 `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []controlapi.NexWorkload `json:"workload_types,omitempty"`
 	DenyTriggerSubjects              []string                 `json:"deny_trigger_subjects,omitempty"`
+	NodeLimits                       NodeLimitsConfig         `json:"node_limits"`
 
 	PreflightVerbose bool `json:"-"`
 	PreflightVerify  bool `json:"-"`
@@ -80,6 +81,12 @@ type HostServicesConfig struct {
 	NatsUserJwt  string                   `json:"nats_user_jwt"`
 	NatsUserSeed string                   `json:"nats_user_seed"`
 	Services     map[string]ServiceConfig `json:"services"`
+}
+
+type NodeLimitsConfig struct {
+	MaxWorkloads     int `json:"max_workloads"`
+	MaxTotalBytes    int `json:"max_total_bytes"`
+	MaxWorkloadBytes int `json:"max_workload_bytes"`
 }
 
 type ServiceConfig struct {
