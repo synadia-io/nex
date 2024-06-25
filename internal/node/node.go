@@ -333,12 +333,6 @@ func (n *Node) handleAutostarts() {
 				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
 				time.Sleep(50 * time.Millisecond)
 			}
-			agentClient, err = n.manager.SelectRandomAgent()
-		}
-		if err != nil {
-			n.log.Error("No warm workload machine in pool for autostart. Node is in a bad state, will shut down",
-				slog.Any("error", err),
-			)
 		}
 
 		// functions cannot be essential
