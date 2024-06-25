@@ -34,6 +34,7 @@ const (
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
 	runloopTickInterval          = 2500 * time.Millisecond
+	agentPoolRetryMax            = 3
 )
 
 // Nex node process
@@ -323,23 +324,36 @@ func (n *Node) startPublicNATS() error {
 }
 
 func (n *Node) handleAutostarts() {
+	successCount := 0
 	for _, autostart := range n.config.AutostartConfiguration.Workloads {
 		var agentClient *agentapi.AgentClient
 		var err error
 
+		retry := 0
 		for agentClient == nil {
 			agentClient, err = n.manager.SelectRandomAgent()
 			if err != nil {
 				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
-				time.Sleep(25 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
+				retry += 1
+				if retry > agentPoolRetryMax {
+					n.log.Error("Exceeded warm agent retrieval retry count, terminating node",
+						slog.Int("allowed_retries", agentPoolRetryMax),
+					)
+					n.shutdown()
+					return
+				}
 			}
 		}
+
+		// functions cannot be essential
+		essential := autostart.Essential && autostart.WorkloadType == controlapi.NexWorkloadNative
 
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
 			controlapi.Environment(autostart.Environment),
-			controlapi.Essential(false), // avoid startup flapping, also not supported for funcs
+			controlapi.Essential(essential),
 			controlapi.Issuer(n.issuerKeypair),
 			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),
@@ -368,6 +382,7 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
+		// TODO: add potential backoff and retry to cacheworkload
 		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(agentClient.ID(), request)
 		if err != nil {
 			n.api.log.Error("Failed to cache auto-start workload bytes",
@@ -396,6 +411,13 @@ func (n *Node) handleAutostarts() {
 			slog.String("name", autostart.Name),
 			slog.String("namespace", autostart.Namespace),
 			slog.String("workload_id", agentClient.ID()),
+		)
+		successCount += 1
+	}
+	if successCount < len(n.config.AutostartConfiguration.Workloads) {
+		n.log.Error("Not all startup workloads suceeded",
+			slog.Int("expected", len(n.config.AutostartConfiguration.Workloads)),
+			slog.Int("actual", successCount),
 		)
 	}
 }
