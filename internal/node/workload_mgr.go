@@ -683,6 +683,15 @@ func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 	return nil, nil
 }
 
+func (w *WorkloadManager) TotalRunningWorkloadBytes() uint64 {
+	total := uint64(0)
+	for _, c := range w.activeAgents {
+		total += c.WorkloadBytes()
+	}
+
+	return total
+}
+
 func createJwtConnection(info *controlapi.NatsJwtConnectionInfo) (*nats.Conn, error) {
 	natsOpts := []nats.Option{
 		nats.Name("workload-trigger-subscription"),

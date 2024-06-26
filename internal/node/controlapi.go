@@ -226,7 +226,12 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	}
 
 	if api.node.IsLameDuck() {
-		respondFail(controlapi.RunResponseType, m, "Node is in lame duck mode. Workload deploy request rejected")
+		respondFail(controlapi.RunResponseType, m, "Node is in lame duck mode. Workload deploy request denied")
+		return
+	}
+
+	if api.exceedsMaxWorkloadCount() {
+		respondFail(controlapi.RunResponseType, m, "Node is at maximum workload limit. Deploy request denied")
 		return
 	}
 
@@ -297,6 +302,14 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	if err != nil {
 		api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))
+		return
+	}
+	if api.exceedsMaxWorkloadSize(numBytes) {
+		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node limitations")
+		return
+	}
+	if api.exceedsPerNodeWorkloadSizeMax(numBytes) {
+		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node total limitations")
 		return
 	}
 
@@ -534,6 +547,21 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 	} else {
 		_ = m.Respond(raw)
 	}
+}
+
+func (api *ApiListener) exceedsMaxWorkloadCount() bool {
+	return api.node.config.NodeLimits.MaxWorkloads > 0 &&
+		len(api.mgr.activeAgents) >= api.node.config.NodeLimits.MaxWorkloads
+}
+
+func (api *ApiListener) exceedsMaxWorkloadSize(bytes uint64) bool {
+	return api.node.config.NodeLimits.MaxWorkloadBytes > 0 &&
+		bytes > uint64(api.node.config.NodeLimits.MaxWorkloadBytes)
+}
+
+func (api *ApiListener) exceedsPerNodeWorkloadSizeMax(bytes uint64) bool {
+	return api.node.config.NodeLimits.MaxTotalBytes > 0 &&
+		bytes+api.mgr.TotalRunningWorkloadBytes() > uint64(api.node.config.NodeLimits.MaxTotalBytes)
 }
 
 func summarizeMachines(workloads []controlapi.MachineSummary, namespace string) []controlapi.MachineSummary {
