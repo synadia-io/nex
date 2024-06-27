@@ -58,6 +58,7 @@ var (
 	nodePreflight *fisk.CmdClause
 
 	node_info_id_arg = nodesInfo.Arg("id", "Public key of the node you're interested in").Required().String()
+	node_info_full   = nodesInfo.Flag("full", "Long form output").Default("false").UnNegatableBool()
 
 	Opts       = &models.Options{}
 	GuiOpts    = &models.UiOptions{}
@@ -266,7 +267,7 @@ func main() {
 			logger.Error("Failed to list workloads", slog.Any("err", err))
 		}
 	case nodesInfo.FullCommand():
-		err := NodeInfo(ctx, *node_info_id_arg)
+		err := NodeInfo(ctx, *node_info_id_arg, *node_info_full)
 		if err != nil {
 			logger.Error("Failed to get node info", slog.Any("err", err))
 		}

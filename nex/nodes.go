@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/nats-io/natscli/columns"
 	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/internal/models"
@@ -69,7 +70,7 @@ func LameDuck(ctx context.Context, logger *slog.Logger) error {
 }
 
 // Uses a control API client to retrieve info on a single node
-func NodeInfo(ctx context.Context, nodeid string) error {
+func NodeInfo(ctx context.Context, nodeid string, full bool) error {
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nc, err := models.GenerateConnectionFromOpts(Opts, log)
 	if err != nil {
@@ -80,7 +81,7 @@ func NodeInfo(ctx context.Context, nodeid string) error {
 	if err != nil {
 		return err
 	}
-	renderNodeInfo(nodeInfo, nodeid)
+	renderNodeInfo(nodeInfo, nodeid, full)
 
 	return nil
 }
@@ -88,10 +89,9 @@ func NodeInfo(ctx context.Context, nodeid string) error {
 func render(cols *columns.Writer) {
 	_ = cols.Frender(os.Stdout)
 }
-func renderNodeInfo(info *controlapi.InfoResponse, id string) {
+func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 	cols := newColumns("NEX Node Information")
 
-	defer render(cols)
 	cols.AddRow("Node", id)
 	cols.AddRowf("Xkey", info.PublicXKey)
 	cols.AddRow("Version", info.Version)
@@ -114,19 +114,43 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string) {
 
 		cols.Indent(0)
 	}
+	cols.Println()
+	render(cols)
 
-	if len(info.Machines) > 0 {
-		cols.AddSectionTitle("Workloads")
-		cols.Indent(2)
-		for _, m := range info.Machines {
-			cols.Println()
-			cols.AddRow("Id", m.Id)
-			cols.AddRow("Healthy", m.Healthy)
-			cols.AddRow("Runtime", m.Workload.Runtime)
-			cols.AddRow("Name", m.Workload.Name)
-			cols.AddRow("Description", m.Workload.Description)
+	if full {
+		if len(info.Machines) > 0 {
+			cols.AddSectionTitle("Workloads")
+			cols.Indent(2)
+			for _, m := range info.Machines {
+				cols.Println()
+				cols.AddRow("Id", m.Id)
+				cols.AddRow("Healthy", m.Healthy)
+				cols.AddRow("Runtime", m.Workload.Runtime)
+				cols.AddRow("Name", m.Workload.Name)
+				cols.AddRow("Description", m.Workload.Description)
+			}
+			cols.Indent(0)
 		}
-		cols.Indent(0)
+	} else {
+		t := table.NewWriter()
+		t.SetStyle(table.StyleRounded)
+
+		t.SetTitle("Workloads")
+		t.Style().Title.Align = text.AlignCenter
+		t.AppendHeader(table.Row{"", "ID", "Name", "Runtime"})
+
+		for _, m := range info.Machines {
+			health := func() string {
+				if m.Healthy {
+					return "🟢"
+				}
+				return "🔴"
+			}()
+
+			t.AppendRow(table.Row{health, m.Id, m.Workload.Name, m.Workload.Runtime})
+		}
+
+		fmt.Println(t.Render())
 	}
 }
 
