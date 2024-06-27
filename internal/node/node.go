@@ -178,7 +178,11 @@ func (n *Node) IsLameDuck() bool {
 }
 
 func (n *Node) createPid() error {
-	n.pidFilepath = filepath.Join(os.TempDir(), "nex.pid")
+	if n.config.PidFilepath != nil {
+		n.pidFilepath = *n.config.PidFilepath
+	} else {
+		n.pidFilepath = filepath.Join(os.TempDir(), "nex.pid")
+	}
 
 	var err error
 	if _, err = os.Stat(n.pidFilepath); err == nil {
