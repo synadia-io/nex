@@ -17,8 +17,8 @@ type BinaryVerify struct {
 type PreflightError error
 
 var (
-	ErrBinaryNotFound      = errors.New("nex-agent binary not found")
-	ErrBinaryNotExecutable = errors.New("nex-agent binary not executable")
+	ErrBinaryNotFound      = errors.New("binary not found")
+	ErrBinaryNotExecutable = errors.New("binary not executable")
 	ErrRootFsNotFound      = errors.New("rootfs file not found")
 	ErrVmlinuxNotFound     = errors.New("vmlinux file not found")
 	ErrCNIConfigNotFound   = errors.New("cni config file not found")
