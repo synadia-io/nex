@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/synadia-io/nex/internal/models"
 )
@@ -49,6 +50,11 @@ var (
 func Validate(config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
 	var errs PreflightError
 	if config.NoSandbox {
+		if len(config.BinPath) != 0 {
+			path := strings.Join(config.BinPath, ":")
+			os.Setenv("PATH", path)
+		}
+
 		nexAgentPath, err := exec.LookPath("nex-agent")
 		if err != nil {
 			errs = errors.Join(errs, ErrNexAgentNotFound)
@@ -59,6 +65,15 @@ func Validate(config *models.NodeConfiguration, logger *slog.Logger) PreflightEr
 	}
 
 	for _, bin := range binVerify {
+		if bin.BinName == "firecracker" && len(config.BinPath) != 0 {
+			path := strings.Join(config.BinPath, ":")
+			os.Setenv("PATH", path)
+		}
+		if bin.BinName != "firecracker" && len(config.CNI.BinPath) != 0 {
+			path := strings.Join(config.CNI.BinPath, ":")
+			os.Setenv("PATH", path)
+		}
+
 		binPath, err := exec.LookPath(bin.BinName)
 		if err != nil {
 			errs = errors.Join(errs, bin.Error)
