@@ -670,6 +670,9 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployR
 
 // Picks a pending agent from the pool that will receive the next deployment
 func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
+	w.poolMutex.Lock()
+	defer w.poolMutex.Unlock()
+
 	if len(w.pendingAgents) == 0 {
 		return nil, errors.New("no available agent client in pool")
 	}
