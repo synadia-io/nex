@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,9 @@ import (
 
 const (
 	workloadRegex = `^[a-zA-Z0-9_-]+$`
+
+	WorkloadLocationSchemeFile = "file"
+	WorkloadLocationSchemeNATS = "nats"
 )
 
 type DeployRequest struct {
@@ -137,6 +141,14 @@ func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
 
 	if request.Hash != nil && *request.Hash != request.DecodedClaims.Data["hash"].(string) {
 		return nil, errors.New("artifact hash claim does not match request")
+	}
+
+	if request.Essential != nil && *request.Essential && request.WorkloadType != NexWorkloadNative {
+		return nil, errors.New("essential workloads must be native")
+	}
+
+	if !strings.EqualFold(request.Location.Scheme, WorkloadLocationSchemeFile) && !strings.EqualFold(request.Location.Scheme, WorkloadLocationSchemeNATS) {
+		return nil, errors.New("workload location scheme invalid")
 	}
 
 	var vr jwt.ValidationResults

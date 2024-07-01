@@ -30,12 +30,13 @@ import (
 )
 
 const (
-	systemNamespace              = "system"
+	agentPoolRetryMax            = 100
+	autostartAgentRetryMax       = 10
 	heartbeatInterval            = 30 * time.Second
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
 	runloopTickInterval          = 2500 * time.Millisecond
-	agentPoolRetryMax            = 100
+	systemNamespace              = "system"
 )
 
 // Nex node process
@@ -343,14 +344,16 @@ func (n *Node) handleAutostarts() {
 				time.Sleep(50 * time.Millisecond)
 
 				retry += 1
-				if retry > agentPoolRetryMax {
-					n.log.Error("Exceeded warm agent retrieval retry count, terminating node",
-						slog.Int("allowed_retries", agentPoolRetryMax),
+				if retry > autostartAgentRetryMax {
+					n.log.Error("Exceeded warm agent retrieval retry count during attempted autostart; terminating node",
+						slog.Int("allowed_retries", autostartAgentRetryMax),
 					)
 
 					n.shutdown()
 					return
 				}
+
+				time.Sleep(time.Millisecond * 50)
 			}
 		}
 
@@ -425,7 +428,7 @@ func (n *Node) handleAutostarts() {
 
 		_, err = request.Validate()
 		if err != nil {
-			n.log.Error("Failed to validate autostart deployment request",
+			n.log.Error("Failed to validate autostart workload deploy request",
 				slog.Any("error", err),
 			)
 			agentClient.MarkUnselected()
@@ -445,10 +448,15 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		agentWorkloadInfo := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
+		var hash string
+		if workloadHash != nil {
+			hash = *workloadHash // HACK!!! for agent-local workloads, this should be read from the release manifest
+		}
+
+		agentWorkloadInfo := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, hash)
 
 		agentWorkloadInfo.TotalBytes = int64(numBytes)
-		agentWorkloadInfo.Hash = *workloadHash
+		agentWorkloadInfo.Hash = hash
 
 		agentWorkloadInfo.Environment = autostart.Environment // HACK!!! we need to fix autostart config to allow encrypted environment...
 
@@ -473,7 +481,7 @@ func (n *Node) handleAutostarts() {
 	}
 
 	if successCount < len(n.config.AutostartConfiguration.Workloads) {
-		n.log.Error("Not all startup workloads suceeded",
+		n.log.Error("Failed to initialize autostart workloads",
 			slog.Int("expected", len(n.config.AutostartConfiguration.Workloads)),
 			slog.Int("actual", successCount),
 		)

@@ -32,6 +32,8 @@ const (
 	runloopSleepInterval                = 250 * time.Millisecond
 	runloopTickInterval                 = 2500 * time.Millisecond
 	workloadExecutionSleepTimeoutMillis = 50
+	workloadLocationSchemeFile          = "file"
+	workloadLocationSchemeNATS          = "nats"
 )
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
@@ -171,33 +173,70 @@ func (a *Agent) Version() string {
 	return VERSION
 }
 
-// cacheExecutableArtifact uses the underlying agent configuration to fetch
-// the executable workload artifact from the cache bucket, write it to a
-// temporary file and make it executable; this method returns the full
-// path to the cached artifact if successful
-func (a *Agent) cacheExecutableArtifact(req *agentapi.AgentWorkloadInfo) (*string, error) {
-	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
-	tempFile := path.Join(os.TempDir(), fileName)
+// resolveExecutableArtifact uses the underlying agent configuration and
+// location specified in the workload deploy request to prepare the workload
+// artifact for execution by the agent.
+//
+// in the case of the workload artifact being deployed from a nats:// location
+// this method fetches the workload artifact from the object store bucket,
+// writes it to a temporary file and makes it executable.
+//
+// in the case of the workload artifact being deployed from a file:// location,
+// this method verifies that the specified file exists on the agent rootfs and
+// is executable.
+func (a *Agent) resolveExecutableArtifact(req *agentapi.AgentWorkloadInfo) (*string, error) {
+	var file *string
 
-	if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == controlapi.NexWorkloadNative {
-		tempFile = fmt.Sprintf("%s.exe", tempFile)
+	switch strings.ToLower(req.Location.Scheme) {
+	case workloadLocationSchemeFile:
+		if !isSandboxed() {
+			return nil, fmt.Errorf("attempted to execute agent-local workload artifact %s outside of sandbox ", req.Location.String())
+		}
+
+		path, _ := strings.CutPrefix(req.Location.String(), fmt.Sprintf("%s://", workloadLocationSchemeFile))
+
+		fi, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("attempted to execute agent-local workload artifact %s; file does not exist: %s", path, err.Error())
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to stat agent-local workload artifact %s; %s", path, err.Error())
+		}
+
+		if fi.IsDir() {
+			return nil, fmt.Errorf("failed to execute agent-local workload artifact; %s is a directory", path)
+		} else if fi.Mode()&0111 == 0 {
+			return nil, fmt.Errorf("failed to execute agent-local workload artifact; %s is not executable", path)
+		}
+
+		file = &path
+	case workloadLocationSchemeNATS:
+		fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
+		tempFile := path.Join(os.TempDir(), fileName)
+
+		if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == controlapi.NexWorkloadNative {
+			tempFile = fmt.Sprintf("%s.exe", tempFile)
+		}
+
+		err := a.cacheBucket.GetFile(*a.md.VmID, tempFile)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to get and write workload artifact to temp dir: %s", err)
+			a.submitLog(msg, slog.LevelError)
+			return nil, errors.New(msg)
+		}
+
+		err = os.Chmod(tempFile, 0777)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to set workload artifact as executable: %s", err)
+			a.submitLog(msg, slog.LevelError)
+			return nil, errors.New(msg)
+		}
+
+		file = &tempFile
 	}
 
-	err := a.cacheBucket.GetFile(*a.md.VmID, tempFile)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to get and write workload artifact to temp dir: %s", err)
-		a.submitLog(msg, slog.LevelError)
-		return nil, errors.New(msg)
-	}
-
-	err = os.Chmod(tempFile, 0777)
-	if err != nil {
-		msg := fmt.Sprintf("Failed to set workload artifact as executable: %s", err)
-		a.submitLog(msg, slog.LevelError)
-		return nil, errors.New(msg)
-	}
-
-	return &tempFile, nil
+	return file, nil
 }
 
 // deleteExecutableArtifact deletes the installed workload executable
@@ -275,13 +314,13 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	tmpFile, err := a.cacheExecutableArtifact(&info)
+	path, err := a.resolveExecutableArtifact(&info)
 	if err != nil {
 		_ = a.workAck(m, false, err.Error())
 		return
 	}
 
-	params, err := a.newExecutionProviderParams(&info, *tmpFile)
+	params, err := a.newExecutionProviderParams(&info, *path)
 	if err != nil {
 		_ = a.workAck(m, false, err.Error())
 		return
