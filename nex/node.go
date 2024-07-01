@@ -25,6 +25,7 @@ func setConditionalCommands() {
 	nodePreflight.Flag("verify", "does binary verification on download").Default("false").BoolVar(&NodeOpts.PreflightVerify)
 	nodePreflight.Flag("verbose", "prints additional information during install").Default("false").BoolVar(&NodeOpts.PreflightVerbose)
 	nodePreflight.Flag("check", "checks status of requirements without attempting to install").Default("false").BoolVar(&NodeOpts.PreflightCheck)
+	nodePreflight.Flag("install_version", "uses specific version of nex during preflight installs").PlaceHolder("0.3.0").StringVar(&NodeOpts.PreflightInstallVersion)
 	nodePreflight.Flag("cni_ns", "nameservers to use in CNI configuration file").StringsVar(&NodeOpts.CniNS)
 }
 

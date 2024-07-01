@@ -76,7 +76,9 @@ var _ = Describe("nex node", func() {
 		opts = &models.Options{
 			Servers: _fixtures.natsServer.ClientURL(),
 		}
-		nodeOpts = &models.NodeOptions{}
+		nodeOpts = &models.NodeOptions{
+			PreflightInstallVersion: "0.2.5",
+		}
 
 		_ = os.MkdirAll(defaultCNIPluginBinPath, 0755)
 		_ = os.MkdirAll(defaultCNIConfigurationPath, 0755)
