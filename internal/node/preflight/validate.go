@@ -90,25 +90,27 @@ func Validate(config *models.NodeConfiguration, logger *slog.Logger) PreflightEr
 		}
 	}
 
-	_, err := os.Stat(config.RootFsFilepath)
-	if errors.Is(err, os.ErrNotExist) {
-		errs = errors.Join(errs, ErrRootFsNotFound)
-	} else {
-		logger.Debug("rootfs file found", slog.String("path", config.RootFsFilepath))
-	}
+	if !config.NoSandbox {
+		_, err := os.Stat(config.RootFsFilepath)
+		if errors.Is(err, os.ErrNotExist) {
+			errs = errors.Join(errs, ErrRootFsNotFound)
+		} else {
+			logger.Debug("rootfs file found", slog.String("path", config.RootFsFilepath))
+		}
 
-	_, err = os.Stat(config.KernelFilepath)
-	if errors.Is(err, os.ErrNotExist) {
-		errs = errors.Join(errs, ErrVmlinuxNotFound)
-	} else {
-		logger.Debug("vmlinux file found", slog.String("path", config.KernelFilepath))
-	}
+		_, err = os.Stat(config.KernelFilepath)
+		if errors.Is(err, os.ErrNotExist) {
+			errs = errors.Join(errs, ErrVmlinuxNotFound)
+		} else {
+			logger.Debug("vmlinux file found", slog.String("path", config.KernelFilepath))
+		}
 
-	_, err = os.Stat(filepath.Join("/etc/cni/conf.d", *config.CNI.NetworkName+".conflist"))
-	if errors.Is(err, os.ErrNotExist) {
-		errs = errors.Join(errs, ErrCNIConfigNotFound)
-	} else {
-		logger.Debug("cni config file found", slog.String("path", "/etc/cni/conf.d/"+*config.CNI.NetworkName+".conflist"))
+		_, err = os.Stat(filepath.Join("/etc/cni/conf.d", *config.CNI.NetworkName+".conflist"))
+		if errors.Is(err, os.ErrNotExist) {
+			errs = errors.Join(errs, ErrCNIConfigNotFound)
+		} else {
+			logger.Debug("cni config file found", slog.String("path", "/etc/cni/conf.d/"+*config.CNI.NetworkName+".conflist"))
+		}
 	}
 
 	if errs != nil {
