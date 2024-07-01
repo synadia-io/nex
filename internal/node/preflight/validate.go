@@ -12,6 +12,7 @@ import (
 
 type BinaryVerify struct {
 	BinName string
+	Path    []string
 }
 
 type PreflightError error
@@ -33,81 +34,58 @@ var (
 	ErrSha256Mismatch               = errors.New("sha256 mismatch")
 	ErrFailedToUncompress           = errors.New("failed to uncompress file")
 	ErrUserCanceledPreflight        = errors.New("user canceled preflight")
-
-	binVerify = []BinaryVerify{
-		{BinName: "firecracker"},
-		{BinName: "host-local"},
-		{BinName: "ptp"},
-		{BinName: "tc-redirect-tap"},
-	}
 )
+
+func verifyPath(binary string, path []string, logger *slog.Logger) (string, PreflightError) {
+	if len(path) == 0 {
+		e, err := exec.LookPath(binary)
+		if err != nil {
+			logger.Debug(binary + " binary NOT found")
+			return "", ErrBinaryNotFound
+		}
+		return e, nil
+	}
+
+	for _, p := range path {
+		e := filepath.Join(p, binary)
+		f, err := os.Stat(e)
+		if err != nil {
+			continue
+		}
+
+		if f.Mode()&0100 == 0 {
+			logger.Debug(binary+" binary NOT executable", slog.String("path", e))
+			return "", ErrBinaryNotExecutable
+		} else {
+			logger.Debug(binary+" binary found", slog.String("path", e))
+			return e, nil
+		}
+	}
+
+	logger.Debug(binary + " binary NOT found")
+	return "", ErrBinaryNotFound
+}
 
 func Validate(config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
 	var errs PreflightError
+	var binVerify []BinaryVerify
 	if config.NoSandbox {
-
-		if len(config.BinPath) > 0 {
-			for _, p := range config.BinPath {
-				e := filepath.Join(p, "nex-agent")
-				f, err := os.Stat(e)
-				if err != nil {
-					logger.Debug("nex-agent binary NOT found", slog.String("path", e))
-					errs = errors.Join(errs, ErrBinaryNotFound)
-				} else if f.Mode()&0100 == 0 {
-					logger.Debug("nex-agent binary NOT executable", slog.String("path", e))
-					errs = errors.Join(errs, ErrBinaryNotExecutable)
-				} else {
-					logger.Debug("nex-agent binary found", slog.String("path", e))
-				}
-			}
-		} else {
-			nexAgentPath, err := exec.LookPath("nex-agent")
-			if err != nil {
-				logger.Debug("nex-agent binary NOT found", slog.String("path", nexAgentPath))
-				errs = errors.Join(errs, ErrBinaryNotFound)
-			} else {
-				logger.Debug("nex-agent binary found", slog.String("path", nexAgentPath))
-			}
+		binVerify = []BinaryVerify{
+			{BinName: "nex-agent", Path: config.BinPath},
 		}
-		return errs
+	} else {
+		binVerify = []BinaryVerify{
+			{BinName: "firecracker", Path: config.BinPath},
+			{BinName: "host-local", Path: config.CNI.BinPath},
+			{BinName: "ptp", Path: config.CNI.BinPath},
+			{BinName: "tc-redirect-tap", Path: config.CNI.BinPath},
+		}
 	}
 
 	for _, bin := range binVerify {
-		if len(config.BinPath) > 0 && bin.BinName == "firecracker" {
-			for _, p := range config.BinPath {
-				e := filepath.Join(p, bin.BinName)
-				f, err := os.Stat(e)
-				if err != nil {
-					logger.Debug(bin.BinName+" binary NOT found", slog.String("path", e))
-					errs = errors.Join(errs, ErrBinaryNotFound)
-				} else if f.Mode()&0100 == 0 {
-					logger.Debug(bin.BinName+" binary NOT executable", slog.String("path", e))
-					errs = errors.Join(errs, ErrBinaryNotExecutable)
-				} else {
-					logger.Debug(bin.BinName+" binary found", slog.String("path", e))
-				}
-			}
-		} else if len(config.CNI.BinPath) > 0 && bin.BinName != "firecracker" {
-			for _, p := range config.CNI.BinPath {
-				e := filepath.Join(p, bin.BinName)
-				f, err := os.Stat(e)
-				if err != nil {
-					logger.Debug(bin.BinName+" binary NOT found", slog.String("path", e))
-					errs = errors.Join(errs, ErrBinaryNotFound)
-				} else if f.Mode()&0100 == 0 {
-					logger.Debug(bin.BinName+" binary NOT executable", slog.String("path", e))
-					errs = errors.Join(errs, ErrBinaryNotExecutable)
-				} else {
-					logger.Debug(bin.BinName+" binary found", slog.String("path", e))
-				}
-			}
-		}
-		binPath, err := exec.LookPath(bin.BinName)
+		_, err := verifyPath(bin.BinName, bin.Path, logger)
 		if err != nil {
-			logger.Debug(bin.BinName+" binary NOT found", slog.String("path", binPath))
-			errs = errors.Join(errs, ErrBinaryNotFound)
-		} else {
-			logger.Debug(bin.BinName+" binary found", slog.String("path", binPath))
+			errs = errors.Join(errs, err)
 		}
 	}
 
