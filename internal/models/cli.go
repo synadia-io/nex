@@ -122,10 +122,11 @@ type NodeOptions struct {
 	OtelTraces          bool   `json:"-"`
 	OtelTracesExporter  string `json:"-"`
 
-	PreflightInit    string `json:"-"`
-	PreflightVerify  bool   `json:"-"`
-	PreflightVerbose bool   `json:"-"`
-	PreflightCheck   bool   `json:"-"`
+	PreflightInit           string `json:"-"`
+	PreflightVerify         bool   `json:"-"`
+	PreflightVerbose        bool   `json:"-"`
+	PreflightCheck          bool   `json:"-"`
+	PreflightInstallVersion string `json:"-"`
 
 	ListFull  bool   `json:"-"`
 	NexusName string `json:"-"`

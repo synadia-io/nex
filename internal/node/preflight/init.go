@@ -31,6 +31,10 @@ var (
 				fmt.Printf("error making http request: %s\n", err)
 				return ""
 			}
+			if res.StatusCode != 200 {
+				fmt.Printf("error fetching latest version from github: %s\n", res.Status)
+				return ""
+			}
 			defer res.Body.Close()
 
 			b, err := io.ReadAll(res.Body)

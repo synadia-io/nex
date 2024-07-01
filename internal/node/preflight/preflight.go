@@ -34,7 +34,17 @@ type requirement struct {
 }
 
 func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *slog.Logger) PreflightError {
-	nexVer := nexLatestVersion(ctx)
+	var nexVer string
+	if config.PreflightInstallVersion == "" {
+		nexVer = nexLatestVersion(ctx)
+		if nexVer == "" {
+			logger.Error("Failed to get latest nex version")
+			return ErrFailedToDetermineLatestNexVersion
+		}
+	} else {
+		nexVer = config.PreflightInstallVersion
+	}
+
 	logger.Debug("using nex version", slog.String("version", nexVer))
 
 	required, err := preflightInit(nexVer, config, logger)

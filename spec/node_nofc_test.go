@@ -64,7 +64,9 @@ var _ = Describe("nex node", func() {
 		opts = &models.Options{
 			Servers: _fixtures.natsServer.ClientURL(),
 		}
-		nodeOpts = &models.NodeOptions{}
+		nodeOpts = &models.NodeOptions{
+			PreflightInstallVersion: "0.2.5",
+		}
 
 		validResourceDirOnce.Do(func() {
 			validResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-wd", _fixtures.seededRand.Int()))

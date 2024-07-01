@@ -69,6 +69,7 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 	config.PreflightCheck = nodeopts.PreflightCheck
 	config.PreflightVerify = nodeopts.PreflightVerify
 	config.PreflightVerbose = nodeopts.PreflightVerbose
+	config.PreflightInstallVersion = nodeopts.PreflightInstallVersion
 
 	err = preflight.Preflight(ctx, config, log)
 	if err != nil {

@@ -66,9 +66,10 @@ type NodeConfiguration struct {
 	DenyTriggerSubjects              []string                 `json:"deny_trigger_subjects,omitempty"`
 	NodeLimits                       NodeLimitsConfig         `json:"node_limits"`
 
-	PreflightVerbose bool `json:"-"`
-	PreflightVerify  bool `json:"-"`
-	PreflightCheck   bool `json:"-"`
+	PreflightVerbose        bool   `json:"-"`
+	PreflightVerify         bool   `json:"-"`
+	PreflightCheck          bool   `json:"-"`
+	PreflightInstallVersion string `json:"-"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
 	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`
