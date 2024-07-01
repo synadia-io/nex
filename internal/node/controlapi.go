@@ -224,7 +224,7 @@ func (api *ApiListener) handleAuction(m *nats.Msg) {
 func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	tracer := api.node.telemetry.Tracer
 	ctx := context.Background()
-	ctx, span := tracer.Start(ctx, "Handling deployment request",
+	_, span := tracer.Start(ctx, "Handling deployment request",
 		trace.WithSpanKind(trace.SpanKindServer))
 	defer span.End()
 
