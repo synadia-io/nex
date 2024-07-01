@@ -187,6 +187,10 @@ func (a *Agent) resolveExecutableArtifact(req *agentapi.DeployRequest) (*string,
 
 	switch req.Location.Scheme {
 	case workloadLocationSchemeFile:
+		if !isSandboxed() {
+			return nil, fmt.Errorf("attempted to execute agent-local workload artifact %s outside of sandbox ", req.Location.String())
+		}
+
 		path, _ := strings.CutPrefix(req.Location.String(), fmt.Sprintf("%s://", workloadLocationSchemeFile))
 
 		fi, err := os.Stat(path)
