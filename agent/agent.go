@@ -185,7 +185,7 @@ func (a *Agent) Version() string {
 func (a *Agent) resolveExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
 	var file *string
 
-	switch req.Location.Scheme {
+	switch strings.ToLower(req.Location.Scheme) {
 	case workloadLocationSchemeFile:
 		if !isSandboxed() {
 			return nil, fmt.Errorf("attempted to execute agent-local workload artifact %s outside of sandbox ", req.Location.String())

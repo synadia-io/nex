@@ -156,7 +156,7 @@ func (w *WorkloadManager) Start() {
 }
 
 func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.DeployRequest) (uint64, *string, error) {
-	switch request.Location.Scheme {
+	switch strings.ToLower(request.Location.Scheme) {
 	case controlapi.WorkloadLocationSchemeFile:
 		if m.config.NoSandbox {
 			return 0, nil, fmt.Errorf("Attempted to deploy agent-local workload artifact outside of sandbox")
