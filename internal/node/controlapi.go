@@ -1,6 +1,7 @@
 package nexnode
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -15,6 +16,9 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/pkg/errors"
 	controlapi "github.com/synadia-io/nex/control-api"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // The API listener is the command and control interface for the node server
@@ -218,19 +222,29 @@ func (api *ApiListener) handleAuction(m *nats.Msg) {
 }
 
 func (api *ApiListener) handleDeploy(m *nats.Msg) {
+	tracer := api.node.telemetry.Tracer
+	ctx := context.Background()
+	ctx, span := tracer.Start(ctx, "Handling deployment request",
+		trace.WithSpanKind(trace.SpanKindServer))
+	defer span.End()
+
 	namespace, err := extractNamespace(m.Subject)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Invalid subject for workload deployment", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, "Invalid subject for workload deployment")
 		return
 	}
+	span.SetAttributes(attribute.String("namespace", namespace))
 
 	if api.node.IsLameDuck() {
+		span.SetStatus(codes.Error, "Node is in lame duck mode, rejected deploy request")
 		respondFail(controlapi.RunResponseType, m, "Node is in lame duck mode. Workload deploy request denied")
 		return
 	}
 
 	if api.exceedsMaxWorkloadCount() {
+		span.SetStatus(codes.Error, "Node is at maximum workload limit, rejected deploy request")
 		respondFail(controlapi.RunResponseType, m, "Node is at maximum workload limit. Deploy request denied")
 		return
 	}
@@ -238,12 +252,14 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	var request controlapi.DeployRequest
 	err = json.Unmarshal(m.Data, &request)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to deserialize deploy request", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unable to deserialize deploy request: %s", err))
 		return
 	}
 
 	if !slices.Contains(api.node.config.WorkloadTypes, request.WorkloadType) {
+		span.SetStatus(codes.Error, "Unsupported workload type")
 		api.log.Error("This node does not support the given workload type", slog.String("workload_type", string(request.WorkloadType)))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type on this node: %s", string(request.WorkloadType)))
 		return
@@ -251,14 +267,17 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 	if len(request.TriggerSubjects) > 0 && (request.WorkloadType != controlapi.NexWorkloadV8 &&
 		request.WorkloadType != controlapi.NexWorkloadWasm) { // FIXME -- workload type comparison
+		span.SetStatus(codes.Error, "Unsupported workload type for trigger subjects")
 		api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", string(request.WorkloadType)))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", string(request.WorkloadType)))
 		return
 	}
+	span.SetAttributes(attribute.String("trigger_subjects", strings.Join(request.TriggerSubjects, ",")))
 
 	if len(request.TriggerSubjects) > 0 && len(api.node.config.DenyTriggerSubjects) > 0 {
 		for _, subject := range request.TriggerSubjects {
 			if inDenyList(subject, api.node.config.DenyTriggerSubjects) {
+				span.SetStatus(codes.Error, "Trigger subject space overlaps with blocked subjects")
 				respondFail(controlapi.RunResponseType, m,
 					fmt.Sprintf("The trigger subject %s overlaps with subject(s) in this node's deny list", subject))
 				return
@@ -269,13 +288,16 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	err = request.DecryptRequestEnvironment(api.xk)
 	if err != nil {
 		publicKey, _ := api.xk.PublicKey()
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to decrypt environment for deploy request", slog.String("public_key", publicKey), slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to decrypt environment for deploy request: %s", err))
 		return
 	}
+	span.SetAttributes(attribute.String("workload_name", request.DecodedClaims.Subject))
 
 	decodedClaims, err := request.Validate()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Invalid deploy request", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Invalid deploy request: %s", err))
 		return
@@ -284,6 +306,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 	request.DecodedClaims = *decodedClaims
 	if !validateIssuer(request.DecodedClaims.Issuer, api.node.config.ValidIssuers) {
 		err := fmt.Errorf("invalid workload issuer: %s", request.DecodedClaims.Issuer)
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Workload validation failed", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("%s", err))
 		return
@@ -291,49 +314,60 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 	agentClient, err := api.mgr.SelectRandomAgent()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to get agent client from pool", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to get agent client from pool: %s", err))
 		return
 	}
 
 	workloadID := agentClient.ID()
+	span.SetAttributes(attribute.String("workload_id", workloadID))
 
+	span.AddEvent("Started workload download")
 	numBytes, workloadHash, err := api.mgr.CacheWorkload(workloadID, &request)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to cache workload bytes: %s", err))
 		return
 	}
+	span.AddEvent("Completed workload download")
 	if api.exceedsMaxWorkloadSize(numBytes) {
+		span.SetStatus(codes.Error, "Workload file size is too big")
 		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node limitations")
 		return
 	}
 	if api.exceedsPerNodeWorkloadSizeMax(numBytes) {
+		span.SetStatus(codes.Error, "Workload file size exceeds node limitations")
 		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node total limitations")
 		return
 	}
 
-	deployRequest := agentDeployRequestFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
+	agentDeployRequest := agentDeployRequestFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
 
 	api.log.
 		Info("Submitting workload to agent",
 			slog.String("namespace", namespace),
-			slog.String("workload", *deployRequest.WorkloadName),
+			slog.String("workload", *agentDeployRequest.WorkloadName),
 			slog.Uint64("workload_size", numBytes),
 			slog.String("workload_sha256", *workloadHash),
 			slog.String("type", string(request.WorkloadType)),
 		)
 
-	err = api.mgr.DeployWorkload(agentClient, deployRequest)
+	span.AddEvent("Created agent deploy request")
+	err = api.mgr.DeployWorkload(agentClient, agentDeployRequest)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to deploy workload",
 			slog.String("error", err.Error()),
 		)
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to deploy workload: %s", err))
 		return
 	}
+	span.AddEvent("Agent deploy request accepted")
 
 	if _, ok := api.mgr.handshakes[workloadID]; !ok {
+		span.SetStatus(codes.Error, "Tried to deploy into non-handshaked agent")
 		api.log.Error("Attempted to deploy workload into bad process (no handshake)",
 			slog.String("workload_id", workloadID),
 		)
@@ -341,6 +375,7 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 		return
 	}
 	workloadName := request.DecodedClaims.Subject
+	span.SetAttributes(attribute.String("workload_name", workloadName))
 
 	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("workload_id", workloadID))
 
@@ -353,8 +388,10 @@ func (api *ApiListener) handleDeploy(m *nats.Msg) {
 
 	raw, err := json.Marshal(res)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to marshal deploy response", slog.Any("err", err))
 	} else {
+		span.SetStatus(codes.Ok, "Workload deployed")
 		_ = m.Respond(raw)
 	}
 }
