@@ -350,11 +350,13 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		return
 	}
 	span.AddEvent("Completed workload download")
+
 	if api.exceedsMaxWorkloadSize(numBytes) {
 		span.SetStatus(codes.Error, "Workload file size is too big")
 		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node limitations")
 		return
 	}
+
 	if api.exceedsPerNodeWorkloadSizeMax(numBytes) {
 		span.SetStatus(codes.Error, "Workload file size exceeds node limitations")
 		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node total limitations")
@@ -363,14 +365,13 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 
 	agentDeployRequest := agentDeployRequestFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
 
-	api.log.
-		Info("Submitting workload to agent",
-			slog.String("namespace", namespace),
-			slog.String("workload", *agentDeployRequest.WorkloadName),
-			slog.Uint64("workload_size", numBytes),
-			slog.String("workload_sha256", *workloadHash),
-			slog.String("type", string(request.WorkloadType)),
-		)
+	api.log.Info("Submitting workload to agent",
+		slog.String("namespace", namespace),
+		slog.String("workload", *agentDeployRequest.WorkloadName),
+		slog.Uint64("workload_size", numBytes),
+		slog.String("workload_sha256", *workloadHash),
+		slog.String("type", string(request.WorkloadType)),
+	)
 
 	span.AddEvent("Created agent deploy request")
 	err = api.mgr.DeployWorkload(agentClient, agentDeployRequest)
@@ -392,6 +393,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, agent pool did not initialize properly")
 		return
 	}
+
 	workloadName := request.DecodedClaims.Subject
 	span.SetAttributes(attribute.String("workload_name", workloadName))
 

@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	systemNamespace              = "system"
+	autostartAgentRetryMax       = 10
 	heartbeatInterval            = 30 * time.Second
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
 	runloopTickInterval          = 2500 * time.Millisecond
-	agentPoolRetryMax            = 3
+	systemNamespace              = "system"
 )
 
 // Nex node process
@@ -338,26 +338,24 @@ func (n *Node) handleAutostarts() {
 			agentClient, err = n.manager.SelectRandomAgent()
 			if err != nil {
 				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
-				time.Sleep(50 * time.Millisecond)
+
 				retry += 1
-				if retry > agentPoolRetryMax {
-					n.log.Error("Exceeded warm agent retrieval retry count, terminating node",
-						slog.Int("allowed_retries", agentPoolRetryMax),
+				if retry > autostartAgentRetryMax {
+					n.log.Error("Exceeded warm agent retrieval retry count during attempted autostart; terminating node",
+						slog.Int("allowed_retries", autostartAgentRetryMax),
 					)
+
 					n.shutdown()
 					return
 				}
 			}
 		}
 
-		// functions cannot be essential
-		essential := autostart.Essential && autostart.WorkloadType == controlapi.NexWorkloadNative
-
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
 			controlapi.Environment(autostart.Environment),
-			controlapi.Essential(essential),
+			controlapi.Essential(autostart.Essential),
 			controlapi.Issuer(n.issuerKeypair),
 			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),
@@ -380,7 +378,7 @@ func (n *Node) handleAutostarts() {
 
 		_, err = request.Validate()
 		if err != nil {
-			n.log.Error("Failed to validate autostart deployment request",
+			n.log.Error("Failed to validate autostart workload deploy request",
 				slog.Any("error", err),
 			)
 			continue
@@ -397,6 +395,7 @@ func (n *Node) handleAutostarts() {
 			)
 			continue
 		}
+
 		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 
 		agentDeployRequest.TotalBytes = int64(numBytes)
@@ -411,6 +410,7 @@ func (n *Node) handleAutostarts() {
 			)
 			continue
 		}
+
 		n.log.Info("Autostart workload started",
 			slog.String("name", autostart.Name),
 			slog.String("namespace", autostart.Namespace),
@@ -418,8 +418,9 @@ func (n *Node) handleAutostarts() {
 		)
 		successCount += 1
 	}
+
 	if successCount < len(n.config.AutostartConfiguration.Workloads) {
-		n.log.Error("Not all startup workloads suceeded",
+		n.log.Error("Failed to initialize autostart workloads",
 			slog.Int("expected", len(n.config.AutostartConfiguration.Workloads)),
 			slog.Int("actual", successCount),
 		)
