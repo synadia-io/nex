@@ -156,57 +156,68 @@ func (w *WorkloadManager) Start() {
 }
 
 func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.DeployRequest) (uint64, *string, error) {
-	bucket := request.Location.Host
-	key := strings.Trim(request.Location.Path, "/")
+	switch request.Location.Scheme {
+	case controlapi.WorkloadLocationSchemeFile:
+		if m.config.NoSandbox {
+			return 0, nil, fmt.Errorf("Attempted to deploy agent-local workload artifact outside of sandbox")
+		}
 
-	jsLogAttr := []any{slog.String("bucket", bucket), slog.String("key", key)}
-	opts := []nats.JSOpt{}
-	if request.JsDomain != nil {
-		opts = append(opts, nats.Domain(*request.JsDomain))
+		return 0, nil, nil
+	case controlapi.WorkloadLocationSchemeNATS:
+		bucket := request.Location.Host
+		key := strings.Trim(request.Location.Path, "/")
 
-		jsLogAttr = append(jsLogAttr, slog.String("jsdomain", *request.JsDomain))
+		jsLogAttr := []any{slog.String("bucket", bucket), slog.String("key", key)}
+		opts := []nats.JSOpt{}
+		if request.JsDomain != nil {
+			opts = append(opts, nats.Domain(*request.JsDomain))
+
+			jsLogAttr = append(jsLogAttr, slog.String("jsdomain", *request.JsDomain))
+		}
+
+		m.log.Info("Attempting object store download", jsLogAttr...)
+
+		js, err := m.nc.JetStream(opts...)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		store, err := js.ObjectStore(bucket)
+		if err != nil {
+			m.log.Error("Failed to bind to source object store", slog.Any("err", err), slog.String("bucket", bucket))
+			return 0, nil, err
+		}
+
+		_, err = store.GetInfo(key)
+		if err != nil {
+			m.log.Error("Failed to locate workload binary in source object store", slog.Any("err", err), slog.String("key", key), slog.String("bucket", bucket))
+			return 0, nil, err
+		}
+
+		workload, err := store.GetBytes(key)
+		if err != nil {
+			m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
+			return 0, nil, err
+		}
+
+		err = m.natsint.StoreFileForID(workloadID, workload)
+		if err != nil {
+			m.log.Error("Failed to store bytes from source object store in cache", slog.Any("err", err), slog.String("key", key))
+		}
+
+		workloadHash := sha256.New()
+		workloadHash.Write(workload)
+		workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
+
+		m.log.Info("Successfully stored workload in internal object store",
+			slog.String("workload", request.DecodedClaims.Subject),
+			slog.String("workload_id", workloadID),
+			slog.Int("bytes", len(workload)))
+
+		return uint64(len(workload)), &workloadHashString, nil
 	}
 
-	m.log.Info("Attempting object store download", jsLogAttr...)
-
-	js, err := m.nc.JetStream(opts...)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	store, err := js.ObjectStore(bucket)
-	if err != nil {
-		m.log.Error("Failed to bind to source object store", slog.Any("err", err), slog.String("bucket", bucket))
-		return 0, nil, err
-	}
-
-	_, err = store.GetInfo(key)
-	if err != nil {
-		m.log.Error("Failed to locate workload binary in source object store", slog.Any("err", err), slog.String("key", key), slog.String("bucket", bucket))
-		return 0, nil, err
-	}
-
-	workload, err := store.GetBytes(key)
-	if err != nil {
-		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
-		return 0, nil, err
-	}
-
-	err = m.natsint.StoreFileForID(workloadID, workload)
-	if err != nil {
-		m.log.Error("Failed to store bytes from source object store in cache", slog.Any("err", err), slog.String("key", key))
-	}
-
-	workloadHash := sha256.New()
-	workloadHash.Write(workload)
-	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
-
-	m.log.Info("Successfully stored workload in internal object store",
-		slog.String("workload", request.DecodedClaims.Subject),
-		slog.String("workload_id", workloadID),
-		slog.Int("bytes", len(workload)))
-
-	return uint64(len(workload)), &workloadHashString, nil
+	return 0, nil, fmt.Errorf("Unsupported scheme specified for workload location")
 }
 
 // Deploy a workload as specified by the given deploy request to an available

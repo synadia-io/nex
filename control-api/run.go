@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 )
+
+const WorkloadLocationSchemeFile = "file"
+const WorkloadLocationSchemeNATS = "nats"
 
 type DeployRequest struct {
 	Argv         []string    `json:"argv,omitempty"`
@@ -82,17 +86,17 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 	req := &DeployRequest{
 		Argv:               reqOpts.argv,
 		Description:        &reqOpts.workloadDescription,
-		WorkloadType:       reqOpts.workloadType,
-		Location:           &reqOpts.location,
-		WorkloadJwt:        &workloadJwt,
 		Environment:        &encryptedEnv,
 		Essential:          &reqOpts.essential,
+		HostServicesConfig: reqOpts.hostServicesConfiguration,
+		JsDomain:           &reqOpts.jsDomain,
+		Location:           &reqOpts.location,
 		SenderPublicKey:    &senderPublic,
 		TargetNode:         &reqOpts.targetNode,
-		TriggerSubjects:    reqOpts.triggerSubjects,
-		JsDomain:           &reqOpts.jsDomain,
-		HostServicesConfig: reqOpts.hostServicesConfiguration,
 		TriggerConnection:  reqOpts.triggerConnection,
+		TriggerSubjects:    reqOpts.triggerSubjects,
+		WorkloadJwt:        &workloadJwt,
+		WorkloadType:       reqOpts.workloadType,
 	}
 
 	return req, nil
@@ -109,6 +113,14 @@ func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
 	request.DecodedClaims = *claims
 	if !validWorkloadName.MatchString(claims.Subject) {
 		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements (%s)", claims.Subject, workloadRegex)
+	}
+
+	if request.Essential != nil && *request.Essential && request.WorkloadType != NexWorkloadNative {
+		return nil, errors.New("essential workloads must be native")
+	}
+
+	if !strings.EqualFold(request.Location.Scheme, WorkloadLocationSchemeFile) && !strings.EqualFold(request.Location.Scheme, WorkloadLocationSchemeNATS) {
+		return nil, errors.New("workload location scheme invalid")
 	}
 
 	var vr jwt.ValidationResults

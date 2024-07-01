@@ -418,6 +418,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, agent pool did not initialize properly")
 		return
 	}
+
 	workloadName := request.DecodedClaims.Subject
 	span.SetAttributes(attribute.String("workload_name", workloadName))
 
