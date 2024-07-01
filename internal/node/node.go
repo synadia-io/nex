@@ -348,6 +348,8 @@ func (n *Node) handleAutostarts() {
 					n.shutdown()
 					return
 				}
+
+				time.Sleep(time.Millisecond * 50)
 			}
 		}
 
