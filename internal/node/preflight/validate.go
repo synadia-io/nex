@@ -54,13 +54,13 @@ func verifyPath(binary string, path []string, logger *slog.Logger) (string, Pref
 			continue
 		}
 
-		if f.Mode()&0100 == 0 {
-			logger.Debug(binary+" binary NOT executable", slog.String("path", e))
-			return "", ErrBinaryNotExecutable
-		} else {
-			logger.Debug(binary+" binary found", slog.String("path", e))
-			return e, nil
-		}
+		// if f.Mode()&0100 == 0 {
+		// 	logger.Debug(binary+" binary NOT executable", slog.String("path", e))
+		// 	return "", ErrBinaryNotExecutable
+		// } else {
+		logger.Debug(binary+" binary found", slog.String("path", e), slog.Any("perms", f.Mode()))
+		return e, nil
+		//		}
 	}
 
 	logger.Debug(binary + " binary NOT found")
