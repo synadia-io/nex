@@ -100,7 +100,7 @@ func (api *ApiListener) Start() error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".AUCTION", api.handleAuction)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".AUCTION", api.injectSpan(api.handleAuction))
 	if err != nil {
 		api.log.Error("Failed to subscribe to auction subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
@@ -118,33 +118,33 @@ func (api *ApiListener) Start() error {
 	}
 	api.subz = append(api.subz, sub)
 
-	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.>", api.handleWorkloadPing)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".WPING.>", api.injectSpan(api.handleWorkloadPing))
 	if err != nil {
 		api.log.Error("Failed to subscribe to workload ping subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 	api.subz = append(api.subz, sub)
 
 	// Namespaced subscriptions, the * below is for the namespace
-	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.PublicKey(), api.handleInfo)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".INFO.*."+api.PublicKey(), api.injectSpan(api.handleInfo))
 	if err != nil {
 		api.log.Error("Failed to subscribe to info subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 	api.subz = append(api.subz, sub)
 
-	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".DEPLOY.*."+api.PublicKey(), api.handleDeploy)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".DEPLOY.*."+api.PublicKey(), api.injectSpan(api.handleDeploy))
 	if err != nil {
 		api.log.Error("Failed to subscribe to run subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 	api.subz = append(api.subz, sub)
 
 	// FIXME? per contract, this should probably be renamed from STOP to UNDEPLOY
-	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.PublicKey(), api.handleStop)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".STOP.*."+api.PublicKey(), api.injectSpan(api.handleStop))
 	if err != nil {
 		api.log.Error("Failed to subscribe to stop subject", slog.Any("err", err), slog.String("id", api.PublicKey()))
 	}
 	api.subz = append(api.subz, sub)
 
-	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".LAMEDUCK."+api.PublicKey(), api.handleLameDuck)
+	sub, err = api.node.nc.Subscribe(controlapi.APIPrefix+".LAMEDUCK."+api.PublicKey(), api.injectSpan(api.handleLameDuck))
 	if err != nil {
 		api.log.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.PublicKey()))
 	}
@@ -154,7 +154,25 @@ func (api *ApiListener) Start() error {
 	return nil
 }
 
-func (api *ApiListener) handleAuction(m *nats.Msg) {
+type apiHandler func(ctx context.Context, span trace.Span, m *nats.Msg)
+
+func (api *ApiListener) injectSpan(h apiHandler) nats.MsgHandler {
+
+	return func(m *nats.Msg) {
+		tracer := api.node.telemetry.Tracer
+		ctx := context.Background()
+		_, span := tracer.Start(ctx, "Control API Request",
+			trace.WithSpanKind(trace.SpanKindServer))
+		defer span.End()
+
+		h(ctx, span, m)
+	}
+
+}
+
+func (api *ApiListener) handleAuction(ctx context.Context, span trace.Span, m *nats.Msg) {
+	span.SetName("Handle Auction Request")
+
 	now := time.Now().UTC()
 
 	filter := false
@@ -193,11 +211,13 @@ func (api *ApiListener) handleAuction(m *nats.Msg) {
 
 	if filter {
 		api.log.Debug("Node not viable for deploy request specified at auction")
+		span.SetStatus(codes.Ok, "Node did not match auction parameters")
 		return
 	}
 
 	machines, err := api.mgr.RunningWorkloads()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to query running machines", slog.Any("error", err))
 		respondFail(controlapi.AuctionResponseType, m, "Failed to query running machines on node")
 		return
@@ -215,18 +235,16 @@ func (api *ApiListener) handleAuction(m *nats.Msg) {
 
 	raw, err := json.Marshal(res)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
 	} else {
+		span.SetStatus(codes.Ok, "Responded to auction")
 		_ = m.Respond(raw)
 	}
 }
 
-func (api *ApiListener) handleDeploy(m *nats.Msg) {
-	tracer := api.node.telemetry.Tracer
-	ctx := context.Background()
-	_, span := tracer.Start(ctx, "Handling deployment request",
-		trace.WithSpanKind(trace.SpanKindServer))
-	defer span.End()
+func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *nats.Msg) {
+	span.SetName("Handle Deploy Request")
 
 	namespace, err := extractNamespace(m.Subject)
 	if err != nil {
@@ -424,9 +442,11 @@ func (api *ApiListener) handlePing(m *nats.Msg) {
 	}
 }
 
-func (api *ApiListener) handleStop(m *nats.Msg) {
+func (api *ApiListener) handleStop(ctx context.Context, span trace.Span, m *nats.Msg) {
+	span.SetName("Handle workload stop request")
 	namespace, err := extractNamespace(m.Subject)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Invalid subject for workload stop", slog.Any("err", err))
 		respondFail(controlapi.StopResponseType, m, "Invalid subject for workload stop")
 		return
@@ -435,6 +455,7 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 	var request controlapi.StopRequest
 	err = json.Unmarshal(m.Data, &request)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to deserialize stop request", slog.Any("err", err))
 		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Unable to deserialize stop request: %s", err))
 		return
@@ -442,6 +463,7 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 
 	deployRequest, _ := api.mgr.LookupWorkload(request.WorkloadId)
 	if deployRequest == nil {
+		span.SetStatus(codes.Error, "No such workload")
 		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadId))
 		respondFail(controlapi.StopResponseType, m, "No such workload")
 		return
@@ -449,6 +471,7 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 
 	err = request.Validate(&deployRequest.DecodedClaims)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to validate stop request", slog.Any("err", err))
 		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Invalid stop request: %s", err))
 		return
@@ -460,12 +483,14 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 			slog.String("targetnamespace", namespace),
 		)
 
+		span.SetStatus(codes.Error, "Namespace mismatch")
 		respondFail(controlapi.StopResponseType, m, "No such workload") // do not expose ID existence to avoid existence probes
 		return
 	}
 
 	err = api.mgr.StopWorkload(request.WorkloadId, true)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to stop workload", slog.Any("err", err))
 		respondFail(controlapi.StopResponseType, m, fmt.Sprintf("Failed to stop workload: %s", err))
 	}
@@ -478,14 +503,17 @@ func (api *ApiListener) handleStop(m *nats.Msg) {
 	}, nil)
 	raw, err := json.Marshal(res)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to marshal run response", slog.Any("err", err))
 	} else {
+		span.SetStatus(codes.Ok, "Responded to stop request")
 		_ = m.Respond(raw)
 	}
 }
 
 // $NEX.WPING.{namespace}.{workloadId}
-func (api *ApiListener) handleWorkloadPing(m *nats.Msg) {
+func (api *ApiListener) handleWorkloadPing(ctx context.Context, span trace.Span, m *nats.Msg) {
+	span.SetName("Handle workload ping")
 	// Note that this ping _only_ responds on success, all others are silent
 	// $NEX.WPING.{namespace}.{workloadId}
 	// result payload looks exactly like a node ping reply
@@ -503,6 +531,7 @@ func (api *ApiListener) handleWorkloadPing(m *nats.Msg) {
 
 	machines, err := api.mgr.RunningWorkloads()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to query running machines", slog.Any("error", err))
 		return
 	}
@@ -521,18 +550,23 @@ func (api *ApiListener) handleWorkloadPing(m *nats.Msg) {
 
 		raw, err := json.Marshal(res)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			api.log.Error("Failed to marshal ping response", slog.Any("err", err))
 		} else {
+			span.SetStatus(codes.Ok, "Returned workload ping")
 			_ = m.Respond(raw)
 		}
 	}
+	span.SetStatus(codes.Ok, "No machines matched ping request")
 
 	// silence if there were no matching machines
 }
 
-func (api *ApiListener) handleLameDuck(m *nats.Msg) {
+func (api *ApiListener) handleLameDuck(ctx context.Context, span trace.Span, m *nats.Msg) {
+	span.SetName("Handle enter lameduck")
 	err := api.node.EnterLameDuck()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to enter lame duck mode", slog.Any("error", err))
 		respondFail(controlapi.LameDuckResponseType, m, "Failed to enter lame duck mode")
 		return
@@ -543,16 +577,20 @@ func (api *ApiListener) handleLameDuck(m *nats.Msg) {
 	}, nil)
 	raw, err := json.Marshal(res)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to serialize response", slog.Any("error", err))
 		respondFail(controlapi.LameDuckResponseType, m, "Serialization failure")
 	} else {
+		span.SetStatus(codes.Ok, "Responded to lame duck request")
 		_ = m.Respond(raw)
 	}
 }
 
-func (api *ApiListener) handleInfo(m *nats.Msg) {
+func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats.Msg) {
+	span.SetName("Handle info request")
 	namespace, err := extractNamespace(m.Subject)
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to extract namespace for info request", slog.Any("err", err))
 		respondFail(controlapi.InfoResponseType, m, "Failed to extract namespace for info request")
 		return
@@ -560,6 +598,7 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 
 	machines, err := api.mgr.RunningWorkloads()
 	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to query running machines", slog.Any("error", err))
 		respondFail(controlapi.PingResponseType, m, "Failed to query running machines on node")
 		return
@@ -580,8 +619,10 @@ func (api *ApiListener) handleInfo(m *nats.Msg) {
 
 	raw, err := json.Marshal(res)
 	if err != nil {
-		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
+		span.SetStatus(codes.Error, err.Error())
+		api.log.Error("Failed to marshal info response", slog.Any("err", err))
 	} else {
+		span.SetStatus(codes.Ok, "Responded to info response")
 		_ = m.Respond(raw)
 	}
 }
