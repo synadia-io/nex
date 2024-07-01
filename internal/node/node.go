@@ -557,9 +557,11 @@ func (n *Node) shutdown() {
 			_ = n.publishNodeStopped()
 		}
 
-		_ = n.nc.Drain()
-		for !n.nc.IsClosed() {
-			time.Sleep(time.Millisecond * 25)
+		if n.nc != nil {
+			_ = n.nc.Drain()
+			for !n.nc.IsClosed() {
+				time.Sleep(time.Millisecond * 25)
+			}
 		}
 
 		if n.natspub != nil {
