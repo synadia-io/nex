@@ -108,18 +108,15 @@ func (s *SpawningProcessManager) EnterLameDuck() error {
 
 // Attaches a deployment request to a running process. Until a process is prepared, it's just an empty agent
 func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.DeployRequest) error {
-	select {
-	case proc := <-s.warmProcs:
-		if proc == nil {
-			return fmt.Errorf("could not prepare workload, no agent process")
-		}
-		proc.deployRequest = deployRequest
-		proc.workloadStarted = time.Now().UTC()
-
-		s.deployRequests[proc.ID] = deployRequest
-	case <-time.After(500 * time.Millisecond):
-		return fmt.Errorf("timed out waiting for available agent process")
+	proc := <-s.warmProcs
+	if proc == nil {
+		return fmt.Errorf("could not prepare workload, no available agent process")
 	}
+
+	proc.deployRequest = deployRequest
+	proc.workloadStarted = time.Now().UTC()
+
+	s.deployRequests[proc.ID] = deployRequest
 
 	return nil
 }
