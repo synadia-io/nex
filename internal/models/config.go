@@ -29,7 +29,7 @@ var (
 	RequiredTriggerSubjectDenyList = []string{"$SYS.>", "$JS.>", "$NEX.>"}
 	DefaultWorkloadTypes           = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 
-	DefaultBinPath    = filepath.SplitList(os.Getenv("PATH"))
+	DefaultBinPath    = buildDefaultBinPath()
 	DefaultCNIBinPath = filepath.SplitList(os.Getenv("PATH"))
 )
 
@@ -217,4 +217,20 @@ func DefaultNodeConfiguration() NodeConfiguration {
 	}
 
 	return config
+}
+
+func buildDefaultBinPath() []string {
+	homedir, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.SplitList(os.Getenv("PATH"))
+	}
+
+	defaultBinPath := filepath.Join(homedir, ".nex", "bin")
+	_ = os.MkdirAll(defaultBinPath, 0755)
+
+	path := make([]string, 0)
+	path = append(path, defaultBinPath)
+	path = append(path, filepath.SplitList(os.Getenv("PATH"))...)
+
+	return path
 }

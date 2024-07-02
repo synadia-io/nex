@@ -28,6 +28,7 @@ type SpawningProcessManager struct {
 	closing     uint32
 	config      *models.NodeConfiguration
 	ctx         context.Context
+	mutex       *sync.Mutex
 	stopMutexes map[string]*sync.Mutex
 	t           *observability.Telemetry
 
@@ -64,10 +65,11 @@ func NewSpawningProcessManager(
 ) (*SpawningProcessManager, error) {
 	return &SpawningProcessManager{
 		config:  config,
-		t:       telemetry,
-		log:     log,
 		ctx:     ctx,
 		intNats: intNats,
+		log:     log,
+		mutex:   &sync.Mutex{},
+		t:       telemetry,
 
 		stopMutexes: make(map[string]*sync.Mutex),
 
@@ -108,6 +110,9 @@ func (s *SpawningProcessManager) EnterLameDuck() error {
 
 // Attaches a deployment request to a running process. Until a process is prepared, it's just an empty agent
 func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.DeployRequest) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	proc := <-s.warmProcs
 	if proc == nil {
 		return fmt.Errorf("could not prepare workload, no available agent process")
@@ -179,6 +184,9 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 
 // Stops a single agent process
 func (s *SpawningProcessManager) StopProcess(workloadID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	proc, exists := s.liveProcs[workloadID]
 	if !exists {
 		return fmt.Errorf("failed to stop process %s. No such process", workloadID)

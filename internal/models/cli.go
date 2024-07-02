@@ -192,6 +192,10 @@ func GenerateConnectionFromOpts(opts *Options, logger *slog.Logger) (*nats.Conn,
 	}
 
 	conn, err := nats.Connect(opts.Servers, natsOpts...)
+	if err != nil {
+		return nil, err
+	}
+
 	logger.Debug("Connected to NATS server",
 		slog.String("server", conn.ConnectedUrlRedacted()),
 		slog.String("name", opts.ConnectionName),

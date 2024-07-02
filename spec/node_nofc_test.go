@@ -48,6 +48,7 @@ var _ = Describe("nex node", func() {
 	var validResourceDir string // prevent downloading kernel and rootfs template multiple times
 	var validResourceDirOnce sync.Once
 
+	var defaultBinPath string
 	var snapshotAgentRootFSPath string
 	var snapshotAgentRootFSPathOnce sync.Once
 
@@ -55,7 +56,7 @@ var _ = Describe("nex node", func() {
 		initData := map[string]string{
 			"version":    "development",
 			"commit":     "spec",
-			"build_date": "2021-01-01T00:00:00Z",
+			"build_date": time.Now().UTC().Format(time.RFC3339),
 		}
 
 		ctxx, cancel = context.WithCancel(context.WithValue(context.Background(), "build_data", initData)) //nolint:all
@@ -68,30 +69,41 @@ var _ = Describe("nex node", func() {
 			PreflightInstallVersion: "0.2.5",
 		}
 
+		homedir, err := os.UserHomeDir()
+		Expect(err).To(BeNil())
+
+		defaultBinPath = filepath.Join(homedir, ".nex", "bin")
+		_ = os.MkdirAll(defaultBinPath, 0755)
+
 		validResourceDirOnce.Do(func() {
 			validResourceDir = filepath.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-wd", _fixtures.seededRand.Int()))
 		})
 
 		snapshotAgentRootFSPathOnce.Do(func() {
-			// require the nex-agent binary to be built... FIXME-- build it here instead of relying on the Taskfile
+			var agentPath string
+			// require the nex-agent binary to be built
+
 			switch runtime.GOOS {
 			case "windows":
-				_, err := os.Stat(filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent.exe"))
-				Expect(err).To(BeNil())
+				agentPath = filepath.Join(defaultBinPath, "nex-agent.exe")
+				_ = os.Remove(agentPath)
+
+				cmd := exec.Command("go", "build", "-o", agentPath, "-tags", "netgo", "-ldflags", "-extldflags -static", filepath.Join("..", "agent", "cmd", "nex-agent"))
+				_ = cmd.Start()
+				_ = cmd.Wait()
 			case "darwin":
-				_, err := os.Stat(filepath.Join("..", "agent", "cmd", "nex-agent", "nex-agent"))
-				Expect(err).To(BeNil())
+				agentPath = filepath.Join(defaultBinPath, "nex-agent")
+				_ = os.Remove(agentPath)
+
+				cmd := exec.Command("go", "build", "-o", agentPath, "-tags", "netgo", "-ldflags", "-extldflags -static", filepath.Join("..", "agent", "cmd", "nex-agent"))
+				_ = cmd.Start()
+				_ = cmd.Wait()
 			}
 
-			agentPath, err := filepath.Abs(filepath.Join("..", "agent", "cmd", "nex-agent"))
+			_, err := os.Stat(agentPath)
 			Expect(err).To(BeNil())
 
-			switch runtime.GOOS {
-			case "windows":
-				_ = os.Setenv("PATH", fmt.Sprintf("%s;%s", os.Getenv("PATH"), agentPath))
-			case "darwin":
-				_ = os.Setenv("PATH", fmt.Sprintf("%s:%s", os.Getenv("PATH"), agentPath))
-			}
+			os.Setenv("PATH", fmt.Sprintf("%s%s%s", defaultBinPath, string(os.PathListSeparator), os.Getenv("PATH")))
 		})
 	})
 
@@ -207,7 +219,7 @@ var _ = Describe("nex node", func() {
 			BeforeEach(func() {
 				nodeConfig = models.DefaultNodeConfiguration()
 				nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
-				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
+				nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadWasm}
 
 				nodeConfig.NoSandbox = !sandbox
 				nodeKey, _ = nkeys.CreateServer()
@@ -240,12 +252,40 @@ var _ = Describe("nex node", func() {
 					var nodeID *string // node id == node public key
 
 					BeforeEach(func() {
-						nodeConfig.DefaultResourceDir = validResourceDir
-						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
-						_ = os.Mkdir(validResourceDir, 0755)
-						nodeOpts.ForceDepInstall = true
+						var err error
 
-						nodeConfig.MachinePoolSize = 1
+						nodeConfig = models.DefaultNodeConfiguration()
+						nodeConfig.DefaultResourceDir = validResourceDir
+						nodeConfig.MachinePoolSize = 2
+						nodeConfig.NoSandbox = !sandbox
+						nodeConfig.RootFsFilepath = snapshotAgentRootFSPath
+						nodeConfig.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative, controlapi.NexWorkloadV8, controlapi.NexWorkloadWasm}
+
+						nodeOpts.ConfigFilepath = path.Join(os.TempDir(), fmt.Sprintf("%d-spec-nex-conf.json", _fixtures.seededRand.Int()))
+						nodeOpts.PreflightYes = true
+
+						_ = os.Mkdir(nodeConfig.DefaultResourceDir, 0755)
+
+						cfg, _ := json.Marshal(nodeConfig)
+						_ = os.WriteFile(nodeOpts.ConfigFilepath, cfg, 0644)
+
+						keypair, err := nkeys.CreateServer()
+						Expect(err).To(BeNil())
+
+						err = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
+						Expect(err).To(BeNil())
+
+						node, err = nexnode.NewNode(keypair, opts, nodeOpts, ctxx, cancel, log)
+						Expect(err).To(BeNil())
+						Expect(node).ToNot(BeNil())
+
+						go node.Start()
+
+						nodeID, err = node.PublicKey()
+						Expect(err).To(BeNil())
+
+						nodeProxy = nexnode.NewNodeProxyWith(node)
+						time.Sleep(time.Millisecond * 3000) // allow enough time for the pool to warm up...
 					})
 
 					AfterEach(func() {
@@ -255,7 +295,6 @@ var _ = Describe("nex node", func() {
 						node = nil
 						nodeID = nil
 						nodeProxy = nil
-						nodeKey = nil
 					})
 
 					JustBeforeEach(func() {
@@ -356,8 +395,10 @@ var _ = Describe("nex node", func() {
 							})
 
 							Describe("deploying a native binary workload", func() {
-								var deployRequest *controlapi.DeployRequest
-								var err error
+								var echoDeployRequest *controlapi.DeployRequest
+								var ultimateDeployRequest *controlapi.DeployRequest
+								var echoErr error
+								var ultimateErr error
 
 								AfterEach(func() {
 									switch runtime.GOOS {
@@ -369,17 +410,26 @@ var _ = Describe("nex node", func() {
 								})
 
 								JustBeforeEach(func() {
+									time.Sleep(time.Millisecond * 2500)
+
 									switch runtime.GOOS {
 									case "windows":
-										deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice.exe", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
-										Expect(err).To(BeNil())
+										echoDeployRequest, echoErr = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice.exe", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+										Expect(echoErr).To(BeNil())
+
+										ultimateDeployRequest, ultimateErr = newDeployRequest(*nodeID, "ultimateechoservice", "nex example echoservice", "./echoservice.exe", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+										Expect(ultimateErr).To(BeNil())
 									case "darwin":
-										deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
-										Expect(err).To(BeNil())
+										echoDeployRequest, echoErr = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+										Expect(echoErr).To(BeNil())
+
+										ultimateDeployRequest, ultimateErr = newDeployRequest(*nodeID, "ultimateechoservice", "nex example ultimateechoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+										Expect(ultimateErr).To(BeNil())
 									}
 
 									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-									_, err = nodeClient.StartWorkload(deployRequest)
+									_, echoErr = nodeClient.StartWorkload(echoDeployRequest)
+									_, ultimateErr = nodeClient.StartWorkload(ultimateDeployRequest)
 
 									time.Sleep(time.Millisecond * 1000)
 								})
@@ -392,7 +442,8 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should deploy the native workload", func(ctx SpecContext) {
-										Expect(err).To(BeNil())
+										Expect(echoErr).To(BeNil())
+										Expect(ultimateErr).To(BeNil())
 									})
 								})
 
@@ -406,7 +457,8 @@ var _ = Describe("nex node", func() {
 									})
 
 									It("should deploy the native workload", func(ctx SpecContext) {
-										Expect(err).To(BeNil())
+										Expect(echoErr).To(BeNil())
+										Expect(ultimateErr).To(BeNil())
 									})
 								})
 							})

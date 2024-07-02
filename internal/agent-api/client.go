@@ -24,6 +24,8 @@ type LogCallback func(string, LogEntry)
 type ContactLostCallback func(string)
 
 const (
+	defaultAgentPingIntervalMillis = 5000
+
 	NexTriggerSubject = "x-nex-trigger-subject"
 	NexRuntimeNs      = "x-nex-runtime-ns"
 
@@ -137,7 +139,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		slog.String("status", status.String()))
 
 	subject := fmt.Sprintf("agentint.%s.deploy", a.agentID)
-	resp, err := a.nc.Request(subject, bytes, 1*time.Second)
+	resp, err := a.nc.Request(subject, bytes, 10*time.Second)
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return nil, errors.New("timed out waiting for acknowledgement of workload deployment")
@@ -220,7 +222,7 @@ func (a *AgentClient) Ping() error {
 	// a.log.Debug("pinging agent", slog.String("subject", subject))
 
 	_, err := a.nc.Request(subject, []byte{}, a.pingTimeout)
-	if err != nil {
+	if err != nil && !a.shuttingDown() {
 		a.log.Warn("agent failed to respond to ping", slog.Any("error", err))
 		return err
 	}
@@ -299,7 +301,7 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 }
 
 func (a *AgentClient) monitorAgent() {
-	ticker := time.NewTicker(5000 * time.Millisecond) // FIXME-- make configurable
+	ticker := time.NewTicker(time.Millisecond * defaultAgentPingIntervalMillis) // FIXME-- make configurable
 	defer ticker.Stop()
 
 	for !a.shuttingDown() {

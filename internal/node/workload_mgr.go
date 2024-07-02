@@ -202,7 +202,8 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
 
 	m.log.Info("Successfully stored workload in internal object store",
-		slog.String("name", request.DecodedClaims.Subject),
+		slog.String("workload", request.DecodedClaims.Subject),
+		slog.String("workload_id", workloadID),
 		slog.Int("bytes", len(workload)))
 
 	return uint64(len(workload)), &workloadHashString, nil
@@ -224,7 +225,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 	w.log.Debug("Workload manager deploying workload",
 		slog.String("workload_id", workloadID),
-		slog.String("conn_status", status.String()))
+		slog.String("status", status.String()))
 
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
@@ -338,7 +339,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 
 		summaries[i] = controlapi.MachineSummary{
 			Id:        p.ID,
-			Healthy:   true,
+			Healthy:   true, // FIXME!!!
 			Uptime:    uptimeFriendly,
 			Namespace: p.Namespace,
 			Workload: controlapi.WorkloadSummary{
@@ -456,9 +457,10 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 // Called by the agent process manager when an agent has been warmed and is ready
 // to receive workload deployment instructions
 func (w *WorkloadManager) OnProcessStarted(id string) {
-	w.log.Debug("Process started", slog.String("workload_id", id))
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
+
+	w.log.Debug("Process started", slog.String("workload_id", id))
 
 	clientConn, err := w.natsint.ConnectionWithID(id)
 	if err != nil {
@@ -565,6 +567,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			if err != nil {
 				w.log.Warn("failed to log function runtime", slog.Any("err", err))
 			}
+
 			_ = w.publishFunctionExecSucceeded(workloadID, tsub, runTimeNs64)
 			agentClient.RecordExecTime(runTimeNs64)
 			parentSpan.AddEvent("published success event")

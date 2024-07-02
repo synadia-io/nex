@@ -28,6 +28,7 @@ type FirecrackerProcessManager struct {
 	config    *models.NodeConfiguration
 	ctx       context.Context
 	log       *slog.Logger
+	mutex     *sync.Mutex
 	stopMutex map[string]*sync.Mutex
 	t         *observability.Telemetry
 
@@ -50,10 +51,11 @@ func NewFirecrackerProcessManager(
 
 	return &FirecrackerProcessManager{
 		config:  config,
-		intNats: intnats,
-		t:       telemetry,
-		log:     log,
 		ctx:     ctx,
+		intNats: intnats,
+		log:     log,
+		mutex:   &sync.Mutex{},
+		t:       telemetry,
 
 		allVMs:         make(map[string]*runningFirecracker),
 		warmVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
@@ -93,6 +95,9 @@ func (f *FirecrackerProcessManager) EnterLameDuck() error {
 
 // Preparing a workload reads from the warmVMs channel
 func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.DeployRequest) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	vm := <-f.warmVMs
 	if vm == nil {
 		return fmt.Errorf("could not prepare workload, no available firecracker VM")
@@ -156,17 +161,24 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 				time.Sleep(runloopSleepInterval)
 				continue
 			}
+
 			vmmID := xid.New().String()
+
 			workloadKey, err := f.intNats.CreateCredentials(vmmID)
 			if err != nil {
 				f.log.Error("Failed to create workload user", slog.Any("err", err))
 				continue
 			}
-			workloadSeed, _ := workloadKey.Seed()
 
 			vm, err := createAndStartVM(context.TODO(), vmmID, f.config, f.log)
 			if err != nil {
 				f.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
+				continue
+			}
+
+			workloadSeed, err := workloadKey.Seed()
+			if err != nil {
+				f.log.Error("Failed to resolve seed from workload key", slog.Any("err", err))
 				continue
 			}
 
@@ -192,6 +204,9 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 }
 
 func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	vm, exists := f.allVMs[workloadID]
 	if !exists {
 		return fmt.Errorf("failed to stop machine %s", workloadID)

@@ -96,6 +96,7 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 	cols.AddRowf("Xkey", info.PublicXKey)
 	cols.AddRow("Version", info.Version)
 	cols.AddRow("Uptime", info.Uptime)
+	cols.AddRow("Available Agents", info.AvailableAgents)
 
 	taglist := make([]string, 0)
 	for k, v := range info.Tags {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
@@ -17,15 +18,16 @@ import (
 )
 
 const (
-	defaultInternalNatsConfigFile = "internalconf"
-	workloadCacheBucketName       = "NEXCACHE"
-	workloadCacheFileKey          = "workload"
+	defaultInternalNatsConfigFile             = "internalconf"
+	defaultInternalNatsConnectionDrainTimeout = time.Millisecond * 5000
+	workloadCacheBucketName                   = "NEXCACHE"
 )
 
 type InternalNatsServer struct {
 	ncInternal       *nats.Conn
 	log              *slog.Logger
 	lastOpts         *server.Options
+	mutex            *sync.Mutex
 	server           *server.Server
 	serverConfigData internalServerData
 }
@@ -71,10 +73,16 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 	}
 
 	// This connection uses the `nexhost` account, specifically provisioned for the node
-	ncInternal, err := nats.Connect(s.ClientURL(), nats.Nkey(data.NexHostUserPublic, func(b []byte) ([]byte, error) {
-		log.Debug("Attempting to sign NATS server nonce for internal host connection", slog.String("public_key", data.NexHostUserPublic))
-		return hostUser.Sign(b)
-	}))
+	ncInternal, err := nats.Connect(s.ClientURL(),
+		nats.DrainTimeout(defaultInternalNatsConnectionDrainTimeout),
+		nats.Nkey(
+			data.NexHostUserPublic,
+			func(b []byte) ([]byte, error) {
+				log.Debug("Attempting to sign NATS server nonce for internal host connection", slog.String("public_key", data.NexHostUserPublic))
+				return hostUser.Sign(b)
+			},
+		),
+	)
 	if err != nil {
 		server.PrintAndDie(err.Error())
 		return nil, err
@@ -87,6 +95,7 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 		serverConfigData: data,
 		log:              log,
 		lastOpts:         opts,
+		mutex:            &sync.Mutex{},
 		server:           s,
 	}
 
@@ -103,6 +112,9 @@ func (s *InternalNatsServer) Subsz(opts *server.SubszOptions) (*server.Subsz, er
 
 // Returns a user keypair that can be used to log into the internal server
 func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	kp, err := nkeys.CreateUser()
 	if err != nil {
 		s.log.Error("Failed to create nkey user", slog.Any("error", err))
@@ -157,6 +169,9 @@ func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error)
 
 // Destroy previously-created credentials
 func (s *InternalNatsServer) DestroyCredentials(id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	delete(s.serverConfigData.Credentials, id)
 
 	updated, err := updateNatsOptions(&server.Options{
@@ -213,7 +228,7 @@ func (s *InternalNatsServer) StoreFileForID(id string, bytes []byte) error {
 		return err
 	}
 
-	_, err = bucket.PutBytes(ctx, workloadCacheFileKey, bytes)
+	_, err = bucket.PutBytes(ctx, id, bytes)
 	return err
 }
 
@@ -232,13 +247,18 @@ func (s *InternalNatsServer) ConnectionWithCredentials(creds *credentials) (*nat
 		return nil, err
 	}
 
-	nc, err := nats.Connect(s.server.ClientURL(), nats.Nkey(creds.NkeyPublic, func(b []byte) ([]byte, error) {
-		s.log.Debug("Attempting to sign NATS server nonce for internal connection", slog.String("public_nkey", creds.NkeyPublic))
-		return pair.Sign(b)
-	}))
+	nc, err := nats.Connect(s.server.ClientURL(),
+		nats.DrainTimeout(defaultInternalNatsConnectionDrainTimeout),
+		nats.Nkey(creds.NkeyPublic,
+			func(b []byte) ([]byte, error) {
+				s.log.Debug("Attempting to sign NATS server nonce for internal connection", slog.String("public_key", creds.NkeyPublic))
+				return pair.Sign(b)
+			},
+		),
+	)
 	if err != nil {
 		s.log.Error("Failed to connect to internal NATS server",
-			slog.String("public_nkey", creds.NkeyPublic),
+			slog.String("public_key", creds.NkeyPublic),
 			slog.String("id", creds.ID),
 			slog.Any("error", err),
 		)
@@ -258,7 +278,7 @@ func (s *InternalNatsServer) FindCredentials(id string) (*credentials, error) {
 
 func ensureWorkloadObjectStore(nc *nats.Conn) (jetstream.ObjectStore, error) {
 	var err error
-	ctx, cancelF := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancelF := context.WithTimeout(context.Background(), 2*time.Second) // FIXME-- constantize and/or make timeout configurable
 	defer cancelF()
 
 	js, err := jetstream.New(nc)

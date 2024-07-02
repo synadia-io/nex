@@ -2,7 +2,6 @@ package internalnats
 
 import (
 	"bytes"
-	"context"
 	"log/slog"
 	"text/template"
 )
@@ -29,7 +28,6 @@ type credentials struct {
 const (
 	configTemplate = `
 jetstream: true
-
 accounts: {
 	nexhost: {
 		jetstream: true		
@@ -76,7 +74,7 @@ accounts: {
 	{{ end }}
 }
 no_sys_acc: true
-debug: false
+debug: true
 trace: false
 `
 )
@@ -91,6 +89,6 @@ func GenerateTemplate(log *slog.Logger, config internalServerData) ([]byte, erro
 	}
 
 	// -8 is equivalent to TRACE-ish level
-	log.Log(context.Background(), -8, "generated NATS config", slog.String("config", wr.String()))
+	log.Debug("generated NATS config", slog.String("config", wr.String()))
 	return wr.Bytes(), nil
 }

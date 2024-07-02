@@ -99,21 +99,22 @@ type MemoryStat struct {
 }
 
 type InfoResponse struct {
-	Version                string            `json:"version"`
-	Uptime                 string            `json:"uptime"`
-	PublicXKey             string            `json:"public_xkey"`
-	Tags                   map[string]string `json:"tags,omitempty"`
+	AvailableAgents        int               `json:"available_agents"`
+	Machines               []MachineSummary  `json:"machines"` // FIXME-- rename to workloads?
 	Memory                 *MemoryStat       `json:"memory,omitempty"`
-	Machines               []MachineSummary  `json:"machines"`
+	PublicXKey             string            `json:"public_xkey"`
 	SupportedWorkloadTypes []NexWorkload     `json:"supported_workload_types,omitempty"`
+	Tags                   map[string]string `json:"tags,omitempty"`
+	Uptime                 string            `json:"uptime"`
+	Version                string            `json:"version"`
 }
 
-type MachineSummary struct {
+type MachineSummary struct { // FIXME-- rename to workload summary?
 	Id        string          `json:"id"`
 	Healthy   bool            `json:"healthy"`
 	Uptime    string          `json:"uptime"`
 	Namespace string          `json:"namespace,omitempty"`
-	Workload  WorkloadSummary `json:"workload,omitempty"`
+	Workload  WorkloadSummary `json:"workload,omitempty"` // FIXME-- rename to deploy request?
 }
 
 type WorkloadSummary struct {

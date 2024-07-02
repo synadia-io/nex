@@ -34,7 +34,7 @@ const (
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
 	runloopTickInterval          = 2500 * time.Millisecond
-	agentPoolRetryMax            = 3
+	agentPoolRetryMax            = 100
 )
 
 // Nex node process
@@ -265,12 +265,8 @@ func (n *Node) init() error {
 			err = errors.Join(err, fmt.Errorf("failed to connect to NATS server: %s", _err))
 		} else {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
+			n.setConnectionCallbackHandler(n.nc)
 		}
-
-		n.nc.SetDisconnectErrHandler(n.ncDisconnectErrorHandler)
-		n.nc.SetReconnectHandler(n.ncReconnectedHandler)
-		n.nc.SetErrorHandler(n.ncErrorHandler)
-		n.nc.SetClosedHandler(n.ncClosedHandler)
 
 		n.manager, _err = NewWorkloadManager(
 			n.ctx,
@@ -307,30 +303,6 @@ func (n *Node) init() error {
 	})
 
 	return err
-}
-
-func (n *Node) ncDisconnectErrorHandler(conn *nats.Conn, err error) {
-	n.log.Error("NATS connection disconnected",
-		slog.Any("error", err),
-		slog.String("connection", conn.Opts.Name),
-	)
-}
-
-func (n *Node) ncReconnectedHandler(conn *nats.Conn) {
-	n.log.Info("NATS connection re-established")
-}
-
-func (n *Node) ncErrorHandler(conn *nats.Conn, _ *nats.Subscription, err error) {
-	n.log.Error("NATS error",
-		slog.Any("error", err),
-		slog.String("connection", conn.Opts.Name),
-	)
-}
-
-func (n *Node) ncClosedHandler(conn *nats.Conn) {
-	n.log.Info("NATS connection closed",
-		slog.String("connection", conn.Opts.Name),
-	)
 }
 
 func (n *Node) startPublicNATS() error {
@@ -426,12 +398,12 @@ func (n *Node) handleAutostarts() {
 			)
 			continue
 		}
-		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 
+		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 		agentDeployRequest.TotalBytes = int64(numBytes)
 		agentDeployRequest.Hash = *workloadHash
 
-		err = n.api.mgr.DeployWorkload(agentClient, agentDeployRequest)
+		err = n.manager.DeployWorkload(agentClient, agentDeployRequest)
 		if err != nil {
 			n.log.Error("Failed to deploy autostart workload",
 				slog.Any("error", err),
@@ -440,13 +412,16 @@ func (n *Node) handleAutostarts() {
 			)
 			continue
 		}
+
 		n.log.Info("Autostart workload started",
 			slog.String("name", autostart.Name),
 			slog.String("namespace", autostart.Namespace),
 			slog.String("workload_id", agentClient.ID()),
 		)
+
 		successCount += 1
 	}
+
 	if successCount < len(n.config.AutostartConfiguration.Workloads) {
 		n.log.Error("Not all startup workloads suceeded",
 			slog.Int("expected", len(n.config.AutostartConfiguration.Workloads)),
@@ -473,6 +448,56 @@ func (n *Node) loadNodeConfig() error {
 	}
 
 	return nil
+}
+
+func (n *Node) ncClosedHandler(conn *nats.Conn) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	n.log.Info("NATS connection closed", attrs...)
+}
+
+func (n *Node) ncDisconnectErrorHandler(conn *nats.Conn, err error) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	if err != nil {
+		attrs = append(attrs, slog.Any("error", err))
+	}
+
+	n.log.Debug("NATS connection disconnected", attrs...)
+}
+
+func (n *Node) ncErrorHandler(conn *nats.Conn, _ *nats.Subscription, err error) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	attrs = append(attrs, slog.Any("error", err))
+
+	n.log.Error("NATS error", attrs...)
+}
+
+func (n *Node) ncReconnectedHandler(conn *nats.Conn) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	n.log.Debug("NATS connection re-established", attrs...)
 }
 
 func (n *Node) publishNodeLameDuckEntered() error {
@@ -557,6 +582,15 @@ func (n *Node) publishNodeStopped() error {
 
 	n.log.Info("Publishing node stopped event")
 	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
+}
+
+func (n *Node) setConnectionCallbackHandler(nc *nats.Conn) {
+	nc.SetClosedHandler(n.ncClosedHandler)
+	nc.SetDisconnectErrHandler(n.ncDisconnectErrorHandler)
+	nc.SetErrorHandler(n.ncErrorHandler)
+	nc.SetReconnectHandler(n.ncReconnectedHandler)
+
+	n.log.Info("Set NATS connection callback handlers", slog.String("servers", n.opts.Servers))
 }
 
 func (n *Node) validateConfig() error {
