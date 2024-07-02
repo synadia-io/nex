@@ -423,19 +423,26 @@ var _ = Describe("nex node", func() {
 							})
 
 							Describe("deploying a native binary workload", func() {
-								var deployRequest *controlapi.DeployRequest
-								var err error
+								var echoDeployRequest *controlapi.DeployRequest
+								var ultimateDeployRequest *controlapi.DeployRequest
+								var echoErr error
+								var ultimateErr error
 
 								AfterEach(func() {
 									os.Remove("./echoservice")
+									os.Remove("./ultimateechoservice")
 								})
 
 								JustBeforeEach(func() {
-									deployRequest, err = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
-									Expect(err).To(BeNil())
+									echoDeployRequest, echoErr = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+									Expect(echoErr).To(BeNil())
+
+									ultimateDeployRequest, ultimateErr = newDeployRequest(*nodeID, "ultimateechoservice", "nex example ultimateechoservice", "./echoservice", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
+									Expect(ultimateErr).To(BeNil())
 
 									nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*1000, "default", log)
-									_, err = nodeClient.StartWorkload(deployRequest)
+									_, echoErr = nodeClient.StartWorkload(echoDeployRequest)
+									_, ultimateErr = nodeClient.StartWorkload(ultimateDeployRequest)
 
 									time.Sleep(time.Millisecond * 1000)
 								})
@@ -447,21 +454,15 @@ var _ = Describe("nex node", func() {
 										_ = cmd.Wait()
 									})
 
-									It("should [fail to] deploy the native workload", func(ctx SpecContext) {
+									It("should [fail to] deploy the native workloads", func(ctx SpecContext) {
 										if sandbox {
-											Expect(err.Error()).To(ContainSubstring("native binary contains at least one dynamically linked dependency"))
+											Expect(echoErr.Error()).To(ContainSubstring("native binary contains at least one dynamically linked dependency"))
+											Expect(ultimateErr.Error()).To(ContainSubstring("native binary contains at least one dynamically linked dependency"))
 										} else {
-											Expect(err).To(BeNil())
+											Expect(echoErr).To(BeNil())
+											Expect(ultimateErr).To(BeNil())
 										}
 									})
-
-									// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.AllAgents())).To(Equal(1))
-									// })
-
-									// It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-									// })
 								})
 
 								Context("when the native binary is statically-linked", func() {
@@ -473,17 +474,13 @@ var _ = Describe("nex node", func() {
 										time.Sleep(time.Millisecond * 1000)
 									})
 
-									It("should deploy the native workload", func(ctx SpecContext) {
-										Expect(err).To(BeNil())
+									It("should deploy the native echoservice workload", func(ctx SpecContext) {
+										Expect(echoErr).To(BeNil())
 									})
 
-									// It("should keep a reference to all running agent processes", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.AllAgents())).To(Equal(2))
-									// })
-
-									// It("should maintain the configured number of warm agents in the pool", func(ctx SpecContext) {
-									// 	Expect(len(managerProxy.PoolAgents())).To(Equal(nodeProxy.NodeConfiguration().MachinePoolSize))
-									// })
+									It("should deploy the native ultimate echoservice workload", func(ctx SpecContext) {
+										Expect(ultimateErr).To(BeNil())
+									})
 								})
 							})
 
