@@ -403,9 +403,15 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
+		var hash string
+		if workloadHash != nil {
+			hash = *workloadHash // HACK!!! for agent-local workloads, this should be read from the release manifest
+		}
+
+		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, hash)
+
 		agentDeployRequest.TotalBytes = int64(numBytes)
-		agentDeployRequest.Hash = *workloadHash
+		agentDeployRequest.Hash = hash
 
 		err = n.manager.DeployWorkload(agentClient, agentDeployRequest)
 		if err != nil {
