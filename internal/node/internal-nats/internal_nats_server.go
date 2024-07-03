@@ -30,14 +30,13 @@ type InternalNatsServer struct {
 	serverConfigData internalServerData
 }
 
-func NewInternalNatsServer(log *slog.Logger, storeDir string) (*InternalNatsServer, error) {
+func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool) (*InternalNatsServer, error) {
 	opts := &server.Options{
 		JetStream: true,
 		StoreDir:  storeDir,
 		Port:      -1,
-		Debug:     true,
-		// Trace:     true,
-		// NoLog:     true,
+		Debug:     debug,
+		Trace:     trace,
 	}
 
 	data := internalServerData{
@@ -62,8 +61,9 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string) (*InternalNatsServ
 		return nil, err
 	}
 
-	// uncomment this if you want internal NATS logs emitted
-	s.ConfigureLogger()
+	if debug || trace {
+		s.ConfigureLogger()
+	}
 
 	if err := server.Run(s); err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())

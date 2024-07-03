@@ -16,7 +16,7 @@ import (
 )
 
 func TestInternalNatsServer(t *testing.T) {
-	server, err := NewInternalNatsServer(slog.Default(), filepath.Join(os.TempDir(), "pnats-test"))
+	server, err := NewInternalNatsServer(slog.Default(), filepath.Join(os.TempDir(), "pnats-test"), true, false)
 	if err != nil {
 		t.Fatalf("Failed to create internal nats server: %s", err)
 	}
@@ -72,7 +72,7 @@ func TestInternalNatsServer(t *testing.T) {
 // the NEXCACHE bucket in their account, with the key of 'workload'
 func TestInternalNatsServerFileCache(t *testing.T) {
 	ctx := context.Background()
-	server, err := NewInternalNatsServer(slog.Default(), filepath.Join(os.TempDir(), "pnats-test"))
+	server, err := NewInternalNatsServer(slog.Default(), filepath.Join(os.TempDir(), "pnats-test"), true, false)
 	if err != nil {
 		t.Fatalf("Failed to create internal nats server: %s", err)
 	}

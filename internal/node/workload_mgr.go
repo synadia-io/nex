@@ -599,7 +599,7 @@ func (w *WorkloadManager) startInternalNATS() error {
 	}
 
 	var err error
-	w.natsint, err = internalnats.NewInternalNatsServer(w.log, storeDir)
+	w.natsint, err = internalnats.NewInternalNatsServer(w.log, storeDir, w.config.InternalNodeDebug, w.config.InternalNodeTrace)
 	if err != nil {
 		return err
 	}
