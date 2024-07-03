@@ -267,6 +267,11 @@ func (n *Node) init() error {
 			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
 		}
 
+		n.nc.SetDisconnectErrHandler(n.ncDisconnectErrorHandler)
+		n.nc.SetReconnectHandler(n.ncReconnectedHandler)
+		n.nc.SetErrorHandler(n.ncErrorHandler)
+		n.nc.SetClosedHandler(n.ncClosedHandler)
+
 		n.manager, _err = NewWorkloadManager(
 			n.ctx,
 			n.cancelF,
@@ -302,6 +307,30 @@ func (n *Node) init() error {
 	})
 
 	return err
+}
+
+func (n *Node) ncDisconnectErrorHandler(conn *nats.Conn, err error) {
+	n.log.Error("NATS connection disconnected",
+		slog.Any("error", err),
+		slog.String("connection", conn.Opts.Name),
+	)
+}
+
+func (n *Node) ncReconnectedHandler(conn *nats.Conn) {
+	n.log.Info("NATS connection re-established")
+}
+
+func (n *Node) ncErrorHandler(conn *nats.Conn, _ *nats.Subscription, err error) {
+	n.log.Error("NATS error",
+		slog.Any("error", err),
+		slog.String("connection", conn.Opts.Name),
+	)
+}
+
+func (n *Node) ncClosedHandler(conn *nats.Conn) {
+	n.log.Info("NATS connection closed",
+		slog.String("connection", conn.Opts.Name),
+	)
 }
 
 func (n *Node) startPublicNATS() error {
