@@ -18,7 +18,6 @@ import (
 
 const (
 	defaultInternalNatsConfigFile = "internalconf"
-	defaultInternalNatsStoreDir   = "pnats"
 	workloadCacheBucketName       = "NEXCACHE"
 	workloadCacheFileKey          = "workload"
 )
@@ -31,14 +30,13 @@ type InternalNatsServer struct {
 	serverConfigData internalServerData
 }
 
-func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
+func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool) (*InternalNatsServer, error) {
 	opts := &server.Options{
 		JetStream: true,
-		StoreDir:  path.Join(os.TempDir(), defaultInternalNatsStoreDir),
+		StoreDir:  storeDir,
 		Port:      -1,
-		// Debug:     true,
-		// Trace:     true,
-		// NoLog:     true,
+		Debug:     debug,
+		Trace:     trace,
 	}
 
 	data := internalServerData{
@@ -63,8 +61,9 @@ func NewInternalNatsServer(log *slog.Logger) (*InternalNatsServer, error) {
 		return nil, err
 	}
 
-	// uncomment this if you want internal NATS logs emitted
-	// s.ConfigureLogger()
+	if debug || trace {
+		s.ConfigureLogger()
+	}
 
 	if err := server.Run(s); err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
@@ -191,6 +190,8 @@ func (s *InternalNatsServer) Connection() *nats.Conn {
 func (s *InternalNatsServer) Shutdown() {
 	s.server.Shutdown()
 	s.server.WaitForShutdown()
+
+	_ = os.Remove(path.Join(os.TempDir(), s.lastOpts.StoreDir))
 }
 
 func (s *InternalNatsServer) StoreFileForID(id string, bytes []byte) error {

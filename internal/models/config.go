@@ -44,8 +44,11 @@ type NodeConfiguration struct {
 	DefaultResourceDir               string                   `json:"default_resource_dir"`
 	ForceDepInstall                  bool                     `json:"-"`
 	HostServicesConfiguration        *HostServicesConfig      `json:"host_services,omitempty"`
+	InternalNodeDebug                bool                     `json:"internal_node_debug,omitempty"`
 	InternalNodeHost                 *string                  `json:"internal_node_host,omitempty"`
 	InternalNodePort                 *int                     `json:"internal_node_port"`
+	InternalNodeStoreDir             *string                  `json:"internal_node_store_dir,omitempty"`
+	InternalNodeTrace                bool                     `json:"internal_node_trace,omitempty"`
 	KernelFilepath                   string                   `json:"kernel_filepath"`
 	MachinePoolSize                  int                      `json:"machine_pool_size"`
 	MachineTemplate                  MachineTemplate          `json:"machine_template"`
