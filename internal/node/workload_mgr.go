@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -383,7 +383,6 @@ func (w *WorkloadManager) Stop() error {
 		}
 
 		w.natsint.Shutdown()
-		_ = os.Remove(path.Join(os.TempDir(), defaultInternalNatsStoreDir))
 	}
 
 	return nil
@@ -594,8 +593,13 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 }
 
 func (w *WorkloadManager) startInternalNATS() error {
+	storeDir := filepath.Join(os.TempDir(), defaultInternalNatsStoreDir)
+	if w.config.InternalNodeStoreDir != nil {
+		storeDir = *w.config.InternalNodeStoreDir
+	}
+
 	var err error
-	w.natsint, err = internalnats.NewInternalNatsServer(w.log)
+	w.natsint, err = internalnats.NewInternalNatsServer(w.log, storeDir)
 	if err != nil {
 		return err
 	}
