@@ -136,28 +136,32 @@ func (a *Agent) requestHandshake() error {
 	}
 	raw, _ := json.Marshal(msg)
 
-	resp, err := a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
-	if err != nil {
-		if errors.Is(err, nats.ErrNoResponders) {
-			time.Sleep(time.Millisecond * 50)
-			resp, err = a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
-		}
-
+	hs := false
+	var attempts int
+	for attempts = 0; attempts < 3; attempts++ {
+		resp, err := a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 		if err != nil {
-			a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s", err))
-			return err
+			a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s, attempt %d", err, attempts+1))
+			time.Sleep(time.Millisecond * 100)
+			continue
 		}
+		var handshakeResponse *agentapi.HandshakeResponse
+		err = json.Unmarshal(resp.Data, &handshakeResponse)
+		if err != nil {
+			a.LogError(fmt.Sprintf("Failed to parse handshake response: %s", err))
+			time.Sleep(time.Millisecond * 100)
+			continue
+		}
+		hs = true
+		break
+	}
+	if hs {
+		a.LogInfo(fmt.Sprintf("Agent is up after %d attempts", attempts+1))
+		return nil
+	} else {
+		return errors.New("Failed to obtain handshake from host")
 	}
 
-	var handshakeResponse *agentapi.HandshakeResponse
-	err = json.Unmarshal(resp.Data, &handshakeResponse)
-	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to parse handshake response: %s", err))
-		return err
-	}
-
-	a.LogInfo("Agent is up")
-	return nil
 }
 
 func (a *Agent) Version() string {
