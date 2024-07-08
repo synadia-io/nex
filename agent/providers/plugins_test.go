@@ -1,3 +1,5 @@
+//go:build linux
+
 package providers
 
 import (
@@ -8,7 +10,7 @@ import (
 )
 
 func TestNoopPluginLoad(t *testing.T) {
-	plugPath := "/home/kevin/code/ConnectEverything/nex/examples/workload_provider_plugins/noop"
+	plugPath := "../../test/fixtures"
 	wName := "echofunctionjs"
 	params := &agentapi.ExecutionProviderParams{
 		DeployRequest: agentapi.DeployRequest{
