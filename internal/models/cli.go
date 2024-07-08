@@ -127,6 +127,7 @@ type NodeOptions struct {
 	PreflightVerbose        bool   `json:"-"`
 	PreflightCheck          bool   `json:"-"`
 	PreflightInstallVersion string `json:"-"`
+	PreflightYes            bool   `json:"-"`
 
 	ListFull  bool   `json:"-"`
 	NexusName string `json:"-"`

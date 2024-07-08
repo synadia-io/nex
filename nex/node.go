@@ -27,6 +27,7 @@ func setConditionalCommands() {
 	nodePreflight.Flag("check", "checks status of requirements without attempting to install").Default("false").BoolVar(&NodeOpts.PreflightCheck)
 	nodePreflight.Flag("install_version", "uses specific version of nex during preflight installs").PlaceHolder("0.3.0").StringVar(&NodeOpts.PreflightInstallVersion)
 	nodePreflight.Flag("cni_ns", "nameservers to use in CNI configuration file").StringsVar(&NodeOpts.CniNS)
+	nodePreflight.Flag("yes", "Installs missing preflight deps without prompt").Short('y').Default("false").UnNegatableBoolVar(&NodeOpts.PreflightYes)
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger, keypair nkeys.KeyPair) error {
