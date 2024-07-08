@@ -111,5 +111,5 @@ func (w *workloadPlugin) Validate() error {
 
 func logError(w io.Writer, msg string) {
 	fmt.Println(msg)
-	w.Write([]byte(msg))
+	_, _ = w.Write([]byte(msg))
 }
