@@ -55,7 +55,7 @@ jobs:
       name: Build plugin fixture
       working-directory: ./examples/workload_provider_plugins/noop/
       run: |
-        go build
+        go build -buildmode=plugin
         mv noop.* ../../../test/fixtures/
     - 
       name: Run test suite
