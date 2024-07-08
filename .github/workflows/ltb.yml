@@ -55,9 +55,8 @@ jobs:
       name: Run test suite
       if: runner.os == 'Linux'
       run: |
-        go env
         go build -buildmode=plugin -o ./test/fixtures/noop.so ./examples/workload_provider_plugins/noop/main.go
-        go test -v $(go list ./... | grep -v spec)
+        go test $(go list ./... | grep -v spec)
         go test -v -race $(go list ./... | grep -v spec)
     - 
       name: Run spec suite | Linux
