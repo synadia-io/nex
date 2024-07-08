@@ -52,6 +52,12 @@ jobs:
       working-directory: ./agent/cmd/nex-agent
       run: go build -tags netgo -ldflags '-extldflags "-static"'
     - 
+      name: Build plugin fixture
+      working-directory: ./examples/workload_provider_plugins/noop/
+      run: |
+        go build
+        mv noop.* ../../../test/fixtures/
+    - 
       name: Run test suite
       working-directory: .
       if: runner.os == 'Linux'
