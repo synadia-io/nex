@@ -98,7 +98,7 @@ func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *sl
 			continue
 		}
 
-		if !config.ForceDepInstall {
+		if !config.ForceDepInstall && !config.PreflightYes {
 			err := checkContinue(fmt.Sprintf("You are missing required dependencies for [%s], do you want to install?", red(r.description)))
 			if errors.Is(err, ErrUserCanceledPreflight) {
 				return err

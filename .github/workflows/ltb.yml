@@ -52,23 +52,15 @@ jobs:
       working-directory: ./agent/cmd/nex-agent
       run: go build
     - 
-      name: Build plugin fixture
-      working-directory: ./examples/workload_provider_plugins/noop
-      if: runner.os == 'Linux'
-      run: |
-        go build -buildmode=plugin
-        mkdir -p ../../../test/fixtures
-        cp noop.so ../../../test/fixtures/noop.so
-    - 
       name: Run test suite
-      working-directory: .
       if: runner.os == 'Linux'
       run: |
-        go test $(go list ./... | grep -v spec)
+        go env
+        go build -buildmode=plugin -o ./test/fixtures/noop.so ./examples/workload_provider_plugins/noop/main.go
+        go test -v $(go list ./... | grep -v spec)
         go test -v -race $(go list ./... | grep -v spec)
     - 
       name: Run spec suite | Linux
-      working-directory: .
       if: runner.os == 'Linux'
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.19.0
@@ -76,7 +68,6 @@ jobs:
         sudo $(go env GOPATH)/bin/ginkgo -r --randomize-all --randomize-suites --vv --trace --keep-going --output-interceptor-mode=none ./spec
     - 
       name: Run spec suite | Windows
-      working-directory: .
       if: runner.os == 'Windows'
       run: |
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.19.0

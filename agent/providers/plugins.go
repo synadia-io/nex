@@ -10,6 +10,8 @@ import (
 	"path"
 	"plugin"
 	"runtime"
+	"syscall"
+	"time"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -36,6 +38,7 @@ func MaybeLoadPluginProvider(params *agentapi.ExecutionProviderParams) (wp *work
 	// This will end up with something like `./plugins/noop.so`
 	actualPath = path.Join(*params.PluginPath, string(params.WorkloadType))
 	slog.Debug("Attempting provider plugin load", slog.String("path", actualPath))
+
 	switch runtime.GOOS {
 	case "windows":
 		err = errors.New("windows agents do not support workload provider plugins")
@@ -45,6 +48,19 @@ func MaybeLoadPluginProvider(params *agentapi.ExecutionProviderParams) (wp *work
 	case "darwin":
 		actualPath = actualPath + ".dylib"
 	}
+
+	fi, err := os.Stat(actualPath)
+	if err != nil {
+		return
+	}
+	mtime := fi.ModTime()
+	stat := fi.Sys().(*syscall.Stat_t)
+	atime := time.Unix(int64(stat.Atim.Sec), int64(stat.Atim.Nsec))
+	ctime := time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec))
+
+	fmt.Println(time.Now())
+	fmt.Println(atime, mtime)
+	fmt.Println(ctime)
 
 	if _, err = os.Stat(actualPath); errors.Is(err, os.ErrNotExist) {
 		// path does not exist

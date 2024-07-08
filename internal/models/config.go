@@ -74,6 +74,7 @@ type NodeConfiguration struct {
 	PreflightVerify         bool   `json:"-"`
 	PreflightCheck          bool   `json:"-"`
 	PreflightInstallVersion string `json:"-"`
+	PreflightYes            bool   `json:"-"`
 
 	// Public NATS server options; when non-nil, a public "userland" NATS server is started during node init
 	PublicNATSServer *server.Options `json:"public_nats_server,omitempty"`
