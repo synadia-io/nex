@@ -22,3 +22,7 @@ func (V8) Validate() error { return nil }
 func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, error) {
 	return nil, errors.New("V8 is not supported on this platform")
 }
+
+func (v *V8) Name() string {
+	return "JavaScript"
+}
