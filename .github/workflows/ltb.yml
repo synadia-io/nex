@@ -54,10 +54,11 @@ jobs:
     - 
       name: Build plugin fixture
       working-directory: ./examples/workload_provider_plugins/noop
-      if: runner.os == 'Linux'      
+      if: runner.os == 'Linux'
       run: |
         go build -buildmode=plugin
-        cp noop.so ../../../test/fixtures/
+        mkdir -p ../../../test/fixtures
+        cp noop.so ../../../test/fixtures/noop.so
     - 
       name: Run test suite
       working-directory: .
