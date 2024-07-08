@@ -8,6 +8,7 @@
 *.exe~
 *.dll
 *.so
+!test/fixtures/*.so
 *.dylib
 
 # Test binary, built with `go test -c`
