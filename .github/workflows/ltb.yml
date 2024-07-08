@@ -50,7 +50,7 @@ jobs:
     - 
       name: Build agent
       working-directory: ./agent/cmd/nex-agent
-      run: go build -tags netgo -ldflags '-extldflags "-static"'
+      run: go build
     - 
       name: Build plugin fixture
       working-directory: ./examples/workload_provider_plugins/noop/
