@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/synadia-io/nex/agent/providers/lib"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -25,10 +26,19 @@ type ExecutionProvider interface {
 	// Validate the executable artifact, e.g., specific characteristics of a
 	// statically-linked binary or raw source code, depending on provider implementation
 	Validate() error
+
+	// Returns a human-readable name for this provider
+	Name() string
 }
 
 // NewExecutionProvider initializes and returns an execution provider for a given work request
 func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("Failed to create execution provider: %+v\n", r)
+		}
+	}()
 	// if params.WorkloadType == nil {
 	// 	return nil, errors.New("execution provider factory requires a workload type parameter")
 	// }
@@ -44,8 +54,6 @@ func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionPr
 	case controlapi.NexWorkloadWasm:
 		return lib.InitNexExecutionProviderWasm(params)
 	default:
-		break
+		return MaybeLoadPluginProvider(params)
 	}
-
-	return nil, errors.New("invalid execution provider specified")
 }

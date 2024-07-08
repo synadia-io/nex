@@ -207,3 +207,7 @@ func (r *stdInBuf) Read(p []byte) (n int, err error) {
 	r.readIndex += int64(n)
 	return
 }
+
+func (w *Wasm) Name() string {
+	return "WebAssembly"
+}

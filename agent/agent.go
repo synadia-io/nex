@@ -441,6 +441,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 
 		NATSConn:        a.nc,
 		TriggerSubjects: req.TriggerSubjects,
+		PluginPath:      a.md.PluginPath,
 	}
 
 	go func() {

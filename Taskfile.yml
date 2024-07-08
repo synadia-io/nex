@@ -50,6 +50,13 @@ tasks:
     deps:
       [agent, nex]
 
+  noop-workload-provider:
+    dir: examples/workload_provider_plugins/noop
+    sources:
+      - "*.go"
+    cmds:    
+      - go build -buildmode=plugin
+
   echo-service:
     dir: examples/echoservice
     sources:

@@ -66,6 +66,7 @@ type NodeConfiguration struct {
 	Tags                             map[string]string        `json:"tags,omitempty"`
 	ValidIssuers                     []string                 `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []controlapi.NexWorkload `json:"workload_types,omitempty"`
+	AgentPluginPath                  *string                  `json:"agent_plugin_path,omitempty"`
 	DenyTriggerSubjects              []string                 `json:"deny_trigger_subjects,omitempty"`
 	NodeLimits                       NodeLimitsConfig         `json:"node_limits"`
 

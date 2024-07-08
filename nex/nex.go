@@ -122,7 +122,7 @@ func init() {
 	yeet.Flag("trigger_subject", "Trigger subjects to register for subsequent workload execution, if supported by the workload type").StringsVar(&RunOpts.TriggerSubjects)
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
 	yeet.Flag("bucketmaxbytes", "Overrides the default max bytes if the dev object store bucket is created").UintVar(&DevRunOpts.DevBucketMaxBytes)
-	yeet.Flag("type", "Type of workload").Default("native").EnumVar(&workloadType, "native", "v8", "wasm")
+	yeet.Flag("type", "Type of workload").Default("native").StringVar(&workloadType)
 
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
@@ -161,6 +161,8 @@ func main() {
 		RunOpts.WorkloadType = controlapi.NexWorkloadOCI
 	case "wasm":
 		RunOpts.WorkloadType = controlapi.NexWorkloadWasm
+	default:
+		RunOpts.WorkloadType = controlapi.NexWorkload(workloadType)
 	}
 
 	ctx := context.Background()

@@ -134,6 +134,10 @@ func InitNexExecutionProviderNative(params *agentapi.ExecutionProviderParams) (*
 	}, nil
 }
 
+func (n *NativeExecutable) Name() string {
+	return "Native Binary"
+}
+
 // Validates that the indicated file is a 64-bit linux native elf binary that is statically linked.
 // All native binaries must pass this validation before they are executed.
 func validateNativeBinary(path string) error {

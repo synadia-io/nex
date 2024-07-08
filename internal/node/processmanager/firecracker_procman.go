@@ -279,6 +279,7 @@ func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker, workload
 		NodeNatsHost:     vm.config.InternalNodeHost,
 		NodeNatsPort:     vm.config.InternalNodePort,
 		NodeNatsNkeySeed: &workloadSeed,
+		PluginPath:       vm.config.AgentPluginPath,
 		VmID:             &vm.vmmID,
 	})
 }
