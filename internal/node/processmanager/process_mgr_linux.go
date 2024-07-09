@@ -20,6 +20,12 @@ func NewProcessManager(
 	ctx context.Context,
 ) (ProcessManager, error) {
 
+	if config.AgentPluginPath != nil {
+		log.Warn("⚠️  Agent workload provider plugins are enabled on this node. Be sure you only allow trusted providers",
+			slog.String("plugin_path", *config.AgentPluginPath),
+		)
+	}
+
 	if config.NoSandbox {
 		log.Warn("⚠️  Sandboxing has been disabled! Workloads are spawned directly by agents")
 		log.Warn("⚠️  Do not run untrusted workloads in this mode!")

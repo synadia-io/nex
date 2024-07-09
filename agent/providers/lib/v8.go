@@ -882,3 +882,7 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 		utils: make(map[string]*v8.Function),
 	}, nil
 }
+
+func (v *V8) Name() string {
+	return "JavaScript"
+}

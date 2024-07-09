@@ -124,20 +124,21 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 			for _, m := range info.Machines {
 				cols.Println()
 				cols.AddRow("Id", m.Id)
-				cols.AddRow("Healthy", m.Healthy)
+				cols.AddRow("Type", m.Workload.WorkloadType)
 				cols.AddRow("Runtime", m.Workload.Runtime)
 				cols.AddRow("Name", m.Workload.Name)
 				cols.AddRow("Description", m.Workload.Description)
 			}
 			cols.Indent(0)
 		}
+		render(cols)
 	} else {
 		t := table.NewWriter()
 		t.SetStyle(table.StyleRounded)
 
 		t.SetTitle("Workloads")
 		t.Style().Title.Align = text.AlignCenter
-		t.AppendHeader(table.Row{"", "ID", "Name", "Runtime"})
+		t.AppendHeader(table.Row{"", "ID", "Type", "Name", "Runtime"})
 
 		for _, m := range info.Machines {
 			health := func() string {
@@ -147,7 +148,7 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 				return "🔴"
 			}()
 
-			t.AppendRow(table.Row{health, m.Id, m.Workload.Name, m.Workload.Runtime})
+			t.AppendRow(table.Row{health, m.Id, m.Workload.WorkloadType, m.Workload.Name, m.Workload.Runtime})
 		}
 
 		fmt.Println(t.Render())

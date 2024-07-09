@@ -40,6 +40,8 @@ type ExecutionProviderParams struct {
 
 	// NATS connections which be injected into the execution provider
 	NATSConn *nats.Conn `json:"-"`
+
+	PluginPath *string `json:"-"`
 }
 
 // DeployRequest processed by the agent
@@ -188,6 +190,7 @@ type MachineMetadata struct {
 	NodeNatsPort     *int    `json:"node_nats_port"`
 	NodeNatsNkeySeed *string `json:"node_nats_nkey"`
 	Message          *string `json:"message"`
+	PluginPath       *string `json:"plugin_path,omitempty"`
 
 	Errors []error `json:"errors,omitempty"`
 }

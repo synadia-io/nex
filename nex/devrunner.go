@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -94,6 +95,10 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 
 	if RunOpts.WorkloadType == "v8" && len(RunOpts.TriggerSubjects) == 0 {
 		return errors.New("cannot start a function-type workload without specifying at least one trigger subject")
+	}
+
+	if !slices.Contains([]string{"v8", "wasm", "native", "elf", "oci"}, workloadType) {
+		fmt.Printf("Warning: You've supplied a custom workload type (%s). Target node must support this plugin", workloadType)
 	}
 
 	if DevRunOpts.AutoStop {

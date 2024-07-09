@@ -239,6 +239,10 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		fmt.Sprintf("NEX_NODE_NATS_PORT=%d", *s.config.InternalNodePort),
 		fmt.Sprintf("NEX_NODE_NATS_NKEY_SEED=%s", seed),
 	)
+	// If this config entry exists, workload plugins are allowed by the agent
+	if s.config.AgentPluginPath != nil {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("NEX_AGENT_PLUGIN_PATH=%s", *s.config.AgentPluginPath))
+	}
 
 	cmd.Stderr = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: true}
 	cmd.Stdout = &procLogEmitter{workloadID: workloadID, log: s.log.WithGroup(workloadID), stderr: false}

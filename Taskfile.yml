@@ -14,7 +14,8 @@ tasks:
     sources:
       - "*.go"
     cmds:
-      - go build -tags netgo -ldflags '-extldflags "-static"'
+#      - go build -tags netgo -ldflags '-extldflags "-static"'
+      - go build
 
   clean:
     cmds:
@@ -49,6 +50,13 @@ tasks:
       - gunzip rootfs.ext4.gz
     deps:
       [agent, nex]
+
+  noop-workload-provider:
+    dir: examples/workload_provider_plugins/noop
+    sources:
+      - "*.go"
+    cmds:    
+      - go build -buildmode=plugin
 
   echo-service:
     dir: examples/echoservice
