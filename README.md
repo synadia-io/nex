@@ -105,5 +105,23 @@ In order to use your NATS context with Nex, you will need to set the `XDG_CONFIG
 XDG_CONFIG_HOME=/home/jordan/.config sudo -E nex node up --loglevel debug --context default
 ```
 
+### Running a nex node in Docker
+We provide a Dockerfile that can be used for local development.  If you choose to run a nex node in docker, it MUST run in no-sandbox mode.
+```bash
+docker build -t nex .
+
+docker network create nex
+
+#start a nats server
+docker run --net nex --rm -d --name nats-server nats --js
+
+# ‼️ make sure you edit ./examples/nodeconfigs/simple.json to reflect the setting `no_sandbox: true` ‼️
+# start a nex node
+docker run --net nex --rm --name nex -v ./examples/nodeconfigs:/conf nex node up --config /conf/simple.json -s nats://nats-server:4222
+
+# interact with your node
+docker run --net nex --rm nex node ls -s nats://nats-server:4222
+```
+
 ## Contributing
 For information on how to contribute to Nex, please read our [contributing](./CONTRIBUTING.md) guide.
