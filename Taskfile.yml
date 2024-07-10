@@ -39,7 +39,8 @@ tasks:
     sources:
       - "*.go"
     cmds:
-      - go build -tags netgo -ldflags '-extldflags "-static"'
+#      - go build -tags netgo -ldflags '-extldflags "-static"'
+    - go build
 
   rootfs:
     dir: nex
@@ -56,6 +57,13 @@ tasks:
     sources:
       - "*.go"
     cmds:    
+      - go build -buildmode=plugin
+
+  noop-hostservice-provider:
+    dir: examples/host_services_plugins/noop
+    sources:
+      - "*.go"
+    cmds:
       - go build -buildmode=plugin
 
   echo-service:

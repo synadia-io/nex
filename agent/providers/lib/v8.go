@@ -49,6 +49,9 @@ const (
 	hostServicesMessagingRequestFunctionName     = "request"
 	hostServicesMessagingRequestManyFunctionName = "requestMany"
 
+	hostServicesRawObjectName   = "rawService"
+	hostServicesRawFunctionName = "request"
+
 	hostServicesObjectStoreObjectName         = "objectStore"
 	hostServicesObjectStoreGetFunctionName    = "get"
 	hostServicesObjectStorePutFunctionName    = "put"
@@ -327,6 +330,11 @@ func (v *V8) newHostServicesTemplate(ctx context.Context) (*v8.ObjectTemplate, e
 		return nil, err
 	}
 
+	err = hostServices.Set(hostServicesRawObjectName, v.newRawObjectTemplate(ctx))
+	if err != nil {
+		return nil, err
+	}
+
 	return hostServices, nil
 }
 
@@ -538,6 +546,46 @@ func (v *V8) newKeyValueObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 	}))
 
 	return kv
+}
+
+// this.hostServices.raw.request('keyvalue', 'set', ...)
+func (v *V8) newRawObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
+	raw := v8.NewObjectTemplate(v.iso)
+
+	_ = raw.Set(hostServicesRawFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		_, _ = v.stdout.Write([]byte("performing raw untyped host services request"))
+
+		args := info.Args()
+		// serviceName, methodName, payload
+		if len(args) != 3 {
+			val, _ := v8.NewValue(v.iso, "service, method, and payload are all required")
+			return v.iso.ThrowException(val)
+		}
+		serviceName := args[0].String()
+		methodName := args[1].String()
+		payload, err := v.marshalValue(args[2])
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		reply, err := v.builtins.RawCall(ctx, serviceName, methodName, payload)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		val, err := v.toUInt8ArrayValue(reply)
+		if err != nil {
+			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(reply), err.Error())))
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val
+	}))
+
+	return raw
 }
 
 func (v *V8) newMessagingObjectTemplate(ctx context.Context) *v8.ObjectTemplate {

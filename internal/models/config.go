@@ -99,6 +99,7 @@ type NodeLimitsConfig struct {
 type ServiceConfig struct {
 	Enabled       bool            `json:"enabled"`
 	Configuration json.RawMessage `json:"config"`
+	PluginPath    *string         `json:"plugin_path,omitempty"`
 }
 
 type AutostartConfig struct {
