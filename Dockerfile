@@ -10,7 +10,7 @@ WORKDIR /agent
 COPY go.mod ./
 RUN go mod download
 COPY . .
-RUN go build -tags netgo -ldflags '-extldflags "-static"' -o nexagent ./agent/cmd/nex-agent
+RUN go build -o nexagent ./agent/cmd/nex-agent
 
 FROM debian:12-slim
 RUN apt-get update \
