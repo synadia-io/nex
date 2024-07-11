@@ -14,7 +14,7 @@ import (
 	_ "net/http/pprof"
 )
 
-func initDebug(logger *slog.Logger) func() {
+func initDebug(logger *slog.Logger) func() error {
 	d, _ := os.Getwd()
 	traceFileName := fmt.Sprintf("trace-%d.out", time.Now().Unix())
 	tracePath := filepath.Join(d, traceFileName)
@@ -40,9 +40,9 @@ func initDebug(logger *slog.Logger) func() {
 	logger.Info("trace output at: " + tracePath)
 	logger.Info("***************************************************")
 
-	return func() {
+	return func() error {
 		logger.Info("Stopping trace", slog.String("file", tracePath))
 		trace.Stop()
-		fp.Close()
+		return fp.Close()
 	}
 }
