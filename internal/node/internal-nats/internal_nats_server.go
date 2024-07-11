@@ -172,6 +172,10 @@ func (s *InternalNatsServer) DestroyCredentials(id string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	if nc, ok := s.serverConfigData.Connections[id]; ok {
+		_ = nc.Drain()
+	}
+
 	delete(s.serverConfigData.Credentials, id)
 	delete(s.serverConfigData.Connections, id)
 
