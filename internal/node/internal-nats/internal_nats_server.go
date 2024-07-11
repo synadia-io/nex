@@ -3,6 +3,7 @@ package internalnats
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
@@ -47,6 +48,7 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 
 	data := &internalServerData{
 		Credentials:       map[string]*credentials{},
+		Connections:       map[string]*nats.Conn{},
 		NexHostUserPublic: hostPub,
 		NexHostUserSeed:   string(hostSeed),
 	}
@@ -130,14 +132,12 @@ func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error)
 	}
 	s.serverConfigData.Credentials[id] = creds
 
-	opts := &server.Options{
+	updated, err := updateNatsOptions(&server.Options{
 		ConfigFile: s.lastOpts.ConfigFile,
 		JetStream:  true,
 		Port:       s.lastOpts.Port,
 		StoreDir:   s.lastOpts.StoreDir,
-	}
-
-	updated, err := updateNatsOptions(opts, s.log, s.serverConfigData)
+	}, s.log, s.serverConfigData)
 	if err != nil {
 		s.log.Error("Failed to update NATS options in internal server", slog.Any("error", err))
 		return nil, err
@@ -149,11 +149,12 @@ func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error)
 		return nil, err
 	}
 
-	nc, err := s.ConnectionWithID(id)
+	nc, err := s.ConnectionWithCredentials(creds)
 	if err != nil {
 		s.log.Error("Failed to obtain connection for given credentials", slog.Any("error", err))
 		return nil, err
 	}
+	s.serverConfigData.Connections[id] = nc
 
 	_, err = ensureWorkloadObjectStore(nc)
 	if err != nil {
@@ -172,6 +173,7 @@ func (s *InternalNatsServer) DestroyCredentials(id string) error {
 	defer s.mutex.Unlock()
 
 	delete(s.serverConfigData.Credentials, id)
+	delete(s.serverConfigData.Connections, id)
 
 	updated, err := updateNatsOptions(&server.Options{
 		ConfigFile: s.lastOpts.ConfigFile,
@@ -238,6 +240,14 @@ func (s *InternalNatsServer) ConnectionWithID(id string) (*nats.Conn, error) {
 	}
 
 	return s.ConnectionWithCredentials(creds)
+}
+
+func (s *InternalNatsServer) ConnectionByID(id string) (*nats.Conn, error) {
+	if nc, ok := s.serverConfigData.Connections[id]; ok {
+		return nc, nil
+	}
+
+	return nil, fmt.Errorf("failed to resolve internal NATS connection for id: %s", id)
 }
 
 func (s *InternalNatsServer) ConnectionWithCredentials(creds *credentials) (*nats.Conn, error) {

@@ -467,7 +467,7 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 
 	w.log.Debug("Process started", slog.String("workload_id", id))
 
-	clientConn, err := w.natsint.ConnectionWithID(id)
+	clientConn, err := w.natsint.ConnectionByID(id)
 	if err != nil {
 		w.log.Error("Failed to resolve internal NATS connection for agent client", slog.Any("err", err))
 		return

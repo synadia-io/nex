@@ -5,10 +5,13 @@ import (
 	"context"
 	"log/slog"
 	"text/template"
+
+	"github.com/nats-io/nats.go"
 )
 
 type internalServerData struct {
 	Credentials       map[string]*credentials
+	Connections       map[string]*nats.Conn
 	NexHostUserPublic string
 	NexHostUserSeed   string
 }
