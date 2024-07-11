@@ -469,7 +469,7 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 
 	clientConn, err := w.natsint.ConnectionWithID(id)
 	if err != nil {
-		w.log.Error("Failed to start agent client", slog.Any("err", err))
+		w.log.Error("Failed to resolve internal NATS connection for agent client", slog.Any("err", err))
 		return
 	}
 
