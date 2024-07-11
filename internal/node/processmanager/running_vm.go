@@ -19,7 +19,6 @@ import (
 
 	"github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
-	"github.com/rs/xid"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	nexmodels "github.com/synadia-io/nex/internal/models"
@@ -89,8 +88,7 @@ func (vm *runningFirecracker) shutdown() {
 }
 
 // Create a VMM with a given set of options and start the VM
-func createAndStartVM(ctx context.Context, config *nexmodels.NodeConfiguration, log *slog.Logger) (*runningFirecracker, error) {
-	vmmID := xid.New().String()
+func createAndStartVM(ctx context.Context, vmmID string, config *nexmodels.NodeConfiguration, log *slog.Logger) (*runningFirecracker, error) {
 
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/rs/xid"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -155,19 +156,19 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 				time.Sleep(runloopSleepInterval)
 				continue
 			}
-
-			vm, err := createAndStartVM(context.TODO(), f.config, f.log)
-			if err != nil {
-				f.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
-				continue
-			}
-
-			workloadKey, err := f.intNats.CreateCredentials(vm.vmmID)
+			vmmID := xid.New().String()
+			workloadKey, err := f.intNats.CreateCredentials(vmmID)
 			if err != nil {
 				f.log.Error("Failed to create workload user", slog.Any("err", err))
 				continue
 			}
 			workloadSeed, _ := workloadKey.Seed()
+
+			vm, err := createAndStartVM(context.TODO(), vmmID, f.config, f.log)
+			if err != nil {
+				f.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
+				continue
+			}
 
 			err = f.setMetadata(vm, string(workloadSeed))
 			if err != nil {
