@@ -339,8 +339,6 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 			} else {
 				w.log.Warn("Failed to generate parsed time from nanos", slog.Any("error", err))
 			}
-		} else {
-			runtimeFriendly = uptimeFriendly
 		}
 
 		summaries = append(summaries, controlapi.MachineSummary{
