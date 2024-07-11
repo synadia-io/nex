@@ -322,10 +322,9 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 	for id, agentClient := range w.liveAgents {
 		deployRequest := agentClient.DeployRequest()
 
-		uptimeFriendly := "unknown"
-		runtimeFriendly := "unknown"
+		uptimeFriendly := myUptime(agentClient.UptimeMillis())
+		runtimeFriendly := "--"
 
-		uptimeFriendly = myUptime(agentClient.UptimeMillis())
 		if agentClient.WorkloadType() == controlapi.NexWorkloadV8 || agentClient.WorkloadType() == controlapi.NexWorkloadWasm {
 			nanoTime := fmt.Sprintf("%dns", agentClient.ExecTimeNanos())
 			rt, err := time.ParseDuration(nanoTime)
