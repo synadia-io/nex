@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	defaultAgentHandshakeTimeoutMillis  = 500
+	defaultAgentHandshakeTimeoutMillis  = 1000
 	runloopSleepInterval                = 250 * time.Millisecond
 	runloopTickInterval                 = 2500 * time.Millisecond
 	workloadExecutionSleepTimeoutMillis = 1000
@@ -385,14 +385,22 @@ func (a *Agent) initNATS() error {
 	}
 
 	pk, _ := pair.PublicKey()
-	a.nc, err = nats.Connect(url, nats.Nkey(pk, func(b []byte) ([]byte, error) {
-		fmt.Fprintf(os.Stdout, "Attempting to sign NATS server nonce for internal NATS connection; public key: %s", pk)
-		return pair.Sign(b)
-	}))
+	for attempt := 0; attempt < 3; attempt++ {
+		a.nc, err = nats.Connect(url, nats.Nkey(pk, func(b []byte) ([]byte, error) {
+			fmt.Fprintf(os.Stdout, "Attempting to authenticate to internal NATS as %s", pk)
+			return pair.Sign(b)
+		}))
+		if err != nil {
+			time.Sleep(100 * time.Millisecond)
+		} else {
+			break
+		}
+	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to connect to shared NATS: %s", err)
+		fmt.Fprintf(os.Stderr, "failed to connect to internal NATS: %s", err)
 		return err
 	}
+
 	fmt.Printf("Connected to internal NATS: %s\n", url)
 
 	js, err := a.nc.JetStream()
