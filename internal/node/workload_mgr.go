@@ -229,6 +229,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
+		delete(w.poolAgents, workloadID)
 		return fmt.Errorf("failed to submit request for workload deployment: %s", err)
 	}
 
@@ -685,10 +686,6 @@ func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
-	if len(w.poolAgents) == 0 {
-		return nil, errors.New("no available agent client in pool")
-	}
-
 	// there might be a slightly faster version of this, but this effectively
 	// gives us a random pick among the map elements
 	for _, agentClient := range w.poolAgents {
@@ -700,7 +697,7 @@ func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 		return agentClient, nil
 	}
 
-	return nil, nil
+	return nil, errors.New("no available agent client in pool")
 }
 
 func (w *WorkloadManager) TotalRunningWorkloadBytes() uint64 {
