@@ -31,7 +31,10 @@ func setConditionalCommands() {
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger, keypair nkeys.KeyPair) error {
-	tShutdown := initDebug(logger)
+	tShutdown, err := initDebug(logger)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		err := tShutdown()
 		if err != nil {
@@ -40,7 +43,7 @@ func RunNodeUp(ctx context.Context, logger *slog.Logger, keypair nkeys.KeyPair) 
 	}()
 
 	ctx, cancel := context.WithCancel(newContext(ctx))
-	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, keypair, logger)
+	err = nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, keypair, logger)
 	if err != nil {
 		return err
 	}

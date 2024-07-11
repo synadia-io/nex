@@ -14,8 +14,12 @@ import (
 	_ "net/http/pprof"
 )
 
-func initDebug(logger *slog.Logger) func() error {
-	d, _ := os.Getwd()
+func initDebug(logger *slog.Logger) (func() error, error) {
+	d, err := os.Getwd()
+	if err != nil {
+		logger.Error("Failed to determine CWD", slog.Any("err", err))
+		return nil, err
+	}
 	traceFileName := fmt.Sprintf("trace-%d.out", time.Now().Unix())
 	tracePath := filepath.Join(d, traceFileName)
 
@@ -25,14 +29,14 @@ func initDebug(logger *slog.Logger) func() error {
 
 	fp, err := os.Create(tracePath)
 	if err != nil {
-		fmt.Println("Error creating trace file: ", err)
-		os.Exit(1)
+		logger.Error("Error creating trace file", slog.Any("err", err))
+		return nil, err
 	}
 
 	err = trace.Start(fp)
 	if err != nil {
-		fmt.Println("Error starting trace: ", err)
-		os.Exit(1)
+		logger.Error("Error starting trace", slog.Any("err", err))
+		return nil, err
 	}
 
 	logger.Info("******************* DEBUG BUILD *******************")
@@ -44,5 +48,5 @@ func initDebug(logger *slog.Logger) func() error {
 		logger.Info("Stopping trace", slog.String("file", tracePath))
 		trace.Stop()
 		return fp.Close()
-	}
+	}, nil
 }
