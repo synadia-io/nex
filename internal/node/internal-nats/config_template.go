@@ -80,7 +80,7 @@ trace: false
 `
 )
 
-func GenerateTemplate(log *slog.Logger, config internalServerData) ([]byte, error) {
+func GenerateTemplate(log *slog.Logger, config *internalServerData) ([]byte, error) {
 	var wr bytes.Buffer
 
 	t := template.Must(template.New("natsconfig").Parse(configTemplate))

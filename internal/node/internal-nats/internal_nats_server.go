@@ -29,7 +29,7 @@ type InternalNatsServer struct {
 	lastOpts         *server.Options
 	mutex            *sync.Mutex
 	server           *server.Server
-	serverConfigData internalServerData
+	serverConfigData *internalServerData
 }
 
 func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool) (*InternalNatsServer, error) {
@@ -41,16 +41,15 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 		Trace:     trace,
 	}
 
-	data := internalServerData{
-		Credentials: map[string]*credentials{},
-	}
-
 	hostUser, _ := nkeys.CreateUser()
 	hostPub, _ := hostUser.PublicKey()
 	hostSeed, _ := hostUser.Seed()
 
-	data.NexHostUserPublic = hostPub
-	data.NexHostUserSeed = string(hostSeed)
+	data := &internalServerData{
+		Credentials:       map[string]*credentials{},
+		NexHostUserPublic: hostPub,
+		NexHostUserSeed:   string(hostSeed),
+	}
 
 	opts, err := updateNatsOptions(opts, log, data)
 	if err != nil {
@@ -92,11 +91,11 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 
 	internalServer := InternalNatsServer{
 		ncInternal:       ncInternal,
-		serverConfigData: data,
 		log:              log,
 		lastOpts:         opts,
 		mutex:            &sync.Mutex{},
 		server:           s,
+		serverConfigData: data,
 	}
 
 	return &internalServer, nil
@@ -302,10 +301,11 @@ func ensureWorkloadObjectStore(nc *nats.Conn) (jetstream.ObjectStore, error) {
 			return nil, err
 		}
 	}
+
 	return bucket, nil
 }
 
-func updateNatsOptions(opts *server.Options, log *slog.Logger, data internalServerData) (*server.Options, error) {
+func updateNatsOptions(opts *server.Options, log *slog.Logger, data *internalServerData) (*server.Options, error) {
 	bytes, err := GenerateTemplate(log, data)
 	if err != nil {
 		log.Error("Failed to generate internal nats server config file", slog.Any("error", err))
