@@ -150,7 +150,7 @@ func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error)
 		return nil, err
 	}
 
-	nc, err := s.ConnectionWithCredentials(creds)
+	nc, err := s.ConnectionWithID(id)
 	if err != nil {
 		s.log.Error("Failed to obtain connection for given credentials", slog.Any("error", err))
 		return nil, err

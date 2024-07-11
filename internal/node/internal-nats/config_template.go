@@ -2,6 +2,7 @@ package internalnats
 
 import (
 	"bytes"
+	"context"
 	"log/slog"
 	"text/template"
 )
@@ -89,6 +90,6 @@ func GenerateTemplate(log *slog.Logger, config internalServerData) ([]byte, erro
 	}
 
 	// -8 is equivalent to TRACE-ish level
-	log.Debug("generated NATS config", slog.String("config", wr.String()))
+	log.Log(context.Background(), -8, "generated NATS config", slog.String("config", wr.String()))
 	return wr.Bytes(), nil
 }

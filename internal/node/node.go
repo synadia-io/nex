@@ -372,6 +372,7 @@ func (n *Node) handleAutostarts() {
 			n.log.Error("Failed to create deployment request for autostart workload",
 				slog.Any("error", err),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
 
@@ -384,6 +385,7 @@ func (n *Node) handleAutostarts() {
 			n.log.Error("Failed to validate autostart deployment request",
 				slog.Any("error", err),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
 
@@ -396,6 +398,7 @@ func (n *Node) handleAutostarts() {
 				slog.String("namespace", autostart.Namespace),
 				slog.String("url", autostart.Location),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
 
@@ -410,6 +413,7 @@ func (n *Node) handleAutostarts() {
 				slog.String("name", autostart.Name),
 				slog.String("namespace", autostart.Namespace),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
 

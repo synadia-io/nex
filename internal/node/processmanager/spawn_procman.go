@@ -32,9 +32,10 @@ type SpawningProcessManager struct {
 	stopMutexes map[string]*sync.Mutex
 	t           *observability.Telemetry
 
-	liveProcs map[string]*spawnedProcess
-	warmProcs chan *spawnedProcess
-	intNats   *internalnats.InternalNatsServer
+	allProcs  map[string]*spawnedProcess
+	poolProcs chan *spawnedProcess
+
+	natsint *internalnats.InternalNatsServer
 
 	delegate       ProcessDelegate
 	deployRequests map[string]*agentapi.DeployRequest
@@ -66,7 +67,7 @@ func NewSpawningProcessManager(
 	return &SpawningProcessManager{
 		config:  config,
 		ctx:     ctx,
-		intNats: intNats,
+		natsint: intNats,
 		log:     log,
 		mutex:   &sync.Mutex{},
 		t:       telemetry,
@@ -74,8 +75,8 @@ func NewSpawningProcessManager(
 		stopMutexes: make(map[string]*sync.Mutex),
 
 		deployRequests: make(map[string]*agentapi.DeployRequest),
-		liveProcs:      make(map[string]*spawnedProcess),
-		warmProcs:      make(chan *spawnedProcess, config.MachinePoolSize),
+		allProcs:       make(map[string]*spawnedProcess),
+		poolProcs:      make(chan *spawnedProcess, config.MachinePoolSize),
 	}, nil
 }
 
@@ -83,7 +84,7 @@ func NewSpawningProcessManager(
 func (s *SpawningProcessManager) ListProcesses() ([]ProcessInfo, error) {
 	pinfos := make([]ProcessInfo, 0)
 
-	for workloadID, proc := range s.liveProcs {
+	for workloadID, proc := range s.allProcs {
 		// Ignore pending "unprepared" processes that don't have workloads on them yet
 		if proc.deployRequest != nil {
 			pinfo := ProcessInfo{
@@ -113,7 +114,7 @@ func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployReques
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	proc := <-s.warmProcs
+	proc := <-s.poolProcs
 	if proc == nil {
 		return fmt.Errorf("could not prepare workload, no available agent process")
 	}
@@ -131,7 +132,7 @@ func (s *SpawningProcessManager) Stop() error {
 	if atomic.AddUint32(&s.closing, 1) == 1 {
 		s.log.Info("Spawning process manager stopping")
 
-		for workloadID := range s.liveProcs {
+		for workloadID := range s.allProcs {
 			err := s.StopProcess(workloadID)
 			if err != nil {
 				s.log.Warn("Failed to stop spawned agent process",
@@ -155,7 +156,7 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 		case <-s.ctx.Done():
 			return nil
 		default:
-			if len(s.warmProcs) == s.config.MachinePoolSize {
+			if len(s.poolProcs) == s.config.MachinePoolSize {
 				time.Sleep(runloopSleepInterval)
 				continue
 			}
@@ -167,7 +168,7 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 				continue
 			}
 
-			s.liveProcs[p.ID] = p
+			s.allProcs[p.ID] = p
 			s.stopMutexes[p.ID] = &sync.Mutex{}
 
 			go s.delegate.OnProcessStarted(p.ID)
@@ -175,7 +176,7 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 			s.log.Info("Adding new agent process to warm pool",
 				slog.String("workload_id", p.ID))
 
-			s.warmProcs <- p // If the pool is full, this line will block until a slot is available.
+			s.poolProcs <- p // If the pool is full, this line will block until a slot is available.
 		}
 	}
 
@@ -187,7 +188,7 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	proc, exists := s.liveProcs[workloadID]
+	proc, exists := s.allProcs[workloadID]
 	if !exists {
 		return fmt.Errorf("failed to stop process %s. No such process", workloadID)
 	}
@@ -205,7 +206,7 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 		return err
 	}
 
-	delete(s.liveProcs, workloadID)
+	delete(s.allProcs, workloadID)
 	delete(s.stopMutexes, workloadID)
 
 	return nil
@@ -213,14 +214,14 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 
 // Looks up an agent process. A non-existent agent process returns (nil, nil), not
 // an error
-func (s *SpawningProcessManager) Lookup(workloadID string) (*agentapi.DeployRequest, error) {
-	if request, ok := s.deployRequests[workloadID]; ok {
-		return request, nil
-	}
+// func (s *SpawningProcessManager) Lookup(workloadID string) (*agentapi.DeployRequest, error) {
+// 	if request, ok := s.deployRequests[workloadID]; ok {
+// 		return request, nil
+// 	}
 
-	// Per contract, a non-prepared workload returns nil, not error
-	return nil, nil
-}
+// 	// Per contract, a non-prepared workload returns nil, not error
+// 	return nil, nil
+// }
 
 // Checks if the process manager is stopping
 func (s *SpawningProcessManager) stopping() bool {
@@ -232,7 +233,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	id := xid.New()
 	workloadID := id.String()
 
-	kp, err := s.intNats.CreateCredentials(workloadID)
+	kp, err := s.natsint.CreateCredentials(workloadID)
 	if err != nil {
 		return nil, err
 	}

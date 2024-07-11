@@ -13,6 +13,7 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
+	controlapi "github.com/synadia-io/nex/control-api"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -56,8 +57,11 @@ type AgentClient struct {
 	execTotalNanos    int64
 	workloadStartedAt time.Time
 
+	deployRequest *DeployRequest
 	workloadBytes uint64
 	subz          []*nats.Subscription
+
+	selected bool // FIXME-- rename...
 }
 
 func NewAgentClient(
@@ -139,7 +143,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		slog.String("status", status.String()))
 
 	subject := fmt.Sprintf("agentint.%s.deploy", a.agentID)
-	resp, err := a.nc.Request(subject, bytes, 10*time.Second)
+	resp, err := a.nc.Request(subject, bytes, 5*time.Second)
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return nil, errors.New("timed out waiting for acknowledgement of workload deployment")
@@ -155,6 +159,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		return nil, err
 	}
 
+	a.deployRequest = request
 	a.workloadStartedAt = time.Now().UTC()
 	a.workloadBytes = uint64(request.TotalBytes)
 	return &deployResponse, nil
@@ -243,6 +248,24 @@ func (a *AgentClient) UptimeMillis() time.Duration {
 	return time.Since(a.workloadStartedAt)
 }
 
+func (a *AgentClient) DeployRequest() *DeployRequest {
+	return a.deployRequest
+}
+
+func (a *AgentClient) IsSelected() bool {
+	return a.selected
+}
+
+func (a *AgentClient) MarkSelected() {
+	// make sure not to call this anywhere other than SelectRandomAgent()!!!
+	a.selected = true
+}
+
+func (a *AgentClient) MarkUnselected() {
+	// make sure not to call this anywhere other than SelectRandomAgent()!!!
+	a.selected = false
+}
+
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
 	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
 	intmsg.Header.Add(NexTriggerSubject, subject)
@@ -260,6 +283,10 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 	childSpan.End()
 
 	return resp, err
+}
+
+func (a *AgentClient) WorkloadType() controlapi.NexWorkload {
+	return a.deployRequest.WorkloadType
 }
 
 func (a *AgentClient) awaitHandshake(agentID string) {

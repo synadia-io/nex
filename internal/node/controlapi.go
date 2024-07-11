@@ -487,8 +487,8 @@ func (api *ApiListener) handleStop(ctx context.Context, span trace.Span, m *nats
 		return
 	}
 
-	deployRequest, _ := api.mgr.LookupWorkload(request.WorkloadId)
-	if deployRequest == nil {
+	deployRequest, err := api.mgr.LookupWorkload(request.WorkloadId)
+	if err != nil {
 		span.SetStatus(codes.Error, "No such workload")
 		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadId))
 		respondFail(controlapi.StopResponseType, m, "No such workload")
@@ -654,7 +654,7 @@ func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats
 	}
 
 	res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
-		AvailableAgents:        len(api.mgr.pendingAgents),
+		AvailableAgents:        len(api.mgr.poolAgents),
 		Machines:               namespaceWorkloads,
 		Memory:                 stats,
 		PublicXKey:             pubX,
@@ -676,7 +676,7 @@ func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats
 
 func (api *ApiListener) exceedsMaxWorkloadCount() bool {
 	return api.node.config.NodeLimits.MaxWorkloads > 0 &&
-		len(api.mgr.activeAgents) >= api.node.config.NodeLimits.MaxWorkloads
+		len(api.mgr.liveAgents) >= api.node.config.NodeLimits.MaxWorkloads
 }
 
 func (api *ApiListener) exceedsMaxWorkloadSize(bytes uint64) bool {
