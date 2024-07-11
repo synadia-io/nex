@@ -43,7 +43,7 @@ func TestTemplateGenerator(t *testing.T) {
 		}
 	}
 
-	bytes, err := GenerateTemplate(slog.Default(), data)
+	bytes, err := GenerateTemplate(slog.Default(), &data)
 	if err != nil {
 		t.Fatalf("failed to render template: %s", err)
 	}
