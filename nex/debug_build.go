@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -13,14 +14,10 @@ import (
 	_ "net/http/pprof"
 )
 
-func init() {
+func initDebug(logger *slog.Logger) func() {
 	d, _ := os.Getwd()
 	traceFileName := fmt.Sprintf("trace-%d.out", time.Now().Unix())
 	tracePath := filepath.Join(d, traceFileName)
-	fmt.Println("******************* DEBUG BUILD *******************")
-	fmt.Println("pprof server started at :6060")
-	fmt.Println("trace output at: " + tracePath)
-	fmt.Println("***************************************************")
 
 	go func() {
 		fmt.Println(http.ListenAndServe(":6060", nil))
@@ -29,14 +26,23 @@ func init() {
 	fp, err := os.Create(tracePath)
 	if err != nil {
 		fmt.Println("Error creating trace file: ", err)
-		return
+		os.Exit(1)
 	}
-	defer fp.Close()
 
 	err = trace.Start(fp)
 	if err != nil {
 		fmt.Println("Error starting trace: ", err)
-		return
+		os.Exit(1)
 	}
-	defer trace.Stop()
+
+	logger.Info("******************* DEBUG BUILD *******************")
+	logger.Info("pprof server started at :6060")
+	logger.Info("trace output at: " + tracePath)
+	logger.Info("***************************************************")
+
+	return func() {
+		logger.Info("Stopping trace", slog.String("file", tracePath))
+		trace.Stop()
+		fp.Close()
+	}
 }
