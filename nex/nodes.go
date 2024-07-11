@@ -139,7 +139,7 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 
 		t.SetTitle("Workloads")
 		t.Style().Title.Align = text.AlignCenter
-		t.AppendHeader(table.Row{"", "ID", "Type", "Name", "Runtime"})
+		t.AppendHeader(table.Row{"", "ID", "Type", "Name", "Uptime", "Runtime"})
 
 		for _, m := range info.Machines {
 			health := func() string {
@@ -149,7 +149,7 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 				return "🔴"
 			}()
 
-			t.AppendRow(table.Row{health, m.Id, m.Workload.WorkloadType, m.Workload.Name, m.Workload.Runtime})
+			t.AppendRow(table.Row{health, m.Id, m.Workload.WorkloadType, m.Workload.Name, m.Workload.Uptime, m.Workload.Runtime})
 		}
 
 		fmt.Println(t.Render())

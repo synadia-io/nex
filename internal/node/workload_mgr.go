@@ -233,6 +233,10 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 	}
 
 	if deployResponse.Accepted {
+		w.log.Debug("Workload manager deploy attempt accepted",
+			slog.String("workload_id", workloadID),
+		)
+
 		// move the client from active to pending
 		w.activeAgents[workloadID] = agentClient
 		delete(w.pendingAgents, workloadID)
@@ -345,9 +349,10 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 			Workload: controlapi.WorkloadSummary{
 				Name:         p.Name,
 				Description:  *p.DeployRequest.Description,
-				Runtime:      runtimeFriendly,
-				WorkloadType: p.DeployRequest.WorkloadType,
 				Hash:         p.DeployRequest.Hash,
+				Runtime:      runtimeFriendly,
+				Uptime:       uptimeFriendly,
+				WorkloadType: p.DeployRequest.WorkloadType,
 			},
 		}
 	}

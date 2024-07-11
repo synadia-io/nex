@@ -120,9 +120,10 @@ type MachineSummary struct { // FIXME-- rename to workload summary?
 type WorkloadSummary struct {
 	Name         string      `json:"name"`
 	Description  string      `json:"description,omitempty"`
-	Runtime      string      `json:"runtime"`
-	WorkloadType NexWorkload `json:"type"`
 	Hash         string      `json:"hash"`
+	Runtime      string      `json:"runtime"`
+	Uptime       string      `json:"uptime"`
+	WorkloadType NexWorkload `json:"type"`
 }
 
 type Envelope struct {
