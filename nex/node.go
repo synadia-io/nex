@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"log/slog"
-	"os"
-	"runtime/trace"
 
 	"github.com/nats-io/nkeys"
 	nexnode "github.com/synadia-io/nex/internal/node"
@@ -13,7 +11,6 @@ import (
 func setConditionalCommands() {
 	nodeUp = nodes.Command("up", "Starts a Nex node")
 	nodeUp.Flag("config", "configuration file for the node").Default("./config.json").StringVar(&NodeOpts.ConfigFilepath)
-	nodeUp.Flag("execution_trace", "file for writing execution trace").StringVar(&NodeOpts.ExecutionTrace)
 	nodeUp.Flag("metrics", "enable open telemetry metrics endpoint").Default("false").UnNegatableBoolVar(&NodeOpts.OtelMetrics)
 	nodeUp.Flag("metrics_port", "enable open telemetry metrics endpoint").Default("8085").IntVar(&NodeOpts.OtelMetricsPort)
 	nodeUp.Flag("otel_metrics_exporter", "OTel exporter for metrics").Default("file").EnumVar(&NodeOpts.OtelMetricsExporter, "file", "prometheus")
@@ -34,27 +31,13 @@ func setConditionalCommands() {
 }
 
 func RunNodeUp(ctx context.Context, logger *slog.Logger, keypair nkeys.KeyPair) error {
-	if NodeOpts.ExecutionTrace != "" {
-		fp, err := os.Create(NodeOpts.ExecutionTrace)
-		if err != nil {
-			return err
-		}
-		defer fp.Close()
-
-		err = trace.Start(fp)
-		if err != nil {
-			return err
-		}
-		defer trace.Stop()
-	}
-
 	ctx, cancel := context.WithCancel(newContext(ctx))
 	err := nexnode.CmdUp(Opts, NodeOpts, ctx, cancel, keypair, logger)
 	if err != nil {
 		return err
 	}
-	<-ctx.Done()
 
+	<-ctx.Done()
 	return nil
 }
 
