@@ -257,12 +257,10 @@ func (a *AgentClient) IsSelected() bool {
 }
 
 func (a *AgentClient) MarkSelected() {
-	// make sure not to call this anywhere other than SelectRandomAgent()!!!
 	a.selected = true
 }
 
 func (a *AgentClient) MarkUnselected() {
-	// make sure not to call this anywhere other than SelectRandomAgent()!!!
 	a.selected = false
 }
 
