@@ -24,6 +24,7 @@ type Wasm struct {
 	runtime       wazero.Runtime
 	runtimeConfig wazero.ModuleConfig
 	module        wazero.CompiledModule
+	tmpFile       string
 
 	fail chan bool
 	run  chan bool
@@ -92,7 +93,7 @@ func (e *Wasm) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 }
 
 func (e *Wasm) Undeploy() error {
-	// We shouldn't have to do anything here since the wasm "owns" no resources
+	_ = os.Remove(e.tmpFile)
 	return nil
 }
 
@@ -157,7 +158,8 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 		run:  params.Run,
 		exit: params.Exit,
 
-		nc: params.NATSConn,
+		nc:      params.NATSConn,
+		tmpFile: *params.TmpFilename,
 	}, nil
 }
 

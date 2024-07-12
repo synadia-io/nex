@@ -5,10 +5,13 @@ import (
 	"context"
 	"log/slog"
 	"text/template"
+
+	"github.com/nats-io/nats.go"
 )
 
 type internalServerData struct {
 	Credentials       map[string]*credentials
+	Connections       map[string]*nats.Conn
 	NexHostUserPublic string
 	NexHostUserSeed   string
 }
@@ -29,7 +32,6 @@ type credentials struct {
 const (
 	configTemplate = `
 jetstream: true
-
 accounts: {
 	nexhost: {
 		jetstream: true		
@@ -76,12 +78,12 @@ accounts: {
 	{{ end }}
 }
 no_sys_acc: true
-debug: false
+debug: true
 trace: false
 `
 )
 
-func GenerateTemplate(log *slog.Logger, config internalServerData) ([]byte, error) {
+func GenerateTemplate(log *slog.Logger, config *internalServerData) ([]byte, error) {
 	var wr bytes.Buffer
 
 	t := template.Must(template.New("natsconfig").Parse(configTemplate))

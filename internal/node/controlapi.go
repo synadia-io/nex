@@ -16,6 +16,7 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/pkg/errors"
 	controlapi "github.com/synadia-io/nex/control-api"
+	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -330,16 +331,38 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		return
 	}
 
-	agentClient, err := api.mgr.SelectRandomAgent()
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		api.log.Error("Failed to get agent client from pool", slog.Any("err", err))
-		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to get agent client from pool: %s", err))
-		return
+	var agentClient *agentapi.AgentClient
+
+	retry := 0
+	for agentClient == nil {
+		agentClient, err = api.mgr.SelectRandomAgent()
+		if err != nil {
+			api.log.Warn("Failed to resolve agent for attempted deploy",
+				slog.String("error", err.Error()),
+			)
+
+			retry += 1
+			if retry > agentPoolRetryMax-1 {
+				api.log.Error("Exceeded warm agent retrieval retry count during attempted deploy",
+					slog.Int("allowed_retries", agentPoolRetryMax),
+				)
+
+				span.SetStatus(codes.Error, err.Error())
+				api.log.Error("Failed to get agent client from pool", slog.Any("err", err))
+				respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to get agent client from pool: %s", err))
+				return
+			}
+
+			time.Sleep(time.Millisecond * 100)
+		}
 	}
 
 	workloadID := agentClient.ID()
 	span.SetAttributes(attribute.String("workload_id", workloadID))
+
+	api.log.Debug("Resolved warm agent for attempted deploy",
+		slog.String("workload_id", workloadID),
+	)
 
 	span.AddEvent("Started workload download")
 	numBytes, workloadHash, err := api.mgr.CacheWorkload(workloadID, &request)
@@ -350,11 +373,13 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		return
 	}
 	span.AddEvent("Completed workload download")
+
 	if api.exceedsMaxWorkloadSize(numBytes) {
 		span.SetStatus(codes.Error, "Workload file size is too big")
 		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node limitations")
 		return
 	}
+
 	if api.exceedsPerNodeWorkloadSizeMax(numBytes) {
 		span.SetStatus(codes.Error, "Workload file size exceeds node limitations")
 		respondFail(controlapi.RunResponseType, m, "Workload file size would exceed node total limitations")
@@ -367,6 +392,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		Info("Submitting workload to agent",
 			slog.String("namespace", namespace),
 			slog.String("workload", *agentDeployRequest.WorkloadName),
+			slog.String("workload_id", workloadID),
 			slog.Uint64("workload_size", numBytes),
 			slog.String("workload_sha256", *workloadHash),
 			slog.String("type", string(request.WorkloadType)),
@@ -461,8 +487,8 @@ func (api *ApiListener) handleStop(ctx context.Context, span trace.Span, m *nats
 		return
 	}
 
-	deployRequest, _ := api.mgr.LookupWorkload(request.WorkloadId)
-	if deployRequest == nil {
+	deployRequest, err := api.mgr.LookupWorkload(request.WorkloadId)
+	if err != nil {
 		span.SetStatus(codes.Error, "No such workload")
 		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadId))
 		respondFail(controlapi.StopResponseType, m, "No such workload")
@@ -596,25 +622,46 @@ func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats
 		return
 	}
 
-	machines, err := api.mgr.RunningWorkloads()
+	workloads, err := api.mgr.RunningWorkloads()
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		api.log.Error("Failed to query running machines", slog.Any("error", err))
-		respondFail(controlapi.PingResponseType, m, "Failed to query running machines on node")
+		api.log.Error("Failed to query running workloads", slog.Any("error", err))
+		respondFail(controlapi.InfoResponseType, m, "Failed to query running workloads on node")
 		return
 	}
 
-	pubX, _ := api.xk.PublicKey()
-	now := time.Now().UTC()
-	stats, _ := ReadMemoryStats()
+	namespaceWorkloads := make([]controlapi.MachineSummary, 0)
+	for _, w := range workloads {
+		if strings.EqualFold(w.Namespace, namespace) {
+			namespaceWorkloads = append(namespaceWorkloads, w)
+		}
+	}
+
+	pubX, err := api.xk.PublicKey()
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		api.log.Error("Failed to query running workloads", slog.Any("error", err))
+		respondFail(controlapi.InfoResponseType, m, "Failed to query running workloads on node")
+		return
+	}
+
+	stats, err := ReadMemoryStats()
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		api.log.Error("Failed to query running workloads", slog.Any("error", err))
+		respondFail(controlapi.InfoResponseType, m, "Failed to query running workloads on node")
+		return
+	}
+
 	res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
-		Version:                VERSION,
-		PublicXKey:             pubX,
-		Uptime:                 myUptime(now.Sub(api.start)),
-		Tags:                   api.node.config.Tags,
-		SupportedWorkloadTypes: api.node.config.WorkloadTypes,
-		Machines:               summarizeMachines(machines, namespace), // filters by namespace
+		AvailableAgents:        len(api.mgr.poolAgents),
+		Machines:               namespaceWorkloads,
 		Memory:                 stats,
+		PublicXKey:             pubX,
+		SupportedWorkloadTypes: api.node.config.WorkloadTypes,
+		Tags:                   api.node.config.Tags,
+		Uptime:                 myUptime(time.Now().UTC().Sub(api.start)),
+		Version:                VERSION,
 	}, nil)
 
 	raw, err := json.Marshal(res)
@@ -629,7 +676,7 @@ func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats
 
 func (api *ApiListener) exceedsMaxWorkloadCount() bool {
 	return api.node.config.NodeLimits.MaxWorkloads > 0 &&
-		len(api.mgr.activeAgents) >= api.node.config.NodeLimits.MaxWorkloads
+		len(api.mgr.liveAgents) >= api.node.config.NodeLimits.MaxWorkloads
 }
 
 func (api *ApiListener) exceedsMaxWorkloadSize(bytes uint64) bool {
@@ -640,16 +687,6 @@ func (api *ApiListener) exceedsMaxWorkloadSize(bytes uint64) bool {
 func (api *ApiListener) exceedsPerNodeWorkloadSizeMax(bytes uint64) bool {
 	return api.node.config.NodeLimits.MaxTotalBytes > 0 &&
 		bytes+api.mgr.TotalRunningWorkloadBytes() > uint64(api.node.config.NodeLimits.MaxTotalBytes)
-}
-
-func summarizeMachines(workloads []controlapi.MachineSummary, namespace string) []controlapi.MachineSummary {
-	machines := make([]controlapi.MachineSummary, 0)
-	for _, w := range workloads {
-		if strings.EqualFold(w.Namespace, namespace) {
-			machines = append(machines, w)
-		}
-	}
-	return machines
 }
 
 func summarizeMachinesForPing(workloads []controlapi.MachineSummary, namespace string, workloadId string) []controlapi.WorkloadPingMachineSummary {

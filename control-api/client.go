@@ -79,6 +79,7 @@ func (api *Client) StartWorkload(request *DeployRequest) (*RunResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &response, nil
 }
 
@@ -394,6 +395,7 @@ func handleLogEntry(api *Client, ch chan EmittedLog) func(m *nats.Msg) {
 func (api *Client) performRequest(subject string, raw interface{}) ([]byte, error) {
 	var bytes []byte
 	var err error
+
 	if raw == nil {
 		bytes = []byte{}
 	} else {
@@ -407,13 +409,16 @@ func (api *Client) performRequest(subject string, raw interface{}) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
+
 	env, err := extractEnvelope(resp.Data)
 	if err != nil {
 		return nil, err
 	}
+
 	if env.Error != nil {
 		return nil, fmt.Errorf("%v", env.Error)
 	}
+
 	return json.Marshal(env.Data)
 }
 
@@ -421,10 +426,12 @@ func extractEnvelope(data []byte) (*Envelope, error) {
 	if len(data) == 0 {
 		return nil, errors.New("no data for envelope")
 	}
+
 	var env Envelope
 	err := json.Unmarshal(data, &env)
 	if err != nil {
 		return nil, err
 	}
+
 	return &env, nil
 }

@@ -89,7 +89,6 @@ func (vm *runningFirecracker) shutdown() {
 
 // Create a VMM with a given set of options and start the VM
 func createAndStartVM(ctx context.Context, vmmID string, config *nexmodels.NodeConfiguration, log *slog.Logger) (*runningFirecracker, error) {
-
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
 	if err != nil {
 		log.Error("Failed to generate firecracker configuration", slog.Any("config", config))

@@ -45,7 +45,10 @@ func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *sl
 		nexVer = config.PreflightInstallVersion
 	}
 
-	logger.Debug("using nex version", slog.String("version", nexVer))
+	logger.Debug("Using nex preflight install version",
+		slog.String("version", nexVer),
+		slog.String("bin_path", strings.Join(config.BinPath, string(os.PathListSeparator))),
+	)
 
 	required, err := preflightInit(nexVer, config, logger)
 	if errors.Is(err, ErrNoSandboxRequired) {
@@ -63,6 +66,7 @@ func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *sl
 			if r.satisfied {
 				continue
 			}
+
 			if r.nosandbox == config.NoSandbox {
 				if di == 0 && config.PreflightVerbose {
 					sb.WriteString(fmt.Sprintf("Validating - %s\n", magenta(r.description)))
@@ -83,6 +87,7 @@ func Preflight(ctx context.Context, config *models.NodeConfiguration, logger *sl
 				r.satisfied = true
 			}
 		}
+
 		if !r.satisfied {
 			sb.WriteString(fmt.Sprintf("⛔ Dependency Missing - %s\n", cyan(r.description)))
 		}

@@ -35,9 +35,6 @@ type ProcessManager interface {
 	// Returns a list of agent processes in an implementation-agnostic format
 	ListProcesses() ([]ProcessInfo, error)
 
-	// Lookup a deploy request by id. Returns nil when attempting to lookup an "unprepared" workload
-	Lookup(id string) (*agentapi.DeployRequest, error)
-
 	// Associate a deploy request with the given workload id, and perform any
 	// just in time initialization of resources if necessary
 	PrepareWorkload(id string, request *agentapi.DeployRequest) error

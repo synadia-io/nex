@@ -3,11 +3,13 @@ package internalnats
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 	"path"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
@@ -17,17 +19,18 @@ import (
 )
 
 const (
-	defaultInternalNatsConfigFile = "internalconf"
-	workloadCacheBucketName       = "NEXCACHE"
-	workloadCacheFileKey          = "workload"
+	defaultInternalNatsConfigFile             = "internalconf"
+	defaultInternalNatsConnectionDrainTimeout = time.Millisecond * 5000
+	workloadCacheBucketName                   = "NEXCACHE"
 )
 
 type InternalNatsServer struct {
 	ncInternal       *nats.Conn
 	log              *slog.Logger
 	lastOpts         *server.Options
+	mutex            *sync.Mutex
 	server           *server.Server
-	serverConfigData internalServerData
+	serverConfigData *internalServerData
 }
 
 func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool) (*InternalNatsServer, error) {
@@ -39,16 +42,16 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 		Trace:     trace,
 	}
 
-	data := internalServerData{
-		Credentials: map[string]*credentials{},
-	}
-
 	hostUser, _ := nkeys.CreateUser()
 	hostPub, _ := hostUser.PublicKey()
 	hostSeed, _ := hostUser.Seed()
 
-	data.NexHostUserPublic = hostPub
-	data.NexHostUserSeed = string(hostSeed)
+	data := &internalServerData{
+		Credentials:       map[string]*credentials{},
+		Connections:       map[string]*nats.Conn{},
+		NexHostUserPublic: hostPub,
+		NexHostUserSeed:   string(hostSeed),
+	}
 
 	opts, err := updateNatsOptions(opts, log, data)
 	if err != nil {
@@ -71,10 +74,16 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 	}
 
 	// This connection uses the `nexhost` account, specifically provisioned for the node
-	ncInternal, err := nats.Connect(s.ClientURL(), nats.Nkey(data.NexHostUserPublic, func(b []byte) ([]byte, error) {
-		log.Debug("Attempting to sign NATS server nonce for internal host connection", slog.String("public_key", data.NexHostUserPublic))
-		return hostUser.Sign(b)
-	}))
+	ncInternal, err := nats.Connect(s.ClientURL(),
+		nats.DrainTimeout(defaultInternalNatsConnectionDrainTimeout),
+		nats.Nkey(
+			data.NexHostUserPublic,
+			func(b []byte) ([]byte, error) {
+				log.Debug("Attempting to sign NATS server nonce for internal host connection", slog.String("public_key", data.NexHostUserPublic))
+				return hostUser.Sign(b)
+			},
+		),
+	)
 	if err != nil {
 		server.PrintAndDie(err.Error())
 		return nil, err
@@ -84,10 +93,11 @@ func NewInternalNatsServer(log *slog.Logger, storeDir string, debug, trace bool)
 
 	internalServer := InternalNatsServer{
 		ncInternal:       ncInternal,
-		serverConfigData: data,
 		log:              log,
 		lastOpts:         opts,
+		mutex:            &sync.Mutex{},
 		server:           s,
+		serverConfigData: data,
 	}
 
 	return &internalServer, nil
@@ -103,6 +113,9 @@ func (s *InternalNatsServer) Subsz(opts *server.SubszOptions) (*server.Subsz, er
 
 // Returns a user keypair that can be used to log into the internal server
 func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	kp, err := nkeys.CreateUser()
 	if err != nil {
 		s.log.Error("Failed to create nkey user", slog.Any("error", err))
@@ -119,14 +132,12 @@ func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error)
 	}
 	s.serverConfigData.Credentials[id] = creds
 
-	opts := &server.Options{
+	updated, err := updateNatsOptions(&server.Options{
 		ConfigFile: s.lastOpts.ConfigFile,
 		JetStream:  true,
 		Port:       s.lastOpts.Port,
 		StoreDir:   s.lastOpts.StoreDir,
-	}
-
-	updated, err := updateNatsOptions(opts, s.log, s.serverConfigData)
+	}, s.log, s.serverConfigData)
 	if err != nil {
 		s.log.Error("Failed to update NATS options in internal server", slog.Any("error", err))
 		return nil, err
@@ -143,6 +154,7 @@ func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error)
 		s.log.Error("Failed to obtain connection for given credentials", slog.Any("error", err))
 		return nil, err
 	}
+	s.serverConfigData.Connections[id] = nc
 
 	_, err = ensureWorkloadObjectStore(nc)
 	if err != nil {
@@ -157,7 +169,15 @@ func (s *InternalNatsServer) CreateCredentials(id string) (nkeys.KeyPair, error)
 
 // Destroy previously-created credentials
 func (s *InternalNatsServer) DestroyCredentials(id string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if nc, ok := s.serverConfigData.Connections[id]; ok {
+		_ = nc.Drain()
+	}
+
 	delete(s.serverConfigData.Credentials, id)
+	delete(s.serverConfigData.Connections, id)
 
 	updated, err := updateNatsOptions(&server.Options{
 		ConfigFile: s.lastOpts.ConfigFile,
@@ -213,7 +233,7 @@ func (s *InternalNatsServer) StoreFileForID(id string, bytes []byte) error {
 		return err
 	}
 
-	_, err = bucket.PutBytes(ctx, workloadCacheFileKey, bytes)
+	_, err = bucket.PutBytes(ctx, id, bytes)
 	return err
 }
 
@@ -226,19 +246,32 @@ func (s *InternalNatsServer) ConnectionWithID(id string) (*nats.Conn, error) {
 	return s.ConnectionWithCredentials(creds)
 }
 
+func (s *InternalNatsServer) ConnectionByID(id string) (*nats.Conn, error) {
+	if nc, ok := s.serverConfigData.Connections[id]; ok {
+		return nc, nil
+	}
+
+	return nil, fmt.Errorf("failed to resolve internal NATS connection for id: %s", id)
+}
+
 func (s *InternalNatsServer) ConnectionWithCredentials(creds *credentials) (*nats.Conn, error) {
 	pair, err := nkeys.FromSeed([]byte(creds.NkeySeed))
 	if err != nil {
 		return nil, err
 	}
 
-	nc, err := nats.Connect(s.server.ClientURL(), nats.Nkey(creds.NkeyPublic, func(b []byte) ([]byte, error) {
-		s.log.Debug("Attempting to sign NATS server nonce for internal connection", slog.String("public_nkey", creds.NkeyPublic))
-		return pair.Sign(b)
-	}))
+	nc, err := nats.Connect(s.server.ClientURL(),
+		nats.DrainTimeout(defaultInternalNatsConnectionDrainTimeout),
+		nats.Nkey(creds.NkeyPublic,
+			func(b []byte) ([]byte, error) {
+				s.log.Debug("Attempting to sign NATS server nonce for internal connection", slog.String("public_key", creds.NkeyPublic))
+				return pair.Sign(b)
+			},
+		),
+	)
 	if err != nil {
 		s.log.Error("Failed to connect to internal NATS server",
-			slog.String("public_nkey", creds.NkeyPublic),
+			slog.String("public_key", creds.NkeyPublic),
 			slog.String("id", creds.ID),
 			slog.Any("error", err),
 		)
@@ -258,7 +291,7 @@ func (s *InternalNatsServer) FindCredentials(id string) (*credentials, error) {
 
 func ensureWorkloadObjectStore(nc *nats.Conn) (jetstream.ObjectStore, error) {
 	var err error
-	ctx, cancelF := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancelF := context.WithTimeout(context.Background(), 2*time.Second) // FIXME-- constantize and/or make timeout configurable
 	defer cancelF()
 
 	js, err := jetstream.New(nc)
@@ -282,10 +315,11 @@ func ensureWorkloadObjectStore(nc *nats.Conn) (jetstream.ObjectStore, error) {
 			return nil, err
 		}
 	}
+
 	return bucket, nil
 }
 
-func updateNatsOptions(opts *server.Options, log *slog.Logger, data internalServerData) (*server.Options, error) {
+func updateNatsOptions(opts *server.Options, log *slog.Logger, data *internalServerData) (*server.Options, error) {
 	bytes, err := GenerateTemplate(log, data)
 	if err != nil {
 		log.Error("Failed to generate internal nats server config file", slog.Any("error", err))

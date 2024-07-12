@@ -14,13 +14,15 @@ tasks:
     sources:
       - "*.go"
     cmds:
-#      - go build -tags netgo -ldflags '-extldflags "-static"'
-      - go build
+      - go build -tags netgo -ldflags '-extldflags "-static"'
 
   clean:
     cmds:
       - rm -f nex/nex
       - rm -f rootfs.ext4.gz
+      - sudo killall -9 nex || true
+      - sudo killall -9 nex-agent || true
+      - sudo killall -9 firecracker || true
       - sudo rm -rf /opt/cni/bin/*
       - sudo rm -rf /var/lib/cni/*
       - sudo rm -rf /etc/cni/conf.d/*
@@ -33,6 +35,8 @@ tasks:
       - sudo rm -rf /tmp/*-spec-nex-wd
       - sudo rm -rf /tmp/rootfs-*.ext4
       - sudo rm -rf /tmp/*-rootfs.ext4
+      - sudo rm -rf /tmp/workload-*
+      - sudo rm -rf /tmp/*-non-existent-nex-resource-dir
 
   nex:
     dir: nex

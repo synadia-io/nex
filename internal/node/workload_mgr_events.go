@@ -15,7 +15,7 @@ import (
 )
 
 func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
-	deployRequest, _ := w.procMan.Lookup(agentId)
+	deployRequest, _ := w.LookupWorkload(agentId)
 	if deployRequest == nil {
 		// got an event from a process that doesn't yet have a workload (deployment request) associated
 		// with it
@@ -48,9 +48,9 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 
 		if deployRequest.IsEssential() && workloadStatus.Code != 0 {
 			w.log.Debug("Essential workload stopped with non-zero exit code",
-				slog.String("vmid", agentId),
 				slog.String("namespace", *deployRequest.Namespace),
 				slog.String("workload", *deployRequest.WorkloadName),
+				slog.String("workload_id", agentId),
 				slog.String("workload_type", string(deployRequest.WorkloadType)))
 
 			if deployRequest.RetryCount == nil {
@@ -66,17 +66,17 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 			req, _ := json.Marshal(&controlapi.DeployRequest{
 				Argv:            deployRequest.Argv,
 				Description:     deployRequest.Description,
-				WorkloadType:    deployRequest.WorkloadType,
-				Location:        deployRequest.Location,
-				WorkloadJwt:     deployRequest.WorkloadJwt,
 				Environment:     deployRequest.EncryptedEnvironment,
 				Essential:       deployRequest.Essential,
+				JsDomain:        deployRequest.JsDomain,
+				Location:        deployRequest.Location,
 				RetriedAt:       deployRequest.RetriedAt,
 				RetryCount:      deployRequest.RetryCount,
 				SenderPublicKey: deployRequest.SenderPublicKey,
 				TargetNode:      deployRequest.TargetNode,
 				TriggerSubjects: deployRequest.TriggerSubjects,
-				JsDomain:        deployRequest.JsDomain,
+				WorkloadJwt:     deployRequest.WorkloadJwt,
+				WorkloadType:    deployRequest.WorkloadType,
 			})
 
 			nodeID := w.publicKey
@@ -90,7 +90,7 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 }
 
 func (w *WorkloadManager) agentLog(workloadId string, entry agentapi.LogEntry) {
-	deployRequest, _ := w.procMan.Lookup(workloadId)
+	deployRequest, _ := w.LookupWorkload(workloadId)
 	if deployRequest == nil {
 		// we got a log from a process that has not yet received a deployment, so it doesn't have a
 		// workload name or namespace
@@ -154,8 +154,13 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workloadN
 }
 
 func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub string, elapsedNanos int64) error {
-	deployRequest, err := w.procMan.Lookup(workloadId)
+	deployRequest, err := w.LookupWorkload(workloadId)
 	if err != nil {
+		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadId), slog.Any("error", err))
+		return errors.New("function exec succeeded event was not published")
+	}
+
+	if deployRequest == nil {
 		w.log.Warn("Tried to publish function exec succeeded event for non-existent workload", slog.String("workload_id", workloadId))
 		return nil
 	}
@@ -203,11 +208,12 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub s
 
 // publishWorkloadStopped writes a workload stopped event for the provided workload
 func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
-	deployRequest, err := w.procMan.Lookup(workloadId)
+	deployRequest, err := w.LookupWorkload(workloadId)
 	if err != nil {
 		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadId), slog.Any("error", err))
 		return errors.New("workload stopped event was not published")
 	}
+
 	if deployRequest == nil {
 		w.log.Warn("Tried to publish stopped event for non-existent workload", slog.String("workload_id", workloadId))
 		return errors.New("workload stopped event was not published")

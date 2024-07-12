@@ -67,9 +67,9 @@ func CmdPreflight(opts *nexmodels.Options, nodeopts *nexmodels.NodeOptions, ctx 
 	config.ForceDepInstall = nodeopts.ForceDepInstall
 	config.CNI.Nameservers = nodeopts.CniNS
 	config.PreflightCheck = nodeopts.PreflightCheck
+	config.PreflightInstallVersion = nodeopts.PreflightInstallVersion
 	config.PreflightVerify = nodeopts.PreflightVerify
 	config.PreflightVerbose = nodeopts.PreflightVerbose
-	config.PreflightInstallVersion = nodeopts.PreflightInstallVersion
 	config.PreflightYes = nodeopts.PreflightYes
 
 	err = preflight.Preflight(ctx, config, log)
