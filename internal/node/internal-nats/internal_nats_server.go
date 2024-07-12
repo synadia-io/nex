@@ -233,11 +233,15 @@ func (s *InternalNatsServer) ConnectionWithCredentials(creds *credentials) (*nat
 	}
 
 	nc, err := nats.Connect(s.server.ClientURL(), nats.Nkey(creds.NkeyPublic, func(b []byte) ([]byte, error) {
-		s.log.Debug("Attempting to sign NATS server nonce for internal connection", slog.String("public_key", creds.NkeyPublic))
+		s.log.Debug("Attempting to sign NATS server nonce for internal connection", slog.String("public_nkey", creds.NkeyPublic))
 		return pair.Sign(b)
 	}))
 	if err != nil {
-		s.log.Warn("Failed to sign NATS server nonce for internal connection", slog.String("public_key", creds.NkeyPublic))
+		s.log.Error("Failed to connect to internal NATS server",
+			slog.String("public_nkey", creds.NkeyPublic),
+			slog.String("id", creds.ID),
+			slog.Any("error", err),
+		)
 		return nil, err
 	}
 
