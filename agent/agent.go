@@ -203,23 +203,8 @@ func (a *Agent) deleteExecutableArtifact() error {
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
 
-	// if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == controlapi.NexWorkloadNative {
-	// 	tempFile = fmt.Sprintf("%s.exe", tempFile)
-	// }
-
 	_ = os.Remove(tempFile)
-	// if err != nil {
-	// 	msg := fmt.Sprintf("Failed to delete workload artifact from temp dir: %s", err)
-	// 	a.LogError(msg)
-	// 	return errors.New(msg)
-	// }
-
 	_ = a.cacheBucket.Delete(*a.md.VmID)
-	// if err != nil {
-	// 	msg := fmt.Sprintf("Failed to delete workload artifact from configured cache bucket: %s", err)
-	// 	a.LogError(msg)
-	// 	return errors.New(msg)
-	// }
 
 	return nil
 }

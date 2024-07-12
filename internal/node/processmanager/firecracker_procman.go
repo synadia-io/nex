@@ -239,15 +239,6 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	return nil
 }
 
-// func (f *FirecrackerProcessManager) Lookup(workloadID string) (*agentapi.DeployRequest, error) {
-// 	if request, ok := f.deployRequests[workloadID]; ok {
-// 		return request, nil
-// 	}
-
-// 	// Per contract, a non-prepared workload returns nil, not error
-// 	return nil, nil
-// }
-
 func (f *FirecrackerProcessManager) resetCNI() error {
 	f.log.Info("Resetting network")
 

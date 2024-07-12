@@ -212,17 +212,6 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 	return nil
 }
 
-// Looks up an agent process. A non-existent agent process returns (nil, nil), not
-// an error
-// func (s *SpawningProcessManager) Lookup(workloadID string) (*agentapi.DeployRequest, error) {
-// 	if request, ok := s.deployRequests[workloadID]; ok {
-// 		return request, nil
-// 	}
-
-// 	// Per contract, a non-prepared workload returns nil, not error
-// 	return nil, nil
-// }
-
 // Checks if the process manager is stopping
 func (s *SpawningProcessManager) stopping() bool {
 	return (atomic.LoadUint32(&s.closing) > 0)
