@@ -317,7 +317,7 @@ func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.DeployReq
 
 // Retrieve a list of deployed, running workloads
 func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error) {
-	summaries := make([]controlapi.MachineSummary, len(w.liveAgents))
+	summaries := make([]controlapi.MachineSummary, 0)
 
 	for id, agentClient := range w.liveAgents {
 		deployRequest := agentClient.DeployRequest()
