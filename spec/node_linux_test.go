@@ -902,6 +902,7 @@ func awaitPendingAgents(nodeID string, count int, log *slog.Logger) {
 		info, _ := nodeClient.NodeInfo(nodeID)
 		if info != nil && info.AvailableAgents == count {
 			fmt.Printf("✅ Reached anticipated number of pending agents (%d) on node: %s", count, nodeID)
+			time.Sleep(time.Millisecond * 3000)
 			return
 		}
 
