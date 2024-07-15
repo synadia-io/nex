@@ -255,7 +255,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		if request.SupportsTriggerSubjects() {
 			ncTrigger := ncHostServices
 			if request.TriggerConnection != nil {
-				ncTrigger, err = createJwtConnection(request.TriggerConnection)
+				ncTrigger, err = createJwtConnection(*request.WorkloadName, request.TriggerConnection)
 				if err != nil {
 					w.log.Error("Failed to create trigger connection",
 						slog.Any("error", err),
@@ -706,9 +706,9 @@ func (w *WorkloadManager) TotalRunningWorkloadBytes() uint64 {
 	return total
 }
 
-func createJwtConnection(info *controlapi.NatsJwtConnectionInfo) (*nats.Conn, error) {
+func createJwtConnection(connName string, info *controlapi.NatsJwtConnectionInfo) (*nats.Conn, error) {
 	natsOpts := []nats.Option{
-		nats.Name("workload-trigger-subscription"),
+		nats.Name(connName + "-trigger"),
 	}
 	natsOpts = append(natsOpts,
 		nats.UserJWTAndSeed(info.NatsUserJwt,
