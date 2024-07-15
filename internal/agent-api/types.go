@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/url"
 	"time"
 
@@ -214,9 +215,7 @@ func (m *MachineMetadata) Validate() bool {
 }
 
 type LogEntry struct {
-	Source string   `json:"source,omitempty"`
-	Level  LogLevel `json:"level,omitempty"`
-	Text   string   `json:"text,omitempty"`
+	Source string     `json:"source,omitempty"`
+	Level  slog.Level `json:"level,omitempty"`
+	Text   string     `json:"text,omitempty"`
 }
-
-type LogLevel int32

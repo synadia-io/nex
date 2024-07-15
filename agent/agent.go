@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path"
@@ -526,7 +527,7 @@ func (a *Agent) shuttingDown() bool {
 	return (atomic.LoadUint32(&a.closing) > 0)
 }
 
-func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
+func (a *Agent) submitLog(msg string, lvl slog.Level) {
 	a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,
 		Level:  lvl,
