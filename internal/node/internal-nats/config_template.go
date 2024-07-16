@@ -46,23 +46,23 @@ accounts: {
 		imports: [
 			{{ range .Credentials }}
 			{
-				service: {subject: agentint.{{ .ID }}.>, account: {{ .ID }}}
+				service: {subject: "agentint.{{ .ID }}.>", account: "{{ .ID }}"}
 			},
 			{
-				stream: {subject: agentevt.>, account: {{ .ID }}}, prefix: {{ .ID }}
+				stream: {subject: agentevt.>, account: "{{ .ID }}"}, prefix: "{{ .ID }}"
 			},
 			{{ end }}
 		]
 	},
 	{{ range .Credentials }}
-	{{ .ID }}: {
+	"{{ .ID }}": {
 		jetstream: true
 		users: [
 			{nkey: "{{ .NkeyPublic }}"}
 		]
 		exports: [
 			{
-				service: agentint.{{ .ID }}.>, accounts: [nexhost]
+				service: "agentint.{{ .ID }}.>", accounts: [nexhost]
 			}
 			{
 				stream: agentevt.>, accounts: [nexhost]
@@ -70,7 +70,7 @@ accounts: {
 		]
 		imports: [
 			{
-				service: {account: nexhost, subject: hostint.{{ .ID }}.>}
+				service: {account: nexhost, subject: "hostint.{{ .ID }}.>"}
 			}
 		]
 
