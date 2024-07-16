@@ -306,7 +306,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 }
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
-// Note that this means "pending" workloads are not considered by lookups
+// Note that this means "pending" agents are not considered by lookups
 func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.DeployRequest, error) {
 	if agentClient, ok := w.liveAgents[workloadID]; ok {
 		return agentClient.DeployRequest(), nil
