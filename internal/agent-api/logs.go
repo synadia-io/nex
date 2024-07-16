@@ -1,6 +1,7 @@
 package agentapi
 
 import "log/slog"
+import shandler "github.com/jordan-rash/slog-handler"
 
 const (
 	LogLevelPanic slog.Level = 12
@@ -9,5 +10,5 @@ const (
 	LogLevelWarn  slog.Level = slog.LevelWarn  // 4
 	LogLevelInfo  slog.Level = slog.LevelInfo  // 0
 	LogLevelDebug slog.Level = slog.LevelDebug // -4
-	LogLevelTrace slog.Level = -8
+	LogLevelTrace slog.Level = shandler.LevelTrace
 )

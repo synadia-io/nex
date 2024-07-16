@@ -25,7 +25,7 @@ func (l *logEmitter) Write(bytes []byte) (int, error) {
 	if l.stderr {
 		lvl = agentapi.LogLevelError
 	} else {
-		lvl = agentapi.LogLevelInfo
+		lvl = agentapi.LogLevelTrace
 	}
 
 	l.logs <- &agentapi.LogEntry{

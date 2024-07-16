@@ -88,7 +88,7 @@ func init() {
 	ncli.Flag("jsdomain", "Jetsteam domain to use in nats connection").PlaceHolder("nex").StringVar(&Opts.JsDomain)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
 	ncli.Flag("logger", "How to log").Default("std").Envar("NEX_LOGGER").StringsVar(&Opts.Logger) // Valid options: "std", "file", "nats"
-	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "none", "debug", "info", "warn", "error")
+	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "none", "trace", "debug", "info", "warn", "error")
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").UnNegatableBoolVar(&Opts.LogJSON)
 	ncli.Flag("logcolor", "Prints text logs with color").Envar("NEX_LOG_COLORIZED").Default("false").UnNegatableBoolVar(&Opts.LogsColorized)
 	ncli.Flag("timeformat", "How time is formatted in logger").Envar("NEX_LOG_TIMEFORMAT").Default("DateTime").EnumVar(&Opts.LogTimeFormat, "DateOnly", "DateTime", "Stamp", "RFC822", "RFC3339")
@@ -237,6 +237,8 @@ func main() {
 		stdoutWriters = []io.Writer{io.Discard}
 		stderrWriters = []io.Writer{io.Discard}
 		handlerOpts = append(handlerOpts, shandler.WithLogLevel(12))
+	case "trace":
+		handlerOpts = append(handlerOpts, shandler.WithLogLevel(shandler.LevelTrace))
 	case "debug":
 		handlerOpts = append(handlerOpts, shandler.WithLogLevel(slog.LevelDebug))
 	case "info":

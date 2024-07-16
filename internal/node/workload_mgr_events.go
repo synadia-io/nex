@@ -99,7 +99,7 @@ func (w *WorkloadManager) agentLog(workloadId string, entry agentapi.LogEntry) {
 
 	bytes, err := json.Marshal(&emittedLog{
 		Text:  entry.Text,
-		Level: slog.Level(entry.Level),
+		Level: entry.Level,
 		ID:    workloadId,
 	})
 	if err != nil {
