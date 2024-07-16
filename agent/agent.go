@@ -519,6 +519,9 @@ func (a *Agent) shutdown() {
 			}
 		}
 
+		signal.Stop(a.sigs)
+		close(a.sigs)
+
 		HaltVM(nil)
 	}
 }
