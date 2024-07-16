@@ -2,6 +2,7 @@ package nexagent
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -20,7 +21,7 @@ type logEmitter struct {
 
 // Write arbitrary bytes to the underlying log emitter
 func (l *logEmitter) Write(bytes []byte) (int, error) {
-	var lvl agentapi.LogLevel
+	var lvl slog.Level
 	if l.stderr {
 		lvl = agentapi.LogLevelError
 	} else {
@@ -86,7 +87,7 @@ func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bo
 
 	a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,
-		Level:  agentapi.LogLevel(level),
+		Level:  level,
 		Text:   txt,
 	}
 
