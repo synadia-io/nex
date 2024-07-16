@@ -12,6 +12,7 @@ import (
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go"
+	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
 	controlapi "github.com/synadia-io/nex/control-api"
 	"go.opentelemetry.io/otel"
@@ -367,7 +368,7 @@ func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Debug("Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
+	a.log.Log(context.TODO(), shandler.LevelTrace, "Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
 	a.logReceived(agentID, logentry)
 }
 
