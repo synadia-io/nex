@@ -98,13 +98,13 @@ func (a *Agent) FullVersion() string {
 // NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() {
 	if !a.sandboxed {
-		a.LogDebug(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()))
+		a.submitLog(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()), slog.LevelDebug)
 	}
 
 	err := a.init()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize agent: %s\n", err)
-		a.LogError(fmt.Sprintf("Agent process failed to initialize; %s", err.Error()))
+		a.submitLog(fmt.Sprintf("Agent process failed to initialize; %s", err.Error()), slog.LevelError)
 		a.shutdown()
 	}
 
@@ -116,7 +116,7 @@ func (a *Agent) Start() {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
 		case sig := <-a.sigs:
-			a.LogInfo(fmt.Sprintf("Received signal: %s", sig))
+			a.submitLog(fmt.Sprintf("Received signal: %s", sig), slog.LevelInfo)
 			a.shutdown()
 		case <-a.ctx.Done():
 			a.shutdown()
@@ -131,7 +131,7 @@ func (a *Agent) Start() {
 // Request a handshake with the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) requestHandshake() error {
-	a.LogInfo("Requesting handshake from host")
+	a.submitLog("Requesting handshake from host", slog.LevelDebug)
 	msg := agentapi.HandshakeRequest{
 		ID:        a.md.VmID,
 		StartTime: a.started,
@@ -145,7 +145,7 @@ func (a *Agent) requestHandshake() error {
 
 		resp, err := a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 		if err != nil {
-			a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s, attempt %d", err, attempts+1))
+			a.submitLog(fmt.Sprintf("Agent failed to request initial sync message: %s, attempt %d", err, attempts+1), slog.LevelError)
 			time.Sleep(time.Millisecond * 25)
 			continue
 		}
@@ -153,12 +153,12 @@ func (a *Agent) requestHandshake() error {
 		var handshakeResponse *agentapi.HandshakeResponse
 		err = json.Unmarshal(resp.Data, &handshakeResponse)
 		if err != nil {
-			a.LogError(fmt.Sprintf("Failed to parse handshake response: %s", err))
+			a.submitLog(fmt.Sprintf("Failed to parse handshake response: %s", err), slog.LevelError)
 			time.Sleep(time.Millisecond * 25)
 			continue
 		}
 
-		a.LogInfo(fmt.Sprintf("Agent is up after %d attempt(s)", attempts))
+		a.submitLog(fmt.Sprintf("Agent is up after %d attempt(s)", attempts), slog.LevelInfo)
 		return nil
 	}
 
@@ -184,14 +184,14 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 	err := a.cacheBucket.GetFile(*a.md.VmID, tempFile)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to get and write workload artifact to temp dir: %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		return nil, errors.New(msg)
 	}
 
 	err = os.Chmod(tempFile, 0777)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to set workload artifact as executable: %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		return nil, errors.New(msg)
 	}
 
@@ -259,7 +259,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	err := json.Unmarshal(m.Data, &request)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to unmarshal deploy request: %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		_ = a.workAck(m, false, msg)
 		return
 	}
@@ -285,7 +285,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	provider, err := providers.NewExecutionProvider(params)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		_ = a.workAck(m, false, msg)
 		return
 	}
@@ -300,7 +300,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		err = a.provider.Validate()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to validate workload: %s", err)
-			a.LogError(msg)
+			a.submitLog(msg, slog.LevelError)
 			_ = a.workAck(m, false, msg)
 			return
 		}
@@ -308,7 +308,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 
 	err = a.provider.Deploy()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to deploy workload: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to deploy workload: %s", err), slog.LevelError)
 	} else {
 		_ = a.workAck(m, true, "Workload deployed")
 	}
@@ -316,7 +316,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 
 func (a *Agent) handleUndeploy(m *nats.Msg) {
 	if a.provider == nil {
-		a.LogDebug("Received undeploy workload request on agent without deployed workload")
+		a.submitLog("Received undeploy workload request on agent without deployed workload", slog.LevelDebug)
 		_ = m.Respond([]byte{})
 		return
 	}
@@ -325,7 +325,7 @@ func (a *Agent) handleUndeploy(m *nats.Msg) {
 	if err != nil {
 		// don't return an error here so worst-case scenario is an ungraceful shutdown,
 		// not a failure
-		a.LogError(fmt.Sprintf("Failed to undeploy workload: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to undeploy workload: %s", err), slog.LevelError)
 	}
 
 	_ = m.Respond([]byte{})
@@ -353,20 +353,20 @@ func (a *Agent) init() error {
 
 	err := a.initNATS()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to initialize NATS connection: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to initialize NATS connection: %s", err), slog.LevelError)
 		return err
 	}
 
 	err = a.requestHandshake()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to handshake with node: %s", err), slog.LevelError)
 		return err
 	}
 
 	subject := fmt.Sprintf("agentint.%s.deploy", *a.md.VmID)
 	sub, err := a.nc.Subscribe(subject, a.handleDeploy)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err), slog.LevelError)
 		return err
 	}
 	a.subz = append(a.subz, sub)
@@ -374,7 +374,7 @@ func (a *Agent) init() error {
 	udsubject := fmt.Sprintf("agentint.%s.undeploy", *a.md.VmID)
 	sub, err = a.nc.Subscribe(udsubject, a.handleUndeploy)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err), slog.LevelError)
 		return err
 	}
 	a.subz = append(a.subz, sub)
@@ -382,7 +382,7 @@ func (a *Agent) init() error {
 	pingSubject := fmt.Sprintf("agentint.%s.ping", *a.md.VmID)
 	sub, err = a.nc.Subscribe(pingSubject, a.handlePing)
 	if err != nil {
-		a.LogError(fmt.Sprintf("failed to subscribe to ping subject: %s", err))
+		a.submitLog(fmt.Sprintf("failed to subscribe to ping subject: %s", err), slog.LevelError)
 	}
 	a.subz = append(a.subz, sub)
 
@@ -553,7 +553,7 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 
 	err = m.Respond(bytes)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to acknowledge workload deployment: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to acknowledge workload deployment: %s", err), slog.LevelError)
 		return err
 	}
 

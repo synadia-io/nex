@@ -3,7 +3,6 @@ package nexagent
 import (
 	"fmt"
 	"log/slog"
-	"os"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -36,27 +35,6 @@ func (l *logEmitter) Write(bytes []byte) (int, error) {
 
 	// FIXME-- this never returns an error
 	return len(bytes), nil
-}
-
-func (a *Agent) LogDebug(msg string) {
-	fmt.Fprintln(os.Stdout, msg)
-	if a.sandboxed {
-		a.submitLog(msg, agentapi.LogLevelDebug)
-	}
-}
-
-func (a *Agent) LogError(msg string) {
-	fmt.Fprintln(os.Stderr, msg)
-	if a.sandboxed {
-		a.submitLog(msg, agentapi.LogLevelError)
-	}
-}
-
-func (a *Agent) LogInfo(msg string) {
-	fmt.Fprintln(os.Stdout, msg)
-	if a.sandboxed {
-		a.submitLog(msg, agentapi.LogLevelInfo)
-	}
 }
 
 // FIXME-- revisit error handling
