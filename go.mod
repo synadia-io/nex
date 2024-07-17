@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/jedib0t/go-pretty/v6 v6.5.9
-	github.com/jordan-rash/slog-handler v0.0.0-20240716190743-99e5f0b7188d
+	github.com/jordan-rash/slog-handler v0.0.0-20240716235743-519902d63a1c
 	github.com/nats-io/jsm.go v0.1.1
 	github.com/nats-io/jwt/v2 v2.5.7
 	github.com/nats-io/nats-server/v2 v2.10.16
