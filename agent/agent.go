@@ -54,7 +54,8 @@ type Agent struct {
 	nc          *nats.Conn
 	started     time.Time
 
-	sandboxed bool
+	sandboxed   bool
+	undeploying *atomic.Bool
 }
 
 // Initialize a new agent to facilitate communications with the host
@@ -81,12 +82,13 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		agentLogs: make(chan *agentapi.LogEntry, 64),
 		eventLogs: make(chan *cloudevents.Event, 64),
 		// sandbox defaults to true, only way to override that is with an explicit 'false'
-		cancelF:   cancelF,
-		ctx:       ctx,
-		sandboxed: isSandboxed(),
-		md:        metadata,
-		started:   time.Now().UTC(),
-		subz:      make([]*nats.Subscription, 0),
+		cancelF:     cancelF,
+		ctx:         ctx,
+		sandboxed:   isSandboxed(),
+		md:          metadata,
+		started:     time.Now().UTC(),
+		subz:        make([]*nats.Subscription, 0),
+		undeploying: &atomic.Bool{},
 	}, nil
 }
 
@@ -321,6 +323,13 @@ func (a *Agent) handleUndeploy(m *nats.Msg) {
 		return
 	}
 
+	if a.undeploying.Load() {
+		a.submitLog("Received additional undeploy workload request on agent", slog.LevelWarn)
+		return
+	}
+
+	a.undeploying.Store(true)
+
 	err := a.provider.Undeploy()
 	if err != nil {
 		// don't return an error here so worst-case scenario is an ungraceful shutdown,
@@ -512,7 +521,7 @@ func (a *Agent) shutdown() {
 			}
 		}
 
-		if a.provider != nil {
+		if a.provider != nil && !a.undeploying.Load() {
 			err := a.provider.Undeploy()
 			if err != nil {
 				fmt.Printf("failed to undeploy workload: %s\n", err)
