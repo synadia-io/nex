@@ -31,7 +31,7 @@ const (
 	defaultAgentHandshakeTimeoutMillis  = 500
 	runloopSleepInterval                = 250 * time.Millisecond
 	runloopTickInterval                 = 2500 * time.Millisecond
-	workloadExecutionSleepTimeoutMillis = 100
+	workloadExecutionSleepTimeoutMillis = 50
 )
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
@@ -486,11 +486,14 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", *params.WorkloadName, params.VmID)
 				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, true, -1)
 				return
-
 			case <-params.Run:
-				a.PublishWorkloadDeployed(params.VmID, *params.WorkloadName, params.TotalBytes)
-				sleepMillis = workloadExecutionSleepTimeoutMillis
+				essential := false
+				if params.Essential != nil {
+					essential = *params.Essential
+				}
 
+				a.PublishWorkloadDeployed(params.VmID, *params.WorkloadName, essential, params.TotalBytes)
+				sleepMillis = workloadExecutionSleepTimeoutMillis
 			case exit := <-params.Exit:
 				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", *params.WorkloadName, params.VmID, exit)
 				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, exit != 0, exit)

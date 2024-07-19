@@ -25,6 +25,9 @@ type WorkloadStatusEvent struct {
 	Message      string `json:"message,omitempty"`
 	WorkloadID   string `json:"workload_id"`
 	WorkloadName string `json:"workload_name"`
+
+	Essential  *bool  `json:"essential,omitempty"`
+	TotalBytes *int64 `json:"total_bytes,omitempty"`
 }
 
 type AgentStoppedEvent struct {

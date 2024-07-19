@@ -38,7 +38,7 @@ func (l *logEmitter) Write(bytes []byte) (int, error) {
 }
 
 // FIXME-- revisit error handling
-func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes int64) {
+func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, essential bool, totalBytes int64) {
 	a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,
 		Level:  agentapi.LogLevelInfo,
@@ -49,9 +49,10 @@ func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes in
 		vmID,
 		agentapi.WorkloadDeployedEventType,
 		agentapi.WorkloadStatusEvent{
+			Essential:    &essential,
+			TotalBytes:   &totalBytes,
 			WorkloadID:   vmID,
 			WorkloadName: workloadName,
-			//  FIXME-- should Essential be included here?
 		},
 	)
 	a.eventLogs <- &evt
