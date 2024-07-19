@@ -105,17 +105,20 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		for _, machine := range info.Machines {
 			if machine.Workload.Name == workloadName {
 				fmt.Printf("Workload %s (%s) already exists on the target. Attempting to stop it\n", workloadName, machine.Id)
-				stopRequest, err := controlapi.NewStopRequest(machine.Id, workloadName, target.NodeId, issuerKp)
+				stopRequest, err := controlapi.NewStopRequest(target.NodeId, machine.Id, issuerKp)
 				if err != nil {
 					return err
 				}
+
 				stopResp, err := nodeClient.StopWorkload(stopRequest)
 				if err != nil {
 					return err
 				}
+
 				if !stopResp.Stopped {
 					return errors.New("target node failed to stop the existing workload. This may result in inconsistency or unexpected scale-out")
 				}
+
 				time.Sleep(500 * time.Millisecond)
 			}
 		}
@@ -138,7 +141,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 		controlapi.TriggerSubjects(RunOpts.TriggerSubjects),
 		controlapi.WorkloadName(workloadName),
 		controlapi.WorkloadType(RunOpts.WorkloadType),
-		controlapi.Checksum("abc12345TODOmakethisreal"),
+		controlapi.Hash("abc12345TODOmakethisreal"),
 		controlapi.WorkloadDescription("Workload published in devmode"),
 	)
 	if err != nil {

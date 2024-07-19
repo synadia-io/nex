@@ -49,7 +49,7 @@ func NewApiClientWithNamespace(nc *nats.Conn, timeout time.Duration, namespace s
 // is likely to be security validation that prevents one issuer from submitting a stop request for
 // another issuer's workload
 func (api *Client) StopWorkload(stopRequest *StopRequest) (*StopResponse, error) {
-	subject := fmt.Sprintf("%s.STOP.%s.%s", APIPrefix, api.namespace, stopRequest.TargetNode)
+	subject := fmt.Sprintf("%s.STOP.%s.%s", APIPrefix, api.namespace, stopRequest.NodeID)
 	bytes, err := api.performRequest(subject, stopRequest)
 	if err != nil {
 		return nil, err
@@ -60,8 +60,8 @@ func (api *Client) StopWorkload(stopRequest *StopRequest) (*StopResponse, error)
 	if err != nil {
 		return nil, err
 	}
-	return &response, nil
 
+	return &response, nil
 }
 
 // Attempts to start a workload. The workload URI, at the moment, must always point to a NATS object store
@@ -96,6 +96,7 @@ func (api *Client) NodeInfo(nodeId string) (*InfoResponse, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &response, nil
 }
 
@@ -132,19 +133,23 @@ func (api *Client) PingWorkloads(workloadID string) ([]WorkloadPingResponse, err
 		if len(m.Data) == 0 {
 			return
 		}
+
 		env, err := extractEnvelope(m.Data)
 		if err != nil {
 			return
 		}
+
 		var resp WorkloadPingResponse
 		bytes, err := json.Marshal(env.Data)
 		if err != nil {
 			return
 		}
+
 		err = json.Unmarshal(bytes, &resp)
 		if err != nil {
 			return
 		}
+
 		responses = append(responses, resp)
 	})
 	if err != nil {
@@ -157,8 +162,10 @@ func (api *Client) PingWorkloads(workloadID string) ([]WorkloadPingResponse, err
 	} else {
 		subject = fmt.Sprintf("%s.WPING.%s.%s", APIPrefix, api.namespace, workloadID)
 	}
+
 	msg := nats.NewMsg(subject)
 	msg.Reply = sub.Subject
+
 	err = api.nc.PublishMsg(msg)
 	if err != nil {
 		return nil, err
@@ -252,6 +259,7 @@ func (api *Client) PingNodes() ([]PingResponse, error) {
 			api.log.Error("failed to unmarshal PingResponse", slog.Any("err", err))
 			return
 		}
+
 		responses = append(responses, resp)
 	})
 
@@ -259,8 +267,10 @@ func (api *Client) PingNodes() ([]PingResponse, error) {
 		api.log.Error("failed to subscribe", slog.Any("err", err))
 		return nil, err
 	}
+
 	msg := nats.NewMsg(fmt.Sprintf("%s.PING", APIPrefix))
 	msg.Reply = sub.Subject
+
 	err = api.nc.PublishMsg(msg)
 	if err != nil {
 		return nil, err
@@ -284,7 +294,8 @@ func (api *Client) MonitorLogs(
 	nodeFilter string,
 	workloadFilter string,
 	vmFilter string,
-	bufferLength int) (chan EmittedLog, error) {
+	bufferLength int,
+) (chan EmittedLog, error) {
 
 	subject := fmt.Sprintf("%s.logs.%s.%s.%s.%s", APIPrefix,
 		namespaceFilter,
@@ -313,7 +324,8 @@ func (api *Client) MonitorAllEvents() (chan EmittedEvent, error) {
 func (api *Client) MonitorEvents(
 	namespaceFilter string,
 	eventTypeFilter string,
-	bufferLength int) (chan EmittedEvent, error) {
+	bufferLength int,
+) (chan EmittedEvent, error) {
 
 	subscribeSubject := fmt.Sprintf("%s.events.%s.*", APIPrefix, namespaceFilter)
 
@@ -387,7 +399,6 @@ func handleLogEntry(api *Client, ch chan EmittedLog) func(m *nats.Msg) {
 			RawLog:    logEntry,
 		}
 	}
-
 }
 
 // Helper that submits data, gets a standard envelope back, and returns the inner data

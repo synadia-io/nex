@@ -53,6 +53,7 @@ type DeployRequest struct {
 	Environment       map[string]string                 `json:"environment"`
 	Essential         *bool                             `json:"essential,omitempty"`
 	Hash              string                            `json:"hash,omitempty"`
+	ID                *string                           `json:"id"`
 	Namespace         *string                           `json:"namespace,omitempty"`
 	RetriedAt         *time.Time                        `json:"retried_at,omitempty"`
 	RetryCount        *uint                             `json:"retry_count,omitempty"`

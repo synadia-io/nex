@@ -312,7 +312,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Failed to decrypt environment for deploy request: %s", err))
 		return
 	}
-	span.SetAttributes(attribute.String("workload_name", request.DecodedClaims.Subject))
+	span.SetAttributes(attribute.String("workload_name", *request.WorkloadName))
 
 	decodedClaims, err := request.Validate()
 	if err != nil {
@@ -418,16 +418,15 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, agent pool did not initialize properly")
 		return
 	}
-	workloadName := request.DecodedClaims.Subject
-	span.SetAttributes(attribute.String("workload_name", workloadName))
+	span.SetAttributes(attribute.String("workload_name", *request.WorkloadName))
 
-	api.log.Info("Workload deployed", slog.String("workload", workloadName), slog.String("workload_id", workloadID))
+	api.log.Info("Workload deployed", slog.String("workload", *request.WorkloadName), slog.String("workload_id", workloadID))
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 		Started: true,
-		Name:    workloadName,
+		Name:    *request.WorkloadName,
 		Issuer:  request.DecodedClaims.Issuer,
-		ID:      workloadID, // FIXME-- rename to match
+		ID:      workloadID,
 	}, nil)
 
 	raw, err := json.Marshal(res)
@@ -487,10 +486,10 @@ func (api *ApiListener) handleStop(ctx context.Context, span trace.Span, m *nats
 		return
 	}
 
-	deployRequest, err := api.mgr.LookupWorkload(request.WorkloadId)
+	deployRequest, err := api.mgr.LookupWorkload(request.WorkloadID)
 	if err != nil {
 		span.SetStatus(codes.Error, "No such workload")
-		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadId))
+		api.log.Error("Stop request: no such workload", slog.String("workload_id", request.WorkloadID))
 		respondFail(controlapi.StopResponseType, m, "No such workload")
 		return
 	}
@@ -514,7 +513,7 @@ func (api *ApiListener) handleStop(ctx context.Context, span trace.Span, m *nats
 		return
 	}
 
-	err = api.mgr.StopWorkload(request.WorkloadId, true)
+	err = api.mgr.StopWorkload(request.WorkloadID, true)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to stop workload", slog.Any("err", err))
@@ -522,11 +521,11 @@ func (api *ApiListener) handleStop(ctx context.Context, span trace.Span, m *nats
 	}
 
 	res := controlapi.NewEnvelope(controlapi.StopResponseType, controlapi.StopResponse{
-		Stopped: true,
-		Name:    deployRequest.DecodedClaims.Subject,
+		ID:      request.WorkloadID,
 		Issuer:  deployRequest.DecodedClaims.Issuer,
-		ID:      request.WorkloadId,
+		Stopped: true,
 	}, nil)
+
 	raw, err := json.Marshal(res)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())

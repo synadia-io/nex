@@ -45,7 +45,15 @@ func (a *Agent) PublishWorkloadDeployed(vmID, workloadName string, totalBytes in
 		Text:   fmt.Sprintf("Workload %s deployed", workloadName),
 	}
 
-	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadDeployedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName})
+	evt := agentapi.NewAgentEvent(
+		vmID,
+		agentapi.WorkloadDeployedEventType,
+		agentapi.WorkloadStatusEvent{
+			WorkloadID:   vmID,
+			WorkloadName: workloadName,
+			//  FIXME-- should Essential be included here?
+		},
+	)
 	a.eventLogs <- &evt
 }
 
@@ -69,6 +77,14 @@ func (a *Agent) PublishWorkloadExited(vmID, workloadName, message string, err bo
 		Text:   txt,
 	}
 
-	evt := agentapi.NewAgentEvent(vmID, agentapi.WorkloadUndeployedEventType, agentapi.WorkloadStatusEvent{WorkloadName: workloadName, Code: code, Message: message})
+	evt := agentapi.NewAgentEvent(vmID,
+		agentapi.WorkloadUndeployedEventType,
+		agentapi.WorkloadStatusEvent{
+			WorkloadID:   vmID,
+			WorkloadName: workloadName,
+			Code:         code,
+			Message:      message,
+		},
+	)
 	a.eventLogs <- &evt
 }

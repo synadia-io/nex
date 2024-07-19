@@ -363,10 +363,10 @@ func (n *Node) handleAutostarts() {
 			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),
 			controlapi.TargetPublicXKey(n.api.PublicXKey()),
-			controlapi.WorkloadName(autostart.Name),
-			controlapi.WorkloadType(autostart.WorkloadType),
 			controlapi.TriggerSubjects(autostart.TriggerSubjects),
 			controlapi.WorkloadDescription(*autostart.Description),
+			controlapi.WorkloadName(autostart.Name),
+			controlapi.WorkloadType(autostart.WorkloadType),
 		)
 		if err != nil {
 			n.log.Error("Failed to create deployment request for autostart workload",
@@ -507,7 +507,7 @@ func (n *Node) ncReconnectedHandler(conn *nats.Conn) {
 func (n *Node) publishNodeLameDuckEntered() error {
 	nodeLameDuck := controlapi.LameDuckEnteredEvent{
 		Version: VERSION,
-		Id:      n.publicKey,
+		ID:      n.publicKey,
 	}
 
 	cloudevent := cloudevents.NewEvent()
@@ -532,7 +532,7 @@ func (n *Node) publishHeartbeat() error {
 	now := time.Now().UTC()
 
 	evt := controlapi.HeartbeatEvent{
-		NodeId:          n.publicKey,
+		NodeID:          n.publicKey,
 		Nexus:           n.nexus,
 		Version:         Version(),
 		Uptime:          myUptime(now.Sub(n.startedAt)),
@@ -554,7 +554,7 @@ func (n *Node) publishHeartbeat() error {
 func (n *Node) publishNodeStarted() error {
 	nodeStart := controlapi.NodeStartedEvent{
 		Version: VERSION,
-		Id:      n.publicKey,
+		ID:      n.publicKey,
 		Tags:    n.config.Tags,
 	}
 
@@ -572,7 +572,7 @@ func (n *Node) publishNodeStarted() error {
 
 func (n *Node) publishNodeStopped() error {
 	evt := controlapi.NodeStoppedEvent{
-		Id:       n.publicKey,
+		ID:       n.publicKey,
 		Graceful: true,
 	}
 
@@ -660,6 +660,7 @@ func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployReques
 		Environment:          request.WorkloadEnvironment,
 		Essential:            request.Essential,
 		Hash:                 hash,
+		ID:                   request.ID,
 		JsDomain:             request.JsDomain,
 		Location:             request.Location,
 		Namespace:            &namespace,
@@ -671,8 +672,8 @@ func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployReques
 		HostServicesConfig:   request.HostServicesConfig,
 		TriggerSubjects:      request.TriggerSubjects,
 		TriggerConnection:    request.TriggerConnection,
-		WorkloadName:         &request.DecodedClaims.Subject,
-		WorkloadType:         request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
-		WorkloadJwt:          request.WorkloadJwt,
+		WorkloadName:         request.WorkloadName,
+		WorkloadType:         request.WorkloadType,
+		WorkloadJwt:          request.WorkloadJWT,
 	}
 }

@@ -26,10 +26,10 @@ const (
 )
 
 type RunResponse struct {
-	Started bool   `json:"started"`
 	ID      string `json:"id"`
 	Issuer  string `json:"issuer"`
 	Name    string `json:"name"`
+	Started bool   `json:"started"`
 }
 
 type NexWorkload string
@@ -118,8 +118,10 @@ type MachineSummary struct { // FIXME-- rename to workload summary?
 }
 
 type WorkloadSummary struct {
+	ID           string      `json:"id"`
 	Name         string      `json:"name"`
 	Description  string      `json:"description,omitempty"`
+	Essential    bool        `json:"essential"`
 	Hash         string      `json:"hash"`
 	Runtime      string      `json:"runtime"`
 	Uptime       string      `json:"uptime"`

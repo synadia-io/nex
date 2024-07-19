@@ -202,9 +202,11 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
 
 	m.log.Info("Successfully stored workload in internal object store",
-		slog.String("workload", request.DecodedClaims.Subject),
+		slog.String("workload_name", *request.WorkloadName),
 		slog.String("workload_id", workloadID),
-		slog.Int("bytes", len(workload)))
+		slog.String("workload_hash", workloadHashString),
+		slog.Int("bytes", len(workload)),
+	)
 
 	return uint64(len(workload)), &workloadHashString, nil
 }
@@ -447,12 +449,13 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		return err
 	}
 
+	delete(w.deployRequests, id)
 	delete(w.liveAgents, id)
 	delete(w.poolAgents, id)
 	delete(w.stopMutex, id)
 	w.hostServices.server.RemoveHostServicesConnection(id)
 
-	_ = w.publishWorkloadStopped(id)
+	_ = w.publishWorkloadUndeployed(id)
 
 	return nil
 }

@@ -100,7 +100,7 @@ func init() {
 		return "nex"
 	}()).StringVar(&Opts.ConnectionName)
 
-	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
+	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadURL)
 	run.Arg("id", "Public key of the target node to run the workload").Required().StringVar(&RunOpts.TargetNode)
 	run.Flag("xkey", "Path to publisher's Xkey required to encrypt environment").Required().ExistingFileVar(&RunOpts.PublisherXkeyFile)
 	run.Flag("issuer", "Path to a seed key to sign the workload JWT as the issuer").Required().ExistingFileVar(&RunOpts.ClaimsIssuerFile)
@@ -126,7 +126,6 @@ func init() {
 
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
-	stop.Flag("name", "Name of the workload to stop").Required().StringVar(&StopOpts.WorkloadName)
 	stop.Flag("issuer", "Path to the issuer seed key originally used to start the workload").Required().ExistingFileVar(&StopOpts.ClaimsIssuerFile)
 
 	lame.Arg("id", "Public key of the target node to enter lame duck mode").Required().StringVar(&RunOpts.TargetNode)

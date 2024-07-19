@@ -16,11 +16,14 @@ type AgentStartedEvent struct {
 }
 
 type WorkloadDeployedEvent struct {
+	ID         string `json:"workload_id"`
 	Name       string `json:"workload_name"`
+	Essential  bool   `json:"essential"`
 	TotalBytes int    `json:"total_bytes"`
 }
 
 type WorkloadUndeployedEvent struct {
+	ID      string `json:"workload_id"`
 	Name    string `json:"workload_name"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -33,24 +36,24 @@ type AgentStoppedEvent struct {
 
 type NodeStartedEvent struct {
 	Version string            `json:"version"`
-	Id      string            `json:"id"`
+	ID      string            `json:"id"`
 	Tags    map[string]string `json:"tags,omitempty"`
 }
 
 type LameDuckEnteredEvent struct {
 	Version string `json:"version"`
-	Id      string `json:"id"`
+	ID      string `json:"id"`
 }
 
 type NodeStoppedEvent struct {
-	Id       string `json:"id"`
+	ID       string `json:"id"`
 	Graceful bool   `json:"graceful"`
 }
 
 // TODO: remove omitempty in next version bump
 type HeartbeatEvent struct {
 	Version         string            `json:"version"`
-	NodeId          string            `json:"node_id"`
+	NodeID          string            `json:"node_id"`
 	Nexus           string            `json:"nexus,omitempty"`
 	Uptime          string            `json:"uptime"`
 	Tags            map[string]string `json:"tags,omitempty"`
