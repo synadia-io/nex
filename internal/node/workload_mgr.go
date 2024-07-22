@@ -449,7 +449,6 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		return err
 	}
 
-	delete(w.deployRequests, id)
 	delete(w.liveAgents, id)
 	delete(w.poolAgents, id)
 	delete(w.stopMutex, id)
