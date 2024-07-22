@@ -556,7 +556,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1)
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
-			_ = w.publishFunctionExecFailed(workloadID, *request.WorkloadName, *request.Namespace, tsub, err)
+			_ = w.publishFunctionExecFailed(workloadID, tsub, err)
 		} else if resp != nil {
 			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
 			runtimeNs := resp.Header.Get(agentapi.NexRuntimeNs)

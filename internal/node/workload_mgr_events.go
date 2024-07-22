@@ -142,7 +142,13 @@ func (w *WorkloadManager) agentLog(workloadID string, entry agentapi.LogEntry) {
 	_ = w.nc.Publish(subject, bytes)
 }
 
-func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, workloadName string, namespace string, tsub string, origErr error) error {
+func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, tsub string, origErr error) error {
+	deployRequest, err := w.LookupWorkload(workloadID)
+	if err != nil {
+		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadID), slog.Any("error", err))
+		return errors.New("function exec succeeded event was not published")
+	}
+
 	functionExecFailed := struct {
 		ID        string `json:"workload_id"`
 		Name      string `json:"workload_name"`
@@ -151,8 +157,8 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, workloadN
 		Error     string `json:"error"`
 	}{
 		ID:        workloadID,
-		Name:      workloadName,
-		Namespace: namespace,
+		Name:      *deployRequest.WorkloadName,
+		Namespace: *deployRequest.Namespace,
 		Subject:   tsub,
 		Error:     origErr.Error(),
 	}
@@ -165,7 +171,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, workloadN
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecFailed)
 
-	err := PublishCloudEvent(w.nc, namespace, cloudevent, w.log)
+	err = PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
 	if err != nil {
 		return err
 	}
@@ -177,7 +183,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, workloadN
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, namespace, w.publicKey, workloadID)
+	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadID)
 	err = w.nc.Publish(subject, logBytes)
 	if err != nil {
 		w.log.Error("Failed to publish function exec failed log", slog.Any("err", err))
