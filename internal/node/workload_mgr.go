@@ -449,6 +449,8 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		return err
 	}
 
+	_ = w.publishWorkloadUndeployed(id)
+
 	delete(w.liveAgents, id)
 	delete(w.poolAgents, id)
 	delete(w.stopMutex, id)
