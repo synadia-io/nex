@@ -456,8 +456,6 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	delete(w.stopMutex, id)
 	w.hostServices.server.RemoveHostServicesConnection(id)
 
-	_ = w.publishWorkloadUndeployed(id)
-
 	return nil
 }
 
