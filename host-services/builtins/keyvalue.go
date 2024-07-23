@@ -62,7 +62,14 @@ func (k *KeyValueService) HandleRequest(
 	metadata map[string]string,
 	request []byte,
 ) (hostservices.ServiceResult, error) {
-	nc := conns[hostservices.DefaultConnection]
+	var nc *nats.Conn
+	// TODO:(jr) might need to rename "TriggerConnection" to upstream or something similiar as its starting to be reused
+	if conns[hostservices.TriggerConnection] != nil {
+		nc = conns[hostservices.TriggerConnection]
+	} else {
+		nc = conns[hostservices.DefaultConnection]
+	}
+
 	switch method {
 	case kvServiceMethodGet:
 		return k.handleGet(nc, workloadId, workloadName, request, metadata, namespace)
