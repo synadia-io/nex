@@ -118,8 +118,8 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 	cols.Println()
 	render(cols)
 
-	if full {
-		if len(info.Machines) > 0 {
+	if len(info.Machines) > 0 {
+		if full {
 			cols.AddSectionTitle("Workloads")
 			cols.Indent(2)
 			for _, m := range info.Machines {
@@ -131,28 +131,28 @@ func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
 				cols.AddRow("Description", m.Workload.Description)
 			}
 			cols.Indent(0)
+			render(cols)
+		} else {
+			t := table.NewWriter()
+			t.SetStyle(table.StyleRounded)
+
+			t.SetTitle("Workloads")
+			t.Style().Title.Align = text.AlignCenter
+			t.AppendHeader(table.Row{"", "ID", "Type", "Name", "Uptime", "Runtime"})
+
+			for _, m := range info.Machines {
+				health := func() string {
+					if m.Healthy {
+						return "🟢"
+					}
+					return "🔴"
+				}()
+
+				t.AppendRow(table.Row{health, m.Id, m.Workload.WorkloadType, m.Workload.Name, m.Workload.Uptime, m.Workload.Runtime})
+			}
+
+			fmt.Println(t.Render())
 		}
-		render(cols)
-	} else {
-		t := table.NewWriter()
-		t.SetStyle(table.StyleRounded)
-
-		t.SetTitle("Workloads")
-		t.Style().Title.Align = text.AlignCenter
-		t.AppendHeader(table.Row{"", "ID", "Type", "Name", "Uptime", "Runtime"})
-
-		for _, m := range info.Machines {
-			health := func() string {
-				if m.Healthy {
-					return "🟢"
-				}
-				return "🔴"
-			}()
-
-			t.AppendRow(table.Row{health, m.Id, m.Workload.WorkloadType, m.Workload.Name, m.Workload.Uptime, m.Workload.Runtime})
-		}
-
-		fmt.Println(t.Render())
 	}
 }
 
