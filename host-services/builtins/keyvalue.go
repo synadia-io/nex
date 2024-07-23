@@ -38,7 +38,8 @@ func NewKeyValueService(log *slog.Logger) (*KeyValueService, error) {
 
 func (k *KeyValueService) Initialize(config json.RawMessage) error {
 
-	k.config.BucketName = "hs_${namespace}_${workload_name}_kv"
+	// k.config.BucketName = "hs_${namespace}_${workload_name}_kv"
+	k.config.BucketName = "hs_${namespace}_kv"
 	k.config.JitProvision = true
 	k.config.MaxBytes = 524288
 
@@ -191,17 +192,18 @@ func (k *KeyValueService) handleKeys(
 }
 
 // resolve the key value store for this workload; initialize it if necessary
-func (k *KeyValueService) resolveKeyValueStore(nc *nats.Conn, namespace, workload string) (nats.KeyValue, error) {
+func (k *KeyValueService) resolveKeyValueStore(nc *nats.Conn, namespace, _ string) (nats.KeyValue, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		return nil, err
 	}
 
-	reWorkload := regexp.MustCompile(`(?i)\$\{workload_name\}`)
+	// reWorkload := regexp.MustCompile(`(?i)\$\{workload_name\}`)
 	reNamespace := regexp.MustCompile(`(?i)\$\{namespace\}`)
 
-	kvStoreName := reWorkload.ReplaceAllString(k.config.BucketName, workload)
-	kvStoreName = reNamespace.ReplaceAllString(kvStoreName, namespace)
+	//kvStoreName := reWorkload.ReplaceAllString(k.config.BucketName, workload)
+	//kvStoreName = reNamespace.ReplaceAllString(kvStoreName, namespace)
+	kvStoreName := reNamespace.ReplaceAllString(k.config.BucketName, namespace)
 
 	kvStore, err := js.KeyValue(kvStoreName)
 	if err != nil {
