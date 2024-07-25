@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"disorder.dev/shandler"
 	cloudevents "github.com/cloudevents/sdk-go"
-	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
 	controlapi "github.com/synadia-io/nex/control-api"
 	"go.opentelemetry.io/otel"

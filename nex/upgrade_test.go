@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	shandler "github.com/jordan-rash/slog-handler"
+	"disorder.dev/shandler"
 )
 
 func logger(t *testing.T) *slog.Logger {

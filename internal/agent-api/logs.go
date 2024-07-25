@@ -1,7 +1,9 @@
 package agentapi
 
-import "log/slog"
-import shandler "github.com/jordan-rash/slog-handler"
+import (
+	"disorder.dev/shandler"
+	"log/slog"
+)
 
 const (
 	LogLevelPanic slog.Level = 12

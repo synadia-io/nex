@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"time"
 
+	"disorder.dev/shandler"
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
-	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"

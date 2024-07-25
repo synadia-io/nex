@@ -4,6 +4,7 @@ go 1.22.4
 
 require (
 	dagger.io/dagger v0.12.2
+	disorder.dev/shandler v0.0.0-20240725150605-ab0948188a44
 	github.com/cdfmlr/ellipsis v0.0.1
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.26.6
@@ -16,7 +17,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf
 	github.com/jedib0t/go-pretty/v6 v6.5.9
-	github.com/jordan-rash/slog-handler v0.0.0-20240717154525-6a571cb7e400
 	github.com/nats-io/jsm.go v0.1.1
 	github.com/nats-io/jwt/v2 v2.5.8
 	github.com/nats-io/nats-server/v2 v2.10.18
@@ -51,7 +51,6 @@ require (
 require (
 	github.com/99designs/gqlgen v0.17.49 // indirect
 	github.com/Khan/genqlient v0.7.0 // indirect
-	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/adrg/xdg v0.5.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
