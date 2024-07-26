@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"regexp"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -114,6 +115,7 @@ func (o *ObjectStoreService) handleGet(
 		return hostservices.ServiceResultFail(400, "name is required"), nil
 	}
 
+	start := time.Now()
 	result, err := objectStore.Get(name)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to get object %s: %s", name, err.Error()))
@@ -123,6 +125,8 @@ func (o *ObjectStoreService) handleGet(
 		}
 		return hostservices.ServiceResultFail(code, "failed to get object"), nil
 	}
+	finished := time.Since(start)
+	o.log.Debug("Object store download complete", slog.String("name", name), slog.Duration("duration", finished))
 
 	val, err := io.ReadAll(result)
 	if err != nil {
