@@ -192,7 +192,9 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
 		return 0, nil, err
 	}
-	m.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.Duration("duration", time.Since(started)), slog.Int("bytes", len(workload)))
+	finished := time.Since(started)
+	dlRate := float64(len(workload)) / finished.Seconds()
+	m.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.Duration("duration", finished), slog.String("rate", fmt.Sprintf("%s/sec", byteConvert(dlRate))))
 
 	err = m.natsint.StoreFileForID(workloadID, workload)
 	if err != nil {
@@ -720,4 +722,18 @@ func createJwtConnection(connName string, info *controlapi.NatsJwtConnectionInfo
 		))
 
 	return nats.Connect(info.NatsUrl, natsOpts...)
+}
+
+func byteConvert(b float64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%f B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
 }
