@@ -207,7 +207,10 @@ func (a *Agent) deleteExecutableArtifact() error {
 	tempFile := path.Join(os.TempDir(), fileName)
 
 	_ = os.Remove(tempFile)
-	_ = a.cacheBucket.Delete(*a.md.VmID)
+
+	if a.cacheBucket != nil {
+		_ = a.cacheBucket.Delete(*a.md.VmID)
+	}
 
 	return nil
 }
