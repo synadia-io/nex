@@ -186,11 +186,13 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 		return 0, nil, err
 	}
 
+	started := time.Now()
 	workload, err := store.GetBytes(key)
 	if err != nil {
 		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
 		return 0, nil, err
 	}
+	m.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.Duration("duration", time.Since(started)), slog.Int("bytes", len(workload)))
 
 	err = m.natsint.StoreFileForID(workloadID, workload)
 	if err != nil {
