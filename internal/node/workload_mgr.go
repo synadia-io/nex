@@ -194,7 +194,7 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 	}
 	finished := time.Since(started)
 	dlRate := float64(len(workload)) / finished.Seconds()
-	m.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.Duration("duration", finished), slog.String("rate", fmt.Sprintf("%s/sec", byteConvert(dlRate))))
+	m.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.String("duration", fmt.Sprintf("%.2f sec", finished.Seconds())), slog.String("rate", fmt.Sprintf("%s/sec", byteConvert(dlRate))))
 
 	err = m.natsint.StoreFileForID(workloadID, workload)
 	if err != nil {

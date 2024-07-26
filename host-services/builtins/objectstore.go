@@ -126,7 +126,7 @@ func (o *ObjectStoreService) handleGet(
 		return hostservices.ServiceResultFail(code, "failed to get object"), nil
 	}
 	finished := time.Since(start)
-	o.log.Debug("Object store download complete", slog.String("name", name), slog.Duration("duration", finished))
+	o.log.Debug("Object store download complete", slog.String("name", name), slog.String("duration", fmt.Sprintf("%.2f sec", finished.Seconds())))
 
 	val, err := io.ReadAll(result)
 	if err != nil {
