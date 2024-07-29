@@ -133,6 +133,10 @@ func (n *Node) Start() {
 	n.startedAt = time.Now()
 	_ = n.publishNodeStarted()
 
+	if n.config.AutostartConfiguration != nil {
+		go n.handleAutostarts()
+	}
+
 	timer := time.NewTicker(runloopTickInterval)
 	defer timer.Stop()
 
@@ -295,10 +299,6 @@ func (n *Node) init() error {
 			}
 		}
 
-		if n.config.AutostartConfiguration != nil {
-			go n.handleAutostarts()
-		}
-
 		n.installSignalHandlers()
 	})
 
@@ -340,11 +340,13 @@ func (n *Node) handleAutostarts() {
 			if err != nil {
 				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
 				time.Sleep(50 * time.Millisecond)
+
 				retry += 1
 				if retry > agentPoolRetryMax {
 					n.log.Error("Exceeded warm agent retrieval retry count, terminating node",
 						slog.Int("allowed_retries", agentPoolRetryMax),
 					)
+
 					n.shutdown()
 					return
 				}

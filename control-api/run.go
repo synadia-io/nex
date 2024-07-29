@@ -96,7 +96,6 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		Essential:          &reqOpts.essential,
 		HostServicesConfig: reqOpts.hostServicesConfiguration,
 		ID:                 &id,
-		JsDomain:           &reqOpts.jsDomain,
 		Location:           &reqOpts.location,
 		SenderPublicKey:    &senderPublic,
 		TargetNode:         &reqOpts.targetNode,
@@ -105,6 +104,10 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		WorkloadJWT:        &workloadJWT,
 		WorkloadName:       &reqOpts.workloadName,
 		WorkloadType:       reqOpts.workloadType,
+	}
+
+	if reqOpts.jsDomain != "" {
+		req.JsDomain = &reqOpts.jsDomain
 	}
 
 	return req, nil
