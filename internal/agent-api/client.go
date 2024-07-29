@@ -148,6 +148,9 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return nil, errors.New("timed out waiting for acknowledgement of workload deployment")
+		} else if errors.Is(err, nats.ErrNoResponders) {
+			time.Sleep(time.Millisecond * 100)
+			return a.DeployWorkload(request)
 		} else {
 			return nil, fmt.Errorf("failed to submit request for workload deployment: %s", err)
 		}
