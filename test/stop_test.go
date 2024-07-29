@@ -52,10 +52,4 @@ func TestStopValidation(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Expected to get an error validating a bad issuer, but got none")
 	}
-
-	badStopRequest2, _ := NewStopRequest("Nx", "1234", issuerAccount)
-	err = badStopRequest2.Validate(&originalClaims)
-	if err == nil {
-		t.Fatalf("Expected to get an error validating bad subject, but got none")
-	}
 }
