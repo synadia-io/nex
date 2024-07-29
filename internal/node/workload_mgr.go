@@ -235,7 +235,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
-		delete(w.poolAgents, workloadID)
+		delete(w.poolAgents, workloadID) // FIXME!!! does this leak running agents??
 		return fmt.Errorf("failed to submit request for workload deployment: %s", err)
 	}
 
@@ -518,8 +518,10 @@ func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
 }
 
 func (w *WorkloadManager) agentContactLost(workloadID string) {
-	w.log.Warn("Lost contact with agent", slog.String("workload_id", workloadID))
-	_ = w.StopWorkload(workloadID, false)
+	w.log.Debug("Lost contact with agent", slog.String("workload_id", workloadID))
+	if _, ok := w.liveAgents[workloadID]; ok {
+		_ = w.StopWorkload(workloadID, false)
+	}
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
