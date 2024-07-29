@@ -13,6 +13,10 @@ import (
 func ReadMemoryStats() (*controlapi.MemoryStat, error) {
 	file, err := os.Open("/proc/meminfo")
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+
 		return nil, err
 	}
 	defer file.Close()
