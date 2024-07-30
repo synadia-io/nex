@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -356,11 +357,47 @@ func (n *Node) handleAutostarts() {
 		// functions cannot be essential
 		essential := autostart.Essential && autostart.WorkloadType == controlapi.NexWorkloadNative
 
+		js, err := n.nc.JetStream()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed resolve jetstream: %s", err)
+			continue
+		}
+
+		workloadURL, err := url.Parse(autostart.Location)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed parse autostart workload location: %s", err)
+			continue
+		}
+
+		bucket, err := js.ObjectStore(workloadURL.Hostname())
+		if err != nil {
+			n.log.Error("failed resolve autostart workload object store",
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+
+		artifact := workloadURL.Path[1:len(workloadURL.Path)]
+		n.log.Debug("resolve autostart workload artifact",
+			slog.String("artifact", artifact),
+			slog.String("location", workloadURL.String()),
+		)
+
+		info, err := bucket.GetInfo(artifact)
+		if err != nil {
+			n.log.Error("failed resolve autostart workload artifact",
+				slog.String("artifact", artifact),
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
 			controlapi.Environment(autostart.Environment),
 			controlapi.Essential(essential),
+			controlapi.Hash(info.Digest),
 			controlapi.Issuer(n.issuerKeypair),
 			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),
