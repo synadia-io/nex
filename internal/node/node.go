@@ -359,38 +359,42 @@ func (n *Node) handleAutostarts() {
 
 		js, err := n.nc.JetStream()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed resolve jetstream: %s", err)
+			n.log.Error("failed to resolve jetstream",
+				slog.String("error", err.Error()),
+			)
 			continue
 		}
 
 		workloadURL, err := url.Parse(autostart.Location)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed parse autostart workload location: %s", err)
+			n.log.Error("failed to parse autostart workload location",
+				slog.String("error", err.Error()),
+			)
 			continue
 		}
 
 		bucket, err := js.ObjectStore(workloadURL.Hostname())
 		if err != nil {
-			n.log.Error("failed resolve autostart workload object store",
+			n.log.Error("failed to resolve autostart workload object store",
 				slog.String("error", err.Error()),
 			)
 			continue
 		}
 
 		artifact := workloadURL.Path[1:len(workloadURL.Path)]
-		n.log.Debug("resolve autostart workload artifact",
-			slog.String("artifact", artifact),
-			slog.String("location", workloadURL.String()),
-		)
-
 		info, err := bucket.GetInfo(artifact)
 		if err != nil {
-			n.log.Error("failed resolve autostart workload artifact",
+			n.log.Error("failed to resolve autostart workload artifact",
 				slog.String("artifact", artifact),
 				slog.String("error", err.Error()),
 			)
 			continue
 		}
+
+		n.log.Debug("resolved autostart workload artifact",
+			slog.String("artifact", artifact),
+			slog.String("location", workloadURL.String()),
+		)
 
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
