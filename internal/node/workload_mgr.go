@@ -127,7 +127,7 @@ func NewWorkloadManager(
 		w.log.Info("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
 	}
 
-	w.hostServices = NewHostServices(w.ncint, config.HostServicesConfiguration, w.log, w.t.Tracer)
+	w.hostServices = NewHostServices(w.ncint, config.HostServicesConfig, w.log, w.t.Tracer)
 	err = w.hostServices.init()
 	if err != nil {
 		w.log.Warn("Failed to initialize host services", slog.Any("err", err))
@@ -622,15 +622,15 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployR
 			))
 
 		url = request.HostServicesConfig.NatsUrl
-	} else if w.config.HostServicesConfiguration != nil {
+	} else if w.config.HostServicesConfig != nil {
 		// FIXME-- check to ensure NATS user JWT and seed are present
 		natsOpts = append(natsOpts,
-			nats.UserJWTAndSeed(w.config.HostServicesConfiguration.NatsUserJwt,
-				w.config.HostServicesConfiguration.NatsUserSeed,
+			nats.UserJWTAndSeed(w.config.HostServicesConfig.NatsUserJwt,
+				w.config.HostServicesConfig.NatsUserSeed,
 			))
 
-		if w.config.HostServicesConfiguration.NatsUrl != "" {
-			url = w.config.HostServicesConfiguration.NatsUrl
+		if w.config.HostServicesConfig.NatsUrl != "" {
+			url = w.config.HostServicesConfig.NatsUrl
 		} else {
 			url = w.nc.Servers()[0]
 		}

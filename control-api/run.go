@@ -39,7 +39,7 @@ type DeployRequest struct {
 	SenderPublicKey    *string                `json:"sender_public_key"`
 	TargetNode         *string                `json:"target_node"`
 	TriggerSubjects    []string               `json:"trigger_subjects,omitempty"`
-	HostServicesConfig *NatsJwtConnectionInfo `json:"host_services,omitempty"`
+	HostServicesConfig *NatsJwtConnectionInfo `json:"host_services_config,omitempty"`
 
 	WorkloadName *string     `json:"workload_name"`
 	WorkloadJWT  *string     `json:"workload_jwt"` // Contains claims for the workload: id, namespace
@@ -80,10 +80,10 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		return nil, err
 	}
 
-	if reqOpts.hostServicesConfiguration != nil && reqOpts.workloadType == NexWorkloadNative {
-		reqOpts.env["NEX_HOSTSERVICES_NATS_SERVER"] = reqOpts.hostServicesConfiguration.NatsUrl
-		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_JWT"] = reqOpts.hostServicesConfiguration.NatsUserJwt
-		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_SEED"] = reqOpts.hostServicesConfiguration.NatsUserSeed
+	if reqOpts.hostServicesConfig != nil && reqOpts.workloadType == NexWorkloadNative {
+		reqOpts.env["NEX_HOSTSERVICES_NATS_SERVER"] = reqOpts.hostServicesConfig.NatsUrl
+		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_JWT"] = reqOpts.hostServicesConfig.NatsUserJwt
+		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_SEED"] = reqOpts.hostServicesConfig.NatsUserSeed
 	}
 
 	encryptedEnv, err := EncryptRequestEnvironment(reqOpts.senderXkey, reqOpts.targetPublicXKey, reqOpts.env)
@@ -98,7 +98,7 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		Description:        &reqOpts.workloadDescription,
 		Environment:        &encryptedEnv,
 		Essential:          &reqOpts.essential,
-		HostServicesConfig: reqOpts.hostServicesConfiguration,
+		HostServicesConfig: reqOpts.hostServicesConfig,
 		ID:                 &id,
 		Location:           &reqOpts.location,
 		SenderPublicKey:    &senderPublic,
@@ -181,21 +181,21 @@ func (request *DeployRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyP
 }
 
 type requestOptions struct {
-	argv                      []string
-	claimsIssuer              nkeys.KeyPair
-	env                       map[string]string
-	essential                 bool
-	hash                      string
-	hostServicesConfiguration *NatsJwtConnectionInfo
-	jsDomain                  string
-	location                  url.URL
-	senderXkey                nkeys.KeyPair
-	targetNode                string
-	targetPublicXKey          string
-	triggerSubjects           []string
-	workloadDescription       string
-	workloadName              string
-	workloadType              NexWorkload
+	argv                []string
+	claimsIssuer        nkeys.KeyPair
+	env                 map[string]string
+	essential           bool
+	hash                string
+	hostServicesConfig  *NatsJwtConnectionInfo
+	jsDomain            string
+	location            url.URL
+	senderXkey          nkeys.KeyPair
+	targetNode          string
+	targetPublicXKey    string
+	triggerSubjects     []string
+	workloadDescription string
+	workloadName        string
+	workloadType        NexWorkload
 }
 
 type RequestOption func(o requestOptions) requestOptions
@@ -211,7 +211,7 @@ func Argv(argv []string) RequestOption {
 // When set, overrides the node's host services configuration
 func HostServicesConfig(config NatsJwtConnectionInfo) RequestOption {
 	return func(o requestOptions) requestOptions {
-		o.hostServicesConfiguration = &config
+		o.hostServicesConfig = &config
 		return o
 	}
 }

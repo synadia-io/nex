@@ -59,7 +59,7 @@ type DeployRequest struct {
 	RetryCount    *uint             `json:"retry_count,omitempty"`
 	TotalBytes    int64             `json:"total_bytes,omitempty"`
 
-	HostServicesConfig *controlapi.NatsJwtConnectionInfo `json:"host_services,omitempty"`
+	HostServicesConfig *controlapi.NatsJwtConnectionInfo `json:"host_services_config,omitempty"`
 	TriggerSubjects    []string                          `json:"trigger_subjects"`
 	WorkloadName       *string                           `json:"workload_name,omitempty"`
 	WorkloadType       controlapi.NexWorkload            `json:"workload_type,omitempty"`

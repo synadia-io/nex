@@ -43,7 +43,7 @@ type NodeConfiguration struct {
 	CNI                              CNIDefinition            `json:"cni"`
 	DefaultResourceDir               string                   `json:"default_resource_dir"`
 	ForceDepInstall                  bool                     `json:"-"`
-	HostServicesConfiguration        *HostServicesConfig      `json:"host_services,omitempty"`
+	HostServicesConfig               *HostServicesConfig      `json:"host_services_config,omitempty"`
 	InternalNodeDebug                bool                     `json:"internal_node_debug,omitempty"`
 	InternalNodeHost                 *string                  `json:"internal_node_host,omitempty"`
 	InternalNodePort                 *int                     `json:"internal_node_port"`
@@ -182,7 +182,7 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		RateLimiters:    nil,
 		Tags:            tags,
 		WorkloadTypes:   DefaultWorkloadTypes,
-		HostServicesConfiguration: &HostServicesConfig{
+		HostServicesConfig: &HostServicesConfig{
 			NatsUrl:      "", // this will trigger logic to re-use the main connection
 			NatsUserJwt:  "",
 			NatsUserSeed: "",
