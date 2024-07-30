@@ -28,8 +28,6 @@ type DeployRequest struct {
 	// A base64-encoded byte array that contains an encrypted json-serialized map[string]string.
 	Environment *string `json:"environment"`
 
-	HostServicesConfig *NatsJwtConnectionInfo `json:"host_services,omitempty"`
-
 	ID *string `json:"id"`
 
 	// If the payload indicates an object store bucket & key, JS domain can be supplied
@@ -38,10 +36,10 @@ type DeployRequest struct {
 	RetryCount *uint      `json:"retry_count,omitempty"`
 	RetriedAt  *time.Time `json:"retried_at,omitempty"`
 
-	SenderPublicKey   *string                `json:"sender_public_key"`
-	TargetNode        *string                `json:"target_node"`
-	TriggerSubjects   []string               `json:"trigger_subjects,omitempty"`
-	TriggerConnection *NatsJwtConnectionInfo `json:"trigger_connection,omitempty"`
+	SenderPublicKey    *string                `json:"sender_public_key"`
+	TargetNode         *string                `json:"target_node"`
+	TriggerSubjects    []string               `json:"trigger_subjects,omitempty"`
+	HostServicesConfig *NatsJwtConnectionInfo `json:"host_services,omitempty"`
 
 	WorkloadName *string     `json:"workload_name"`
 	WorkloadJWT  *string     `json:"workload_jwt"` // Contains claims for the workload: id, namespace
@@ -82,6 +80,12 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		return nil, err
 	}
 
+	if reqOpts.hostServicesConfiguration != nil && reqOpts.workloadType == NexWorkloadNative {
+		reqOpts.env["NEX_HOSTSERVICES_NATS_SERVER"] = reqOpts.hostServicesConfiguration.NatsUrl
+		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_JWT"] = reqOpts.hostServicesConfiguration.NatsUserJwt
+		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_SEED"] = reqOpts.hostServicesConfiguration.NatsUserSeed
+	}
+
 	encryptedEnv, err := EncryptRequestEnvironment(reqOpts.senderXkey, reqOpts.targetPublicXKey, reqOpts.env)
 	if err != nil {
 		return nil, err
@@ -99,7 +103,6 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		Location:           &reqOpts.location,
 		SenderPublicKey:    &senderPublic,
 		TargetNode:         &reqOpts.targetNode,
-		TriggerConnection:  reqOpts.triggerConnection,
 		TriggerSubjects:    reqOpts.triggerSubjects,
 		WorkloadJWT:        &workloadJWT,
 		WorkloadName:       &reqOpts.workloadName,
@@ -179,21 +182,20 @@ func (request *DeployRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyP
 
 type requestOptions struct {
 	argv                      []string
-	workloadName              string
-	workloadType              NexWorkload
-	workloadDescription       string
-	location                  url.URL
+	claimsIssuer              nkeys.KeyPair
 	env                       map[string]string
 	essential                 bool
-	senderXkey                nkeys.KeyPair
-	claimsIssuer              nkeys.KeyPair
-	targetPublicXKey          string
-	jsDomain                  string
 	hash                      string
-	targetNode                string
-	triggerSubjects           []string
 	hostServicesConfiguration *NatsJwtConnectionInfo
-	triggerConnection         *NatsJwtConnectionInfo
+	jsDomain                  string
+	location                  url.URL
+	senderXkey                nkeys.KeyPair
+	targetNode                string
+	targetPublicXKey          string
+	triggerSubjects           []string
+	workloadDescription       string
+	workloadName              string
+	workloadType              NexWorkload
 }
 
 type RequestOption func(o requestOptions) requestOptions
@@ -210,14 +212,6 @@ func Argv(argv []string) RequestOption {
 func HostServicesConfig(config NatsJwtConnectionInfo) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.hostServicesConfiguration = &config
-		return o
-	}
-}
-
-// When set, uses this connection to subscribe to function trigger subjects
-func TriggerConnection(config NatsJwtConnectionInfo) RequestOption {
-	return func(o requestOptions) requestOptions {
-		o.triggerConnection = &config
 		return o
 	}
 }

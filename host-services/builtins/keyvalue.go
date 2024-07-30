@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 
 	"github.com/nats-io/nats.go"
 	hostservices "github.com/synadia-io/nex/host-services"
@@ -16,6 +15,7 @@ const kvServiceMethodGet = "get"
 const kvServiceMethodSet = "set"
 const kvServiceMethodDelete = "delete"
 const kvServiceMethodKeys = "keys"
+const defaultKVBucketName = "hs_%s_kv"
 
 type KeyValueService struct {
 	log    *slog.Logger
@@ -38,8 +38,8 @@ func NewKeyValueService(log *slog.Logger) (*KeyValueService, error) {
 
 func (k *KeyValueService) Initialize(config json.RawMessage) error {
 
-	// k.config.BucketName = "hs_${namespace}_${workload_name}_kv"
-	k.config.BucketName = "hs_${namespace}_kv"
+	// TODO: add override for defaultKVBucketName
+	k.config.BucketName = defaultKVBucketName
 	k.config.JitProvision = true
 	k.config.MaxBytes = 524288
 
@@ -63,9 +63,9 @@ func (k *KeyValueService) HandleRequest(
 	request []byte,
 ) (hostservices.ServiceResult, error) {
 	var nc *nats.Conn
-	// TODO:(jr) might need to rename "TriggerConnection" to upstream or something similiar as its starting to be reused
-	if conns[hostservices.TriggerConnection] != nil {
-		nc = conns[hostservices.TriggerConnection]
+
+	if conns[hostservices.HostServicesConnection] != nil {
+		nc = conns[hostservices.HostServicesConnection]
 	} else {
 		nc = conns[hostservices.DefaultConnection]
 	}
@@ -205,13 +205,7 @@ func (k *KeyValueService) resolveKeyValueStore(nc *nats.Conn, namespace, _ strin
 		return nil, err
 	}
 
-	// reWorkload := regexp.MustCompile(`(?i)\$\{workload_name\}`)
-	reNamespace := regexp.MustCompile(`(?i)\$\{namespace\}`)
-
-	//kvStoreName := reWorkload.ReplaceAllString(k.config.BucketName, workload)
-	//kvStoreName = reNamespace.ReplaceAllString(kvStoreName, namespace)
-	kvStoreName := reNamespace.ReplaceAllString(k.config.BucketName, namespace)
-
+	kvStoreName := fmt.Sprintf(defaultKVBucketName, namespace)
 	kvStore, err := js.KeyValue(kvStoreName)
 	if err != nil {
 		if errors.Is(err, nats.ErrBucketNotFound) && k.config.JitProvision {

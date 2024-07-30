@@ -18,7 +18,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
-	hostservices "github.com/synadia-io/nex/host-services"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -259,24 +258,8 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		w.hostServices.server.SetHostServicesConnection(workloadID, ncHostServices)
 
 		if request.SupportsTriggerSubjects() {
-			ncTrigger := ncHostServices
-			if request.TriggerConnection != nil {
-				ncTrigger, err = createJwtConnection(*request.WorkloadName+"-trigger", request.TriggerConnection)
-				if err != nil {
-					w.log.Error("Failed to create trigger connection",
-						slog.Any("error", err),
-						slog.String("url", request.TriggerConnection.NatsUrl),
-					)
-
-					_ = w.StopWorkload(workloadID, true)
-					return err
-				}
-
-				w.hostServices.server.AddHostServicesConnection(workloadID, hostservices.TriggerConnection, ncTrigger)
-			}
-
 			for _, tsub := range request.TriggerSubjects {
-				sub, err := ncTrigger.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
+				sub, err := ncHostServices.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
 				if err != nil {
 					w.log.Error("Failed to create trigger subject subscription for deployed workload",
 						slog.String("workload_id", workloadID),
@@ -290,7 +273,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 				w.log.Debug("Created trigger subject subscription for deployed workload",
 					slog.String("workload_id", workloadID),
-					slog.String("nats_url", ncTrigger.ConnectedAddr()),
+					slog.String("nats_url", ncHostServices.ConnectedAddr()),
 					slog.String("trigger_subject", tsub),
 					slog.String("workload_type", string(request.WorkloadType)),
 				)
@@ -683,7 +666,6 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployR
 	)
 
 	return nc, nil
-
 }
 
 // Picks a pending agent from the pool that will receive the next deployment
@@ -712,18 +694,6 @@ func (w *WorkloadManager) TotalRunningWorkloadBytes() uint64 {
 	}
 
 	return total
-}
-
-func createJwtConnection(connName string, info *controlapi.NatsJwtConnectionInfo) (*nats.Conn, error) {
-	natsOpts := []nats.Option{
-		nats.Name(connName),
-	}
-	natsOpts = append(natsOpts,
-		nats.UserJWTAndSeed(info.NatsUserJwt,
-			info.NatsUserSeed,
-		))
-
-	return nats.Connect(info.NatsUrl, natsOpts...)
 }
 
 func byteConvert(b float64) string {
