@@ -653,14 +653,15 @@ func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats
 	}
 
 	res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
-		AvailableAgents:        len(api.mgr.poolAgents),
-		Machines:               namespaceWorkloads,
-		Memory:                 stats,
-		PublicXKey:             pubX,
-		SupportedWorkloadTypes: api.node.config.WorkloadTypes,
-		Tags:                   api.node.config.Tags,
-		Uptime:                 myUptime(time.Now().UTC().Sub(api.start)),
-		Version:                VERSION,
+		AllowDuplicateWorkloads: api.mgr.config.AllowDuplicateWorkloads,
+		AvailableAgents:         len(api.mgr.poolAgents),
+		Machines:                namespaceWorkloads,
+		Memory:                  stats,
+		PublicXKey:              pubX,
+		SupportedWorkloadTypes:  api.node.config.WorkloadTypes,
+		Tags:                    api.node.config.Tags,
+		Uptime:                  myUptime(time.Now().UTC().Sub(api.start)),
+		Version:                 VERSION,
 	}, nil)
 
 	raw, err := json.Marshal(res)

@@ -575,12 +575,13 @@ func (n *Node) publishHeartbeat() error {
 	now := time.Now().UTC()
 
 	evt := controlapi.HeartbeatEvent{
-		NodeID:          n.publicKey,
-		Nexus:           n.nexus,
-		Version:         Version(),
-		Uptime:          myUptime(now.Sub(n.startedAt)),
-		RunningMachines: len(machines),
-		Tags:            n.config.Tags,
+		AllowDuplicateWorkloads: n.config.AllowDuplicateWorkloads,
+		Nexus:                   n.nexus,
+		NodeID:                  n.publicKey,
+		RunningMachines:         len(machines),
+		Tags:                    n.config.Tags,
+		Uptime:                  myUptime(now.Sub(n.startedAt)),
+		Version:                 Version(),
 	}
 
 	cloudevent := cloudevents.NewEvent()

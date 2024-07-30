@@ -220,17 +220,31 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
+	if w.config.AllowDuplicateWorkloads != nil && !*w.config.AllowDuplicateWorkloads {
+		for _, agentClient := range w.liveAgents {
+			if strings.EqualFold(agentClient.DeployRequest().Hash, request.Hash) {
+				w.log.Warn("Attempted to deploy duplicate workload",
+					slog.String("workload_name", *request.WorkloadName),
+					slog.String("workload_type", string(request.WorkloadType)),
+				)
+
+				return errors.New("attempted to deploy duplicate workload to node configured to reject duplicates")
+			}
+		}
+	}
+
 	workloadID := agentClient.ID()
 	err := w.procMan.PrepareWorkload(workloadID, request)
 	if err != nil {
 		return fmt.Errorf("failed to prepare agent process for workload deployment: %s", err)
 	}
 
-	status := w.ncint.Status()
-
-	w.log.Debug("Workload manager deploying workload",
+	w.log.Debug("Attempting to deploy workload",
 		slog.String("workload_id", workloadID),
-		slog.String("status", status.String()))
+		slog.String("workload_name", *request.WorkloadName),
+		slog.String("workload_type", string(request.WorkloadType)),
+		slog.String("status", w.ncint.Status().String()),
+	)
 
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {

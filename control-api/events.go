@@ -50,12 +50,12 @@ type NodeStoppedEvent struct {
 	Graceful bool   `json:"graceful"`
 }
 
-// TODO: remove omitempty in next version bump
 type HeartbeatEvent struct {
-	Version         string            `json:"version"`
-	NodeID          string            `json:"node_id"`
-	Nexus           string            `json:"nexus,omitempty"`
-	Uptime          string            `json:"uptime"`
-	Tags            map[string]string `json:"tags,omitempty"`
-	RunningMachines int               `json:"running_machines"`
+	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads"`
+	Nexus                   string            `json:"nexus,omitempty"`
+	NodeID                  string            `json:"node_id"`
+	RunningMachines         int               `json:"running_machines"`
+	Tags                    map[string]string `json:"tags,omitempty"`
+	Uptime                  string            `json:"uptime"`
+	Version                 string            `json:"version"`
 }

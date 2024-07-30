@@ -38,10 +38,13 @@ var (
 type NodeConfiguration struct {
 	AgentHandshakeTimeoutMillisecond int                      `json:"agent_handshake_timeout_ms,omitempty"`
 	AgentPingTimeoutMillisecond      int                      `json:"agent_ping_timeout_ms,omitempty"`
+	AgentPluginPath                  *string                  `json:"agent_plugin_path,omitempty"`
+	AllowDuplicateWorkloads          *bool                    `json:"allow_duplicate_workloads,omitempty"`
 	AutostartConfiguration           *AutostartConfig         `json:"autostart,omitempty"`
 	BinPath                          []string                 `json:"bin_path"`
 	CNI                              CNIDefinition            `json:"cni"`
 	DefaultResourceDir               string                   `json:"default_resource_dir"`
+	DenyTriggerSubjects              []string                 `json:"deny_trigger_subjects,omitempty"`
 	ForceDepInstall                  bool                     `json:"-"`
 	HostServicesConfig               *HostServicesConfig      `json:"host_services_config,omitempty"`
 	InternalNodeDebug                bool                     `json:"internal_node_debug,omitempty"`
@@ -52,6 +55,7 @@ type NodeConfiguration struct {
 	KernelFilepath                   string                   `json:"kernel_filepath"`
 	MachinePoolSize                  int                      `json:"machine_pool_size"`
 	MachineTemplate                  MachineTemplate          `json:"machine_template"`
+	NodeLimits                       NodeLimitsConfig         `json:"node_limits"`
 	NoSandbox                        bool                     `json:"no_sandbox,omitempty"`
 	OtlpExporterUrl                  string                   `json:"otlp_exporter_url,omitempty"`
 	OtelMetrics                      bool                     `json:"otel_metrics"`
@@ -66,9 +70,6 @@ type NodeConfiguration struct {
 	Tags                             map[string]string        `json:"tags,omitempty"`
 	ValidIssuers                     []string                 `json:"valid_issuers,omitempty"`
 	WorkloadTypes                    []controlapi.NexWorkload `json:"workload_types,omitempty"`
-	AgentPluginPath                  *string                  `json:"agent_plugin_path,omitempty"`
-	DenyTriggerSubjects              []string                 `json:"deny_trigger_subjects,omitempty"`
-	NodeLimits                       NodeLimitsConfig         `json:"node_limits"`
 
 	PreflightVerbose        bool   `json:"-"`
 	PreflightVerify         bool   `json:"-"`
@@ -121,6 +122,10 @@ type AutostartDeployRequest struct {
 func (c *NodeConfiguration) Validate() bool {
 	c.Errors = make([]error, 0)
 
+	if c.AllowDuplicateWorkloads == nil {
+		c.Errors = append(c.Errors, errors.New("allow_duplicate_workloads is required"))
+	}
+
 	if c.MachinePoolSize < 1 {
 		c.Errors = append(c.Errors, errors.New("machine pool size must be >= 1"))
 	}
@@ -169,19 +174,12 @@ func DefaultNodeConfiguration() NodeConfiguration {
 		AgentHandshakeTimeoutMillisecond: DefaultAgentHandshakeTimeoutMillisecond,
 		AgentPingTimeoutMillisecond:      DefaultAgentPingTimeoutMillisecond,
 		BinPath:                          DefaultBinPath,
-		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the agent.
-		// This is not necessarily the address on which the internal NATS server is actually listening inside the node.
-		InternalNodeHost: StringOrNil(DefaultInternalNodeHost),
-		InternalNodePort: &defaultNodePort,
-		MachinePoolSize:  1,
-		MachineTemplate: MachineTemplate{
-			VcpuCount:  &defaultVcpuCount,
-			MemSizeMib: &defaultMemSizeMib,
+		CNI: CNIDefinition{
+			BinPath:       DefaultCNIBinPath,
+			NetworkName:   StringOrNil(DefaultCNINetworkName),
+			InterfaceName: StringOrNil(DefaultCNIInterfaceName),
+			Subnet:        StringOrNil(DefaultCNISubnet),
 		},
-		OtlpExporterUrl: DefaultOtelExporterUrl,
-		RateLimiters:    nil,
-		Tags:            tags,
-		WorkloadTypes:   DefaultWorkloadTypes,
 		HostServicesConfig: &HostServicesConfig{
 			NatsUrl:      "", // this will trigger logic to re-use the main connection
 			NatsUserJwt:  "",
@@ -205,15 +203,19 @@ func DefaultNodeConfiguration() NodeConfiguration {
 				},
 			},
 		},
-	}
-
-	if !config.NoSandbox {
-		config.CNI = CNIDefinition{
-			BinPath:       DefaultCNIBinPath,
-			NetworkName:   StringOrNil(DefaultCNINetworkName),
-			InterfaceName: StringOrNil(DefaultCNIInterfaceName),
-			Subnet:        StringOrNil(DefaultCNISubnet),
-		}
+		// CAUTION: This needs to be the IP of the node server's internal NATS --as visible to the agent.
+		// This is not necessarily the address on which the internal NATS server is actually listening inside the node.
+		InternalNodeHost: StringOrNil(DefaultInternalNodeHost),
+		InternalNodePort: &defaultNodePort,
+		MachinePoolSize:  1,
+		MachineTemplate: MachineTemplate{
+			VcpuCount:  &defaultVcpuCount,
+			MemSizeMib: &defaultMemSizeMib,
+		},
+		OtlpExporterUrl: DefaultOtelExporterUrl,
+		RateLimiters:    nil,
+		Tags:            tags,
+		WorkloadTypes:   DefaultWorkloadTypes,
 	}
 
 	return config

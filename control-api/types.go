@@ -99,14 +99,15 @@ type MemoryStat struct {
 }
 
 type InfoResponse struct {
-	AvailableAgents        int               `json:"available_agents"`
-	Machines               []MachineSummary  `json:"machines"` // FIXME-- rename to workloads?
-	Memory                 *MemoryStat       `json:"memory,omitempty"`
-	PublicXKey             string            `json:"public_xkey"`
-	SupportedWorkloadTypes []NexWorkload     `json:"supported_workload_types,omitempty"`
-	Tags                   map[string]string `json:"tags,omitempty"`
-	Uptime                 string            `json:"uptime"`
-	Version                string            `json:"version"`
+	AvailableAgents         int               `json:"available_agents"`
+	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads"`
+	Machines                []MachineSummary  `json:"machines"` // FIXME-- rename to workloads?
+	Memory                  *MemoryStat       `json:"memory,omitempty"`
+	PublicXKey              string            `json:"public_xkey"`
+	SupportedWorkloadTypes  []NexWorkload     `json:"supported_workload_types,omitempty"`
+	Tags                    map[string]string `json:"tags,omitempty"`
+	Uptime                  string            `json:"uptime"`
+	Version                 string            `json:"version"`
 }
 
 type MachineSummary struct { // FIXME-- rename to workload summary?
