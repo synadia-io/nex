@@ -285,11 +285,13 @@ var _ = Describe("nex node", func() {
 					var node *nexnode.Node
 					var nodeProxy *nexnode.NodeProxy
 					var nodeID *string // node id == node public key
+					var allowDuplicateWorkloads bool
 
 					BeforeEach(func() {
 						var err error
 
 						nodeConfig = models.DefaultNodeConfiguration()
+						nodeConfig.AllowDuplicateWorkloads = &allowDuplicateWorkloads
 						nodeConfig.CNI.BinPath = []string{"/opt/cni/bin"}
 						nodeConfig.DefaultResourceDir = validResourceDir
 						nodeConfig.MachinePoolSize = 2
@@ -486,9 +488,26 @@ var _ = Describe("nex node", func() {
 										_ = cmd.Wait()
 									})
 
-									It("should deploy the native workloads", func(ctx SpecContext) {
-										Expect(echoErr).To(BeNil())
-										Expect(ultimateErr).To(BeNil())
+									Context("when the node supports duplicate workloads", func() {
+										BeforeEach(func() {
+											allowDuplicateWorkloads = true
+										})
+
+										It("should deploy the native workloads", func(ctx SpecContext) {
+											Expect(echoErr).To(BeNil())
+											Expect(ultimateErr).To(BeNil())
+										})
+									})
+
+									Context("when the node does not supports duplicate workloads", func() {
+										BeforeEach(func() {
+											allowDuplicateWorkloads = false
+										})
+
+										It("should fail to deploy the duplicate workload", func(ctx SpecContext) {
+											Expect(echoErr).To(BeNil())
+											Expect(ultimateErr).To(ContainSubstring("attempted to deploy duplicate workload to node configured to reject duplicates"))
+										})
 									})
 								})
 							})
