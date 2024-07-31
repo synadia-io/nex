@@ -197,29 +197,11 @@ func (a *AgentClient) Drain() error {
 	return nil
 }
 
-// Mark the agent client instance as stopping, allowing pending handshakes to be aborted;
-// sends a shutdown request to the running agent if no workload has been deployed
+// Stop the agent client instance
+// Currently this method simply sets the stopping flag, e.g., allowing any pending handshakes to be aborted
 func (a *AgentClient) Stop() error {
 	if atomic.AddUint32(&a.stopping, 1) == 1 {
-		if a.deployRequest == nil {
-			subject := fmt.Sprintf("agentint.%s.shutdown", a.agentID)
-
-			a.log.Debug("sending shutdown request to agent via internal NATS connection",
-				slog.String("subject", subject),
-				slog.String("agent_id", a.agentID),
-			)
-
-			_, err := a.nc.Request(subject, []byte{}, 500*time.Millisecond)
-			if err != nil {
-				a.log.Warn("request to shutdown agent via internal NATS connection failed",
-					slog.String("agent_id", a.agentID),
-					slog.String("error", err.Error()),
-				)
-
-				return err
-			}
-		}
-
+		return nil
 	}
 
 	return errors.New("agent client already stopping")
@@ -235,12 +217,9 @@ func (a *AgentClient) Undeploy() error {
 		slog.String("agent_id", a.agentID),
 	)
 
-	_, err := a.nc.Request(subject, []byte{}, 5000*time.Millisecond)
+	_, err := a.nc.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
 	if err != nil {
-		a.log.Warn("request to undeploy workload via internal NATS connection failed",
-			slog.String("agent_id", a.agentID),
-			slog.String("error", err.Error()),
-		)
+		a.log.Warn("request to undeploy workload via internal NATS connection failed", slog.String("agent_id", a.agentID), slog.String("error", err.Error()))
 		return err
 	}
 

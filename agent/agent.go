@@ -164,7 +164,7 @@ func (a *Agent) requestHandshake() error {
 		return nil
 	}
 
-	return errors.New("failed to obtain handshake from host")
+	return errors.New("Failed to obtain handshake from host")
 }
 
 func (a *Agent) Version() string {
@@ -319,18 +319,6 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	}
 }
 
-func (a *Agent) handleShutdown(m *nats.Msg) {
-	if a.provider != nil {
-		a.submitLog("Received shutdown request on agent with deployed workload", slog.LevelDebug)
-		_ = m.Respond([]byte{})
-		return
-	}
-
-	_ = m.Respond([]byte{})
-
-	a.shutdown()
-}
-
 func (a *Agent) handleUndeploy(m *nats.Msg) {
 	if a.provider == nil {
 		a.submitLog("Received undeploy workload request on agent without deployed workload", slog.LevelDebug)
@@ -365,7 +353,6 @@ func (a *Agent) handlePing(m *nats.Msg) {
 // configured internal NATS connection for consumption by the nex node:
 //
 // - agentint.<agent_id>.deploy
-// - agentint.<agent_id>.shutdown
 // - agentint.<agent_id>.undeploy
 // - agentint.<agent_id>.ping
 func (a *Agent) init() error {
@@ -392,14 +379,6 @@ func (a *Agent) init() error {
 	sub, err := a.nc.Subscribe(subject, a.handleDeploy)
 	if err != nil {
 		a.submitLog(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err), slog.LevelError)
-		return err
-	}
-	a.subz = append(a.subz, sub)
-
-	subject = fmt.Sprintf("agentint.%s.shutdown", *a.md.VmID)
-	sub, err = a.nc.Subscribe(subject, a.handleShutdown)
-	if err != nil {
-		a.submitLog(fmt.Sprintf("Failed to subscribe to agent shutdown subject: %s", err), slog.LevelError)
 		return err
 	}
 	a.subz = append(a.subz, sub)
