@@ -161,7 +161,8 @@ var _ = Describe("nex node", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = validResourceDir
 							_ = os.Mkdir(nodeConfig.DefaultResourceDir, 0755)
-							nodeOpts.ForceDepInstall = true
+							// nodeOpts.ForceDepInstall = true
+							nodeOpts.PreflightYes = true
 						})
 
 						JustBeforeEach(func() {
