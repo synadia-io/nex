@@ -499,7 +499,7 @@ var _ = Describe("nex node", func() {
 										})
 									})
 
-									Context("when the node does not supports duplicate workloads", func() {
+									Context("when the node does not support duplicate workloads", func() {
 										BeforeEach(func() {
 											allowDuplicateWorkloads = false
 										})
