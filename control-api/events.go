@@ -51,7 +51,7 @@ type NodeStoppedEvent struct {
 }
 
 type HeartbeatEvent struct {
-	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads"`
+	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads,omitempty"`
 	Nexus                   string            `json:"nexus,omitempty"`
 	NodeID                  string            `json:"node_id"`
 	RunningMachines         int               `json:"running_machines"`

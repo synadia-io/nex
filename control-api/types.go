@@ -100,7 +100,7 @@ type MemoryStat struct {
 
 type InfoResponse struct {
 	AvailableAgents         int               `json:"available_agents"`
-	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads"`
+	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads,omitempty"`
 	Machines                []MachineSummary  `json:"machines"` // FIXME-- rename to workloads?
 	Memory                  *MemoryStat       `json:"memory,omitempty"`
 	PublicXKey              string            `json:"public_xkey"`
