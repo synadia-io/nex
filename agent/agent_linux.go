@@ -14,7 +14,8 @@ func HaltVM(err error) {
 		code = 1
 	}
 
-	if isSandboxed() {
+	// don't call reboot if we expected this halt (e.g. captured sigterm)
+	if isSandboxed() && err != nil {
 		err = syscall.Reboot(syscall.LINUX_REBOOT_CMD_RESTART)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to halt: %s", err)
