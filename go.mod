@@ -154,4 +154,4 @@ require (
 	gotest.tools/v3 v3.5.1 // indirect
 )
 
-replace github.com/firecracker-microvm/firecracker-go-sdk => github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240422123121-239cc054eb0a
+replace github.com/firecracker-microvm/firecracker-go-sdk => github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240731145001-c17fb1cbbee7

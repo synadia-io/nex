@@ -103,7 +103,6 @@ func (a *AgentClient) ID() string {
 // - hostint.<agent_id>.events
 // - hostint.<agent_id>.logs
 func (a *AgentClient) Start(agentID string) error {
-	a.log.Info("Agent client starting", slog.String("agent_id", agentID))
 	a.agentID = agentID
 
 	var sub *nats.Subscription
@@ -129,6 +128,7 @@ func (a *AgentClient) Start(agentID string) error {
 
 	go a.awaitHandshake(agentID)
 
+	a.log.Info("Agent client started", slog.String("agent_id", agentID))
 	return nil
 }
 
@@ -314,7 +314,7 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Info("Received agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
+	a.log.Debug("Received agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
 
 	resp, _ := json.Marshal(&HandshakeResponse{})
 

@@ -201,7 +201,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 
 			go f.delegate.OnProcessStarted(vm.vmmID)
 
-			f.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
+			f.log.Debug("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 			f.poolVMs <- vm // If the pool is full, this line will block until a slot is available.
 		}
 	}
