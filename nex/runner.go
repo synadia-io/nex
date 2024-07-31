@@ -117,7 +117,7 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 
 	request, err := controlapi.NewDeployRequest(
 		controlapi.Argv(argv),
-		controlapi.Hash(info.Digest),
+		controlapi.Hash(controlapi.SanitizeNATSDigest(info.Digest)),
 		controlapi.Environment(RunOpts.Env),
 		controlapi.Essential(RunOpts.Essential),
 		controlapi.Issuer(issuerKp),

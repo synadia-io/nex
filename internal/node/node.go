@@ -401,7 +401,7 @@ func (n *Node) handleAutostarts() {
 			controlapi.Location(autostart.Location),
 			controlapi.Environment(autostart.Environment),
 			controlapi.Essential(essential),
-			controlapi.Hash(info.Digest),
+			controlapi.Hash(controlapi.SanitizeNATSDigest(info.Digest)),
 			controlapi.Issuer(n.issuerKeypair),
 			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),

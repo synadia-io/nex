@@ -90,11 +90,12 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 				w.log.Error("Failed to resolve workload artifact: %s; %s", artifact, slog.Any("err", err))
 				return
 			}
+			digest := controlapi.SanitizeNATSDigest(info.Digest)
 
 			req, _ := json.Marshal(&controlapi.DeployRequest{
 				Argv:            deployRequest.Argv,
 				Description:     deployRequest.Description,
-				Hash:            &info.Digest,
+				Hash:            &digest,
 				Environment:     deployRequest.EncryptedEnvironment,
 				Essential:       deployRequest.Essential,
 				ID:              &id,
