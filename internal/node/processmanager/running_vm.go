@@ -94,7 +94,6 @@ func createAndStartVM(ctx context.Context, vmmID string, config *nexmodels.NodeC
 		log.Error("Failed to generate firecracker configuration", slog.Any("config", config))
 		return nil, err
 	}
-
 	err = copy(config.RootFsFilepath, *fcCfg.Drives[0].PathOnHost)
 
 	if err != nil {
