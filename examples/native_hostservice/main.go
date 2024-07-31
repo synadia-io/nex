@@ -27,13 +27,11 @@ func main() {
 		return
 	}
 
+	// Warning: this will print your seed into logs
 	fmt.Fprintf(os.Stdout, "Found environment!\nServer: %s\nJWT: %s\nSeed: %s\n", server, jwt, seed)
 
-	// You would be able to use the JWT and Seed to connect to the NATS server and access your host service
-	// assets, but since they are fake here, we will just print them out and connect to demo.nats.io for fun
-
 	ctx := context.Background()
-	nc, err := nats.Connect(server)
+	nc, err := nats.Connect(server, nats.UserJWTAndSeed(jwt, seed))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to connect to NATS: %s\n", err)
 		return
