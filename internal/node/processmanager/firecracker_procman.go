@@ -120,7 +120,7 @@ func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployReq
 
 func (f *FirecrackerProcessManager) Stop() error {
 	if atomic.AddUint32(&f.closing, 1) == 1 {
-		f.log.Info("Firecracker process manager stopping")
+		f.log.Debug("Firecracker process manager stopping")
 		close(f.poolVMs)
 
 		for vmID := range f.allVMs {
