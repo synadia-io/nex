@@ -149,6 +149,8 @@ func init() {
 
 func main() {
 	setConditionalCommands()
+	setDebuggerCommands()
+
 	cmd := fisk.MustParse(ncli.Parse(os.Args[1:]))
 
 	switch workloadType {

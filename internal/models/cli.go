@@ -115,8 +115,6 @@ type NodeOptions struct {
 	ForceDepInstall bool     `json:"-"`
 	CniNS           []string `json:"-"`
 
-	ExecutionTrace string `json:"-"`
-
 	OtelMetrics         bool   `json:"-"`
 	OtelMetricsPort     int    `json:"-"`
 	OtelMetricsExporter string `json:"-"`
