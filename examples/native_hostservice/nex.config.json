@@ -1,0 +1,27 @@
+{
+  "default_resource_dir": "/tmp/nex_resources",
+  "bin_path": [
+    "/usr/local/bin"
+  ],
+  "machine_pool_size": 1,
+  "cni": {
+    "bin_path": [
+      "/opt/cni/bin"
+    ],
+    "network_name": "fcnet",
+    "interface_name": "veth0"
+  },
+  "machine_template": {
+    "vcpu_count": 1,
+    "memsize_mib": 256
+  },
+  "tags": {
+    "simple": "true"
+  },
+  "no_sandbox": false,
+  "host_services_config": {
+    "nats_url": "nats://demo.nats.io",
+    "nats_user_jwt": "somelongjwt",
+    "nats_user_seed": "myuserseed"
+  }
+}
