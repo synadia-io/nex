@@ -78,7 +78,6 @@ func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
 		Host:      "0.0.0.0",
 		Port:      -1,
 		JetStream: true,
-		NoLog:     true,
 		StoreDir:  storeDir,
 	})
 	if err != nil {

@@ -14,7 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rs/xid"
+	"github.com/google/uuid"
+
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -28,13 +29,14 @@ type FirecrackerProcessManager struct {
 	config    *models.NodeConfiguration
 	ctx       context.Context
 	log       *slog.Logger
+	mutex     *sync.Mutex
 	stopMutex map[string]*sync.Mutex
 	t         *observability.Telemetry
 
 	allVMs  map[string]*runningFirecracker
-	warmVMs chan *runningFirecracker
+	poolVMs chan *runningFirecracker
 
-	intNats *internalnats.InternalNatsServer
+	natsint *internalnats.InternalNatsServer
 
 	delegate       ProcessDelegate
 	deployRequests map[string]*agentapi.DeployRequest
@@ -50,13 +52,14 @@ func NewFirecrackerProcessManager(
 
 	return &FirecrackerProcessManager{
 		config:  config,
-		intNats: intnats,
-		t:       telemetry,
-		log:     log,
 		ctx:     ctx,
+		natsint: intnats,
+		log:     log,
+		mutex:   &sync.Mutex{},
+		t:       telemetry,
 
 		allVMs:         make(map[string]*runningFirecracker),
-		warmVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
+		poolVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
 		stopMutex:      make(map[string]*sync.Mutex),
 		deployRequests: make(map[string]*agentapi.DeployRequest),
 	}, nil
@@ -93,7 +96,10 @@ func (f *FirecrackerProcessManager) EnterLameDuck() error {
 
 // Preparing a workload reads from the warmVMs channel
 func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.DeployRequest) error {
-	vm := <-f.warmVMs
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
+	vm := <-f.poolVMs
 	if vm == nil {
 		return fmt.Errorf("could not prepare workload, no available firecracker VM")
 	}
@@ -114,8 +120,8 @@ func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployReq
 
 func (f *FirecrackerProcessManager) Stop() error {
 	if atomic.AddUint32(&f.closing, 1) == 1 {
-		f.log.Info("Firecracker process manager stopping")
-		close(f.warmVMs)
+		f.log.Debug("Firecracker process manager stopping")
+		close(f.poolVMs)
 
 		for vmID := range f.allVMs {
 			err := f.StopProcess(vmID)
@@ -131,7 +137,7 @@ func (f *FirecrackerProcessManager) Stop() error {
 }
 
 func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
-	f.log.Info("Firecracker VM process manager starting")
+	f.log.Debug("Firecracker VM process manager starting")
 	f.delegate = delegate
 
 	defer func() {
@@ -152,21 +158,33 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 		case <-f.ctx.Done():
 			return nil
 		default:
-			if len(f.warmVMs) == f.config.MachinePoolSize {
+			if len(f.poolVMs) == f.config.MachinePoolSize {
 				time.Sleep(runloopSleepInterval)
 				continue
 			}
-			vmmID := xid.New().String()
-			workloadKey, err := f.intNats.CreateCredentials(vmmID)
+
+			vmmUUID, err := uuid.NewRandom()
+			if err != nil {
+				f.log.Error("Failed to generate uuid", slog.Any("err", err))
+				continue
+			}
+			vmmID := vmmUUID.String()
+
+			workloadKey, err := f.natsint.CreateCredentials(vmmID)
 			if err != nil {
 				f.log.Error("Failed to create workload user", slog.Any("err", err))
 				continue
 			}
-			workloadSeed, _ := workloadKey.Seed()
 
 			vm, err := createAndStartVM(context.TODO(), vmmID, f.config, f.log)
 			if err != nil {
 				f.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
+				continue
+			}
+
+			workloadSeed, err := workloadKey.Seed()
+			if err != nil {
+				f.log.Error("Failed to resolve seed from workload key", slog.Any("err", err))
 				continue
 			}
 
@@ -183,8 +201,8 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 
 			go f.delegate.OnProcessStarted(vm.vmmID)
 
-			f.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
-			f.warmVMs <- vm // If the pool is full, this line will block until a slot is available.
+			f.log.Debug("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
+			f.poolVMs <- vm // If the pool is full, this line will block until a slot is available.
 		}
 	}
 
@@ -192,12 +210,13 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 }
 
 func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
+
 	vm, exists := f.allVMs[workloadID]
 	if !exists {
 		return fmt.Errorf("failed to stop machine %s", workloadID)
 	}
-
-	delete(f.deployRequests, workloadID)
 
 	mutex := f.stopMutex[workloadID]
 	mutex.Lock()
@@ -207,6 +226,7 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	vm.shutdown()
 
 	delete(f.allVMs, workloadID)
+	delete(f.deployRequests, workloadID)
 	delete(f.stopMutex, workloadID)
 
 	if vm.deployRequest != nil {
@@ -225,17 +245,8 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	return nil
 }
 
-func (f *FirecrackerProcessManager) Lookup(workloadID string) (*agentapi.DeployRequest, error) {
-	if request, ok := f.deployRequests[workloadID]; ok {
-		return request, nil
-	}
-
-	// Per contract, a non-prepared workload returns nil, not error
-	return nil, nil
-}
-
 func (f *FirecrackerProcessManager) resetCNI() error {
-	f.log.Info("Resetting network")
+	f.log.Debug("Resetting network")
 
 	err := os.RemoveAll("/var/lib/cni")
 	if err != nil {

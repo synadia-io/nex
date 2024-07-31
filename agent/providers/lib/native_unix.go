@@ -17,7 +17,7 @@ func (e *NativeExecutable) Undeploy() error {
 		err := e.cmd.Process.Signal(os.Interrupt)
 
 		if err != nil {
-			fmt.Println("Couldn't terminate elf binary process")
+			fmt.Fprintf(e.stderr, "Couldn't terminate elf binary process: %s", err.Error())
 			e.fail <- true
 		}
 	})

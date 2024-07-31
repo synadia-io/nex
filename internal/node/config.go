@@ -26,6 +26,12 @@ func LoadNodeConfiguration(configFilepath string) (*models.NodeConfiguration, er
 		return nil, err
 	}
 
+	if config.AllowDuplicateWorkloads == nil {
+		// allow duplicate workloads by default in sandbox mode; disallow by default in no-sandbox mode
+		allowDuplicateWorkloads := !config.NoSandbox
+		config.AllowDuplicateWorkloads = &allowDuplicateWorkloads
+	}
+
 	if len(config.WorkloadTypes) == 0 {
 		config.WorkloadTypes = []controlapi.NexWorkload{controlapi.NexWorkloadNative}
 	}

@@ -11,8 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"disorder.dev/shandler"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
+	controlapi "github.com/synadia-io/nex/control-api"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -24,6 +26,8 @@ type LogCallback func(string, LogEntry)
 type ContactLostCallback func(string)
 
 const (
+	defaultAgentPingIntervalMillis = 5000
+
 	NexTriggerSubject = "x-nex-trigger-subject"
 	NexRuntimeNs      = "x-nex-runtime-ns"
 
@@ -54,8 +58,11 @@ type AgentClient struct {
 	execTotalNanos    int64
 	workloadStartedAt time.Time
 
+	deployRequest *DeployRequest
 	workloadBytes uint64
 	subz          []*nats.Subscription
+
+	selected bool // FIXME-- rename...
 }
 
 func NewAgentClient(
@@ -96,7 +103,6 @@ func (a *AgentClient) ID() string {
 // - hostint.<agent_id>.events
 // - hostint.<agent_id>.logs
 func (a *AgentClient) Start(agentID string) error {
-	a.log.Info("Agent client starting", slog.String("agent_id", agentID))
 	a.agentID = agentID
 
 	var sub *nats.Subscription
@@ -122,6 +128,7 @@ func (a *AgentClient) Start(agentID string) error {
 
 	go a.awaitHandshake(agentID)
 
+	a.log.Info("Agent client started", slog.String("agent_id", agentID))
 	return nil
 }
 
@@ -137,10 +144,13 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		slog.String("status", status.String()))
 
 	subject := fmt.Sprintf("agentint.%s.deploy", a.agentID)
-	resp, err := a.nc.Request(subject, bytes, 1*time.Second)
+	resp, err := a.nc.Request(subject, bytes, 5*time.Second)
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return nil, errors.New("timed out waiting for acknowledgement of workload deployment")
+		} else if errors.Is(err, nats.ErrNoResponders) {
+			time.Sleep(time.Millisecond * 100)
+			return a.DeployWorkload(request)
 		} else {
 			return nil, fmt.Errorf("failed to submit request for workload deployment: %s", err)
 		}
@@ -153,6 +163,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		return nil, err
 	}
 
+	a.deployRequest = request
 	a.workloadStartedAt = time.Now().UTC()
 	a.workloadBytes = uint64(request.TotalBytes)
 	return &deployResponse, nil
@@ -220,7 +231,7 @@ func (a *AgentClient) Ping() error {
 	// a.log.Debug("pinging agent", slog.String("subject", subject))
 
 	_, err := a.nc.Request(subject, []byte{}, a.pingTimeout)
-	if err != nil {
+	if err != nil && !a.shuttingDown() {
 		a.log.Warn("agent failed to respond to ping", slog.Any("error", err))
 		return err
 	}
@@ -241,6 +252,22 @@ func (a *AgentClient) UptimeMillis() time.Duration {
 	return time.Since(a.workloadStartedAt)
 }
 
+func (a *AgentClient) DeployRequest() *DeployRequest {
+	return a.deployRequest
+}
+
+func (a *AgentClient) IsSelected() bool {
+	return a.selected
+}
+
+func (a *AgentClient) MarkSelected() {
+	a.selected = true
+}
+
+func (a *AgentClient) MarkUnselected() {
+	a.selected = false
+}
+
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
 	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
 	intmsg.Header.Add(NexTriggerSubject, subject)
@@ -258,6 +285,10 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 	childSpan.End()
 
 	return resp, err
+}
+
+func (a *AgentClient) WorkloadType() controlapi.NexWorkload {
+	return a.deployRequest.WorkloadType
 }
 
 func (a *AgentClient) awaitHandshake(agentID string) {
@@ -283,7 +314,7 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Info("Received agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
+	a.log.Debug("Received agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
 
 	resp, _ := json.Marshal(&HandshakeResponse{})
 
@@ -299,7 +330,7 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 }
 
 func (a *AgentClient) monitorAgent() {
-	ticker := time.NewTicker(5000 * time.Millisecond) // FIXME-- make configurable
+	ticker := time.NewTicker(time.Millisecond * defaultAgentPingIntervalMillis) // FIXME-- make configurable
 	defer ticker.Stop()
 
 	for !a.shuttingDown() {
@@ -340,7 +371,7 @@ func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Debug("Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
+	a.log.Log(context.TODO(), shandler.LevelTrace, "Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
 	a.logReceived(agentID, logentry)
 }
 

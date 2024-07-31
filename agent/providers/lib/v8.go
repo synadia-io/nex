@@ -260,6 +260,7 @@ func (v *V8) Validate() error {
 	}
 
 	v.initUtils()
+	_ = os.Remove(v.tmpFilename)
 
 	return nil
 }

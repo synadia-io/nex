@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -34,7 +35,7 @@ const (
 	publicNATSServerStartTimeout = 50 * time.Millisecond
 	runloopSleepInterval         = 100 * time.Millisecond
 	runloopTickInterval          = 2500 * time.Millisecond
-	agentPoolRetryMax            = 3
+	agentPoolRetryMax            = 100
 )
 
 // Nex node process
@@ -132,6 +133,10 @@ func (n *Node) Start() {
 
 	n.startedAt = time.Now()
 	_ = n.publishNodeStarted()
+
+	if n.config.AutostartConfiguration != nil {
+		go n.handleAutostarts()
+	}
 
 	timer := time.NewTicker(runloopTickInterval)
 	defer timer.Stop()
@@ -246,7 +251,7 @@ func (n *Node) init() error {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", _err))
 			err = errors.Join(err, _err)
 		} else {
-			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
+			n.log.Debug("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
 
 		// start public NATS server
@@ -264,13 +269,9 @@ func (n *Node) init() error {
 			n.log.Error("Failed to connect to NATS server", slog.Any("err", _err))
 			err = errors.Join(err, fmt.Errorf("failed to connect to NATS server: %s", _err))
 		} else {
-			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
+			n.log.Debug("Established node NATS connection", slog.String("servers", n.opts.Servers))
+			n.setConnectionCallbackHandler(n.nc)
 		}
-
-		n.nc.SetDisconnectErrHandler(n.ncDisconnectErrorHandler)
-		n.nc.SetReconnectHandler(n.ncReconnectedHandler)
-		n.nc.SetErrorHandler(n.ncErrorHandler)
-		n.nc.SetClosedHandler(n.ncClosedHandler)
 
 		n.manager, _err = NewWorkloadManager(
 			n.ctx,
@@ -299,38 +300,10 @@ func (n *Node) init() error {
 			}
 		}
 
-		if n.config.AutostartConfiguration != nil {
-			go n.handleAutostarts()
-		}
-
 		n.installSignalHandlers()
 	})
 
 	return err
-}
-
-func (n *Node) ncDisconnectErrorHandler(conn *nats.Conn, err error) {
-	n.log.Error("NATS connection disconnected",
-		slog.Any("error", err),
-		slog.String("connection", conn.Opts.Name),
-	)
-}
-
-func (n *Node) ncReconnectedHandler(conn *nats.Conn) {
-	n.log.Info("NATS connection re-established")
-}
-
-func (n *Node) ncErrorHandler(conn *nats.Conn, _ *nats.Subscription, err error) {
-	n.log.Error("NATS error",
-		slog.Any("error", err),
-		slog.String("connection", conn.Opts.Name),
-	)
-}
-
-func (n *Node) ncClosedHandler(conn *nats.Conn) {
-	n.log.Info("NATS connection closed",
-		slog.String("connection", conn.Opts.Name),
-	)
 }
 
 func (n *Node) startPublicNATS() error {
@@ -368,11 +341,13 @@ func (n *Node) handleAutostarts() {
 			if err != nil {
 				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
 				time.Sleep(50 * time.Millisecond)
+
 				retry += 1
 				if retry > agentPoolRetryMax {
 					n.log.Error("Exceeded warm agent retrieval retry count, terminating node",
 						slog.Int("allowed_retries", agentPoolRetryMax),
 					)
+
 					n.shutdown()
 					return
 				}
@@ -382,24 +357,65 @@ func (n *Node) handleAutostarts() {
 		// functions cannot be essential
 		essential := autostart.Essential && autostart.WorkloadType == controlapi.NexWorkloadNative
 
+		js, err := n.nc.JetStream()
+		if err != nil {
+			n.log.Error("failed to resolve jetstream",
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+
+		workloadURL, err := url.Parse(autostart.Location)
+		if err != nil {
+			n.log.Error("failed to parse autostart workload location",
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+
+		bucket, err := js.ObjectStore(workloadURL.Hostname())
+		if err != nil {
+			n.log.Error("failed to resolve autostart workload object store",
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+
+		artifact := workloadURL.Path[1:len(workloadURL.Path)]
+		info, err := bucket.GetInfo(artifact)
+		if err != nil {
+			n.log.Error("failed to resolve autostart workload artifact",
+				slog.String("artifact", artifact),
+				slog.String("error", err.Error()),
+			)
+			continue
+		}
+
+		n.log.Debug("resolved autostart workload artifact",
+			slog.String("artifact", artifact),
+			slog.String("location", workloadURL.String()),
+		)
+
 		request, err := controlapi.NewDeployRequest(
 			controlapi.Argv(autostart.Argv),
 			controlapi.Location(autostart.Location),
 			controlapi.Environment(autostart.Environment),
 			controlapi.Essential(essential),
+			controlapi.Hash(controlapi.SanitizeNATSDigest(info.Digest)),
 			controlapi.Issuer(n.issuerKeypair),
 			controlapi.SenderXKey(n.api.xk),
 			controlapi.TargetNode(n.publicKey),
 			controlapi.TargetPublicXKey(n.api.PublicXKey()),
-			controlapi.WorkloadName(autostart.Name),
-			controlapi.WorkloadType(autostart.WorkloadType),
 			controlapi.TriggerSubjects(autostart.TriggerSubjects),
 			controlapi.WorkloadDescription(*autostart.Description),
+			controlapi.WorkloadName(autostart.Name),
+			controlapi.WorkloadType(autostart.WorkloadType),
 		)
 		if err != nil {
 			n.log.Error("Failed to create deployment request for autostart workload",
 				slog.Any("error", err),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
 
@@ -412,6 +428,7 @@ func (n *Node) handleAutostarts() {
 			n.log.Error("Failed to validate autostart deployment request",
 				slog.Any("error", err),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
 
@@ -424,29 +441,34 @@ func (n *Node) handleAutostarts() {
 				slog.String("namespace", autostart.Namespace),
 				slog.String("url", autostart.Location),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
-		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 
+		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 		agentDeployRequest.TotalBytes = int64(numBytes)
 		agentDeployRequest.Hash = *workloadHash
 
-		err = n.api.mgr.DeployWorkload(agentClient, agentDeployRequest)
+		err = n.manager.DeployWorkload(agentClient, agentDeployRequest)
 		if err != nil {
 			n.log.Error("Failed to deploy autostart workload",
 				slog.Any("error", err),
 				slog.String("name", autostart.Name),
 				slog.String("namespace", autostart.Namespace),
 			)
+			agentClient.MarkUnselected()
 			continue
 		}
+
 		n.log.Info("Autostart workload started",
 			slog.String("name", autostart.Name),
 			slog.String("namespace", autostart.Namespace),
 			slog.String("workload_id", agentClient.ID()),
 		)
+
 		successCount += 1
 	}
+
 	if successCount < len(n.config.AutostartConfiguration.Workloads) {
 		n.log.Error("Not all startup workloads suceeded",
 			slog.Int("expected", len(n.config.AutostartConfiguration.Workloads)),
@@ -475,10 +497,60 @@ func (n *Node) loadNodeConfig() error {
 	return nil
 }
 
+func (n *Node) ncClosedHandler(conn *nats.Conn) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	n.log.Debug("NATS connection closed", attrs...)
+}
+
+func (n *Node) ncDisconnectErrorHandler(conn *nats.Conn, err error) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	if err != nil {
+		attrs = append(attrs, slog.Any("error", err))
+	}
+
+	n.log.Debug("NATS connection disconnected", attrs...)
+}
+
+func (n *Node) ncErrorHandler(conn *nats.Conn, _ *nats.Subscription, err error) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	attrs = append(attrs, slog.Any("error", err))
+
+	n.log.Error("NATS error", attrs...)
+}
+
+func (n *Node) ncReconnectedHandler(conn *nats.Conn) {
+	attrs := make([]any, 0)
+	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+
+	if conn.Opts.Name != "" {
+		attrs = append(attrs, slog.String("name", conn.Opts.Name))
+	}
+
+	n.log.Debug("NATS connection re-established", attrs...)
+}
+
 func (n *Node) publishNodeLameDuckEntered() error {
 	nodeLameDuck := controlapi.LameDuckEnteredEvent{
 		Version: VERSION,
-		Id:      n.publicKey,
+		ID:      n.publicKey,
 	}
 
 	cloudevent := cloudevents.NewEvent()
@@ -503,12 +575,13 @@ func (n *Node) publishHeartbeat() error {
 	now := time.Now().UTC()
 
 	evt := controlapi.HeartbeatEvent{
-		NodeId:          n.publicKey,
-		Nexus:           n.nexus,
-		Version:         Version(),
-		Uptime:          myUptime(now.Sub(n.startedAt)),
-		RunningMachines: len(machines),
-		Tags:            n.config.Tags,
+		AllowDuplicateWorkloads: n.config.AllowDuplicateWorkloads,
+		Nexus:                   n.nexus,
+		NodeID:                  n.publicKey,
+		RunningMachines:         len(machines),
+		Tags:                    n.config.Tags,
+		Uptime:                  myUptime(now.Sub(n.startedAt)),
+		Version:                 Version(),
 	}
 
 	cloudevent := cloudevents.NewEvent()
@@ -525,7 +598,7 @@ func (n *Node) publishHeartbeat() error {
 func (n *Node) publishNodeStarted() error {
 	nodeStart := controlapi.NodeStartedEvent{
 		Version: VERSION,
-		Id:      n.publicKey,
+		ID:      n.publicKey,
 		Tags:    n.config.Tags,
 	}
 
@@ -537,13 +610,13 @@ func (n *Node) publishNodeStarted() error {
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(nodeStart)
 
-	n.log.Info("Publishing node started event")
+	n.log.Debug("Publishing node started event")
 	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
 }
 
 func (n *Node) publishNodeStopped() error {
 	evt := controlapi.NodeStoppedEvent{
-		Id:       n.publicKey,
+		ID:       n.publicKey,
 		Graceful: true,
 	}
 
@@ -555,8 +628,17 @@ func (n *Node) publishNodeStopped() error {
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(evt)
 
-	n.log.Info("Publishing node stopped event")
+	n.log.Debug("Publishing node stopped event")
 	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
+}
+
+func (n *Node) setConnectionCallbackHandler(nc *nats.Conn) {
+	nc.SetClosedHandler(n.ncClosedHandler)
+	nc.SetDisconnectErrHandler(n.ncDisconnectErrorHandler)
+	nc.SetErrorHandler(n.ncErrorHandler)
+	nc.SetReconnectHandler(n.ncReconnectedHandler)
+
+	n.log.Debug("Set NATS connection callback handlers", slog.String("servers", n.opts.Servers))
 }
 
 func (n *Node) validateConfig() error {
@@ -622,19 +704,19 @@ func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployReques
 		Environment:          request.WorkloadEnvironment,
 		Essential:            request.Essential,
 		Hash:                 hash,
+		HostServicesConfig:   request.HostServicesConfig,
+		ID:                   request.ID,
 		JsDomain:             request.JsDomain,
 		Location:             request.Location,
 		Namespace:            &namespace,
-		RetryCount:           request.RetryCount,
 		RetriedAt:            request.RetriedAt,
+		RetryCount:           request.RetryCount,
 		SenderPublicKey:      request.SenderPublicKey,
 		TargetNode:           request.TargetNode,
 		TotalBytes:           int64(numBytes),
-		HostServicesConfig:   request.HostServicesConfig,
 		TriggerSubjects:      request.TriggerSubjects,
-		TriggerConnection:    request.TriggerConnection,
-		WorkloadName:         &request.DecodedClaims.Subject,
-		WorkloadType:         request.WorkloadType, // FIXME-- audit all types for string -> *string, and validate...
-		WorkloadJwt:          request.WorkloadJwt,
+		WorkloadJwt:          request.WorkloadJWT,
+		WorkloadName:         request.WorkloadName,
+		WorkloadType:         request.WorkloadType,
 	}
 }

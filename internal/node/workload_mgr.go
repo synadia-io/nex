@@ -18,7 +18,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
-	hostservices "github.com/synadia-io/nex/host-services"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -59,11 +58,11 @@ type WorkloadManager struct {
 	procMan processmanager.ProcessManager
 
 	// Any agent client in this map is one that has successfully acknowledged a deployment
-	activeAgents map[string]*agentapi.AgentClient
+	liveAgents map[string]*agentapi.AgentClient
 
 	// Agent clients in this slice are attached to processes that have not yet received a deployment AND have
 	// successfully performed a handshake. Handshake failures are immediately removed
-	pendingAgents map[string]*agentapi.AgentClient
+	poolAgents map[string]*agentapi.AgentClient
 
 	handshakes       map[string]string
 	handshakeTimeout time.Duration
@@ -110,8 +109,8 @@ func NewWorkloadManager(
 		publicKey:        publicKey,
 		t:                telemetry,
 
-		pendingAgents: make(map[string]*agentapi.AgentClient),
-		activeAgents:  make(map[string]*agentapi.AgentClient),
+		poolAgents: make(map[string]*agentapi.AgentClient),
+		liveAgents: make(map[string]*agentapi.AgentClient),
 
 		stopMutex: make(map[string]*sync.Mutex),
 		subz:      make(map[string][]*nats.Subscription),
@@ -125,10 +124,10 @@ func NewWorkloadManager(
 		w.log.Error("Failed to start internal NATS server", slog.Any("err", err))
 		return nil, err
 	} else {
-		w.log.Info("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
+		w.log.Debug("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
 	}
 
-	w.hostServices = NewHostServices(w.ncint, config.HostServicesConfiguration, w.log, w.t.Tracer)
+	w.hostServices = NewHostServices(w.ncint, config.HostServicesConfig, w.log, w.t.Tracer)
 	err = w.hostServices.init()
 	if err != nil {
 		w.log.Warn("Failed to initialize host services", slog.Any("err", err))
@@ -146,7 +145,7 @@ func NewWorkloadManager(
 
 // Start the workload manager, which in turn starts the configured agent process manager
 func (w *WorkloadManager) Start() {
-	w.log.Info("Workload manager starting")
+	w.log.Debug("Workload manager starting")
 
 	err := w.procMan.Start(w)
 	if err != nil {
@@ -186,11 +185,15 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 		return 0, nil, err
 	}
 
+	started := time.Now()
 	workload, err := store.GetBytes(key)
 	if err != nil {
 		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
 		return 0, nil, err
 	}
+	finished := time.Since(started)
+	dlRate := float64(len(workload)) / finished.Seconds()
+	m.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.String("duration", fmt.Sprintf("%.2f sec", finished.Seconds())), slog.String("rate", fmt.Sprintf("%s/sec", byteConvert(dlRate))))
 
 	err = m.natsint.StoreFileForID(workloadID, workload)
 	if err != nil {
@@ -202,8 +205,11 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
 
 	m.log.Info("Successfully stored workload in internal object store",
-		slog.String("name", request.DecodedClaims.Subject),
-		slog.Int("bytes", len(workload)))
+		slog.String("workload_name", *request.WorkloadName),
+		slog.String("workload_id", workloadID),
+		slog.String("workload_hash", workloadHashString),
+		slog.Int("bytes", len(workload)),
+	)
 
 	return uint64(len(workload)), &workloadHashString, nil
 }
@@ -214,27 +220,46 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
+	if w.config.AllowDuplicateWorkloads != nil && !*w.config.AllowDuplicateWorkloads {
+		for _, agentClient := range w.liveAgents {
+			if strings.EqualFold(agentClient.DeployRequest().Hash, request.Hash) {
+				w.log.Warn("Attempted to deploy duplicate workload",
+					slog.String("workload_name", *request.WorkloadName),
+					slog.String("workload_type", string(request.WorkloadType)),
+				)
+
+				return errors.New("attempted to deploy duplicate workload to node configured to reject duplicates")
+			}
+		}
+	}
+
 	workloadID := agentClient.ID()
 	err := w.procMan.PrepareWorkload(workloadID, request)
 	if err != nil {
 		return fmt.Errorf("failed to prepare agent process for workload deployment: %s", err)
 	}
 
-	status := w.ncint.Status()
-
-	w.log.Debug("Workload manager deploying workload",
+	w.log.Debug("Attempting to deploy workload",
 		slog.String("workload_id", workloadID),
-		slog.String("conn_status", status.String()))
+		slog.String("workload_name", *request.WorkloadName),
+		slog.String("workload_type", string(request.WorkloadType)),
+		slog.String("status", w.ncint.Status().String()),
+	)
 
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
+		delete(w.poolAgents, workloadID) // FIXME!!! does this leak running agents??
 		return fmt.Errorf("failed to submit request for workload deployment: %s", err)
 	}
 
 	if deployResponse.Accepted {
-		// move the client from active to pending
-		w.activeAgents[workloadID] = agentClient
-		delete(w.pendingAgents, workloadID)
+		w.log.Debug("Workload manager deploy attempt accepted",
+			slog.String("workload_id", workloadID),
+		)
+
+		// move the client from pool to pending
+		w.liveAgents[workloadID] = agentClient
+		delete(w.poolAgents, workloadID)
 
 		ncHostServices, err := w.createHostServicesConnection(request)
 		if err != nil {
@@ -247,21 +272,8 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		w.hostServices.server.SetHostServicesConnection(workloadID, ncHostServices)
 
 		if request.SupportsTriggerSubjects() {
-			ncTrigger := ncHostServices
-			if request.TriggerConnection != nil {
-				ncTrigger, err = createJwtConnection(request.TriggerConnection)
-				if err != nil {
-					w.log.Error("Failed to create trigger connection",
-						slog.Any("error", err),
-						slog.String("url", request.TriggerConnection.NatsUrl),
-					)
-					_ = w.StopWorkload(workloadID, true)
-					return err
-				}
-				w.hostServices.server.AddHostServicesConnection(workloadID, hostservices.TriggerConnection, ncTrigger)
-			}
 			for _, tsub := range request.TriggerSubjects {
-				sub, err := ncTrigger.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
+				sub, err := ncHostServices.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
 				if err != nil {
 					w.log.Error("Failed to create trigger subject subscription for deployed workload",
 						slog.String("workload_id", workloadID),
@@ -275,7 +287,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 				w.log.Debug("Created trigger subject subscription for deployed workload",
 					slog.String("workload_id", workloadID),
-					slog.String("nats_url", ncTrigger.ConnectedAddr()),
+					slog.String("nats_url", ncHostServices.ConnectedAddr()),
 					slog.String("trigger_subject", tsub),
 					slog.String("workload_type", string(request.WorkloadType)),
 				)
@@ -297,58 +309,55 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 }
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
-// Note that this means "pending" workloads are not considered by lookups
+// Note that this means "pending" agents are not considered by lookups
 func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.DeployRequest, error) {
-	return w.procMan.Lookup(workloadID)
+	if agentClient, ok := w.liveAgents[workloadID]; ok {
+		return agentClient.DeployRequest(), nil
+	}
+
+	return nil, fmt.Errorf("workload doesn't exist: %s", workloadID)
 }
 
 // Retrieve a list of deployed, running workloads
 func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error) {
-	procs, err := w.procMan.ListProcesses()
-	if err != nil {
-		return nil, err
-	}
+	summaries := make([]controlapi.MachineSummary, 0)
 
-	summaries := make([]controlapi.MachineSummary, len(procs))
+	for id, agentClient := range w.liveAgents {
+		deployRequest := agentClient.DeployRequest()
 
-	for i, p := range procs {
-		uptimeFriendly := "unknown"
-		runtimeFriendly := "unknown"
-		agentClient, ok := w.activeAgents[p.ID]
-		if ok {
-			uptimeFriendly = myUptime(agentClient.UptimeMillis())
-			if p.DeployRequest.WorkloadType == controlapi.NexWorkloadV8 || p.DeployRequest.WorkloadType == controlapi.NexWorkloadWasm {
-				nanoTime := fmt.Sprintf("%dns", agentClient.ExecTimeNanos())
-				rt, err := time.ParseDuration(nanoTime)
-				if err == nil {
-					if rt.Nanoseconds() < 1000 {
-						runtimeFriendly = nanoTime
-					} else if rt.Milliseconds() < 1000 {
-						runtimeFriendly = fmt.Sprintf("%dms", rt.Milliseconds())
-					} else {
-						runtimeFriendly = myUptime(rt)
-					}
+		uptimeFriendly := myUptime(agentClient.UptimeMillis())
+		runtimeFriendly := "--"
+
+		if agentClient.WorkloadType() == controlapi.NexWorkloadV8 || agentClient.WorkloadType() == controlapi.NexWorkloadWasm {
+			nanoTime := fmt.Sprintf("%dns", agentClient.ExecTimeNanos())
+			rt, err := time.ParseDuration(nanoTime)
+			if err == nil {
+				if rt.Nanoseconds() < 1000 {
+					runtimeFriendly = nanoTime
+				} else if rt.Milliseconds() < 1000 {
+					runtimeFriendly = fmt.Sprintf("%dms", rt.Milliseconds())
 				} else {
-					w.log.Warn("Failed to generate parsed time from nanos", slog.Any("error", err))
+					runtimeFriendly = myUptime(rt)
 				}
 			} else {
-				runtimeFriendly = uptimeFriendly
+				w.log.Warn("Failed to generate parsed time from nanos", slog.Any("error", err))
 			}
 		}
 
-		summaries[i] = controlapi.MachineSummary{
-			Id:        p.ID,
-			Healthy:   true,
+		summaries = append(summaries, controlapi.MachineSummary{
+			Id:        id,
+			Healthy:   true, // FIXME!!!
 			Uptime:    uptimeFriendly,
-			Namespace: p.Namespace,
+			Namespace: *deployRequest.Namespace,
 			Workload: controlapi.WorkloadSummary{
-				Name:         p.Name,
-				Description:  *p.DeployRequest.Description,
+				Name:         *deployRequest.WorkloadName,
+				Description:  *deployRequest.Description,
+				Hash:         deployRequest.Hash,
 				Runtime:      runtimeFriendly,
-				WorkloadType: p.DeployRequest.WorkloadType,
-				Hash:         p.DeployRequest.Hash,
+				Uptime:       uptimeFriendly,
+				WorkloadType: deployRequest.WorkloadType,
 			},
-		}
+		})
 	}
 
 	return summaries, nil
@@ -358,13 +367,11 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 // up all applicable resources.
 func (w *WorkloadManager) Stop() error {
 	if atomic.AddUint32(&w.closing, 1) == 1 {
-		w.log.Info("Workload manager stopping")
-
-		for id := range w.pendingAgents {
-			_ = w.pendingAgents[id].Stop()
+		for id := range w.poolAgents {
+			_ = w.poolAgents[id].Stop()
 		}
 
-		for id := range w.activeAgents {
+		for id := range w.liveAgents {
 			err := w.StopWorkload(id, true)
 			if err != nil {
 				w.log.Warn("Failed to stop agent", slog.String("workload_id", id), slog.String("error", err.Error()))
@@ -383,6 +390,7 @@ func (w *WorkloadManager) Stop() error {
 		}
 
 		w.natsint.Shutdown()
+		w.log.Debug("Workload manager stopped")
 	}
 
 	return nil
@@ -390,16 +398,7 @@ func (w *WorkloadManager) Stop() error {
 
 // Stop a workload, optionally attempting a graceful undeploy prior to termination
 func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
-	defer func() {
-		delete(w.activeAgents, id)
-		delete(w.pendingAgents, id)
-		delete(w.stopMutex, id)
-		w.hostServices.server.RemoveHostServicesConnection(id)
-
-		_ = w.publishWorkloadStopped(id)
-	}()
-
-	deployRequest, err := w.procMan.Lookup(id)
+	deployRequest, err := w.LookupWorkload(id)
 	if err != nil {
 		w.log.Warn("request to undeploy workload failed", slog.String("workload_id", id), slog.String("error", err.Error()))
 		return err
@@ -430,7 +429,7 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	}
 
 	if deployRequest != nil && undeploy {
-		agentClient := w.activeAgents[id]
+		agentClient := w.liveAgents[id]
 		defer func() {
 			_ = agentClient.Drain()
 		}()
@@ -450,19 +449,27 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 		return err
 	}
 
+	_ = w.publishWorkloadUndeployed(id)
+
+	delete(w.liveAgents, id)
+	delete(w.poolAgents, id)
+	delete(w.stopMutex, id)
+	w.hostServices.server.RemoveHostServicesConnection(id)
+
 	return nil
 }
 
 // Called by the agent process manager when an agent has been warmed and is ready
 // to receive workload deployment instructions
 func (w *WorkloadManager) OnProcessStarted(id string) {
-	w.log.Debug("Process started", slog.String("workload_id", id))
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
-	clientConn, err := w.natsint.ConnectionWithID(id)
+	w.log.Debug("Process started", slog.String("workload_id", id))
+
+	clientConn, err := w.natsint.ConnectionByID(id)
 	if err != nil {
-		w.log.Error("Failed to start agent client", slog.Any("err", err))
+		w.log.Error("Failed to resolve internal NATS connection for agent client", slog.Any("err", err))
 		return
 	}
 
@@ -484,7 +491,7 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 		return
 	}
 
-	w.pendingAgents[id] = agentClient
+	w.poolAgents[id] = agentClient
 	w.stopMutex[id] = &sync.Mutex{}
 }
 
@@ -493,7 +500,7 @@ func (w *WorkloadManager) agentHandshakeTimedOut(id string) {
 	defer w.poolMutex.Unlock()
 
 	w.log.Error("Did not receive NATS handshake from agent within timeout.", slog.String("workload_id", id))
-	delete(w.pendingAgents, id)
+	delete(w.poolAgents, id)
 
 	if len(w.handshakes) == 0 {
 		w.log.Error("First handshake failed, shutting down to avoid inconsistent behavior")
@@ -507,13 +514,15 @@ func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
 }
 
 func (w *WorkloadManager) agentContactLost(workloadID string) {
-	w.log.Warn("Lost contact with agent", slog.String("workload_id", workloadID))
-	_ = w.StopWorkload(workloadID, false)
+	w.log.Debug("Lost contact with agent", slog.String("workload_id", workloadID))
+	if _, ok := w.liveAgents[workloadID]; ok {
+		_ = w.StopWorkload(workloadID, false)
+	}
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
 func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
-	agentClient, ok := w.activeAgents[workloadID]
+	agentClient, ok := w.liveAgents[workloadID]
 	if !ok {
 		w.log.Error("Attempted to generate trigger handler for non-existent agent client")
 		return nil
@@ -549,7 +558,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1)
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
-			_ = w.publishFunctionExecFailed(workloadID, *request.WorkloadName, *request.Namespace, tsub, err)
+			_ = w.publishFunctionExecFailed(workloadID, tsub, err)
 		} else if resp != nil {
 			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
 			runtimeNs := resp.Header.Get(agentapi.NexRuntimeNs)
@@ -565,6 +574,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			if err != nil {
 				w.log.Warn("failed to log function runtime", slog.Any("err", err))
 			}
+
 			_ = w.publishFunctionExecSucceeded(workloadID, tsub, runTimeNs64)
 			agentClient.RecordExecTime(runTimeNs64)
 			parentSpan.AddEvent("published success event")
@@ -625,15 +635,15 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployR
 			))
 
 		url = request.HostServicesConfig.NatsUrl
-	} else if w.config.HostServicesConfiguration != nil {
+	} else if w.config.HostServicesConfig != nil {
 		// FIXME-- check to ensure NATS user JWT and seed are present
 		natsOpts = append(natsOpts,
-			nats.UserJWTAndSeed(w.config.HostServicesConfiguration.NatsUserJwt,
-				w.config.HostServicesConfiguration.NatsUserSeed,
+			nats.UserJWTAndSeed(w.config.HostServicesConfig.NatsUserJwt,
+				w.config.HostServicesConfig.NatsUserSeed,
 			))
 
-		if w.config.HostServicesConfiguration.NatsUrl != "" {
-			url = w.config.HostServicesConfiguration.NatsUrl
+		if w.config.HostServicesConfig.NatsUrl != "" {
+			url = w.config.HostServicesConfig.NatsUrl
 		} else {
 			url = w.nc.Servers()[0]
 		}
@@ -669,7 +679,6 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployR
 	)
 
 	return nc, nil
-
 }
 
 // Picks a pending agent from the pool that will receive the next deployment
@@ -677,36 +686,39 @@ func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
-	if len(w.pendingAgents) == 0 {
-		return nil, errors.New("no available agent client in pool")
-	}
-
 	// there might be a slightly faster version of this, but this effectively
 	// gives us a random pick among the map elements
-	for _, v := range w.pendingAgents {
-		return v, nil
+	for _, agentClient := range w.poolAgents {
+		if agentClient.IsSelected() {
+			continue
+		}
+
+		agentClient.MarkSelected()
+		return agentClient, nil
 	}
 
-	return nil, nil
+	return nil, errors.New("no available agent client in pool")
 }
 
 func (w *WorkloadManager) TotalRunningWorkloadBytes() uint64 {
 	total := uint64(0)
-	for _, c := range w.activeAgents {
+	for _, c := range w.liveAgents {
 		total += c.WorkloadBytes()
 	}
 
 	return total
 }
 
-func createJwtConnection(info *controlapi.NatsJwtConnectionInfo) (*nats.Conn, error) {
-	natsOpts := []nats.Option{
-		nats.Name("workload-trigger-subscription"),
+func byteConvert(b float64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%f B", b)
 	}
-	natsOpts = append(natsOpts,
-		nats.UserJWTAndSeed(info.NatsUserJwt,
-			info.NatsUserSeed,
-		))
-
-	return nats.Connect(info.NatsUrl, natsOpts...)
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
 }

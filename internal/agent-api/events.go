@@ -21,14 +21,18 @@ type AgentStartedEvent struct {
 }
 
 type WorkloadStatusEvent struct {
-	WorkloadName string `json:"workload_name"`
 	Code         int    `json:"code"`
 	Message      string `json:"message,omitempty"`
+	WorkloadID   string `json:"workload_id"`
+	WorkloadName string `json:"workload_name"`
+
+	Essential  *bool  `json:"essential,omitempty"`
+	TotalBytes *int64 `json:"total_bytes,omitempty"`
 }
 
 type AgentStoppedEvent struct {
-	Message string `json:"message"`
 	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 func NewAgentEvent(sourceId string, eventType string, event interface{}) cloudevents.Event {

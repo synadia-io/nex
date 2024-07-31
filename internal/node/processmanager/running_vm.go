@@ -53,7 +53,7 @@ func (vm *runningFirecracker) setMetadata(metadata *agentapi.MachineMetadata) er
 
 func (vm *runningFirecracker) shutdown() {
 	if atomic.AddUint32(&vm.closing, 1) == 1 {
-		vm.log.Info("Machine stopping",
+		vm.log.Debug("Machine stopping",
 			slog.String("vmid", vm.vmmID),
 			slog.String("ip", vm.ip.String()),
 		)
@@ -89,7 +89,6 @@ func (vm *runningFirecracker) shutdown() {
 
 // Create a VMM with a given set of options and start the VM
 func createAndStartVM(ctx context.Context, vmmID string, config *nexmodels.NodeConfiguration, log *slog.Logger) (*runningFirecracker, error) {
-
 	fcCfg, err := generateFirecrackerConfig(vmmID, config)
 	if err != nil {
 		log.Error("Failed to generate firecracker configuration", slog.Any("config", config))

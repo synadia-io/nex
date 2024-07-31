@@ -16,11 +16,14 @@ type AgentStartedEvent struct {
 }
 
 type WorkloadDeployedEvent struct {
+	ID         string `json:"workload_id"`
 	Name       string `json:"workload_name"`
+	Essential  bool   `json:"essential"`
 	TotalBytes int    `json:"total_bytes"`
 }
 
 type WorkloadUndeployedEvent struct {
+	ID      string `json:"workload_id"`
 	Name    string `json:"workload_name"`
 	Code    int    `json:"code"`
 	Message string `json:"message"`
@@ -33,26 +36,26 @@ type AgentStoppedEvent struct {
 
 type NodeStartedEvent struct {
 	Version string            `json:"version"`
-	Id      string            `json:"id"`
+	ID      string            `json:"id"`
 	Tags    map[string]string `json:"tags,omitempty"`
 }
 
 type LameDuckEnteredEvent struct {
 	Version string `json:"version"`
-	Id      string `json:"id"`
+	ID      string `json:"id"`
 }
 
 type NodeStoppedEvent struct {
-	Id       string `json:"id"`
+	ID       string `json:"id"`
 	Graceful bool   `json:"graceful"`
 }
 
-// TODO: remove omitempty in next version bump
 type HeartbeatEvent struct {
-	Version         string            `json:"version"`
-	NodeId          string            `json:"node_id"`
-	Nexus           string            `json:"nexus,omitempty"`
-	Uptime          string            `json:"uptime"`
-	Tags            map[string]string `json:"tags,omitempty"`
-	RunningMachines int               `json:"running_machines"`
+	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads,omitempty"`
+	Nexus                   string            `json:"nexus,omitempty"`
+	NodeID                  string            `json:"node_id"`
+	RunningMachines         int               `json:"running_machines"`
+	Tags                    map[string]string `json:"tags,omitempty"`
+	Uptime                  string            `json:"uptime"`
+	Version                 string            `json:"version"`
 }

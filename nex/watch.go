@@ -129,14 +129,14 @@ func handleEventEntry(log *slog.Logger, emittedEvent controlapi.EmittedEvent) {
 		if err := event.DataAs(evt); err != nil {
 			attrs = append(attrs, slog.Any("err", err))
 		} else {
-			attrs = append(attrs, slog.String("node_id", ellipsis.Centering(evt.Id, 25)), slog.String("version", evt.Version))
+			attrs = append(attrs, slog.String("node_id", ellipsis.Centering(evt.ID, 25)), slog.String("version", evt.Version))
 		}
 	case controlapi.NodeStoppedEventType:
 		evt := &controlapi.NodeStoppedEvent{}
 		if err := event.DataAs(evt); err != nil {
 			attrs = append(attrs, slog.Any("err", err))
 		} else {
-			attrs = append(attrs, slog.String("node_id", ellipsis.Centering(evt.Id, 25)), slog.Bool("graceful", evt.Graceful))
+			attrs = append(attrs, slog.String("node_id", ellipsis.Centering(evt.ID, 25)), slog.Bool("graceful", evt.Graceful))
 		}
 	}
 

@@ -97,7 +97,7 @@ func TestInternalNatsServerFileCache(t *testing.T) {
 	userCn, _ := server.ConnectionWithCredentials(ud)
 	js, _ := jetstream.New(userCn)
 	bucket, _ := js.ObjectStore(ctx, workloadCacheBucketName)
-	workload, err := bucket.GetBytes(ctx, workloadCacheFileKey)
+	workload, err := bucket.GetBytes(ctx, workloadId)
 	if err != nil {
 		t.Fatalf("Should have queried the workload bytes, but got error instead: %s", err)
 	}

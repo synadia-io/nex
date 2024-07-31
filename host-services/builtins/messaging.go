@@ -64,8 +64,8 @@ func (m *MessagingService) HandleRequest(
 	request []byte) (hostservices.ServiceResult, error) {
 
 	conn := conns[hostservices.DefaultConnection]
-	// if there's a separate "trigger" connection, we use that to ensure consistency
-	if c, ok := conns[hostservices.TriggerConnection]; ok {
+	// if there's a separate "host services" connection, we use that to ensure consistency
+	if c, ok := conns[hostservices.HostServicesConnection]; ok {
 		conn = c
 	}
 

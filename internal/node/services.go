@@ -128,6 +128,7 @@ func (h *HostServices) init() error {
 		}
 	}
 
+
 	for k, svcConfig := range h.config.Services {
 		if !slices.Contains(hostServicesBuiltins, k) {
 			if svcConfig.Enabled && svcConfig.PluginPath != nil {
@@ -144,7 +145,8 @@ func (h *HostServices) init() error {
 		}
 	}
 
-	h.log.Info("Host services configured", slog.Any("services", h.server.Services()))
+	h.log.Debug("Host services configured", slog.Any("services", h.server.Services()))
+
 	return h.server.Start()
 }
 

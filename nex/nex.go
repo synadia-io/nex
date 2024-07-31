@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"time"
 
+	"disorder.dev/shandler"
 	"github.com/choria-io/fisk"
 	"github.com/fatih/color"
-	shandler "github.com/jordan-rash/slog-handler"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -88,7 +88,7 @@ func init() {
 	ncli.Flag("jsdomain", "Jetsteam domain to use in nats connection").PlaceHolder("nex").StringVar(&Opts.JsDomain)
 	ncli.Flag("namespace", "Scoping namespace for applicable operations").Default("default").Envar("NEX_NAMESPACE").StringVar(&Opts.Namespace)
 	ncli.Flag("logger", "How to log").Default("std").Envar("NEX_LOGGER").StringsVar(&Opts.Logger) // Valid options: "std", "file", "nats"
-	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "none", "debug", "info", "warn", "error")
+	ncli.Flag("loglevel", "Log level").Default("info").Envar("NEX_LOGLEVEL").EnumVar(&Opts.LogLevel, "none", "trace", "debug", "info", "warn", "error")
 	ncli.Flag("logjson", "Log JSON").Default("false").Envar("NEX_LOGJSON").UnNegatableBoolVar(&Opts.LogJSON)
 	ncli.Flag("logcolor", "Prints text logs with color").Envar("NEX_LOG_COLORIZED").Default("false").UnNegatableBoolVar(&Opts.LogsColorized)
 	ncli.Flag("timeformat", "How time is formatted in logger").Envar("NEX_LOG_TIMEFORMAT").Default("DateTime").EnumVar(&Opts.LogTimeFormat, "DateOnly", "DateTime", "Stamp", "RFC822", "RFC3339")
@@ -100,7 +100,7 @@ func init() {
 		return "nex"
 	}()).StringVar(&Opts.ConnectionName)
 
-	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadUrl)
+	run.Arg("url", "URL pointing to the file to run").Required().URLVar(&RunOpts.WorkloadURL)
 	run.Arg("id", "Public key of the target node to run the workload").Required().StringVar(&RunOpts.TargetNode)
 	run.Flag("xkey", "Path to publisher's Xkey required to encrypt environment").Required().ExistingFileVar(&RunOpts.PublisherXkeyFile)
 	run.Flag("issuer", "Path to a seed key to sign the workload JWT as the issuer").Required().ExistingFileVar(&RunOpts.ClaimsIssuerFile)
@@ -126,7 +126,6 @@ func init() {
 
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
-	stop.Flag("name", "Name of the workload to stop").Required().StringVar(&StopOpts.WorkloadName)
 	stop.Flag("issuer", "Path to the issuer seed key originally used to start the workload").Required().ExistingFileVar(&StopOpts.ClaimsIssuerFile)
 
 	lame.Arg("id", "Public key of the target node to enter lame duck mode").Required().StringVar(&RunOpts.TargetNode)
@@ -237,6 +236,8 @@ func main() {
 		stdoutWriters = []io.Writer{io.Discard}
 		stderrWriters = []io.Writer{io.Discard}
 		handlerOpts = append(handlerOpts, shandler.WithLogLevel(12))
+	case "trace":
+		handlerOpts = append(handlerOpts, shandler.WithLogLevel(shandler.LevelTrace))
 	case "debug":
 		handlerOpts = append(handlerOpts, shandler.WithLogLevel(slog.LevelDebug))
 	case "info":
