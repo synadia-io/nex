@@ -114,6 +114,6 @@ func (h *HostServices) init() error {
 		}
 	}
 
-	h.log.Info("Host services configured", slog.Any("services", h.server.Services()))
+	h.log.Debug("Host services configured", slog.Any("services", h.server.Services()))
 	return h.server.Start()
 }

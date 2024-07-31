@@ -9,10 +9,10 @@ func TestNodeConfigResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("couldn't load node config example: %s", err)
 	}
-	if config1.HostServicesConfiguration == nil {
+	if config1.HostServicesConfig == nil {
 		t.Fatal("host services configuration should not default to nil")
 	}
-	if config1.HostServicesConfiguration.Services["http"].Enabled == false {
+	if config1.HostServicesConfig.Services["http"].Enabled == false {
 		t.Fatal("All of the builtin host services should default to enabled")
 	}
 
@@ -20,10 +20,10 @@ func TestNodeConfigResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("couldn't load node config example: %s", err)
 	}
-	if config2.HostServicesConfiguration == nil {
+	if config2.HostServicesConfig == nil {
 		t.Fatal("host services configuration should not be nil when explicitly defined")
 	}
-	if config2.HostServicesConfiguration.Services["http"].Enabled {
+	if config2.HostServicesConfig.Services["http"].Enabled {
 		t.Fatal("in custom config http service should be disabled")
 	}
 }

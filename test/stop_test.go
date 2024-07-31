@@ -21,7 +21,7 @@ func TestStopValidation(t *testing.T) {
 		WorkloadName("testworkload"),
 		WorkloadType("elf"),
 		WorkloadDescription("testy mctesto"),
-		Checksum("hashbrowns"),
+		Hash("hashbrowns"),
 		EnvironmentValue("NATS_URL", "nats://127.0.0.1:4222"),
 		EnvironmentValue("TOP_SECRET_LUGGAGE", "12345"),
 		SenderXKey(myKey),
@@ -39,7 +39,7 @@ func TestStopValidation(t *testing.T) {
 	fmt.Printf("%+v", originalClaims)
 	time.Sleep(1 * time.Second) // ensure that second token has a newer timestamp
 
-	stopRequest, _ := NewStopRequest("1234", "testworkload", "Nx", issuerAccount)
+	stopRequest, _ := NewStopRequest("Nx", "1234", issuerAccount)
 
 	err = stopRequest.Validate(&originalClaims)
 	if err != nil {
@@ -47,15 +47,9 @@ func TestStopValidation(t *testing.T) {
 	}
 
 	badIssuerAccount, _ := nkeys.CreateAccount()
-	badStopRequest, _ := NewStopRequest("1234", "testworkload", "Nx", badIssuerAccount)
+	badStopRequest, _ := NewStopRequest("Nx", "1234", badIssuerAccount)
 	err = badStopRequest.Validate(&originalClaims)
 	if err == nil {
 		t.Fatalf("Expected to get an error validating a bad issuer, but got none")
-	}
-
-	badStopRequest2, _ := NewStopRequest("1234", "nonexistentworkload", "Nx", issuerAccount)
-	err = badStopRequest2.Validate(&originalClaims)
-	if err == nil {
-		t.Fatalf("Expected to get an error validating bad subject, but got none")
 	}
 }

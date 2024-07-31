@@ -58,6 +58,6 @@ type HostService interface {
 }
 
 const (
-	DefaultConnection = "default"
-	TriggerConnection = "trigger"
+	DefaultConnection      = "default"
+	HostServicesConnection = "hostservices"
 )

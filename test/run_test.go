@@ -19,7 +19,7 @@ func TestEncryption(t *testing.T) {
 	request, _ := NewDeployRequest(
 		WorkloadName("testworkload"),
 		WorkloadDescription("testy mctesto"),
-		Checksum("hashbrowns"),
+		Hash("hashbrowns"),
 		EnvironmentValue("NATS_URL", "nats://127.0.0.1:4222"),
 		EnvironmentValue("TOP_SECRET_LUGGAGE", "12345"),
 		SenderXKey(myKey),

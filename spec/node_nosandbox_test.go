@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	shandler "github.com/jordan-rash/slog-handler"
+	"disorder.dev/shandler"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
@@ -95,7 +95,7 @@ var _ = Describe("nex node", func() {
 				agentPath = filepath.Join(defaultBinPath, "nex-agent")
 				_ = os.Remove(agentPath)
 
-				cmd := exec.Command("go", "build", "-o", agentPath, "-tags", "netgo", "-ldflags", "-extldflags -static", filepath.Join("..", "agent", "cmd", "nex-agent"))
+				cmd := exec.Command("go", "build", "-o", agentPath, "-tags", "netgo", filepath.Join("..", "agent", "cmd", "nex-agent"))
 				_ = cmd.Start()
 				_ = cmd.Wait()
 			}
@@ -161,7 +161,8 @@ var _ = Describe("nex node", func() {
 						BeforeEach(func() {
 							nodeConfig.DefaultResourceDir = validResourceDir
 							_ = os.Mkdir(nodeConfig.DefaultResourceDir, 0755)
-							nodeOpts.ForceDepInstall = true
+							// nodeOpts.ForceDepInstall = true
+							nodeOpts.PreflightYes = true
 						})
 
 						JustBeforeEach(func() {
@@ -254,7 +255,10 @@ var _ = Describe("nex node", func() {
 					BeforeEach(func() {
 						var err error
 
+						allowDuplicateWorkloads := true
+
 						nodeConfig = models.DefaultNodeConfiguration()
+						nodeConfig.AllowDuplicateWorkloads = &allowDuplicateWorkloads
 						nodeConfig.DefaultResourceDir = validResourceDir
 						nodeConfig.MachinePoolSize = 2
 						nodeConfig.NoSandbox = !sandbox
@@ -285,30 +289,17 @@ var _ = Describe("nex node", func() {
 						Expect(err).To(BeNil())
 
 						nodeProxy = nexnode.NewNodeProxyWith(node)
-						time.Sleep(time.Millisecond * 3000) // allow enough time for the pool to warm up...
+						awaitPendingAgents(*nodeID, nodeConfig.MachinePoolSize, log)
 					})
 
 					AfterEach(func() {
 						p, _ := os.FindProcess(os.Getpid())
 						_ = p.Signal(os.Interrupt)
+						awaitPendingAgents(*nodeID, 0, log)
 
 						node = nil
 						nodeID = nil
 						nodeProxy = nil
-					})
-
-					JustBeforeEach(func() {
-						var err error
-
-						_ = nexnode.CmdPreflight(opts, nodeOpts, ctxx, cancel, log)
-						node, err = nexnode.NewNode(nodeKey, opts, nodeOpts, ctxx, cancel, log)
-						Expect(err).To(BeNil())
-
-						go node.Start()
-
-						nodeID, _ = node.PublicKey()
-						nodeProxy = nexnode.NewNodeProxyWith(node)
-						time.Sleep(time.Millisecond * 1000)
 					})
 
 					It("should generate a keypair for the node", func(ctx SpecContext) {
@@ -356,8 +347,6 @@ var _ = Describe("nex node", func() {
 						JustBeforeEach(func() {
 							manager = nodeProxy.WorkloadManager()
 							managerProxy = nexnode.NewWorkloadManagerProxyWith(manager)
-
-							time.Sleep(time.Millisecond * 1000) // allow enough time for the pool to warm up...
 						})
 
 						It("should use the provided logger instance", func(ctx SpecContext) {
@@ -410,8 +399,6 @@ var _ = Describe("nex node", func() {
 								})
 
 								JustBeforeEach(func() {
-									time.Sleep(time.Millisecond * 2500)
-
 									switch runtime.GOOS {
 									case "windows":
 										echoDeployRequest, echoErr = newDeployRequest(*nodeID, "echoservice", "nex example echoservice", "./echoservice.exe", map[string]string{"NATS_URL": "nats://127.0.0.1:4222"}, []string{}, log)
@@ -456,9 +443,11 @@ var _ = Describe("nex node", func() {
 										time.Sleep(time.Millisecond * 1000)
 									})
 
-									It("should deploy the native workload", func(ctx SpecContext) {
-										Expect(echoErr).To(BeNil())
-										Expect(ultimateErr).To(BeNil())
+									Context("when the node supports duplicate workloads", func() {
+										It("should deploy the native workloads", func(ctx SpecContext) {
+											Expect(echoErr).To(BeNil())
+											Expect(ultimateErr).To(BeNil())
+										})
 									})
 								})
 							})
@@ -520,6 +509,29 @@ var _ = Describe("nex node", func() {
 		Entry("no-sandbox", false), // no-sandbox mode
 	)
 })
+
+func awaitPendingAgents(nodeID string, count int, log *slog.Logger) {
+	nodeClient := controlapi.NewApiClientWithNamespace(_fixtures.natsConn, time.Millisecond*250, "default", log)
+
+	startedAt := time.Now()
+	timeoutAt := startedAt.Add(time.Millisecond * 5000)
+
+	for {
+		info, _ := nodeClient.NodeInfo(nodeID)
+		if info != nil && info.AvailableAgents == count {
+			fmt.Printf("✅ Reached anticipated number of pending agents (%d) on node: %s", count, nodeID)
+			time.Sleep(time.Millisecond * 3000)
+			return
+		}
+
+		if time.Now().After(timeoutAt) {
+			fmt.Printf("❌ Failed to reach anticipated number of pending agents (%d) on node: %s", count, nodeID)
+			return
+		}
+
+		time.Sleep(time.Millisecond * 25)
+	}
+}
 
 func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, controlapi.NexWorkload, error) {
 	js, err := nc.JetStream()

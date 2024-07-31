@@ -30,7 +30,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/rs/xid"
 
-	shandler "github.com/jordan-rash/slog-handler"
+	"disorder.dev/shandler"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
@@ -289,7 +289,10 @@ var _ = Describe("nex node", func() {
 					BeforeEach(func() {
 						var err error
 
+						allowDuplicateWorkloads := true
+
 						nodeConfig = models.DefaultNodeConfiguration()
+						nodeConfig.AllowDuplicateWorkloads = &allowDuplicateWorkloads
 						nodeConfig.CNI.BinPath = []string{"/opt/cni/bin"}
 						nodeConfig.DefaultResourceDir = validResourceDir
 						nodeConfig.MachinePoolSize = 2
@@ -486,9 +489,11 @@ var _ = Describe("nex node", func() {
 										_ = cmd.Wait()
 									})
 
-									It("should deploy the native workloads", func(ctx SpecContext) {
-										Expect(echoErr).To(BeNil())
-										Expect(ultimateErr).To(BeNil())
+									Context("when the node supports duplicate workloads", func() {
+										It("should deploy the native workloads", func(ctx SpecContext) {
+											Expect(echoErr).To(BeNil())
+											Expect(ultimateErr).To(BeNil())
+										})
 									})
 								})
 							})

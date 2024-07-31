@@ -31,11 +31,13 @@ func StopWorkload(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	stopRequest, err := controlapi.NewStopRequest(StopOpts.WorkloadId, StopOpts.WorkloadName, StopOpts.TargetNode, issuerKp)
+
+	stopRequest, err := controlapi.NewStopRequest(StopOpts.TargetNode, StopOpts.WorkloadId, issuerKp)
 	if err != nil {
 		fmt.Printf("⛔ Failed to create workload request: %s\n", err)
 		return err
 	}
+
 	resp, err := nodeClient.StopWorkload(stopRequest)
 	if err != nil {
 		fmt.Printf("⛔ Workload stop request failed: %s\n", err)
@@ -52,6 +54,7 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, logger)
 
 	// Get node info so we can get public xkey from the target for env encryption
@@ -71,10 +74,12 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+
 	xkeyRaw, err := os.ReadFile(RunOpts.PublisherXkeyFile)
 	if err != nil {
 		return nil
 	}
+
 	xkey, err := nkeys.FromCurveSeed(xkeyRaw)
 	if err != nil {
 		return err
@@ -84,6 +89,27 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 		return errors.New("cannot start a function-type workload without specifying at least one trigger subject")
 	}
 
+	js, err := nc.JetStream()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed resolve jetstream: %s", err)
+		return err
+	}
+
+	bucket, err := js.ObjectStore(RunOpts.WorkloadURL.Hostname())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed resolve workload object store: %s", err)
+		return err
+	}
+
+	artifact := RunOpts.WorkloadURL.Path[1:len(RunOpts.WorkloadURL.Path)]
+	fmt.Fprintf(os.Stdout, "resolved artifact name from workload url: %s", artifact)
+
+	info, err := bucket.GetInfo(artifact)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed resolve workload artifact: %s; %s", artifact, err)
+		return err
+	}
+
 	argv := []string{}
 	if len(RunOpts.Argv) > 0 {
 		argv = strings.Split(RunOpts.Argv, " ")
@@ -91,19 +117,19 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 
 	request, err := controlapi.NewDeployRequest(
 		controlapi.Argv(argv),
-		controlapi.Location(RunOpts.WorkloadUrl.String()),
+		controlapi.Hash(controlapi.SanitizeNATSDigest(info.Digest)),
 		controlapi.Environment(RunOpts.Env),
 		controlapi.Essential(RunOpts.Essential),
 		controlapi.Issuer(issuerKp),
+		controlapi.JsDomain(Opts.JsDomain),
+		controlapi.Location(RunOpts.WorkloadURL.String()),
 		controlapi.SenderXKey(xkey),
 		controlapi.TargetNode(RunOpts.TargetNode),
 		controlapi.TargetPublicXKey(targetPublicXkey),
-		controlapi.WorkloadName(RunOpts.Name),
-		controlapi.JsDomain(Opts.JsDomain),
-		controlapi.WorkloadType(RunOpts.WorkloadType),
 		controlapi.TriggerSubjects(RunOpts.TriggerSubjects),
-		controlapi.Checksum("abc12345TODOmakethisreal"),
 		controlapi.WorkloadDescription(RunOpts.Description),
+		controlapi.WorkloadName(RunOpts.Name),
+		controlapi.WorkloadType(RunOpts.WorkloadType),
 	)
 	if err != nil {
 		return nil
@@ -129,7 +155,7 @@ func renderRunResponse(targetNode string, resp *controlapi.RunResponse) {
 
 func renderStopResponse(resp *controlapi.StopResponse) {
 	if resp.Stopped {
-		fmt.Printf("✅ Workload '%s' stopped.\n", resp.Name)
+		fmt.Printf("✅ Workload '%s' stopped.\n", resp.ID)
 	} else {
 		fmt.Println("⛔ Workload failed to stop")
 	}

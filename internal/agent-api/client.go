@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"disorder.dev/shandler"
 	cloudevents "github.com/cloudevents/sdk-go"
 	"github.com/nats-io/nats.go"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -102,7 +103,6 @@ func (a *AgentClient) ID() string {
 // - hostint.<agent_id>.events
 // - hostint.<agent_id>.logs
 func (a *AgentClient) Start(agentID string) error {
-	a.log.Info("Agent client starting", slog.String("agent_id", agentID))
 	a.agentID = agentID
 
 	var sub *nats.Subscription
@@ -128,6 +128,7 @@ func (a *AgentClient) Start(agentID string) error {
 
 	go a.awaitHandshake(agentID)
 
+	a.log.Info("Agent client started", slog.String("agent_id", agentID))
 	return nil
 }
 
@@ -147,6 +148,9 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 	if err != nil {
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return nil, errors.New("timed out waiting for acknowledgement of workload deployment")
+		} else if errors.Is(err, nats.ErrNoResponders) {
+			time.Sleep(time.Millisecond * 100)
+			return a.DeployWorkload(request)
 		} else {
 			return nil, fmt.Errorf("failed to submit request for workload deployment: %s", err)
 		}
@@ -310,7 +314,7 @@ func (a *AgentClient) handleHandshake(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Info("Received agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
+	a.log.Debug("Received agent handshake", slog.String("agent_id", *req.ID), slog.String("message", *req.Message))
 
 	resp, _ := json.Marshal(&HandshakeResponse{})
 
@@ -367,7 +371,7 @@ func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 		return
 	}
 
-	a.log.Debug("Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
+	a.log.Log(context.TODO(), shandler.LevelTrace, "Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
 	a.logReceived(agentID, logentry)
 }
 

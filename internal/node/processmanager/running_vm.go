@@ -53,7 +53,7 @@ func (vm *runningFirecracker) setMetadata(metadata *agentapi.MachineMetadata) er
 
 func (vm *runningFirecracker) shutdown() {
 	if atomic.AddUint32(&vm.closing, 1) == 1 {
-		vm.log.Info("Machine stopping",
+		vm.log.Debug("Machine stopping",
 			slog.String("vmid", vm.vmmID),
 			slog.String("ip", vm.ip.String()),
 		)

@@ -14,7 +14,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rs/xid"
+	"github.com/google/uuid"
+
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -119,7 +120,7 @@ func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployReq
 
 func (f *FirecrackerProcessManager) Stop() error {
 	if atomic.AddUint32(&f.closing, 1) == 1 {
-		f.log.Info("Firecracker process manager stopping")
+		f.log.Debug("Firecracker process manager stopping")
 		close(f.poolVMs)
 
 		for vmID := range f.allVMs {
@@ -136,7 +137,7 @@ func (f *FirecrackerProcessManager) Stop() error {
 }
 
 func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
-	f.log.Info("Firecracker VM process manager starting")
+	f.log.Debug("Firecracker VM process manager starting")
 	f.delegate = delegate
 
 	defer func() {
@@ -162,7 +163,12 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 				continue
 			}
 
-			vmmID := xid.New().String()
+			vmmUUID, err := uuid.NewRandom()
+			if err != nil {
+				f.log.Error("Failed to generate uuid", slog.Any("err", err))
+				continue
+			}
+			vmmID := vmmUUID.String()
 
 			workloadKey, err := f.natsint.CreateCredentials(vmmID)
 			if err != nil {
@@ -195,7 +201,7 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 
 			go f.delegate.OnProcessStarted(vm.vmmID)
 
-			f.log.Info("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
+			f.log.Debug("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 			f.poolVMs <- vm // If the pool is full, this line will block until a slot is available.
 		}
 	}
@@ -240,7 +246,7 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 }
 
 func (f *FirecrackerProcessManager) resetCNI() error {
-	f.log.Info("Resetting network")
+	f.log.Debug("Resetting network")
 
 	err := os.RemoveAll("/var/lib/cni")
 	if err != nil {

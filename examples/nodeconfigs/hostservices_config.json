@@ -12,7 +12,7 @@
     "tags": {
         "simple": "true"
     },
-    "host_services": {
+    "host_services_config": {
         "nats_url": "nats://0.0.0.0:4222",
         "nats_user_jwt": "",
         "nats_user_seed": "",

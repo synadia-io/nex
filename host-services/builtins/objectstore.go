@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"regexp"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -23,7 +23,7 @@ const (
 	objectStoreServiceMethodList   = "list"
 
 	defaultMaxBytes   = 524288
-	defaultBucketName = "hs_${namespace}_${workload_name}_obj"
+	defaultBucketName = "hs_%s_obj"
 )
 
 type ObjectStoreService struct {
@@ -70,17 +70,22 @@ func (o *ObjectStoreService) HandleRequest(
 	metadata map[string]string,
 	request []byte) (hostservices.ServiceResult, error) {
 
-	nc := conns[hostservices.DefaultConnection]
+	var nc *nats.Conn
+	if conns[hostservices.HostServicesConnection] != nil {
+		nc = conns[hostservices.HostServicesConnection]
+	} else {
+		nc = conns[hostservices.DefaultConnection]
+	}
 
 	switch method {
 	case objectStoreServiceMethodGet:
-		return o.handleGet(nc, workloadId, workloadName, request, metadata, namespace)
+		return o.handleGet(nc, workloadId, request, metadata, namespace)
 	case objectStoreServiceMethodPut:
-		return o.handlePut(nc, workloadId, workloadName, request, metadata, namespace)
+		return o.handlePut(nc, workloadId, request, metadata, namespace)
 	case objectStoreServiceMethodDelete:
-		return o.handleDelete(nc, workloadId, workloadName, request, metadata, namespace)
+		return o.handleDelete(nc, workloadId, request, metadata, namespace)
 	case objectStoreServiceMethodList:
-		return o.handleList(nc, workloadId, workloadName, request, metadata, namespace)
+		return o.handleList(nc, workloadId, request, metadata, namespace)
 	default:
 		o.log.Warn("Received invalid host services RPC request",
 			slog.String("service", "objectstore"),
@@ -92,12 +97,12 @@ func (o *ObjectStoreService) HandleRequest(
 
 func (o *ObjectStoreService) handleGet(
 	nc *nats.Conn,
-	_, workload string,
+	_ string,
 	_ []byte, metadata map[string]string,
 	namespace string,
 ) (hostservices.ServiceResult, error) {
 
-	objectStore, err := o.resolveObjectStore(nc, namespace, workload)
+	objectStore, err := o.resolveObjectStore(nc, namespace)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 		return hostservices.ServiceResultFail(500, "unable to resolve object store"), nil
@@ -108,6 +113,7 @@ func (o *ObjectStoreService) handleGet(
 		return hostservices.ServiceResultFail(400, "name is required"), nil
 	}
 
+	start := time.Now()
 	result, err := objectStore.Get(name)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to get object %s: %s", name, err.Error()))
@@ -117,6 +123,8 @@ func (o *ObjectStoreService) handleGet(
 		}
 		return hostservices.ServiceResultFail(code, "failed to get object"), nil
 	}
+	finished := time.Since(start)
+	o.log.Debug("Object store download complete", slog.String("name", name), slog.String("duration", fmt.Sprintf("%.2f sec", finished.Seconds())))
 
 	val, err := io.ReadAll(result)
 	if err != nil {
@@ -129,12 +137,12 @@ func (o *ObjectStoreService) handleGet(
 
 func (o *ObjectStoreService) handlePut(
 	nc *nats.Conn,
-	_, workload string,
+	_ string,
 	data []byte, metadata map[string]string,
 	namespace string,
 ) (hostservices.ServiceResult, error) {
 
-	objectStore, err := o.resolveObjectStore(nc, namespace, workload)
+	objectStore, err := o.resolveObjectStore(nc, namespace)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to resolve object store"), nil
@@ -164,12 +172,12 @@ func (o *ObjectStoreService) handlePut(
 
 func (o *ObjectStoreService) handleDelete(
 	nc *nats.Conn,
-	_, workload string,
+	_ string,
 	_ []byte, metadata map[string]string,
 	namespace string,
 ) (hostservices.ServiceResult, error) {
 
-	objectStore, err := o.resolveObjectStore(nc, namespace, workload)
+	objectStore, err := o.resolveObjectStore(nc, namespace)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to resolve object store"), nil
@@ -194,12 +202,12 @@ func (o *ObjectStoreService) handleDelete(
 
 func (o *ObjectStoreService) handleList(
 	nc *nats.Conn,
-	_, workload string,
+	_ string,
 	_ []byte, _ map[string]string,
 	namespace string,
 ) (hostservices.ServiceResult, error) {
 
-	objectStore, err := o.resolveObjectStore(nc, namespace, workload)
+	objectStore, err := o.resolveObjectStore(nc, namespace)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to resolve object store"), nil
@@ -216,18 +224,13 @@ func (o *ObjectStoreService) handleList(
 }
 
 // resolve the object store for the given workload; initialize it if necessary & configured to do so
-func (o *ObjectStoreService) resolveObjectStore(nc *nats.Conn, namespace, workload string) (nats.ObjectStore, error) {
+func (o *ObjectStoreService) resolveObjectStore(nc *nats.Conn, namespace string) (nats.ObjectStore, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		return nil, err
 	}
 
-	reWorkload := regexp.MustCompile(`(?i)\$\{workload_name\}`)
-	reNamespace := regexp.MustCompile(`(?i)\$\{namespace\}`)
-
-	objectStoreName := reWorkload.ReplaceAllString(o.config.BucketName, workload)
-	objectStoreName = reNamespace.ReplaceAllString(objectStoreName, namespace)
-
+	objectStoreName := fmt.Sprintf(defaultBucketName, namespace)
 	objectStore, err := js.ObjectStore(objectStoreName)
 	if err != nil {
 		if errors.Is(err, nats.ErrStreamNotFound) && o.config.JitProvision {

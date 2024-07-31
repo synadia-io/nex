@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path"
@@ -30,7 +31,7 @@ const (
 	defaultAgentHandshakeTimeoutMillis  = 500
 	runloopSleepInterval                = 250 * time.Millisecond
 	runloopTickInterval                 = 2500 * time.Millisecond
-	workloadExecutionSleepTimeoutMillis = 100
+	workloadExecutionSleepTimeoutMillis = 50
 )
 
 // Agent facilitates communication between the nex agent running in the firecracker VM
@@ -53,7 +54,8 @@ type Agent struct {
 	nc          *nats.Conn
 	started     time.Time
 
-	sandboxed bool
+	sandboxed   bool
+	undeploying *atomic.Bool
 }
 
 // Initialize a new agent to facilitate communications with the host
@@ -80,12 +82,13 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 		agentLogs: make(chan *agentapi.LogEntry, 64),
 		eventLogs: make(chan *cloudevents.Event, 64),
 		// sandbox defaults to true, only way to override that is with an explicit 'false'
-		cancelF:   cancelF,
-		ctx:       ctx,
-		sandboxed: isSandboxed(),
-		md:        metadata,
-		started:   time.Now().UTC(),
-		subz:      make([]*nats.Subscription, 0),
+		cancelF:     cancelF,
+		ctx:         ctx,
+		sandboxed:   isSandboxed(),
+		md:          metadata,
+		started:     time.Now().UTC(),
+		subz:        make([]*nats.Subscription, 0),
+		undeploying: &atomic.Bool{},
 	}, nil
 }
 
@@ -97,13 +100,13 @@ func (a *Agent) FullVersion() string {
 // NOTE: agent process will request vm shutdown if this fails
 func (a *Agent) Start() {
 	if !a.sandboxed {
-		a.LogDebug(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()))
+		a.submitLog(fmt.Sprintf("Agent process running outside of sandbox; pid: %d", os.Getpid()), slog.LevelDebug)
 	}
 
 	err := a.init()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize agent: %s\n", err)
-		a.LogError(fmt.Sprintf("Agent process failed to initialize; %s", err.Error()))
+		a.submitLog(fmt.Sprintf("Agent process failed to initialize; %s", err.Error()), slog.LevelError)
 		a.shutdown()
 	}
 
@@ -115,7 +118,7 @@ func (a *Agent) Start() {
 		case <-timer.C:
 			// TODO: check NATS subscription statuses, etc.
 		case sig := <-a.sigs:
-			a.LogInfo(fmt.Sprintf("Received signal: %s", sig))
+			a.submitLog(fmt.Sprintf("Received signal: %s", sig), slog.LevelInfo)
 			a.shutdown()
 		case <-a.ctx.Done():
 			a.shutdown()
@@ -130,7 +133,7 @@ func (a *Agent) Start() {
 // Request a handshake with the host indicating the agent is "all the way" up
 // NOTE: the agent process will request a VM shutdown if this fails
 func (a *Agent) requestHandshake() error {
-	a.LogInfo("Requesting handshake from host")
+	a.submitLog("Requesting handshake from host", slog.LevelDebug)
 	msg := agentapi.HandshakeRequest{
 		ID:        a.md.VmID,
 		StartTime: a.started,
@@ -144,7 +147,7 @@ func (a *Agent) requestHandshake() error {
 
 		resp, err := a.nc.Request(fmt.Sprintf("hostint.%s.handshake", *a.md.VmID), raw, time.Millisecond*defaultAgentHandshakeTimeoutMillis)
 		if err != nil {
-			a.LogError(fmt.Sprintf("Agent failed to request initial sync message: %s, attempt %d", err, attempts+1))
+			a.submitLog(fmt.Sprintf("Agent failed to request initial sync message: %s, attempt %d", err, attempts+1), slog.LevelError)
 			time.Sleep(time.Millisecond * 25)
 			continue
 		}
@@ -152,12 +155,12 @@ func (a *Agent) requestHandshake() error {
 		var handshakeResponse *agentapi.HandshakeResponse
 		err = json.Unmarshal(resp.Data, &handshakeResponse)
 		if err != nil {
-			a.LogError(fmt.Sprintf("Failed to parse handshake response: %s", err))
+			a.submitLog(fmt.Sprintf("Failed to parse handshake response: %s", err), slog.LevelError)
 			time.Sleep(time.Millisecond * 25)
 			continue
 		}
 
-		a.LogInfo(fmt.Sprintf("Agent is up after %d attempt(s)", attempts))
+		a.submitLog(fmt.Sprintf("Agent is up after %d attempt(s)", attempts), slog.LevelInfo)
 		return nil
 	}
 
@@ -183,14 +186,14 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, e
 	err := a.cacheBucket.GetFile(*a.md.VmID, tempFile)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to get and write workload artifact to temp dir: %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		return nil, errors.New(msg)
 	}
 
 	err = os.Chmod(tempFile, 0777)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to set workload artifact as executable: %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		return nil, errors.New(msg)
 	}
 
@@ -204,7 +207,10 @@ func (a *Agent) deleteExecutableArtifact() error {
 	tempFile := path.Join(os.TempDir(), fileName)
 
 	_ = os.Remove(tempFile)
-	_ = a.cacheBucket.Delete(*a.md.VmID)
+
+	if a.cacheBucket != nil {
+		_ = a.cacheBucket.Delete(*a.md.VmID)
+	}
 
 	return nil
 }
@@ -258,7 +264,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	err := json.Unmarshal(m.Data, &request)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to unmarshal deploy request: %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		_ = a.workAck(m, false, msg)
 		return
 	}
@@ -284,7 +290,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	provider, err := providers.NewExecutionProvider(params)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
-		a.LogError(msg)
+		a.submitLog(msg, slog.LevelError)
 		_ = a.workAck(m, false, msg)
 		return
 	}
@@ -299,7 +305,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		err = a.provider.Validate()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to validate workload: %s", err)
-			a.LogError(msg)
+			a.submitLog(msg, slog.LevelError)
 			_ = a.workAck(m, false, msg)
 			return
 		}
@@ -307,7 +313,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 
 	err = a.provider.Deploy()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to deploy workload: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to deploy workload: %s", err), slog.LevelError)
 	} else {
 		_ = a.workAck(m, true, "Workload deployed")
 	}
@@ -315,16 +321,23 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 
 func (a *Agent) handleUndeploy(m *nats.Msg) {
 	if a.provider == nil {
-		a.LogDebug("Received undeploy workload request on agent without deployed workload")
+		a.submitLog("Received undeploy workload request on agent without deployed workload", slog.LevelDebug)
 		_ = m.Respond([]byte{})
 		return
 	}
+
+	if a.undeploying.Load() {
+		a.submitLog("Received additional undeploy workload request on agent", slog.LevelWarn)
+		return
+	}
+
+	a.undeploying.Store(true)
 
 	err := a.provider.Undeploy()
 	if err != nil {
 		// don't return an error here so worst-case scenario is an ungraceful shutdown,
 		// not a failure
-		a.LogError(fmt.Sprintf("Failed to undeploy workload: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to undeploy workload: %s", err), slog.LevelError)
 	}
 
 	_ = m.Respond([]byte{})
@@ -352,20 +365,20 @@ func (a *Agent) init() error {
 
 	err := a.initNATS()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to initialize NATS connection: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to initialize NATS connection: %s", err), slog.LevelError)
 		return err
 	}
 
 	err = a.requestHandshake()
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to handshake with node: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to handshake with node: %s", err), slog.LevelError)
 		return err
 	}
 
 	subject := fmt.Sprintf("agentint.%s.deploy", *a.md.VmID)
 	sub, err := a.nc.Subscribe(subject, a.handleDeploy)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to subscribe to agent deploy subject: %s", err), slog.LevelError)
 		return err
 	}
 	a.subz = append(a.subz, sub)
@@ -373,7 +386,7 @@ func (a *Agent) init() error {
 	udsubject := fmt.Sprintf("agentint.%s.undeploy", *a.md.VmID)
 	sub, err = a.nc.Subscribe(udsubject, a.handleUndeploy)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err), slog.LevelError)
 		return err
 	}
 	a.subz = append(a.subz, sub)
@@ -381,7 +394,7 @@ func (a *Agent) init() error {
 	pingSubject := fmt.Sprintf("agentint.%s.ping", *a.md.VmID)
 	sub, err = a.nc.Subscribe(pingSubject, a.handlePing)
 	if err != nil {
-		a.LogError(fmt.Sprintf("failed to subscribe to ping subject: %s", err))
+		a.submitLog(fmt.Sprintf("failed to subscribe to ping subject: %s", err), slog.LevelError)
 	}
 	a.subz = append(a.subz, sub)
 
@@ -476,11 +489,14 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", *params.WorkloadName, params.VmID)
 				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, true, -1)
 				return
-
 			case <-params.Run:
-				a.PublishWorkloadDeployed(params.VmID, *params.WorkloadName, params.TotalBytes)
-				sleepMillis = workloadExecutionSleepTimeoutMillis
+				essential := false
+				if params.Essential != nil {
+					essential = *params.Essential
+				}
 
+				a.PublishWorkloadDeployed(params.VmID, *params.WorkloadName, essential, params.TotalBytes)
+				sleepMillis = workloadExecutionSleepTimeoutMillis
 			case exit := <-params.Exit:
 				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", *params.WorkloadName, params.VmID, exit)
 				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, exit != 0, exit)
@@ -511,12 +527,15 @@ func (a *Agent) shutdown() {
 			}
 		}
 
-		if a.provider != nil {
+		if a.provider != nil && !a.undeploying.Load() {
 			err := a.provider.Undeploy()
 			if err != nil {
 				fmt.Printf("failed to undeploy workload: %s\n", err)
 			}
 		}
+
+		signal.Stop(a.sigs)
+		close(a.sigs)
 
 		HaltVM(nil)
 	}
@@ -526,7 +545,7 @@ func (a *Agent) shuttingDown() bool {
 	return (atomic.LoadUint32(&a.closing) > 0)
 }
 
-func (a *Agent) submitLog(msg string, lvl agentapi.LogLevel) {
+func (a *Agent) submitLog(msg string, lvl slog.Level) {
 	a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,
 		Level:  lvl,
@@ -549,7 +568,7 @@ func (a *Agent) workAck(m *nats.Msg, accepted bool, msg string) error {
 
 	err = m.Respond(bytes)
 	if err != nil {
-		a.LogError(fmt.Sprintf("Failed to acknowledge workload deployment: %s", err))
+		a.submitLog(fmt.Sprintf("Failed to acknowledge workload deployment: %s", err), slog.LevelError)
 		return err
 	}
 

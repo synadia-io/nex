@@ -157,7 +157,7 @@ func TestObjectBuiltin(t *testing.T) {
 		t.Fatalf("Expected to get an error for non-existing object but didn't: %+v", res3)
 	}
 
-	server.AddHostServicesConnection(testWorkloadId, hostservices.TriggerConnection, nc)
+	server.AddHostServicesConnection(testWorkloadId, hostservices.HostServicesConnection, nc)
 	err = bClient.MessagingPublish(context.Background(), "foo", []byte{1, 2, 3})
 	if err != nil {
 		t.Fatalf("Failed to use trigger connection for messaging publish: %s", err.Error())

@@ -70,42 +70,41 @@ type Options struct {
 
 type RunOptions struct {
 	Argv              string
-	TargetNode        string
-	WorkloadUrl       *url.URL
-	Name              string
-	WorkloadType      controlapi.NexWorkload
-	Description       string
-	PublisherXkeyFile string
 	ClaimsIssuerFile  string
+	DevMode           bool
+	Description       string
 	Env               map[string]string
 	Essential         bool
-	DevMode           bool
+	HsUrl             string
+	HsUserJwt         string
+	HsUserSeed        string
+	Name              string
+	PublisherXkeyFile string
+	TargetNode        string
 	TriggerSubjects   []string
-
-	HsUrl      string
-	HsUserJwt  string
-	HsUserSeed string
+	WorkloadType      controlapi.NexWorkload
+	WorkloadURL       *url.URL
 }
 
 type StopOptions struct {
+	ClaimsIssuerFile string
 	TargetNode       string
 	WorkloadName     string
 	WorkloadId       string
-	ClaimsIssuerFile string
 }
 
 type WatchOptions struct {
+	LogLevel     string
 	NodeId       string
 	WorkloadId   string
 	WorkloadName string
-	LogLevel     string
 }
 
 type RootfsOptions struct {
-	OutName         string
+	AgentBinaryPath string
 	BaseImage       string
 	BuildScriptPath string
-	AgentBinaryPath string
+	OutName         string
 	RootFSSize      int
 }
 

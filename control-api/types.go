@@ -26,10 +26,10 @@ const (
 )
 
 type RunResponse struct {
-	Started bool   `json:"started"`
 	ID      string `json:"id"`
 	Issuer  string `json:"issuer"`
 	Name    string `json:"name"`
+	Started bool   `json:"started"`
 }
 
 type NexWorkload string
@@ -99,14 +99,15 @@ type MemoryStat struct {
 }
 
 type InfoResponse struct {
-	AvailableAgents        int               `json:"available_agents"`
-	Machines               []MachineSummary  `json:"machines"` // FIXME-- rename to workloads?
-	Memory                 *MemoryStat       `json:"memory,omitempty"`
-	PublicXKey             string            `json:"public_xkey"`
-	SupportedWorkloadTypes []NexWorkload     `json:"supported_workload_types,omitempty"`
-	Tags                   map[string]string `json:"tags,omitempty"`
-	Uptime                 string            `json:"uptime"`
-	Version                string            `json:"version"`
+	AvailableAgents         int               `json:"available_agents"`
+	AllowDuplicateWorkloads *bool             `json:"allow_duplicate_workloads,omitempty"`
+	Machines                []MachineSummary  `json:"machines"` // FIXME-- rename to workloads?
+	Memory                  *MemoryStat       `json:"memory,omitempty"`
+	PublicXKey              string            `json:"public_xkey"`
+	SupportedWorkloadTypes  []NexWorkload     `json:"supported_workload_types,omitempty"`
+	Tags                    map[string]string `json:"tags,omitempty"`
+	Uptime                  string            `json:"uptime"`
+	Version                 string            `json:"version"`
 }
 
 type MachineSummary struct { // FIXME-- rename to workload summary?
@@ -118,8 +119,10 @@ type MachineSummary struct { // FIXME-- rename to workload summary?
 }
 
 type WorkloadSummary struct {
+	ID           string      `json:"id"`
 	Name         string      `json:"name"`
 	Description  string      `json:"description,omitempty"`
+	Essential    bool        `json:"essential"`
 	Hash         string      `json:"hash"`
 	Runtime      string      `json:"runtime"`
 	Uptime       string      `json:"uptime"`

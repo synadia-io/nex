@@ -63,11 +63,42 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 			retriedAt := time.Now().UTC()
 			deployRequest.RetriedAt = &retriedAt
 
+			// generate a new uuid for this deploy request
+			reqUUID, err := uuid.NewRandom()
+			if err != nil {
+				w.log.Error("Failed to generate unique identifier for deploy request", slog.Any("err", err))
+				return
+			}
+			id := reqUUID.String()
+
+			js, err := w.nc.JetStream()
+			if err != nil {
+				w.log.Error("Failed to resolve jetstream", slog.Any("err", err))
+				return
+			}
+
+			bucket, err := js.ObjectStore(deployRequest.Location.Hostname())
+			if err != nil {
+				w.log.Error("Failed to resolve workload object store", slog.Any("err", err))
+				return
+			}
+
+			artifact := deployRequest.Location.Path[1:len(deployRequest.Location.Path)]
+
+			info, err := bucket.GetInfo(artifact)
+			if err != nil {
+				w.log.Error("Failed to resolve workload artifact: %s; %s", artifact, slog.Any("err", err))
+				return
+			}
+			digest := controlapi.SanitizeNATSDigest(info.Digest)
+
 			req, _ := json.Marshal(&controlapi.DeployRequest{
 				Argv:            deployRequest.Argv,
 				Description:     deployRequest.Description,
+				Hash:            &digest,
 				Environment:     deployRequest.EncryptedEnvironment,
 				Essential:       deployRequest.Essential,
+				ID:              &id,
 				JsDomain:        deployRequest.JsDomain,
 				Location:        deployRequest.Location,
 				RetriedAt:       deployRequest.RetriedAt,
@@ -75,7 +106,8 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 				SenderPublicKey: deployRequest.SenderPublicKey,
 				TargetNode:      deployRequest.TargetNode,
 				TriggerSubjects: deployRequest.TriggerSubjects,
-				WorkloadJwt:     deployRequest.WorkloadJwt,
+				WorkloadName:    deployRequest.WorkloadName,
+				WorkloadJWT:     deployRequest.WorkloadJwt,
 				WorkloadType:    deployRequest.WorkloadType,
 			})
 
@@ -89,8 +121,8 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 	}
 }
 
-func (w *WorkloadManager) agentLog(workloadId string, entry agentapi.LogEntry) {
-	deployRequest, _ := w.LookupWorkload(workloadId)
+func (w *WorkloadManager) agentLog(workloadID string, entry agentapi.LogEntry) {
+	deployRequest, _ := w.LookupWorkload(workloadID)
 	if deployRequest == nil {
 		// we got a log from a process that has not yet received a deployment, so it doesn't have a
 		// workload name or namespace
@@ -99,27 +131,35 @@ func (w *WorkloadManager) agentLog(workloadId string, entry agentapi.LogEntry) {
 
 	bytes, err := json.Marshal(&emittedLog{
 		Text:  entry.Text,
-		Level: slog.Level(entry.Level),
-		ID:    workloadId,
+		Level: entry.Level,
+		ID:    workloadID,
 	})
 	if err != nil {
 		w.log.Error("Failed to marshal our own log entry", slog.Any("err", err))
 		return
 	}
 
-	subject := logPublishSubject(*deployRequest.Namespace, w.publicKey, workloadId, deployRequest.WorkloadName)
+	subject := logPublishSubject(*deployRequest.Namespace, w.publicKey, workloadID)
 	_ = w.nc.Publish(subject, bytes)
 }
 
-func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workloadName string, namespace string, tsub string, origErr error) error {
+func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, tsub string, origErr error) error {
+	deployRequest, err := w.LookupWorkload(workloadID)
+	if err != nil {
+		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadID), slog.Any("error", err))
+		return errors.New("function exec succeeded event was not published")
+	}
+
 	functionExecFailed := struct {
+		ID        string `json:"workload_id"`
 		Name      string `json:"workload_name"`
-		Subject   string `json:"trigger_subject"`
 		Namespace string `json:"namespace"`
+		Subject   string `json:"trigger_subject"`
 		Error     string `json:"error"`
 	}{
-		Name:      workloadName,
-		Namespace: namespace,
+		ID:        workloadID,
+		Name:      *deployRequest.WorkloadName,
+		Namespace: *deployRequest.Namespace,
 		Subject:   tsub,
 		Error:     origErr.Error(),
 	}
@@ -132,7 +172,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workloadN
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecFailed)
 
-	err := PublishCloudEvent(w.nc, namespace, cloudevent, w.log)
+	err = PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
 	if err != nil {
 		return err
 	}
@@ -140,11 +180,11 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workloadN
 	emitLog := emittedLog{
 		Text:  "Function execution failed",
 		Level: slog.LevelError,
-		ID:    workloadId,
+		ID:    workloadID,
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, namespace, w.publicKey, workloadName, workloadId)
+	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadID)
 	err = w.nc.Publish(subject, logBytes)
 	if err != nil {
 		w.log.Error("Failed to publish function exec failed log", slog.Any("err", err))
@@ -153,28 +193,30 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadId string, workloadN
 	return w.nc.Flush()
 }
 
-func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub string, elapsedNanos int64) error {
-	deployRequest, err := w.LookupWorkload(workloadId)
+func (w *WorkloadManager) publishFunctionExecSucceeded(workloadID string, tsub string, elapsedNanos int64) error {
+	deployRequest, err := w.LookupWorkload(workloadID)
 	if err != nil {
-		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadId), slog.Any("error", err))
+		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadID), slog.Any("error", err))
 		return errors.New("function exec succeeded event was not published")
 	}
 
 	if deployRequest == nil {
-		w.log.Warn("Tried to publish function exec succeeded event for non-existent workload", slog.String("workload_id", workloadId))
+		w.log.Warn("Tried to publish function exec succeeded event for non-existent workload", slog.String("workload_id", workloadID))
 		return nil
 	}
 
 	functionExecPassed := struct {
+		ID        string `json:"workload_id"`
 		Name      string `json:"workload_name"`
+		Namespace string `json:"namespace"`
 		Subject   string `json:"trigger_subject"`
 		Elapsed   int64  `json:"elapsed_nanos"`
-		Namespace string `json:"namespace"`
 	}{
+		ID:        workloadID,
 		Name:      *deployRequest.WorkloadName,
+		Namespace: *deployRequest.Namespace,
 		Subject:   tsub,
 		Elapsed:   elapsedNanos,
-		Namespace: *deployRequest.Namespace,
 	}
 
 	cloudevent := cloudevents.NewEvent()
@@ -193,11 +235,11 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub s
 	emitLog := emittedLog{
 		Text:  fmt.Sprintf("Function %s execution succeeded (%dns)", functionExecPassed.Name, functionExecPassed.Elapsed),
 		Level: slog.LevelDebug,
-		ID:    workloadId,
+		ID:    workloadID,
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, *deployRequest.WorkloadName, workloadId)
+	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadID)
 	err = w.nc.Publish(subject, logBytes)
 	if err != nil {
 		w.log.Error("Failed to publish function exec passed log", slog.Any("err", err))
@@ -206,29 +248,29 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadId string, tsub s
 	return w.nc.Flush()
 }
 
-// publishWorkloadStopped writes a workload stopped event for the provided workload
-func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
-	deployRequest, err := w.LookupWorkload(workloadId)
+// publish a workload undeployed event for the provided workload
+func (w *WorkloadManager) publishWorkloadUndeployed(workloadID string) error {
+	deployRequest, err := w.LookupWorkload(workloadID)
 	if err != nil {
-		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadId), slog.Any("error", err))
-		return errors.New("workload stopped event was not published")
+		w.log.Error("Failed to look up workload", slog.String("workload_id", workloadID), slog.Any("error", err))
+		return errors.New("workload undeployed event was not published")
 	}
 
 	if deployRequest == nil {
-		w.log.Warn("Tried to publish stopped event for non-existent workload", slog.String("workload_id", workloadId))
-		return errors.New("workload stopped event was not published")
+		w.log.Warn("Tried to publish undeployed event for non-existent workload", slog.String("workload_id", workloadID))
+		return errors.New("workload undeployed event was not published")
 	}
 
-	workloadName := strings.TrimSpace(deployRequest.DecodedClaims.Subject)
+	workloadName := strings.TrimSpace(*deployRequest.WorkloadName)
 	if len(workloadName) > 0 {
-		workloadStopped := struct {
-			Name   string `json:"name"`
+		workloadUndeployed := struct {
+			ID     string `json:"workload_id"`
+			Name   string `json:"workload_name"`
 			Reason string `json:"reason,omitempty"`
-			VmId   string `json:"vmid"`
 		}{
+			ID:     workloadID,
 			Name:   workloadName,
-			Reason: "Workload shutdown requested",
-			VmId:   workloadId,
+			Reason: "Workload undeploy requested",
 		}
 
 		cloudevent := cloudevents.NewEvent()
@@ -237,7 +279,7 @@ func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
 		cloudevent.SetTime(time.Now().UTC())
 		cloudevent.SetType(agentapi.WorkloadUndeployedEventType)
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
-		_ = cloudevent.SetData(workloadStopped)
+		_ = cloudevent.SetData(workloadUndeployed)
 
 		err := PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
 		if err != nil {
@@ -245,16 +287,16 @@ func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
 		}
 
 		emitLog := emittedLog{
-			Text:  "Workload stopped",
+			Text:  "Workload undeployed",
 			Level: slog.LevelDebug,
-			ID:    workloadId,
+			ID:    workloadID,
 		}
 		logBytes, _ := json.Marshal(emitLog)
 
-		subject := fmt.Sprintf("%s.%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadName, workloadId)
+		subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadID)
 		err = w.nc.Publish(subject, logBytes)
 		if err != nil {
-			w.log.Error("Failed to publish machine stopped event", slog.Any("err", err))
+			w.log.Error("Failed to publish workload undeployed event", slog.Any("err", err))
 		}
 
 		return w.nc.Flush()
@@ -263,12 +305,7 @@ func (w *WorkloadManager) publishWorkloadStopped(workloadId string) error {
 	return nil
 }
 
-func logPublishSubject(namespace string, node string, vm string, workload *string) string {
-	// $NEX.logs.{namespace}.{node}.{vm}[.{workload name}]
-	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, namespace, node, vm)
-	if workload != nil {
-		subject = fmt.Sprintf("%s.%s", subject, *workload)
-	}
-
-	return subject
+func logPublishSubject(namespace, nodeID, workloadID string) string {
+	// $NEX.logs.{namespace}.{node}.{workloadID}
+	return fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, namespace, nodeID, workloadID)
 }

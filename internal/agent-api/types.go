@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/url"
 	"time"
 
@@ -46,22 +47,22 @@ type ExecutionProviderParams struct {
 
 // DeployRequest processed by the agent
 type DeployRequest struct {
-	Argv              []string                          `json:"argv,omitempty"`
-	DecodedClaims     jwt.GenericClaims                 `json:"-"`
-	Description       *string                           `json:"description"`
-	Environment       map[string]string                 `json:"environment"`
-	Essential         *bool                             `json:"essential,omitempty"`
-	Hash              string                            `json:"hash,omitempty"`
-	Namespace         *string                           `json:"namespace,omitempty"`
-	RetriedAt         *time.Time                        `json:"retried_at,omitempty"`
-	RetryCount        *uint                             `json:"retry_count,omitempty"`
-	TotalBytes        int64                             `json:"total_bytes,omitempty"`
-	TriggerSubjects   []string                          `json:"trigger_subjects"`
-	TriggerConnection *controlapi.NatsJwtConnectionInfo `json:"trigger_connection,omitempty"`
+	Argv          []string          `json:"argv,omitempty"`
+	DecodedClaims jwt.GenericClaims `json:"-"`
+	Description   *string           `json:"description"`
+	Environment   map[string]string `json:"environment"`
+	Essential     *bool             `json:"essential,omitempty"`
+	Hash          string            `json:"hash,omitempty"`
+	ID            *string           `json:"id"`
+	Namespace     *string           `json:"namespace,omitempty"`
+	RetriedAt     *time.Time        `json:"retried_at,omitempty"`
+	RetryCount    *uint             `json:"retry_count,omitempty"`
+	TotalBytes    int64             `json:"total_bytes,omitempty"`
 
+	HostServicesConfig *controlapi.NatsJwtConnectionInfo `json:"host_services_config,omitempty"`
+	TriggerSubjects    []string                          `json:"trigger_subjects"`
 	WorkloadName       *string                           `json:"workload_name,omitempty"`
 	WorkloadType       controlapi.NexWorkload            `json:"workload_type,omitempty"`
-	HostServicesConfig *controlapi.NatsJwtConnectionInfo `json:"host_services,omitempty"`
 
 	Stderr      io.Writer `json:"-"`
 	Stdout      io.Writer `json:"-"`
@@ -214,9 +215,7 @@ func (m *MachineMetadata) Validate() bool {
 }
 
 type LogEntry struct {
-	Source string   `json:"source,omitempty"`
-	Level  LogLevel `json:"level,omitempty"`
-	Text   string   `json:"text,omitempty"`
+	Source string     `json:"source,omitempty"`
+	Level  slog.Level `json:"level,omitempty"`
+	Text   string     `json:"text,omitempty"`
 }
-
-type LogLevel int32

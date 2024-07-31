@@ -8,44 +8,47 @@ import (
 )
 
 type StopRequest struct {
-	WorkloadId  string `json:"workload_id"`
-	WorkloadJwt string `json:"workload_jwt"`
-	TargetNode  string `json:"target_node"`
+	NodeID      string `json:"node_id"`
+	WorkloadID  string `json:"workload_id"`
+	WorkloadJWT string `json:"workload_jwt"`
 }
 
 type StopResponse struct {
-	Stopped bool   `json:"stopped"`
 	ID      string `json:"id"`
 	Issuer  string `json:"issuer"`
-	Name    string `json:"name"`
+	Stopped bool   `json:"stopped"`
 }
 
-func NewStopRequest(workloadId string, name string, targetNode string, issuer nkeys.KeyPair) (*StopRequest, error) {
-	claims := jwt.NewGenericClaims(name)
+func NewStopRequest(nodeID, workloadID string, issuer nkeys.KeyPair) (*StopRequest, error) {
+	claims := jwt.NewGenericClaims(workloadID)
 	jwtText, err := claims.Encode(issuer)
 	if err != nil {
 		return nil, err
 	}
 
 	return &StopRequest{
-		WorkloadId:  workloadId,
-		TargetNode:  targetNode,
-		WorkloadJwt: jwtText,
+		NodeID:      nodeID,
+		WorkloadID:  workloadID,
+		WorkloadJWT: jwtText,
 	}, nil
 }
 
 func (request *StopRequest) Validate(originalClaims *jwt.GenericClaims) error {
-	claims, err := jwt.DecodeGeneric(request.WorkloadJwt)
+	claims, err := jwt.DecodeGeneric(request.WorkloadJWT)
 	if err != nil {
 		return fmt.Errorf("could not decode workload JWT: %s", err)
 	}
+
 	if claims.ID == originalClaims.ID ||
 		claims.IssuedAt == originalClaims.IssuedAt {
 		return fmt.Errorf("stop claims appear to be cloned or captured from the original start claims. Rejecting for security reasons")
 	}
-	if claims.Subject != originalClaims.Subject {
-		return fmt.Errorf("stop claims subject does not match original start claims subject")
-	}
+
+	// FIXME-- we don't have the original deploy request id... this used to compare using the workload names :/
+	// if claims.Subject != originalClaims.Subject {
+	// 	return fmt.Errorf("stop claims subject does not match original start claims subject")
+	// }
+
 	if claims.Issuer != originalClaims.Issuer {
 		return fmt.Errorf("the only entity allowed to terminate a workload is the issuer that originally started it")
 	}

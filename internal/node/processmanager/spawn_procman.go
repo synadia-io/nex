@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rs/xid"
+	"github.com/google/uuid"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -219,7 +219,11 @@ func (s *SpawningProcessManager) stopping() bool {
 
 // Spawns a new child process, a waiting nex-agent
 func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
-	id := xid.New()
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err
+	}
+
 	workloadID := id.String()
 
 	kp, err := s.natsint.CreateCredentials(workloadID)

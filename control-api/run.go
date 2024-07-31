@@ -9,38 +9,44 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nkeys"
 )
 
-type DeployRequest struct {
-	Argv         []string    `json:"argv,omitempty"`
-	Description  *string     `json:"description,omitempty"`
-	WorkloadType NexWorkload `json:"type"`
-	Location     *url.URL    `json:"location"`
-	Essential    *bool       `json:"essential,omitempty"`
+const (
+	workloadRegex = `^[a-zA-Z0-9_-]+$`
+)
 
-	// Contains claims for the workload: name, hash
-	WorkloadJwt *string `json:"workload_jwt"`
+type DeployRequest struct {
+	Argv        []string `json:"argv,omitempty"`
+	Description *string  `json:"description,omitempty"`
+	Hash        *string  `json:"hash"`
+	Location    *url.URL `json:"location"`
+	Essential   *bool    `json:"essential,omitempty"`
 
 	// A base64-encoded byte array that contains an encrypted json-serialized map[string]string.
 	Environment *string `json:"environment"`
 
+	ID *string `json:"id"`
+
 	// If the payload indicates an object store bucket & key, JS domain can be supplied
 	JsDomain *string `json:"jsdomain,omitempty"`
-
-	SenderPublicKey   *string                `json:"sender_public_key"`
-	TargetNode        *string                `json:"target_node"`
-	TriggerSubjects   []string               `json:"trigger_subjects,omitempty"`
-	TriggerConnection *NatsJwtConnectionInfo `json:"trigger_connection,omitempty"`
 
 	RetryCount *uint      `json:"retry_count,omitempty"`
 	RetriedAt  *time.Time `json:"retried_at,omitempty"`
 
-	HostServicesConfig *NatsJwtConnectionInfo `json:"host_services,omitempty"`
+	SenderPublicKey    *string                `json:"sender_public_key"`
+	TargetNode         *string                `json:"target_node"`
+	TriggerSubjects    []string               `json:"trigger_subjects,omitempty"`
+	HostServicesConfig *NatsJwtConnectionInfo `json:"host_services_config,omitempty"`
 
-	WorkloadEnvironment map[string]string `json:"-"`
+	WorkloadName *string     `json:"workload_name"`
+	WorkloadJWT  *string     `json:"workload_jwt"` // Contains claims for the workload: id, namespace
+	WorkloadType NexWorkload `json:"type"`
+
 	DecodedClaims       jwt.GenericClaims `json:"-"`
+	WorkloadEnvironment map[string]string `json:"-"`
 }
 
 type NatsJwtConnectionInfo struct {
@@ -48,10 +54,6 @@ type NatsJwtConnectionInfo struct {
 	NatsUserJwt  string `json:"nats_user_jwt"`
 	NatsUserSeed string `json:"nats_user_seed"`
 }
-
-const (
-	workloadRegex = `^[a-zA-Z0-9_-]+$`
-)
 
 var (
 	validWorkloadName = regexp.MustCompile(workloadRegex)
@@ -67,9 +69,21 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 
 	// TODO: ensure that all the required fields are here
 
-	workloadJwt, err := CreateWorkloadJwt(reqOpts.hash, reqOpts.workloadName, reqOpts.claimsIssuer)
+	reqUUID, err := uuid.NewRandom()
 	if err != nil {
 		return nil, err
+	}
+	id := reqUUID.String()
+
+	workloadJWT, err := CreateWorkloadJWT(id, reqOpts.workloadName, reqOpts.hash, reqOpts.claimsIssuer)
+	if err != nil {
+		return nil, err
+	}
+
+	if reqOpts.hostServicesConfig != nil && reqOpts.workloadType == NexWorkloadNative {
+		reqOpts.env["NEX_HOSTSERVICES_NATS_SERVER"] = reqOpts.hostServicesConfig.NatsUrl
+		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_JWT"] = reqOpts.hostServicesConfig.NatsUserJwt
+		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_SEED"] = reqOpts.hostServicesConfig.NatsUserSeed
 	}
 
 	encryptedEnv, err := EncryptRequestEnvironment(reqOpts.senderXkey, reqOpts.targetPublicXKey, reqOpts.env)
@@ -82,33 +96,41 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 	req := &DeployRequest{
 		Argv:               reqOpts.argv,
 		Description:        &reqOpts.workloadDescription,
-		WorkloadType:       reqOpts.workloadType,
-		Location:           &reqOpts.location,
-		WorkloadJwt:        &workloadJwt,
 		Environment:        &encryptedEnv,
 		Essential:          &reqOpts.essential,
+		HostServicesConfig: reqOpts.hostServicesConfig,
+		ID:                 &id,
+		Location:           &reqOpts.location,
 		SenderPublicKey:    &senderPublic,
 		TargetNode:         &reqOpts.targetNode,
 		TriggerSubjects:    reqOpts.triggerSubjects,
-		JsDomain:           &reqOpts.jsDomain,
-		HostServicesConfig: reqOpts.hostServicesConfiguration,
-		TriggerConnection:  reqOpts.triggerConnection,
+		WorkloadJWT:        &workloadJWT,
+		WorkloadName:       &reqOpts.workloadName,
+		WorkloadType:       reqOpts.workloadType,
+	}
+
+	if reqOpts.jsDomain != "" {
+		req.JsDomain = &reqOpts.jsDomain
 	}
 
 	return req, nil
 }
 
-// This will validate a request's workload JWT. It will not perform a
-// comparison of the hash found in the claims with a recipient's expected hash
+// This will validate a request's workload JWT and return the parsed claims
 func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
-	claims, err := jwt.DecodeGeneric(*request.WorkloadJwt)
+	claims, err := jwt.DecodeGeneric(*request.WorkloadJWT)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode workload JWT: %s", err)
 	}
 
 	request.DecodedClaims = *claims
-	if !validWorkloadName.MatchString(claims.Subject) {
-		return nil, fmt.Errorf("workload name claim ('%s') does not match requirements (%s)", claims.Subject, workloadRegex)
+
+	if !validWorkloadName.MatchString(claims.Data["name"].(string)) {
+		return nil, errors.New("invalid workload name")
+	}
+
+	if request.Hash != nil && *request.Hash != request.DecodedClaims.Data["hash"].(string) {
+		return nil, errors.New("artifact hash claim does not match request")
 	}
 
 	var vr jwt.ValidationResults
@@ -120,9 +142,10 @@ func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
 	return claims, nil
 }
 
-func CreateWorkloadJwt(hash string, name string, issuer nkeys.KeyPair) (string, error) {
-	genericClaims := jwt.NewGenericClaims(name)
+func CreateWorkloadJWT(id, name, hash string, issuer nkeys.KeyPair) (string, error) {
+	genericClaims := jwt.NewGenericClaims(id)
 	genericClaims.Data["hash"] = hash
+	genericClaims.Data["name"] = name
 
 	return genericClaims.Encode(issuer)
 }
@@ -158,22 +181,21 @@ func (request *DeployRequest) DecryptRequestEnvironment(recipientXKey nkeys.KeyP
 }
 
 type requestOptions struct {
-	argv                      []string
-	workloadName              string
-	workloadType              NexWorkload
-	workloadDescription       string
-	location                  url.URL
-	env                       map[string]string
-	essential                 bool
-	senderXkey                nkeys.KeyPair
-	claimsIssuer              nkeys.KeyPair
-	targetPublicXKey          string
-	jsDomain                  string
-	hash                      string
-	targetNode                string
-	triggerSubjects           []string
-	hostServicesConfiguration *NatsJwtConnectionInfo
-	triggerConnection         *NatsJwtConnectionInfo
+	argv                []string
+	claimsIssuer        nkeys.KeyPair
+	env                 map[string]string
+	essential           bool
+	hash                string
+	hostServicesConfig  *NatsJwtConnectionInfo
+	jsDomain            string
+	location            url.URL
+	senderXkey          nkeys.KeyPair
+	targetNode          string
+	targetPublicXKey    string
+	triggerSubjects     []string
+	workloadDescription string
+	workloadName        string
+	workloadType        NexWorkload
 }
 
 type RequestOption func(o requestOptions) requestOptions
@@ -189,15 +211,7 @@ func Argv(argv []string) RequestOption {
 // When set, overrides the node's host services configuration
 func HostServicesConfig(config NatsJwtConnectionInfo) RequestOption {
 	return func(o requestOptions) requestOptions {
-		o.hostServicesConfiguration = &config
-		return o
-	}
-}
-
-// When set, uses this connection to subscribe to function trigger subjects
-func TriggerConnection(config NatsJwtConnectionInfo) RequestOption {
-	return func(o requestOptions) requestOptions {
-		o.triggerConnection = &config
+		o.hostServicesConfig = &config
 		return o
 	}
 }
@@ -317,7 +331,7 @@ func EnvironmentValue(key string, value string) RequestOption {
 }
 
 // Sets the hash of the workload payload for verification purposes
-func Checksum(hash string) RequestOption {
+func Hash(hash string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.hash = hash
 		return o
