@@ -137,7 +137,7 @@ func (f *FirecrackerProcessManager) Stop() error {
 }
 
 func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
-	f.log.Info("Firecracker VM process manager starting")
+	f.log.Debug("Firecracker VM process manager starting")
 	f.delegate = delegate
 
 	defer func() {
@@ -246,7 +246,7 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 }
 
 func (f *FirecrackerProcessManager) resetCNI() error {
-	f.log.Info("Resetting network")
+	f.log.Debug("Resetting network")
 
 	err := os.RemoveAll("/var/lib/cni")
 	if err != nil {

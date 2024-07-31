@@ -56,7 +56,7 @@ func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiList
 		return nil
 	}
 
-	log.Info("Use this key as the recipient for encrypted run requests", slog.String("public_xkey", xkPub))
+	log.Info("Encrypted request receipent key", slog.String("public_xkey", xkPub))
 
 	return &ApiListener{
 		mgr:   mgr,

@@ -251,7 +251,7 @@ func (n *Node) init() error {
 			n.log.Error("Failed to initialize telemetry", slog.Any("err", _err))
 			err = errors.Join(err, _err)
 		} else {
-			n.log.Info("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
+			n.log.Debug("Telemetry status", slog.Bool("metrics", n.config.OtelMetrics), slog.Bool("traces", n.config.OtelTraces))
 		}
 
 		// start public NATS server
@@ -269,7 +269,7 @@ func (n *Node) init() error {
 			n.log.Error("Failed to connect to NATS server", slog.Any("err", _err))
 			err = errors.Join(err, fmt.Errorf("failed to connect to NATS server: %s", _err))
 		} else {
-			n.log.Info("Established node NATS connection", slog.String("servers", n.opts.Servers))
+			n.log.Debug("Established node NATS connection", slog.String("servers", n.opts.Servers))
 			n.setConnectionCallbackHandler(n.nc)
 		}
 
@@ -505,7 +505,7 @@ func (n *Node) ncClosedHandler(conn *nats.Conn) {
 		attrs = append(attrs, slog.String("name", conn.Opts.Name))
 	}
 
-	n.log.Info("NATS connection closed", attrs...)
+	n.log.Debug("NATS connection closed", attrs...)
 }
 
 func (n *Node) ncDisconnectErrorHandler(conn *nats.Conn, err error) {
@@ -610,7 +610,7 @@ func (n *Node) publishNodeStarted() error {
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(nodeStart)
 
-	n.log.Info("Publishing node started event")
+	n.log.Debug("Publishing node started event")
 	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
 }
 
@@ -628,7 +628,7 @@ func (n *Node) publishNodeStopped() error {
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(evt)
 
-	n.log.Info("Publishing node stopped event")
+	n.log.Debug("Publishing node stopped event")
 	return PublishCloudEvent(n.nc, "system", cloudevent, n.log)
 }
 
@@ -638,7 +638,7 @@ func (n *Node) setConnectionCallbackHandler(nc *nats.Conn) {
 	nc.SetErrorHandler(n.ncErrorHandler)
 	nc.SetReconnectHandler(n.ncReconnectedHandler)
 
-	n.log.Info("Set NATS connection callback handlers", slog.String("servers", n.opts.Servers))
+	n.log.Debug("Set NATS connection callback handlers", slog.String("servers", n.opts.Servers))
 }
 
 func (n *Node) validateConfig() error {

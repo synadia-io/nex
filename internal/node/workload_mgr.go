@@ -124,7 +124,7 @@ func NewWorkloadManager(
 		w.log.Error("Failed to start internal NATS server", slog.Any("err", err))
 		return nil, err
 	} else {
-		w.log.Info("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
+		w.log.Debug("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
 	}
 
 	w.hostServices = NewHostServices(w.ncint, config.HostServicesConfig, w.log, w.t.Tracer)
@@ -145,7 +145,7 @@ func NewWorkloadManager(
 
 // Start the workload manager, which in turn starts the configured agent process manager
 func (w *WorkloadManager) Start() {
-	w.log.Info("Workload manager starting")
+	w.log.Debug("Workload manager starting")
 
 	err := w.procMan.Start(w)
 	if err != nil {
@@ -367,8 +367,6 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 // up all applicable resources.
 func (w *WorkloadManager) Stop() error {
 	if atomic.AddUint32(&w.closing, 1) == 1 {
-		w.log.Info("Workload manager stopping")
-
 		for id := range w.poolAgents {
 			_ = w.poolAgents[id].Stop()
 		}
@@ -392,6 +390,7 @@ func (w *WorkloadManager) Stop() error {
 		}
 
 		w.natsint.Shutdown()
+		w.log.Debug("Workload manager stopped")
 	}
 
 	return nil
