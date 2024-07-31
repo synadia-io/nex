@@ -95,7 +95,7 @@ var _ = Describe("nex node", func() {
 				agentPath = filepath.Join(defaultBinPath, "nex-agent")
 				_ = os.Remove(agentPath)
 
-				cmd := exec.Command("go", "build", "-o", agentPath, "-tags", "netgo", "-ldflags", "-extldflags -static", filepath.Join("..", "agent", "cmd", "nex-agent"))
+				cmd := exec.Command("go", "build", "-o", agentPath, "-tags", "netgo", filepath.Join("..", "agent", "cmd", "nex-agent"))
 				_ = cmd.Start()
 				_ = cmd.Wait()
 			}
