@@ -201,8 +201,8 @@ github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf h1:FtEj8sfIcaaB
 github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf/go.mod h1:yrqSXGoD/4EKfF26AOGzscPOgTTJcyAwM2rpixWT+t4=
 github.com/jedib0t/go-pretty/v6 v6.5.9 h1:ACteMBRrrmm1gMsXe9PSTOClQ63IXDUt03H5U+UV8OU=
 github.com/jedib0t/go-pretty/v6 v6.5.9/go.mod h1:zbn98qrYlh95FIhwwsbIip0LYpwSG8SUOScs+v9/t0E=
-github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240731145001-c17fb1cbbee7 h1:jQAzAo8ID+L/peeE9RGX2DO5g86wsau58CRI4mISRGQ=
-github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240731145001-c17fb1cbbee7/go.mod h1:kSAg1h7FM4er9xOpCv1m9HgCmx5e8QahgHKzPJ6qwvM=
+github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240731185118-9fefbe818f47 h1:cbqM748tfKtLa2vJSK48UC1xeEoDyz8fwxphLxVyrI0=
+github.com/jordan-rash/firecracker-go-sdk v0.0.0-20240731185118-9fefbe818f47/go.mod h1:kSAg1h7FM4er9xOpCv1m9HgCmx5e8QahgHKzPJ6qwvM=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
 github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024/go.mod h1:6v2b51hI/fHJwM22ozAgKL4VKDeJcHhJFhtBdhmNjmU=
