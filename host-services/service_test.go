@@ -45,7 +45,7 @@ func TestBogusService(t *testing.T) {
 	client := NewHostServicesClient(nc, 2*time.Second, testNamespace, testWorkload, testWorkloadId)
 
 	boguss := bogusService{
-		code:    99,
+		code:    200,
 		message: "howdy",
 		data:    []byte{1, 2, 3, 4, 5, 6},
 	}
@@ -69,10 +69,10 @@ func TestBogusService(t *testing.T) {
 	}
 
 	if !slices.Equal(result.Data, []byte{1, 2, 3, 4, 5, 6}) {
-		t.Fatalf("Data did not round trip properly: %+v", result.Data)
+		t.Fatalf("Data did not round trip properly: %+v", result)
 	}
 
-	if result.Code != 99 {
+	if result.Code != 200 {
 		t.Fatalf("Code did not return properly: %d", result.Code)
 	}
 }
