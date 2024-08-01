@@ -3,6 +3,7 @@ package builtins
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,8 +23,9 @@ const (
 	objectStoreServiceMethodDelete = "delete"
 	objectStoreServiceMethodList   = "list"
 
-	defaultMaxBytes   = 524288
-	defaultBucketName = "hs_%s_obj"
+	defaultMaxBytes         = 524288
+	objectTimeout           = 1500 * time.Millisecond
+	defaultObjectBucketName = "HostServices_ObjectStore"
 )
 
 type ObjectStoreService struct {
@@ -32,9 +34,9 @@ type ObjectStoreService struct {
 }
 
 type objectStoreConfig struct {
-	BucketName   string `json:"bucket_name"`
-	MaxBytes     int    `json:"max_bytes"`
-	JitProvision bool   `json:"jit_provision"`
+	MaxBytes      int    `json:"max_bytes"`
+	AutoProvision bool   `json:"auto_provision"`
+	JsDomain      string `json:"js_domain"`
 }
 
 func NewObjectStoreService(log *slog.Logger) (*ObjectStoreService, error) {
@@ -47,8 +49,7 @@ func NewObjectStoreService(log *slog.Logger) (*ObjectStoreService, error) {
 
 func (o *ObjectStoreService) Initialize(config json.RawMessage) error {
 
-	o.config.BucketName = defaultBucketName
-	o.config.JitProvision = true
+	o.config.AutoProvision = true
 	o.config.MaxBytes = defaultMaxBytes
 
 	if len(config) > 0 {
@@ -77,8 +78,10 @@ func (o *ObjectStoreService) HandleRequest(
 		nc = conns[hostservices.DefaultConnection]
 	}
 	objectStoreName := metadata[agentapi.BucketContextHeader]
+	ctx, cancelF := context.WithTimeout(context.Background(), kvTimeout)
+	defer cancelF()
 
-	objectStore, err := o.resolveObjectStore(nc, objectStoreName)
+	objectStore, err := o.resolveObjectStore(ctx, nc, objectStoreName)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
 		code := uint(500)
@@ -90,13 +93,13 @@ func (o *ObjectStoreService) HandleRequest(
 
 	switch method {
 	case objectStoreServiceMethodGet:
-		return o.handleGet(objectStore, metadata)
+		return o.handleGet(ctx, objectStore, metadata)
 	case objectStoreServiceMethodPut:
-		return o.handlePut(objectStore, request, metadata)
+		return o.handlePut(ctx, objectStore, request, metadata)
 	case objectStoreServiceMethodDelete:
-		return o.handleDelete(objectStore, metadata)
+		return o.handleDelete(ctx, objectStore, metadata)
 	case objectStoreServiceMethodList:
-		return o.handleList(objectStore)
+		return o.handleList(ctx, objectStore)
 	default:
 		o.log.Warn("Received invalid host services RPC request",
 			slog.String("service", "objectstore"),
@@ -107,7 +110,8 @@ func (o *ObjectStoreService) HandleRequest(
 }
 
 func (o *ObjectStoreService) handleGet(
-	objectStore nats.ObjectStore,
+	ctx context.Context,
+	objectStore jetstream.ObjectStore,
 	metadata map[string]string,
 ) (hostservices.ServiceResult, error) {
 
@@ -117,7 +121,7 @@ func (o *ObjectStoreService) handleGet(
 	}
 
 	start := time.Now()
-	result, err := objectStore.Get(name)
+	result, err := objectStore.Get(ctx, name)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to get object %s: %s", name, err.Error()))
 		code := uint(500)
@@ -139,7 +143,8 @@ func (o *ObjectStoreService) handleGet(
 }
 
 func (o *ObjectStoreService) handlePut(
-	objectStore nats.ObjectStore,
+	ctx context.Context,
+	objectStore jetstream.ObjectStore,
 	data []byte, metadata map[string]string,
 ) (hostservices.ServiceResult, error) {
 
@@ -148,7 +153,7 @@ func (o *ObjectStoreService) handlePut(
 		return hostservices.ServiceResultFail(400, "name is required"), nil
 	}
 
-	result, err := objectStore.Put(&nats.ObjectMeta{
+	result, err := objectStore.Put(ctx, jetstream.ObjectMeta{
 		Name: name,
 		// TODO Description
 		// TODO Headers
@@ -166,7 +171,8 @@ func (o *ObjectStoreService) handlePut(
 }
 
 func (o *ObjectStoreService) handleDelete(
-	objectStore nats.ObjectStore,
+	ctx context.Context,
+	objectStore jetstream.ObjectStore,
 	metadata map[string]string,
 ) (hostservices.ServiceResult, error) {
 
@@ -175,7 +181,7 @@ func (o *ObjectStoreService) handleDelete(
 		return hostservices.ServiceResultFail(400, "name is required"), nil
 	}
 
-	err := objectStore.Delete(name)
+	err := objectStore.Delete(ctx, name)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to delete object %s: %s", name, err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to delete object"), nil
@@ -188,10 +194,11 @@ func (o *ObjectStoreService) handleDelete(
 }
 
 func (o *ObjectStoreService) handleList(
-	objectStore nats.ObjectStore,
+	ctx context.Context,
+	objectStore jetstream.ObjectStore,
 ) (hostservices.ServiceResult, error) {
 
-	objects, err := objectStore.List() // TODO-- paginate...
+	objects, err := objectStore.List(ctx)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to respond to object store host service request: %s", err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to list objects"), nil
@@ -202,14 +209,33 @@ func (o *ObjectStoreService) handleList(
 }
 
 // resolve the object store for the given workload; initialize it if necessary & configured to do so
-func (o *ObjectStoreService) resolveObjectStore(nc *nats.Conn, objectStoreName string) (nats.ObjectStore, error) {
-	js, err := nc.JetStream()
+func (o *ObjectStoreService) resolveObjectStore(ctx context.Context, nc *nats.Conn, objectStoreName string) (jetstream.ObjectStore, error) {
+	var js jetstream.JetStream
+	var err error
+
+	if len(o.config.JsDomain) > 0 {
+		js, err = jetstream.NewWithDomain(nc, o.config.JsDomain)
+	} else {
+		js, err = jetstream.New(nc)
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	objectStore, err := js.ObjectStore(objectStoreName)
-	if err != nil {
+	objectStore, err := js.ObjectStore(ctx, objectStoreName)
+	if err != nil && errors.Is(err, jetstream.ErrBucketNotFound) && o.config.AutoProvision {
+		if len(objectStoreName) == 0 {
+			objectStoreName = defaultObjectBucketName
+		}
+		objectStore, err := js.CreateObjectStore(ctx, jetstream.ObjectStoreConfig{
+			Bucket:   objectStoreName,
+			MaxBytes: int64(o.config.MaxBytes),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return objectStore, nil
+	} else if err != nil {
 		return nil, err
 	}
 

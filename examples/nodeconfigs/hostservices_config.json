@@ -22,7 +22,7 @@
                 "config": {
                     "bucket_name": "SAMPLEHSKV_${namespace}_${workload_name}",
                     "max_bytes": 0,
-                    "jit_provision": false
+                    "auto_provision": false
                 }
             },
             "messaging": {
