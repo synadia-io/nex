@@ -93,11 +93,24 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 }
 
 func (a *Agent) FullVersion() string {
-	pk, err := a.md.SharedXKP.PublicKey()
-	if err != nil {
-		return fmt.Sprintf("%s [%s] BuildDate: %s", VERSION, COMMIT, BUILDDATE)
+	if a.sandboxed {
+		pk, err := a.md.SharedXKP.PublicKey()
+		if err == nil {
+			return fmt.Sprintf("%s [%s] BuildDate: %s | Public Shared Xkey: %s", VERSION, COMMIT, BUILDDATE, pk)
+		}
+	} else {
+		xkeyseed, found := os.LookupEnv("NEX_NODE_SHARED_XKEY_SEED")
+		if found {
+			seed, err := nkeys.FromSeed([]byte(xkeyseed))
+			if err == nil {
+				pk, err := seed.PublicKey()
+				if err == nil {
+					return fmt.Sprintf("%s [%s] BuildDate: %s | Public Shared Xkey: %s", VERSION, COMMIT, BUILDDATE, pk)
+				}
+			}
+		}
 	}
-	return fmt.Sprintf("%s [%s] BuildDate: %s | Public Shared Xkey: %s", VERSION, COMMIT, BUILDDATE, pk)
+	return fmt.Sprintf("%s [%s] BuildDate: %s", VERSION, COMMIT, BUILDDATE)
 }
 
 // Start the agent

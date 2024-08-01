@@ -239,6 +239,9 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	seed, _ := kp.Seed()
 
 	cmd := exec.Command(nexAgentBinary)
+
+	sharedSeed, _ := s.sharedXKP.Seed()
+
 	cmd.Env = append(os.Environ(),
 		"NEX_SANDBOX=false",
 		fmt.Sprintf("NEX_WORKLOADID=%s", workloadID),
@@ -246,6 +249,7 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 		"NEX_NODE_NATS_HOST=0.0.0.0",
 		fmt.Sprintf("NEX_NODE_NATS_PORT=%d", *s.config.InternalNodePort),
 		fmt.Sprintf("NEX_NODE_NATS_NKEY_SEED=%s", seed),
+		fmt.Sprintf("NEX_NODE_SHARED_XKEY_SEED=%s", string(sharedSeed)),
 	)
 	// If this config entry exists, workload plugins are allowed by the agent
 	if s.config.AgentPluginPath != nil {
