@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
@@ -129,8 +130,8 @@ func (e *Wasm) Validate() error {
 }
 
 // InitNexExecutionProviderWasm convenience method to initialize a Wasm execution provider
-func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wasm, error) {
-	if params.WorkloadName == nil {
+func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams, receipientXKey nkeys.KeyPair) (*Wasm, error) {
+	if params.DeployRequest.WorkloadName == nil {
 		return nil, errors.New("wasm execution provider requires a workload name parameter")
 	}
 
@@ -149,10 +150,16 @@ func InitNexExecutionProviderWasm(params *agentapi.ExecutionProviderParams) (*Wa
 		return nil, err
 	}
 
+	// FIX ME
+	err = params.DeployRequest.DecryptRequestEnvironment(receipientXKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Wasm{
 		vmID:     params.VmID,
 		wasmFile: bytes,
-		env:      params.Environment,
+		env:      params.DeployRequest.WorkloadEnvironment,
 
 		fail: params.Fail,
 		run:  params.Run,

@@ -999,6 +999,10 @@ func newDeployRequest(nodeID, name, desc, path string, env map[string]string, tr
 		controlapi.TargetNode(nodeID),
 		controlapi.TargetPublicXKey(*targetPublicXKey),
 		controlapi.TriggerSubjects(triggerSubjects),
+
+		controlapi.Namespace("test"),
+		controlapi.TotalBytes(1),
+		controlapi.Hash("asdf"),
 	}
 
 	for k, v := range env {

@@ -6,14 +6,19 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/nats-io/nkeys"
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
 func TestNoopPluginLoad(t *testing.T) {
 	plugPath := "../../test/fixtures"
 	wName := "echofunctionjs"
+
+	recipientKey, _ := nkeys.CreateCurveKeys()
+
 	params := &agentapi.ExecutionProviderParams{
-		DeployRequest: agentapi.DeployRequest{
+		DeployRequest: controlapi.DeployRequest{
 			WorkloadName: &wName,
 			WorkloadType: "noop",
 		},
@@ -27,7 +32,7 @@ func TestNoopPluginLoad(t *testing.T) {
 		PluginPath:  &plugPath,
 	}
 
-	prov, err := MaybeLoadPluginProvider(params)
+	prov, err := MaybeLoadPluginProvider(params, recipientKey)
 	if err != nil {
 		t.Fatalf("Failed to create plugin provider: %s", err.Error())
 	}

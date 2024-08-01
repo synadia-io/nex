@@ -34,7 +34,7 @@ type ApiListener struct {
 }
 
 // FIXME-- stop passing node here
-func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiListener {
+func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node, sharedXKey nkeys.KeyPair) *ApiListener {
 	config := node.config
 
 	efftags := config.Tags
@@ -45,12 +45,7 @@ func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiList
 		efftags[controlapi.TagUnsafe] = "true"
 	}
 
-	kp, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		log.Error("Failed to create x509 curve key", slog.Any("err", err))
-		return nil
-	}
-	xkPub, err := kp.PublicKey()
+	xkPub, err := sharedXKey.PublicKey()
 	if err != nil {
 		log.Error("Failed to get public key from x509 curve key", slog.Any("err", err))
 		return nil
@@ -61,7 +56,7 @@ func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiList
 	return &ApiListener{
 		mgr:   mgr,
 		log:   log,
-		xk:    kp,
+		xk:    sharedXKey,
 		start: time.Now().UTC(),
 		node:  node,
 		subz:  make([]*nats.Subscription, 0),
@@ -386,12 +381,10 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		return
 	}
 
-	agentDeployRequest := agentDeployRequestFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
-
 	api.log.
 		Info("Submitting workload to agent",
 			slog.String("namespace", namespace),
-			slog.String("workload", *agentDeployRequest.WorkloadName),
+			slog.String("workload", *request.WorkloadName),
 			slog.String("workload_id", workloadID),
 			slog.Uint64("workload_size", numBytes),
 			slog.String("workload_sha256", *workloadHash),
@@ -399,7 +392,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		)
 
 	span.AddEvent("Created agent deploy request")
-	err = api.mgr.DeployWorkload(agentClient, agentDeployRequest)
+	err = api.mgr.DeployWorkload(agentClient, &request)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to deploy workload",
@@ -502,9 +495,9 @@ func (api *ApiListener) handleStop(ctx context.Context, span trace.Span, m *nats
 		return
 	}
 
-	if *deployRequest.Namespace != namespace {
+	if deployRequest.Namespace != namespace {
 		api.log.Error("Namespace mismatch on workload stop request",
-			slog.String("namespace", *deployRequest.Namespace),
+			slog.String("namespace", deployRequest.Namespace),
 			slog.String("targetnamespace", namespace),
 		)
 

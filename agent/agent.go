@@ -93,7 +93,11 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 }
 
 func (a *Agent) FullVersion() string {
-	return fmt.Sprintf("%s [%s] BuildDate: %s", VERSION, COMMIT, BUILDDATE)
+	pk, err := a.md.SharedXKP.PublicKey()
+	if err != nil {
+		return fmt.Sprintf("%s [%s] BuildDate: %s", VERSION, COMMIT, BUILDDATE)
+	}
+	return fmt.Sprintf("%s [%s] BuildDate: %s | Public Shared Xkey: %s", VERSION, COMMIT, BUILDDATE, pk)
 }
 
 // Start the agent
@@ -175,7 +179,7 @@ func (a *Agent) Version() string {
 // the executable workload artifact from the cache bucket, write it to a
 // temporary file and make it executable; this method returns the full
 // path to the cached artifact if successful
-func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
+func (a *Agent) cacheExecutableArtifact(req *controlapi.DeployRequest) (*string, error) {
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
 
@@ -260,7 +264,7 @@ func (a *Agent) dispatchLogs() {
 // bucket, write it to tmp, initialize the execution provider per the
 // request, and then validate and deploy a workload
 func (a *Agent) handleDeploy(m *nats.Msg) {
-	var request agentapi.DeployRequest
+	var request controlapi.DeployRequest
 	err := json.Unmarshal(m.Data, &request)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to unmarshal deploy request: %s", err)
@@ -269,7 +273,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	err = request.Validate()
+	_, err = request.Validate()
 	if err != nil {
 		_ = a.workAck(m, false, fmt.Sprintf("%v", err)) // FIXME-- this message can be formatted prettier
 		return
@@ -287,7 +291,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	provider, err := providers.NewExecutionProvider(params)
+	provider, err := providers.NewExecutionProvider(params, a.md.SharedXKP)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
 		a.submitLog(msg, slog.LevelError)
@@ -455,7 +459,7 @@ func (a *Agent) installSignalHandlers() {
 
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
-func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
+func (a *Agent) newExecutionProviderParams(req *controlapi.DeployRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
 	if a.md.VmID == nil {
 		return nil, errors.New("vm id is required to initialize execution provider params")
 	}
@@ -486,20 +490,20 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 		for {
 			select {
 			case <-params.Fail:
-				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", *params.WorkloadName, params.VmID)
-				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, true, -1)
+				msg := fmt.Sprintf("Failed to start workload: %s; vm: %s", *params.DeployRequest.WorkloadName, params.VmID)
+				a.PublishWorkloadExited(params.VmID, *params.DeployRequest.WorkloadName, msg, true, -1)
 				return
 			case <-params.Run:
 				essential := false
-				if params.Essential != nil {
-					essential = *params.Essential
+				if params.DeployRequest.Essential != nil {
+					essential = *params.DeployRequest.Essential
 				}
 
-				a.PublishWorkloadDeployed(params.VmID, *params.WorkloadName, essential, params.TotalBytes)
+				a.PublishWorkloadDeployed(params.VmID, *params.DeployRequest.WorkloadName, essential, params.DeployRequest.TotalBytes)
 				sleepMillis = workloadExecutionSleepTimeoutMillis
 			case exit := <-params.Exit:
-				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", *params.WorkloadName, params.VmID, exit)
-				a.PublishWorkloadExited(params.VmID, *params.WorkloadName, msg, exit != 0, exit)
+				msg := fmt.Sprintf("Exited workload: %s; vm: %s; status: %d", *params.DeployRequest.WorkloadName, params.VmID, exit)
+				a.PublishWorkloadExited(params.VmID, *params.DeployRequest.WorkloadName, msg, exit != 0, exit)
 				return
 			default:
 				// no-op

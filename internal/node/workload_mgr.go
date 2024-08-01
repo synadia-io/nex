@@ -69,6 +69,7 @@ type WorkloadManager struct {
 	pingTimeout      time.Duration
 
 	hostServices *HostServices
+	sharedXKey   nkeys.KeyPair
 
 	poolMutex *sync.Mutex
 	stopMutex map[string]*sync.Mutex
@@ -84,6 +85,7 @@ func NewWorkloadManager(
 	ctx context.Context,
 	cancel context.CancelFunc,
 	nodeKeypair nkeys.KeyPair,
+	sharedXKP nkeys.KeyPair,
 	publicKey string,
 	nc *nats.Conn,
 	config *models.NodeConfiguration,
@@ -108,6 +110,7 @@ func NewWorkloadManager(
 		pingTimeout:      time.Duration(config.AgentPingTimeoutMillisecond) * time.Millisecond,
 		publicKey:        publicKey,
 		t:                telemetry,
+		sharedXKey:       sharedXKP,
 
 		poolAgents: make(map[string]*agentapi.AgentClient),
 		liveAgents: make(map[string]*agentapi.AgentClient),
@@ -139,6 +142,7 @@ func NewWorkloadManager(
 		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
 		return nil, err
 	}
+	w.procMan.SharedEncryptionKey(w.sharedXKey)
 
 	return w, nil
 }
@@ -216,7 +220,7 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 
 // Deploy a workload as specified by the given deploy request to an available
 // agent in the configured pool
-func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *agentapi.DeployRequest) error {
+func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *controlapi.DeployRequest) error {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
@@ -301,16 +305,16 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 	}
 
 	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_type", string(request.WorkloadType))))
-	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)), metric.WithAttributes(attribute.String("workload_type", string(request.WorkloadType))))
+	w.t.WorkloadCounter.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", request.Namespace)), metric.WithAttributes(attribute.String("workload_type", string(request.WorkloadType))))
 	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes)
-	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+	w.t.DeployedByteCounter.Add(w.ctx, request.TotalBytes, metric.WithAttributes(attribute.String("namespace", request.Namespace)))
 
 	return nil
 }
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
 // Note that this means "pending" agents are not considered by lookups
-func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.DeployRequest, error) {
+func (w *WorkloadManager) LookupWorkload(workloadID string) (*controlapi.DeployRequest, error) {
 	if agentClient, ok := w.liveAgents[workloadID]; ok {
 		return agentClient.DeployRequest(), nil
 	}
@@ -348,7 +352,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 			Id:        id,
 			Healthy:   true, // FIXME!!!
 			Uptime:    uptimeFriendly,
-			Namespace: *deployRequest.Namespace,
+			Namespace: deployRequest.Namespace,
 			Workload: controlapi.WorkloadSummary{
 				Name:         *deployRequest.WorkloadName,
 				Description:  *deployRequest.Description,
@@ -521,7 +525,7 @@ func (w *WorkloadManager) agentContactLost(workloadID string) {
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
-func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
+func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *controlapi.DeployRequest) func(msg *nats.Msg) {
 	agentClient, ok := w.liveAgents[workloadID]
 	if !ok {
 		w.log.Error("Attempted to generate trigger handler for non-existent agent client")
@@ -536,7 +540,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			trace.WithSpanKind(trace.SpanKindServer),
 			trace.WithAttributes(
 				attribute.String("name", *request.WorkloadName),
-				attribute.String("namespace", *request.Namespace),
+				attribute.String("namespace", request.Namespace),
 				attribute.String("trigger-subject", msg.Subject),
 			))
 
@@ -556,7 +560,7 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			)
 
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1)
-			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", request.Namespace)))
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
 			_ = w.publishFunctionExecFailed(workloadID, tsub, err)
 		} else if resp != nil {
@@ -580,10 +584,10 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 			parentSpan.AddEvent("published success event")
 
 			w.t.FunctionTriggers.Add(w.ctx, 1)
-			w.t.FunctionTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+			w.t.FunctionTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", request.Namespace)))
 			w.t.FunctionTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
 			w.t.FunctionRunTimeNano.Add(w.ctx, runTimeNs64)
-			w.t.FunctionRunTimeNano.Add(w.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
+			w.t.FunctionRunTimeNano.Add(w.ctx, runTimeNs64, metric.WithAttributes(attribute.String("namespace", request.Namespace)))
 			w.t.FunctionRunTimeNano.Add(w.ctx, runTimeNs64, metric.WithAttributes(attribute.String("workload_name", *request.WorkloadName)))
 
 			err = msg.Respond(resp.Data)
@@ -621,7 +625,7 @@ func (w *WorkloadManager) startInternalNATS() error {
 	return nil
 }
 
-func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployRequest) (*nats.Conn, error) {
+func (w *WorkloadManager) createHostServicesConnection(request *controlapi.DeployRequest) (*nats.Conn, error) {
 	natsOpts := []nats.Option{
 		nats.Name("nex-hostservices"),
 	}

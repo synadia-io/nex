@@ -58,7 +58,7 @@ type AgentClient struct {
 	execTotalNanos    int64
 	workloadStartedAt time.Time
 
-	deployRequest *DeployRequest
+	deployRequest *controlapi.DeployRequest
 	workloadBytes uint64
 	subz          []*nats.Subscription
 
@@ -132,7 +132,7 @@ func (a *AgentClient) Start(agentID string) error {
 	return nil
 }
 
-func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, error) {
+func (a *AgentClient) DeployWorkload(request *controlapi.DeployRequest) (*DeployResponse, error) {
 	bytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -252,7 +252,7 @@ func (a *AgentClient) UptimeMillis() time.Duration {
 	return time.Since(a.workloadStartedAt)
 }
 
-func (a *AgentClient) DeployRequest() *DeployRequest {
+func (a *AgentClient) DeployRequest() *controlapi.DeployRequest {
 	return a.deployRequest
 }
 

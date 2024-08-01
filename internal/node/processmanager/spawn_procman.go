@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/nats-io/nkeys"
+	controlapi "github.com/synadia-io/nex/control-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
 	"github.com/synadia-io/nex/internal/node/observability"
@@ -35,17 +36,18 @@ type SpawningProcessManager struct {
 	allProcs  map[string]*spawnedProcess
 	poolProcs chan *spawnedProcess
 
-	natsint *internalnats.InternalNatsServer
+	natsint   *internalnats.InternalNatsServer
+	sharedXKP nkeys.KeyPair
 
 	delegate       ProcessDelegate
-	deployRequests map[string]*agentapi.DeployRequest
+	deployRequests map[string]*controlapi.DeployRequest
 
 	log *slog.Logger
 }
 
 type spawnedProcess struct {
 	cmd             *exec.Cmd
-	deployRequest   *agentapi.DeployRequest
+	deployRequest   *controlapi.DeployRequest
 	workloadStarted time.Time
 
 	ID string
@@ -74,7 +76,7 @@ func NewSpawningProcessManager(
 
 		stopMutexes: make(map[string]*sync.Mutex),
 
-		deployRequests: make(map[string]*agentapi.DeployRequest),
+		deployRequests: make(map[string]*controlapi.DeployRequest),
 		allProcs:       make(map[string]*spawnedProcess),
 		poolProcs:      make(chan *spawnedProcess, config.MachinePoolSize),
 	}, nil
@@ -90,7 +92,7 @@ func (s *SpawningProcessManager) ListProcesses() ([]ProcessInfo, error) {
 			pinfo := ProcessInfo{
 				ID:            workloadID,
 				Name:          *proc.deployRequest.WorkloadName,
-				Namespace:     *proc.deployRequest.Namespace,
+				Namespace:     proc.deployRequest.Namespace,
 				DeployRequest: proc.deployRequest,
 			}
 			pinfos = append(pinfos, pinfo)
@@ -110,7 +112,7 @@ func (s *SpawningProcessManager) EnterLameDuck() error {
 }
 
 // Attaches a deployment request to a running process. Until a process is prepared, it's just an empty agent
-func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.DeployRequest) error {
+func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *controlapi.DeployRequest) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -210,6 +212,10 @@ func (s *SpawningProcessManager) StopProcess(workloadID string) error {
 	delete(s.stopMutexes, workloadID)
 
 	return nil
+}
+
+func (s *SpawningProcessManager) SharedEncryptionKey(xkey nkeys.KeyPair) {
+	s.sharedXKP = xkey
 }
 
 // Checks if the process manager is stopping

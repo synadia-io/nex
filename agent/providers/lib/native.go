@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -108,8 +109,8 @@ func (e *NativeExecutable) Validate() error {
 }
 
 // convenience method to initialize an ELF execution provider
-func InitNexExecutionProviderNative(params *agentapi.ExecutionProviderParams) (*NativeExecutable, error) {
-	if params.WorkloadName == nil {
+func InitNexExecutionProviderNative(params *agentapi.ExecutionProviderParams, _ nkeys.KeyPair) (*NativeExecutable, error) {
+	if params.DeployRequest.WorkloadName == nil {
 		return nil, errors.New("Native execution provider requires a workload name parameter")
 	}
 
@@ -117,12 +118,18 @@ func InitNexExecutionProviderNative(params *agentapi.ExecutionProviderParams) (*
 		return nil, errors.New("Native execution provider requires a temporary filename parameter")
 	}
 
+	// FIX ME
+	err := params.DeployRequest.DecryptRequestEnvironment(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	return &NativeExecutable{
-		argv:        params.Argv,
-		environment: params.Environment,
-		name:        *params.WorkloadName,
+		argv:        params.DeployRequest.Argv,
+		environment: params.DeployRequest.WorkloadEnvironment,
+		name:        *params.DeployRequest.WorkloadName,
 		tmpFilename: *params.TmpFilename,
-		totalBytes:  params.TotalBytes,
+		totalBytes:  params.DeployRequest.TotalBytes,
 		vmID:        params.VmID,
 
 		stderr: params.Stderr,

@@ -5,11 +5,10 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net/url"
 	"time"
 
-	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
 )
 
@@ -21,7 +20,7 @@ const DefaultRunloopSleepTimeoutMillis = 25
 
 // ExecutionProviderParams parameters for initializing a specific execution provider
 type ExecutionProviderParams struct {
-	DeployRequest
+	DeployRequest   controlapi.DeployRequest
 	TriggerSubjects []string `json:"trigger_subjects"`
 
 	// Fail channel receives bool upon command failing to start
@@ -46,88 +45,88 @@ type ExecutionProviderParams struct {
 }
 
 // DeployRequest processed by the agent
-type DeployRequest struct {
-	Argv          []string          `json:"argv,omitempty"`
-	DecodedClaims jwt.GenericClaims `json:"-"`
-	Description   *string           `json:"description"`
-	Environment   map[string]string `json:"environment"`
-	Essential     *bool             `json:"essential,omitempty"`
-	Hash          string            `json:"hash,omitempty"`
-	ID            *string           `json:"id"`
-	Namespace     *string           `json:"namespace,omitempty"`
-	RetriedAt     *time.Time        `json:"retried_at,omitempty"`
-	RetryCount    *uint             `json:"retry_count,omitempty"`
-	TotalBytes    int64             `json:"total_bytes,omitempty"`
-
-	HostServicesConfig *controlapi.NatsJwtConnectionInfo `json:"host_services_config,omitempty"`
-	TriggerSubjects    []string                          `json:"trigger_subjects"`
-	WorkloadName       *string                           `json:"workload_name,omitempty"`
-	WorkloadType       controlapi.NexWorkload            `json:"workload_type,omitempty"`
-
-	Stderr      io.Writer `json:"-"`
-	Stdout      io.Writer `json:"-"`
-	TmpFilename *string   `json:"-"`
-
-	EncryptedEnvironment *string  `json:"-"`
-	JsDomain             *string  `json:"-"`
-	Location             *url.URL `json:"-"`
-	SenderPublicKey      *string  `json:"-"`
-	TargetNode           *string  `json:"-"`
-	WorkloadJwt          *string  `json:"-"`
-
-	Errors []error `json:"errors,omitempty"`
-}
-
-func (request *DeployRequest) IsEssential() bool {
-	return request.Essential != nil && *request.Essential
-}
-
-// Returns true if the run request supports essential flag
-func (request *DeployRequest) SupportsEssential() bool {
-	return request.WorkloadType == controlapi.NexWorkloadNative ||
-		request.WorkloadType == controlapi.NexWorkloadOCI
-}
-
-// Returns true if the run request supports trigger subjects
-func (request *DeployRequest) SupportsTriggerSubjects() bool {
-	return (request.WorkloadType == controlapi.NexWorkloadV8 ||
-		request.WorkloadType == controlapi.NexWorkloadWasm) &&
-		len(request.TriggerSubjects) > 0
-}
-
-func (r *DeployRequest) Validate() error {
-	var err error
-
-	if r.Namespace == nil {
-		err = errors.Join(err, errors.New("namespace is required"))
-	}
-
-	if r.WorkloadName == nil {
-		err = errors.Join(err, errors.New("workload name is required"))
-	}
-
-	if r.Essential != nil && *r.Essential && !r.SupportsEssential() {
-		err = errors.Join(err, errors.New("essential flag is not supported for workload type"))
-	}
-
-	if r.Hash == "" { // FIXME--- this should probably be checked against *string
-		err = errors.Join(err, errors.New("hash is required"))
-	}
-
-	if r.TotalBytes == 0 { // FIXME--- this should probably be checked against *string
-		err = errors.Join(err, errors.New("total bytes is required"))
-	}
-
-	if r.WorkloadType == "" {
-		err = errors.Join(err, errors.New("workload type is required"))
-	} else if (r.WorkloadType == controlapi.NexWorkloadV8 ||
-		r.WorkloadType == controlapi.NexWorkloadWasm) &&
-		len(r.TriggerSubjects) == 0 {
-		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
-	}
-
-	return err
-}
+// type DeployRequest struct {
+// 	Argv          []string          `json:"argv,omitempty"`
+// 	DecodedClaims jwt.GenericClaims `json:"-"`
+// 	Description   *string           `json:"description"`
+// 	Environment   map[string]string `json:"environment"`
+// 	Essential     *bool             `json:"essential,omitempty"`
+// 	Hash          string            `json:"hash,omitempty"`
+// 	ID            *string           `json:"id"`
+// 	Namespace     *string           `json:"namespace,omitempty"`
+// 	RetriedAt     *time.Time        `json:"retried_at,omitempty"`
+// 	RetryCount    *uint             `json:"retry_count,omitempty"`
+// 	TotalBytes    int64             `json:"total_bytes,omitempty"`
+//
+// 	HostServicesConfig *controlapi.NatsJwtConnectionInfo `json:"host_services_config,omitempty"`
+// 	TriggerSubjects    []string                          `json:"trigger_subjects"`
+// 	WorkloadName       *string                           `json:"workload_name,omitempty"`
+// 	WorkloadType       controlapi.NexWorkload            `json:"workload_type,omitempty"`
+//
+// 	Stderr      io.Writer `json:"-"`
+// 	Stdout      io.Writer `json:"-"`
+// 	TmpFilename *string   `json:"-"`
+//
+// 	EncryptedEnvironment *string  `json:"-"`
+// 	JsDomain             *string  `json:"-"`
+// 	Location             *url.URL `json:"-"`
+// 	SenderPublicKey      *string  `json:"-"`
+// 	TargetNode           *string  `json:"-"`
+// 	WorkloadJwt          *string  `json:"-"`
+//
+// 	Errors []error `json:"errors,omitempty"`
+// }
+//
+// func (request *DeployRequest) IsEssential() bool {
+// 	return request.Essential != nil && *request.Essential
+// }
+//
+// // Returns true if the run request supports essential flag
+// func (request *DeployRequest) SupportsEssential() bool {
+// 	return request.WorkloadType == controlapi.NexWorkloadNative ||
+// 		request.WorkloadType == controlapi.NexWorkloadOCI
+// }
+//
+// // Returns true if the run request supports trigger subjects
+// func (request *DeployRequest) SupportsTriggerSubjects() bool {
+// 	return (request.WorkloadType == controlapi.NexWorkloadV8 ||
+// 		request.WorkloadType == controlapi.NexWorkloadWasm) &&
+// 		len(request.TriggerSubjects) > 0
+// }
+//
+// func (r *DeployRequest) Validate() error {
+// 	var err error
+//
+// 	if r.Namespace == nil {
+// 		err = errors.Join(err, errors.New("namespace is required"))
+// 	}
+//
+// 	if r.WorkloadName == nil {
+// 		err = errors.Join(err, errors.New("workload name is required"))
+// 	}
+//
+// 	if r.Essential != nil && *r.Essential && !r.SupportsEssential() {
+// 		err = errors.Join(err, errors.New("essential flag is not supported for workload type"))
+// 	}
+//
+// 	if r.Hash == "" { // FIXME--- this should probably be checked against *string
+// 		err = errors.Join(err, errors.New("hash is required"))
+// 	}
+//
+// 	if r.TotalBytes == 0 { // FIXME--- this should probably be checked against *string
+// 		err = errors.Join(err, errors.New("total bytes is required"))
+// 	}
+//
+// 	if r.WorkloadType == "" {
+// 		err = errors.Join(err, errors.New("workload type is required"))
+// 	} else if (r.WorkloadType == controlapi.NexWorkloadV8 ||
+// 		r.WorkloadType == controlapi.NexWorkloadWasm) &&
+// 		len(r.TriggerSubjects) == 0 {
+// 		err = errors.Join(err, errors.New("at least one trigger subject is required for this workload type"))
+// 	}
+//
+// 	return err
+// }
 
 type DeployResponse struct {
 	Accepted bool    `json:"accepted"`
@@ -186,12 +185,13 @@ type HostServicesMessagingResponse struct {
 }
 
 type MachineMetadata struct {
-	VmID             *string `json:"vmid"`
-	NodeNatsHost     *string `json:"node_nats_host"`
-	NodeNatsPort     *int    `json:"node_nats_port"`
-	NodeNatsNkeySeed *string `json:"node_nats_nkey"`
-	Message          *string `json:"message"`
-	PluginPath       *string `json:"plugin_path,omitempty"`
+	VmID             *string       `json:"vmid"`
+	NodeNatsHost     *string       `json:"node_nats_host"`
+	NodeNatsPort     *int          `json:"node_nats_port"`
+	NodeNatsNkeySeed *string       `json:"node_nats_nkey"`
+	Message          *string       `json:"message"`
+	PluginPath       *string       `json:"plugin_path,omitempty"`
+	SharedXKP        nkeys.KeyPair `json:"nexus_xkey"`
 
 	Errors []error `json:"errors,omitempty"`
 }

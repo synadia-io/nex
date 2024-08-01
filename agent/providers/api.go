@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/agent/providers/lib"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -32,7 +33,7 @@ type ExecutionProvider interface {
 }
 
 // NewExecutionProvider initializes and returns an execution provider for a given work request
-func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
+func NewExecutionProvider(params *agentapi.ExecutionProviderParams, sharedXKP nkeys.KeyPair) (ExecutionProvider, error) {
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -43,17 +44,16 @@ func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionPr
 	// 	return nil, errors.New("execution provider factory requires a workload type parameter")
 	// }
 
-	switch params.WorkloadType {
+	switch params.DeployRequest.WorkloadType {
 	case controlapi.NexWorkloadNative:
-		return lib.InitNexExecutionProviderNative(params)
+		return lib.InitNexExecutionProviderNative(params, sharedXKP)
 	case controlapi.NexWorkloadV8:
-		return lib.InitNexExecutionProviderV8(params)
+		return lib.InitNexExecutionProviderV8(params, sharedXKP)
 	case controlapi.NexWorkloadOCI:
-		// TODO-- return lib.InitNexExecutionProviderOCI(params), nil
 		return nil, errors.New("oci execution provider not yet implemented")
 	case controlapi.NexWorkloadWasm:
-		return lib.InitNexExecutionProviderWasm(params)
+		return lib.InitNexExecutionProviderWasm(params, sharedXKP)
 	default:
-		return MaybeLoadPluginProvider(params)
+		return MaybeLoadPluginProvider(params, sharedXKP)
 	}
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/nats-io/nkeys"
 	. "github.com/synadia-io/nex/control-api"
+	controlapi "github.com/synadia-io/nex/control-api"
 )
 
 func TestEncryption(t *testing.T) {
@@ -19,13 +20,16 @@ func TestEncryption(t *testing.T) {
 	request, _ := NewDeployRequest(
 		WorkloadName("testworkload"),
 		WorkloadDescription("testy mctesto"),
-		Hash("hashbrowns"),
 		EnvironmentValue("NATS_URL", "nats://127.0.0.1:4222"),
 		EnvironmentValue("TOP_SECRET_LUGGAGE", "12345"),
 		SenderXKey(myKey),
 		Issuer(issuerAccount),
 		Location("nats://MUHBUCKET/muhfile"),
 		TargetPublicXKey(recipientPk),
+		Hash("browns"),
+		Namespace("default"),
+		WorkloadType(controlapi.NexWorkloadNative),
+		TotalBytes(1),
 	)
 
 	err := request.DecryptRequestEnvironment(recipientKey)

@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nats-io/nkeys"
 
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"github.com/synadia-io/nex/internal/models"
 	internalnats "github.com/synadia-io/nex/internal/node/internal-nats"
@@ -38,8 +40,10 @@ type FirecrackerProcessManager struct {
 
 	natsint *internalnats.InternalNatsServer
 
+	sharedXKP nkeys.KeyPair
+
 	delegate       ProcessDelegate
-	deployRequests map[string]*agentapi.DeployRequest
+	deployRequests map[string]*controlapi.DeployRequest
 }
 
 func NewFirecrackerProcessManager(
@@ -61,7 +65,7 @@ func NewFirecrackerProcessManager(
 		allVMs:         make(map[string]*runningFirecracker),
 		poolVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
 		stopMutex:      make(map[string]*sync.Mutex),
-		deployRequests: make(map[string]*agentapi.DeployRequest),
+		deployRequests: make(map[string]*controlapi.DeployRequest),
 	}, nil
 }
 
@@ -74,7 +78,7 @@ func (f *FirecrackerProcessManager) ListProcesses() ([]ProcessInfo, error) {
 			pinfo := ProcessInfo{
 				ID:            workloadId,
 				Name:          *vm.deployRequest.WorkloadName,
-				Namespace:     *vm.deployRequest.Namespace,
+				Namespace:     vm.deployRequest.Namespace,
 				DeployRequest: vm.deployRequest,
 			}
 			pinfos = append(pinfos, pinfo)
@@ -95,7 +99,7 @@ func (f *FirecrackerProcessManager) EnterLameDuck() error {
 }
 
 // Preparing a workload reads from the warmVMs channel
-func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.DeployRequest) error {
+func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *controlapi.DeployRequest) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
@@ -105,7 +109,7 @@ func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployReq
 	}
 
 	vm.deployRequest = deployRequest
-	vm.namespace = *deployRequest.Namespace
+	vm.namespace = deployRequest.Namespace
 	vm.workloadStarted = time.Now().UTC()
 
 	f.deployRequests[vm.vmmID] = deployRequest
@@ -293,9 +297,14 @@ func (f *FirecrackerProcessManager) setMetadata(vm *runningFirecracker, workload
 		NodeNatsNkeySeed: &workloadSeed,
 		PluginPath:       vm.config.AgentPluginPath,
 		VmID:             &vm.vmmID,
+		SharedXKP:        f.sharedXKP,
 	})
 }
 
 func (f *FirecrackerProcessManager) stopping() bool {
 	return (atomic.LoadUint32(&f.closing) > 0)
+}
+
+func (f *FirecrackerProcessManager) SharedEncryptionKey(xkey nkeys.KeyPair) {
+	f.sharedXKP = xkey
 }

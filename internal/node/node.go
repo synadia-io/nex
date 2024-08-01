@@ -273,10 +273,16 @@ func (n *Node) init() error {
 			n.setConnectionCallbackHandler(n.nc)
 		}
 
+		sharedKP, err := nkeys.CreateCurveKeys()
+		if err != nil {
+			n.log.Error("Failed to create x509 curve key", slog.Any("err", err))
+		}
+
 		n.manager, _err = NewWorkloadManager(
 			n.ctx,
 			n.cancelF,
 			n.keypair,
+			sharedKP,
 			n.publicKey,
 			n.nc,
 			n.config,
@@ -292,7 +298,7 @@ func (n *Node) init() error {
 			go n.manager.Start()
 
 			// init API listener
-			n.api = NewApiListener(n.log, n.manager, n)
+			n.api = NewApiListener(n.log, n.manager, n, sharedKP)
 			_err = n.api.Start()
 			if _err != nil {
 				n.log.Error("Failed to start API listener", slog.Any("err", _err))
@@ -445,7 +451,7 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
+		agentDeployRequest := request
 		agentDeployRequest.TotalBytes = int64(numBytes)
 		agentDeployRequest.Hash = *workloadHash
 
@@ -691,32 +697,4 @@ func (n *Node) shutdown() {
 
 func (n *Node) shuttingDown() bool {
 	return (atomic.LoadUint32(&n.closing) > 0)
-}
-
-// For the curious - I tried a number of ways of making a common/shared deploy request and only modeling the differences
-// here, but it made all the code that creates deployment requests look hideous. Will look into cleaning this up again.
-func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.DeployRequest {
-	return &agentapi.DeployRequest{
-		Argv:                 request.Argv,
-		DecodedClaims:        request.DecodedClaims,
-		Description:          request.Description,
-		EncryptedEnvironment: request.Environment,
-		Environment:          request.WorkloadEnvironment,
-		Essential:            request.Essential,
-		Hash:                 hash,
-		HostServicesConfig:   request.HostServicesConfig,
-		ID:                   request.ID,
-		JsDomain:             request.JsDomain,
-		Location:             request.Location,
-		Namespace:            &namespace,
-		RetriedAt:            request.RetriedAt,
-		RetryCount:           request.RetryCount,
-		SenderPublicKey:      request.SenderPublicKey,
-		TargetNode:           request.TargetNode,
-		TotalBytes:           int64(numBytes),
-		TriggerSubjects:      request.TriggerSubjects,
-		WorkloadJwt:          request.WorkloadJWT,
-		WorkloadName:         request.WorkloadName,
-		WorkloadType:         request.WorkloadType,
-	}
 }

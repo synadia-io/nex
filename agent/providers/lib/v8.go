@@ -16,6 +16,7 @@ import (
 	"unicode"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	hostservices "github.com/synadia-io/nex/host-services"
 	"github.com/synadia-io/nex/host-services/builtins"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -110,7 +111,6 @@ func (v *V8) Deploy() error {
 		}
 
 		runtimeNanos := time.Since(startTime).Nanoseconds()
-
 		header := nats.Header{
 			agentapi.NexRuntimeNs: []string{strconv.FormatInt(runtimeNanos, 10)},
 		}
@@ -840,8 +840,8 @@ func (v *V8) toUInt8ArrayValue(val []byte) (*v8.Value, error) {
 }
 
 // convenience method to initialize a V8 execution provider
-func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, error) {
-	if params.WorkloadName == nil {
+func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams, receipientXKey nkeys.KeyPair) (*V8, error) {
+	if params.DeployRequest.WorkloadName == nil {
 		return nil, errors.New("V8 execution provider requires a workload name parameter")
 	}
 
@@ -852,17 +852,23 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 	hsclient := hostservices.NewHostServicesClient(
 		params.NATSConn,
 		time.Second*5, // FIXME-- make configurable
-		*params.Namespace,
-		*params.WorkloadName,
+		params.DeployRequest.Namespace,
+		*params.DeployRequest.WorkloadName,
 		params.VmID,
 	)
 
 	builtins := builtins.NewBuiltinServicesClient(hsclient)
 
+	// FIX ME
+	err := params.DeployRequest.DecryptRequestEnvironment(receipientXKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return &V8{
-		environment: params.Environment,
-		name:        *params.WorkloadName,
-		namespace:   *params.Namespace,
+		environment: params.DeployRequest.WorkloadEnvironment,
+		name:        *params.DeployRequest.WorkloadName,
+		namespace:   params.DeployRequest.Namespace,
 		tmpFilename: *params.TmpFilename,
 		totalBytes:  0, // FIXME
 		vmID:        params.VmID,

@@ -19,7 +19,9 @@ import (
 
 	"github.com/firecracker-microvm/firecracker-go-sdk"
 	"github.com/firecracker-microvm/firecracker-go-sdk/client/models"
+	"github.com/nats-io/nkeys"
 
+	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	nexmodels "github.com/synadia-io/nex/internal/models"
 )
@@ -32,12 +34,13 @@ type runningFirecracker struct {
 
 	closing         uint32
 	config          *nexmodels.NodeConfiguration
-	deployRequest   *agentapi.DeployRequest
+	deployRequest   *controlapi.DeployRequest
 	ip              net.IP
 	log             *slog.Logger
 	machine         *firecracker.Machine
 	machineStarted  time.Time
 	namespace       string
+	nexusXKey       nkeys.KeyPair
 	workloadStarted time.Time
 }
 

@@ -11,6 +11,7 @@ import (
 	"plugin"
 	"runtime"
 
+	"github.com/nats-io/nkeys"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
@@ -19,7 +20,7 @@ type workloadPlugin struct {
 	provider ExecutionProvider
 }
 
-func MaybeLoadPluginProvider(params *agentapi.ExecutionProviderParams) (wp *workloadPlugin, err error) {
+func MaybeLoadPluginProvider(params *agentapi.ExecutionProviderParams, _ nkeys.KeyPair) (wp *workloadPlugin, err error) {
 	var actualPath string
 	defer func() {
 		if r := recover(); r != nil {
@@ -29,12 +30,12 @@ func MaybeLoadPluginProvider(params *agentapi.ExecutionProviderParams) (wp *work
 
 	if params.PluginPath == nil {
 		err = errors.New("invalid execution provider specified")
-		logError(params.Stderr, fmt.Sprintf("invalid execution provider specified: %s", string(params.WorkloadType)))
+		logError(params.Stderr, fmt.Sprintf("invalid execution provider specified: %s", string(params.DeployRequest.WorkloadType)))
 		return
 	}
 
 	// This will end up with something like `./plugins/noop.so`
-	actualPath = path.Join(*params.PluginPath, string(params.WorkloadType))
+	actualPath = path.Join(*params.PluginPath, string(params.DeployRequest.WorkloadType))
 	slog.Debug("Attempting provider plugin load", slog.String("path", actualPath))
 
 	switch runtime.GOOS {

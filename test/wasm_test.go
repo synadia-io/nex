@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/agent/providers/lib"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
@@ -11,31 +12,45 @@ import (
 
 func TestWasmExecution(t *testing.T) {
 	file := "../examples/wasm/echofunction/echofunction.wasm"
-	typ := controlapi.NexWorkloadWasm
+
+	myKey, _ := nkeys.CreateCurveKeys()
+	recipientKey, _ := nkeys.CreateCurveKeys()
+	recipientPk, _ := recipientKey.PublicKey()
+	issuerAccount, _ := nkeys.CreateAccount()
+
+	depRequest, err := controlapi.NewDeployRequest(
+		controlapi.SenderXKey(myKey),
+		controlapi.Issuer(issuerAccount),
+		controlapi.WorkloadName("testworkload"),
+		controlapi.WorkloadDescription("testy mctesto"),
+		controlapi.EnvironmentValue("NATS_URL", "nats://127.0.0.1:4222"),
+		controlapi.EnvironmentValue("TOP_SECRET_LUGGAGE", "12345"),
+		controlapi.SenderXKey(myKey),
+		controlapi.Issuer(issuerAccount),
+		controlapi.Location("nats://MUHBUCKET/muhfile"),
+		controlapi.TargetPublicXKey(recipientPk),
+		controlapi.Hash("browns"),
+		controlapi.Namespace("default"),
+		controlapi.WorkloadType(controlapi.NexWorkloadWasm),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create deploy request: %s", err)
+	}
+
 	params := &agentapi.ExecutionProviderParams{
-		DeployRequest: agentapi.DeployRequest{
-			Environment:  map[string]string{},
-			Hash:         "",
-			TotalBytes:   0,
-			WorkloadName: new(string),
-			WorkloadType: typ,
-			Stderr:       nil,
-			Stdout:       nil,
-			TmpFilename:  &file,
-			Errors:       []error{},
-		},
-		Fail:        make(chan bool),
-		Run:         make(chan bool),
-		Exit:        make(chan int),
-		Stderr:      nil,
-		Stdout:      nil,
-		TmpFilename: &file,
-		VmID:        "bob",
+		DeployRequest: *depRequest,
+		Fail:          make(chan bool),
+		Run:           make(chan bool),
+		Exit:          make(chan int),
+		Stderr:        nil,
+		Stdout:        nil,
+		TmpFilename:   &file,
+		VmID:          "bob",
 
 		NATSConn: nil, // FIXME
 	}
-	params.DeployRequest.WorkloadType = typ
-	wasm, err := lib.InitNexExecutionProviderWasm(params)
+	params.DeployRequest.WorkloadType = controlapi.NexWorkloadWasm
+	wasm, err := lib.InitNexExecutionProviderWasm(params, recipientKey)
 	if err != nil {
 		t.Fatalf("Failed to instantiate wasm provider: %s", err)
 	}

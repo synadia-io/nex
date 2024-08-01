@@ -21,9 +21,10 @@ const (
 type DeployRequest struct {
 	Argv        []string `json:"argv,omitempty"`
 	Description *string  `json:"description,omitempty"`
-	Hash        *string  `json:"hash"`
+	Hash        string   `json:"hash"`
 	Location    *url.URL `json:"location"`
 	Essential   *bool    `json:"essential,omitempty"`
+	Namespace   string   `json:"namespace,omitempty"`
 
 	// A base64-encoded byte array that contains an encrypted json-serialized map[string]string.
 	Environment *string `json:"environment"`
@@ -44,9 +45,27 @@ type DeployRequest struct {
 	WorkloadName *string     `json:"workload_name"`
 	WorkloadJWT  *string     `json:"workload_jwt"` // Contains claims for the workload: id, namespace
 	WorkloadType NexWorkload `json:"type"`
+	TotalBytes   int64       `json:"total_bytes,omitempty"`
 
 	DecodedClaims       jwt.GenericClaims `json:"-"`
 	WorkloadEnvironment map[string]string `json:"-"`
+}
+
+func (request *DeployRequest) IsEssential() bool {
+	return request.Essential != nil && *request.Essential
+}
+
+// Returns true if the run request supports essential flag
+func (request *DeployRequest) SupportsEssential() bool {
+	return request.WorkloadType == NexWorkloadNative ||
+		request.WorkloadType == NexWorkloadOCI
+}
+
+// Returns true if the run request supports trigger subjects
+func (request *DeployRequest) SupportsTriggerSubjects() bool {
+	return (request.WorkloadType == NexWorkloadV8 ||
+		request.WorkloadType == NexWorkloadWasm) &&
+		len(request.TriggerSubjects) > 0
 }
 
 type NatsJwtConnectionInfo struct {
@@ -93,6 +112,8 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 
 	senderPublic, _ := reqOpts.senderXkey.PublicKey()
 
+	// Send encrypted sender XKEY
+
 	req := &DeployRequest{
 		Argv:               reqOpts.argv,
 		Description:        &reqOpts.workloadDescription,
@@ -101,12 +122,16 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		HostServicesConfig: reqOpts.hostServicesConfig,
 		ID:                 &id,
 		Location:           &reqOpts.location,
+		Namespace:          reqOpts.namespace,
 		SenderPublicKey:    &senderPublic,
 		TargetNode:         &reqOpts.targetNode,
 		TriggerSubjects:    reqOpts.triggerSubjects,
 		WorkloadJWT:        &workloadJWT,
 		WorkloadName:       &reqOpts.workloadName,
 		WorkloadType:       reqOpts.workloadType,
+
+		Hash:       reqOpts.hash,
+		TotalBytes: reqOpts.totalBytes,
 	}
 
 	if reqOpts.jsDomain != "" {
@@ -118,28 +143,56 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 
 // This will validate a request's workload JWT and return the parsed claims
 func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
+	var errs error
+
+	if request.Namespace == "" {
+		errs = errors.Join(errs, errors.New("namespace is required"))
+	}
+
+	if request.WorkloadName == nil {
+		errs = errors.Join(errs, errors.New("workload name is required"))
+	}
+	if request.Essential != nil && *request.Essential && !request.SupportsEssential() {
+		errs = errors.Join(errs, errors.New("essential flag is not supported for workload type"))
+	}
+
+	if request.Hash == "" {
+		errs = errors.Join(errs, errors.New("hash is required"))
+	}
+
+	if request.TotalBytes == 0 {
+		errs = errors.Join(errs, errors.New("total bytes is required"))
+	}
+
+	if request.WorkloadType == "" {
+		errs = errors.Join(errs, errors.New("workload type is required"))
+	} else if (request.WorkloadType == NexWorkloadV8 ||
+		request.WorkloadType == NexWorkloadWasm) &&
+		len(request.TriggerSubjects) == 0 {
+		errs = errors.Join(errs, errors.New("at least one trigger subject is required for this workload type"))
+	}
+
 	claims, err := jwt.DecodeGeneric(*request.WorkloadJWT)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode workload JWT: %s", err)
+		errs = errors.Join(errs, fmt.Errorf("could not decode workload JWT: %s", err))
 	}
 
 	request.DecodedClaims = *claims
-
 	if !validWorkloadName.MatchString(claims.Data["name"].(string)) {
-		return nil, errors.New("invalid workload name")
+		errs = errors.Join(errs, errors.New("invalid workload name"))
 	}
 
-	if request.Hash != nil && *request.Hash != request.DecodedClaims.Data["hash"].(string) {
-		return nil, errors.New("artifact hash claim does not match request")
+	if request.Hash != "" && request.Hash != request.DecodedClaims.Data["hash"].(string) {
+		errs = errors.Join(errs, errors.New("artifact hash claim does not match request"))
 	}
 
 	var vr jwt.ValidationResults
 	claims.Validate(&vr)
 	if len(vr.Issues) > 0 || len(vr.Errors()) > 0 {
-		return nil, errors.New("standard claims within JWT are not valid")
+		errs = errors.Join(errs, fmt.Errorf("standard claims within JWT are not valid: %v", vr.Errors()))
 	}
 
-	return claims, nil
+	return claims, errs
 }
 
 func CreateWorkloadJWT(id, name, hash string, issuer nkeys.KeyPair) (string, error) {
@@ -189,9 +242,11 @@ type requestOptions struct {
 	hostServicesConfig  *NatsJwtConnectionInfo
 	jsDomain            string
 	location            url.URL
+	namespace           string
 	senderXkey          nkeys.KeyPair
 	targetNode          string
 	targetPublicXKey    string
+	totalBytes          int64
 	triggerSubjects     []string
 	workloadDescription string
 	workloadName        string
@@ -220,6 +275,21 @@ func HostServicesConfig(config NatsJwtConnectionInfo) RequestOption {
 func WorkloadName(name string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.workloadName = name
+		return o
+	}
+}
+
+// Name of the workload. Conforms to the same name rules as the services API
+func Namespace(name string) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.namespace = name
+		return o
+	}
+}
+
+func TotalBytes(bytes int64) RequestOption {
+	return func(o requestOptions) requestOptions {
+		o.totalBytes = bytes
 		return o
 	}
 }

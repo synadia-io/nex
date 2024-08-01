@@ -3,14 +3,15 @@ package processmanager
 import (
 	"time"
 
-	agentapi "github.com/synadia-io/nex/internal/agent-api"
+	"github.com/nats-io/nkeys"
+	controlapi "github.com/synadia-io/nex/control-api"
 )
 
 const runloopSleepInterval = 100 * time.Millisecond
 
 // Information about an agent process without regard to the implementation of the agent process manager
 type ProcessInfo struct {
-	DeployRequest *agentapi.DeployRequest
+	DeployRequest *controlapi.DeployRequest
 	ID            string
 	Name          string
 	Namespace     string
@@ -37,7 +38,7 @@ type ProcessManager interface {
 
 	// Associate a deploy request with the given workload id, and perform any
 	// just in time initialization of resources if necessary
-	PrepareWorkload(id string, request *agentapi.DeployRequest) error
+	PrepareWorkload(id string, request *controlapi.DeployRequest) error
 
 	// Start the process manager and allocate a pool of agents based on an implementation-specific
 	// strategy, delegating callbacks to the given delegate
@@ -52,4 +53,8 @@ type ProcessManager interface {
 	// Notifies the process manager that the node is in lame duck mode, so that the processes
 	// can be treated differerently (if applicable)
 	EnterLameDuck() error
+
+	// Shares an XKey that the node and agent can use to send
+	// and receive encrypted messages
+	SharedEncryptionKey(xkey nkeys.KeyPair)
 }

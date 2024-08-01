@@ -22,9 +22,9 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 		return
 	}
 	evt.SetSource(fmt.Sprintf("%s-%s", *deployRequest.TargetNode, agentId))
-	evt.SetExtension(controlapi.EventExtensionNamespace, *deployRequest.Namespace)
+	evt.SetExtension(controlapi.EventExtensionNamespace, deployRequest.Namespace)
 
-	err := PublishCloudEvent(w.nc, *deployRequest.Namespace, evt, w.log)
+	err := PublishCloudEvent(w.nc, deployRequest.Namespace, evt, w.log)
 	if err != nil {
 		w.log.Error("Failed to publish cloudevent", slog.Any("err", err))
 		return
@@ -48,7 +48,7 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 
 		if deployRequest.IsEssential() && workloadStatus.Code != 0 {
 			w.log.Debug("Essential workload stopped with non-zero exit code",
-				slog.String("namespace", *deployRequest.Namespace),
+				slog.String("namespace", deployRequest.Namespace),
 				slog.String("workload", *deployRequest.WorkloadName),
 				slog.String("workload_id", agentId),
 				slog.String("workload_type", string(deployRequest.WorkloadType)))
@@ -90,29 +90,18 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 				w.log.Error("Failed to resolve workload artifact: %s; %s", artifact, slog.Any("err", err))
 				return
 			}
-			digest := controlapi.SanitizeNATSDigest(info.Digest)
 
-			req, _ := json.Marshal(&controlapi.DeployRequest{
-				Argv:            deployRequest.Argv,
-				Description:     deployRequest.Description,
-				Hash:            &digest,
-				Environment:     deployRequest.EncryptedEnvironment,
-				Essential:       deployRequest.Essential,
-				ID:              &id,
-				JsDomain:        deployRequest.JsDomain,
-				Location:        deployRequest.Location,
-				RetriedAt:       deployRequest.RetriedAt,
-				RetryCount:      deployRequest.RetryCount,
-				SenderPublicKey: deployRequest.SenderPublicKey,
-				TargetNode:      deployRequest.TargetNode,
-				TriggerSubjects: deployRequest.TriggerSubjects,
-				WorkloadName:    deployRequest.WorkloadName,
-				WorkloadJWT:     deployRequest.WorkloadJwt,
-				WorkloadType:    deployRequest.WorkloadType,
-			})
+			deployRequest.Hash = controlapi.SanitizeNATSDigest(info.Digest)
+			deployRequest.ID = &id
+
+			req, err := json.Marshal(deployRequest)
+			if err != nil {
+				w.log.Error("Failed marshal deployRequest: %s; %s", artifact, slog.Any("err", err))
+				return
+			}
 
 			nodeID := w.publicKey
-			subject := fmt.Sprintf("%s.DEPLOY.%s.%s", controlapi.APIPrefix, *deployRequest.Namespace, nodeID)
+			subject := fmt.Sprintf("%s.DEPLOY.%s.%s", controlapi.APIPrefix, deployRequest.Namespace, nodeID)
 			_, err = w.nc.Request(subject, req, time.Millisecond*2500)
 			if err != nil {
 				w.log.Error("Failed to redeploy essential workload", slog.Any("err", err))
@@ -139,7 +128,7 @@ func (w *WorkloadManager) agentLog(workloadID string, entry agentapi.LogEntry) {
 		return
 	}
 
-	subject := logPublishSubject(*deployRequest.Namespace, w.publicKey, workloadID)
+	subject := logPublishSubject(deployRequest.Namespace, w.publicKey, workloadID)
 	_ = w.nc.Publish(subject, bytes)
 }
 
@@ -159,7 +148,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, tsub stri
 	}{
 		ID:        workloadID,
 		Name:      *deployRequest.WorkloadName,
-		Namespace: *deployRequest.Namespace,
+		Namespace: deployRequest.Namespace,
 		Subject:   tsub,
 		Error:     origErr.Error(),
 	}
@@ -172,7 +161,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, tsub stri
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecFailed)
 
-	err = PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
+	err = PublishCloudEvent(w.nc, deployRequest.Namespace, cloudevent, w.log)
 	if err != nil {
 		return err
 	}
@@ -184,7 +173,7 @@ func (w *WorkloadManager) publishFunctionExecFailed(workloadID string, tsub stri
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadID)
+	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, deployRequest.Namespace, w.publicKey, workloadID)
 	err = w.nc.Publish(subject, logBytes)
 	if err != nil {
 		w.log.Error("Failed to publish function exec failed log", slog.Any("err", err))
@@ -214,7 +203,7 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadID string, tsub s
 	}{
 		ID:        workloadID,
 		Name:      *deployRequest.WorkloadName,
-		Namespace: *deployRequest.Namespace,
+		Namespace: deployRequest.Namespace,
 		Subject:   tsub,
 		Elapsed:   elapsedNanos,
 	}
@@ -227,7 +216,7 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadID string, tsub s
 	cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 	_ = cloudevent.SetData(functionExecPassed)
 
-	err = PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
+	err = PublishCloudEvent(w.nc, deployRequest.Namespace, cloudevent, w.log)
 	if err != nil {
 		return err
 	}
@@ -239,7 +228,7 @@ func (w *WorkloadManager) publishFunctionExecSucceeded(workloadID string, tsub s
 	}
 	logBytes, _ := json.Marshal(emitLog)
 
-	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadID)
+	subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, deployRequest.Namespace, w.publicKey, workloadID)
 	err = w.nc.Publish(subject, logBytes)
 	if err != nil {
 		w.log.Error("Failed to publish function exec passed log", slog.Any("err", err))
@@ -281,7 +270,7 @@ func (w *WorkloadManager) publishWorkloadUndeployed(workloadID string) error {
 		cloudevent.SetDataContentType(cloudevents.ApplicationJSON)
 		_ = cloudevent.SetData(workloadUndeployed)
 
-		err := PublishCloudEvent(w.nc, *deployRequest.Namespace, cloudevent, w.log)
+		err := PublishCloudEvent(w.nc, deployRequest.Namespace, cloudevent, w.log)
 		if err != nil {
 			return err
 		}
@@ -293,7 +282,7 @@ func (w *WorkloadManager) publishWorkloadUndeployed(workloadID string) error {
 		}
 		logBytes, _ := json.Marshal(emitLog)
 
-		subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, *deployRequest.Namespace, w.publicKey, workloadID)
+		subject := fmt.Sprintf("%s.%s.%s.%s", LogSubjectPrefix, deployRequest.Namespace, w.publicKey, workloadID)
 		err = w.nc.Publish(subject, logBytes)
 		if err != nil {
 			w.log.Error("Failed to publish workload undeployed event", slog.Any("err", err))
