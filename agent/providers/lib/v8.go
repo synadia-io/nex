@@ -309,7 +309,7 @@ func (v *V8) newV8Context(ctx context.Context) (*v8.Context, error) {
 		return nil, err
 	}
 
-	bucketedObj, err := v.newBucketedObjectValueFunctionTemplate(ctx)
+	bucketedObj, err := v.newBucketedObjectStoreFunctionTemplate(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +323,7 @@ func (v *V8) newV8Context(ctx context.Context) (*v8.Context, error) {
 }
 
 // obj := this.obj("bucket")
-func (v *V8) newBucketedObjectValueFunctionTemplate(ctx context.Context) (*v8.FunctionTemplate, error) {
+func (v *V8) newBucketedObjectStoreFunctionTemplate(ctx context.Context) (*v8.FunctionTemplate, error) {
 	bucketFunc := v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
 		args := info.Args()
 		if len(args) == 0 {
