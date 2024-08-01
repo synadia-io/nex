@@ -517,6 +517,9 @@ func (w *WorkloadManager) agentHandshakeTimedOut(id string) {
 }
 
 func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
+	w.poolMutex.Lock()
+	defer w.poolMutex.Unlock()
+
 	now := time.Now().UTC()
 	w.handshakes[workloadID] = now.Format(time.RFC3339)
 }
