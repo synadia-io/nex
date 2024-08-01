@@ -98,7 +98,7 @@ func (e *NativeExecutable) removeWorkload() {
 }
 
 func (e *NativeExecutable) Execute(ctx context.Context, payload []byte) ([]byte, error) {
-	return nil, errors.New("Native execution provider does not support execution via trigger subjects")
+	return nil, errors.New("native execution provider does not support execution via trigger subjects")
 }
 
 // Validate the underlying artifact to be a 64-bit linux native ELF
@@ -110,11 +110,11 @@ func (e *NativeExecutable) Validate() error {
 // convenience method to initialize an ELF execution provider
 func InitNexExecutionProviderNative(params *agentapi.ExecutionProviderParams) (*NativeExecutable, error) {
 	if params.WorkloadName == nil {
-		return nil, errors.New("Native execution provider requires a workload name parameter")
+		return nil, errors.New("native execution provider requires a workload name parameter")
 	}
 
 	if params.TmpFilename == nil {
-		return nil, errors.New("Native execution provider requires a temporary filename parameter")
+		return nil, errors.New("native execution provider requires a temporary filename parameter")
 	}
 
 	return &NativeExecutable{

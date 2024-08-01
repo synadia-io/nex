@@ -1,5 +1,5 @@
 (subject, payload) => {
-  this.hostServices.messaging.publish('hello.world', payload);
+  this.messaging.publish('hello.world', payload);
 
   var reqResp;
   var reqEx;
@@ -8,7 +8,7 @@
   var reqManyEx;
 
   try {
-    reqResp = this.hostServices.messaging.request('hello.world.request', payload);
+    reqResp = this.messaging.request('hello.world.request', payload);
     reqResp = String.fromCharCode(...reqResp)
   } catch (e) {
     reqEx = e;

@@ -31,12 +31,10 @@ const (
 	NexTriggerSubject = "x-nex-trigger-subject"
 	NexRuntimeNs      = "x-nex-runtime-ns"
 
-	HttpURLHeader = "x-http-url"
-
-	KeyValueKeyHeader = "x-keyvalue-key"
-
-	MessagingSubjectHeader = "x-subject"
-
+	HttpURLHeader               = "x-http-url"
+	KeyValueKeyHeader           = "x-keyvalue-key"
+	BucketContextHeader         = "x-context-bucket"
+	MessagingSubjectHeader      = "x-subject"
 	ObjectStoreObjectNameHeader = "x-object-name"
 )
 
@@ -270,7 +268,7 @@ func (a *AgentClient) MarkUnselected() {
 
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
 	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
-	intmsg.Header.Add(NexTriggerSubject, subject)
+	intmsg.Header.Add(string(NexTriggerSubject), subject)
 	intmsg.Data = data
 
 	cctx, childSpan := tracer.Start(

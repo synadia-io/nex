@@ -2,7 +2,6 @@ package builtins
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 
@@ -15,7 +14,6 @@ const kvServiceMethodGet = "get"
 const kvServiceMethodSet = "set"
 const kvServiceMethodDelete = "delete"
 const kvServiceMethodKeys = "keys"
-const defaultKVBucketName = "hs_%s_kv"
 
 type KeyValueService struct {
 	log    *slog.Logger
@@ -23,9 +21,8 @@ type KeyValueService struct {
 }
 
 type kvConfig struct {
-	BucketName   string `json:"bucket_name"`
-	MaxBytes     int    `json:"max_bytes"`
-	JitProvision bool   `json:"jit_provision"`
+	BucketName string `json:"bucket_name"`
+	MaxBytes   int    `json:"max_bytes"`
 }
 
 func NewKeyValueService(log *slog.Logger) (*KeyValueService, error) {
@@ -38,9 +35,6 @@ func NewKeyValueService(log *slog.Logger) (*KeyValueService, error) {
 
 func (k *KeyValueService) Initialize(config json.RawMessage) error {
 
-	// TODO: add override for defaultKVBucketName
-	k.config.BucketName = defaultKVBucketName
-	k.config.JitProvision = true
 	k.config.MaxBytes = 524288
 
 	if len(config) > 0 {
@@ -70,15 +64,21 @@ func (k *KeyValueService) HandleRequest(
 		nc = conns[hostservices.DefaultConnection]
 	}
 
+	kv, err := k.resolveKeyValueStore(nc, metadata)
+	if err != nil {
+		k.log.Error("Failed to locate host services KV bucket", slog.String("bucket", metadata[agentapi.BucketContextHeader]))
+		return hostservices.ServiceResultFail(400, "Could not find host services KV bucket"), nil
+	}
+
 	switch method {
 	case kvServiceMethodGet:
-		return k.handleGet(nc, workloadId, workloadName, request, metadata, namespace)
+		return k.handleGet(kv, metadata)
 	case kvServiceMethodSet:
-		return k.handleSet(nc, workloadId, workloadName, request, metadata, namespace)
+		return k.handleSet(kv, request, metadata)
 	case kvServiceMethodDelete:
-		return k.handleDelete(nc, workloadId, workloadName, request, metadata, namespace)
+		return k.handleDelete(kv, metadata)
 	case kvServiceMethodKeys:
-		return k.handleKeys(nc, workloadId, workloadName, request, metadata, namespace)
+		return k.handleKeys(kv)
 	default:
 		k.log.Warn("Received invalid host services RPC request",
 			slog.String("service", "kv"),
@@ -89,17 +89,9 @@ func (k *KeyValueService) HandleRequest(
 }
 
 func (k *KeyValueService) handleGet(
-	nc *nats.Conn,
-	_, workload string,
-	_ []byte, metadata map[string]string,
-	namespace string,
+	kvStore nats.KeyValue,
+	metadata map[string]string,
 ) (hostservices.ServiceResult, error) {
-
-	kvStore, err := k.resolveKeyValueStore(nc, namespace, workload)
-	if err != nil {
-		k.log.Error(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
-		return hostservices.ServiceResultFail(500, "could not resolve k/v store"), nil
-	}
 
 	key := metadata[agentapi.KeyValueKeyHeader]
 	if key == "" {
@@ -116,16 +108,10 @@ func (k *KeyValueService) handleGet(
 }
 
 func (k *KeyValueService) handleSet(
-	nc *nats.Conn,
-	_, workload string,
-	data []byte, metadata map[string]string,
-	namespace string) (hostservices.ServiceResult, error) {
-
-	kvStore, err := k.resolveKeyValueStore(nc, namespace, workload)
-	if err != nil {
-		k.log.Error(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
-		return hostservices.ServiceResultFail(500, "could not resolve k/v store"), nil
-	}
+	kvStore nats.KeyValue,
+	data []byte,
+	metadata map[string]string,
+) (hostservices.ServiceResult, error) {
 
 	key := metadata[agentapi.KeyValueKeyHeader]
 	if key == "" {
@@ -146,23 +132,16 @@ func (k *KeyValueService) handleSet(
 }
 
 func (k *KeyValueService) handleDelete(
-	nc *nats.Conn,
-	_, workload string,
-	_ []byte, metadata map[string]string,
-	namespace string) (hostservices.ServiceResult, error) {
-
-	kvStore, err := k.resolveKeyValueStore(nc, namespace, workload)
-	if err != nil {
-		k.log.Error(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
-		return hostservices.ServiceResultFail(500, "could not resolve k/v store"), nil
-	}
+	kvStore nats.KeyValue,
+	metadata map[string]string,
+) (hostservices.ServiceResult, error) {
 
 	key := metadata[agentapi.KeyValueKeyHeader]
 	if key == "" {
 		return hostservices.ServiceResultFail(400, "key is required"), nil
 	}
 
-	err = kvStore.Delete(key)
+	err := kvStore.Delete(key)
 	if err != nil {
 		k.log.Warn(fmt.Sprintf("failed to delete key %s: %s", key, err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to delete key"), nil
@@ -174,23 +153,16 @@ func (k *KeyValueService) handleDelete(
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-func (k *KeyValueService) handleKeys(
-	nc *nats.Conn,
-	_, workload string,
-	_ []byte, _ map[string]string,
-	namespace string) (hostservices.ServiceResult, error) {
+func (k *KeyValueService) handleKeys(kvStore nats.KeyValue) (hostservices.ServiceResult, error) {
 
-	kvStore, err := k.resolveKeyValueStore(nc, namespace, workload)
-	if err != nil {
-		k.log.Warn(fmt.Sprintf("failed to resolve key/value store: %s", err.Error()))
-		return hostservices.ServiceResultFail(500, "could not resolve k/v store"), nil
-	}
-
-	// TODO: deprecated, switch to a KeysLister channel
-	keys, err := kvStore.Keys() // TODO-- paginate...
+	keyLister, err := kvStore.ListKeys()
 	if err != nil {
 		k.log.Warn(fmt.Sprintf("failed to respond to key/value host service request: %s", err.Error()))
 		return hostservices.ServiceResultFail(500, "failed to resolve keys"), nil
+	}
+	keys := make([]string, 0)
+	for key := range keyLister.Keys() {
+		keys = append(keys, key)
 	}
 
 	resp, _ := json.Marshal(keys)
@@ -199,23 +171,16 @@ func (k *KeyValueService) handleKeys(
 }
 
 // resolve the key value store for this workload; initialize it if necessary
-func (k *KeyValueService) resolveKeyValueStore(nc *nats.Conn, namespace, _ string) (nats.KeyValue, error) {
+func (k *KeyValueService) resolveKeyValueStore(nc *nats.Conn, metadata map[string]string) (nats.KeyValue, error) {
 	js, err := nc.JetStream()
 	if err != nil {
 		return nil, err
 	}
+	kvStoreName := metadata[agentapi.BucketContextHeader]
 
-	kvStoreName := fmt.Sprintf(defaultKVBucketName, namespace)
 	kvStore, err := js.KeyValue(kvStoreName)
 	if err != nil {
-		if errors.Is(err, nats.ErrBucketNotFound) && k.config.JitProvision {
-			kvStore, err = js.CreateKeyValue(&nats.KeyValueConfig{Bucket: kvStoreName, MaxBytes: int64(k.config.MaxBytes)})
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	k.log.Debug("Resolved key/value store for KV host service", slog.String("name", kvStoreName), slog.String("bucket", kvStore.Bucket()))
