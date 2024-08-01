@@ -19,10 +19,9 @@
         "services": {
             "kv": {
                 "enabled": true,
-                "config": {
-                    "bucket_name": "SAMPLEHSKV_${namespace}_${workload_name}",
+                "config": {                    
                     "max_bytes": 0,
-                    "jit_provision": false
+                    "auto_provision": false
                 }
             },
             "messaging": {

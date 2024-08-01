@@ -3,7 +3,7 @@
   let getEx;
 
   try {
-    get = this.hostServices.http.get('https://example.org');
+    get = this.http.get('https://example.org');
   } catch (e) {
     getEx = e;
   }
@@ -12,7 +12,7 @@
   let postEx;
 
   try {
-    post = this.hostServices.http.post('https://example.org', payload);
+    post = this.http.post('https://example.org', payload);
   } catch (e) {
     postEx = e;
   }
@@ -21,7 +21,7 @@
   let putEx;
 
   try {
-    put = this.hostServices.http.put('https://example.org', payload);
+    put = this.http.put('https://example.org', payload);
   } catch (e) {
     putEx = e;
   }
@@ -30,7 +30,7 @@
   let patchEx;
 
   try {
-    patch = this.hostServices.http.patch('https://example.org', payload);
+    patch = this.http.patch('https://example.org', payload);
   } catch (e) {
     patchEx = e;
   }
@@ -39,7 +39,7 @@
   let delEx;
 
   try {
-    del = this.hostServices.http.delete('https://example.org', payload);
+    del = this.http.delete('https://example.org', payload);
   } catch (e) {
     delEx = e;
   }
@@ -49,7 +49,7 @@
   let headEx;
 
   try {
-    head = this.hostServices.http.head('https://example.org');
+    head = this.http.head('https://example.org');
   } catch (e) {
     headEx = e;
   }

@@ -114,6 +114,22 @@ func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
 		return nil, nil, nil, fmt.Errorf("failed to create jetstream object store: %s", err)
 	}
 
+	_, err = js.CreateObjectStore(&nats.ObjectStoreConfig{
+		Bucket:  "testObjBucket",
+		Storage: nats.MemoryStorage,
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create jetstream object store: %s", err)
+	}
+
+	_, err = js.CreateKeyValue(&nats.KeyValueConfig{
+		Bucket:  "testBucket",
+		Storage: nats.MemoryStorage,
+	})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create jetstream kv store: %s", err)
+	}
+
 	return ns, nc, &port, nil
 }
 
