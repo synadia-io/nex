@@ -81,7 +81,11 @@ func (o *ObjectStoreService) HandleRequest(
 	objectStore, err := o.resolveObjectStore(nc, objectStoreName)
 	if err != nil {
 		o.log.Warn(fmt.Sprintf("failed to resolve object store: %s", err.Error()))
-		return hostservices.ServiceResultFail(500, "unable to resolve object store"), nil
+		code := uint(500)
+		if errors.Is(err, jetstream.ErrBucketNotFound) {
+			code = 404
+		}
+		return hostservices.ServiceResultFail(code, "unable to resolve object store"), nil
 	}
 
 	switch method {

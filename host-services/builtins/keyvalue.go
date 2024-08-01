@@ -2,10 +2,12 @@ package builtins
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	hostservices "github.com/synadia-io/nex/host-services"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -66,8 +68,12 @@ func (k *KeyValueService) HandleRequest(
 
 	kv, err := k.resolveKeyValueStore(nc, metadata)
 	if err != nil {
-		k.log.Error("Failed to locate host services KV bucket", slog.String("bucket", metadata[agentapi.BucketContextHeader]))
-		return hostservices.ServiceResultFail(400, "Could not find host services KV bucket"), nil
+		k.log.Error("Failed to resolve host services KV bucket", slog.String("bucket", metadata[agentapi.BucketContextHeader]))
+		code := uint(500)
+		if errors.Is(err, jetstream.ErrBucketNotFound) {
+			code = 404
+		}
+		return hostservices.ServiceResultFail(code, "Could not resolve host services KV bucket"), nil
 	}
 
 	switch method {
