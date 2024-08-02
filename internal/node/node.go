@@ -445,7 +445,7 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		agentDeployRequest := agentDeployRequestFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
+		agentDeployRequest := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 		agentDeployRequest.TotalBytes = int64(numBytes)
 		agentDeployRequest.Hash = *workloadHash
 
@@ -693,9 +693,7 @@ func (n *Node) shuttingDown() bool {
 	return (atomic.LoadUint32(&n.closing) > 0)
 }
 
-// For the curious - I tried a number of ways of making a common/shared deploy request and only modeling the differences
-// here, but it made all the code that creates deployment requests look hideous. Will look into cleaning this up again.
-func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.AgentWorkloadInfo {
+func agentWorkloadInfoFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.AgentWorkloadInfo {
 	return &agentapi.AgentWorkloadInfo{
 		Argv:               request.Argv,
 		DecodedClaims:      request.DecodedClaims,
