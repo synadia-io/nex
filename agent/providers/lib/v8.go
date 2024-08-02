@@ -47,9 +47,6 @@ const (
 	hostServicesMessagingRequestFunctionName     = "request"
 	hostServicesMessagingRequestManyFunctionName = "requestMany"
 
-	hostServicesRawObjectName   = "rawService"
-	hostServicesRawFunctionName = "request"
-
 	hostServicesObjectStoreObjectName         = "objectStore"
 	hostServicesObjectStoreGetFunctionName    = "get"
 	hostServicesObjectStorePutFunctionName    = "put"
