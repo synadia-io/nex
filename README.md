@@ -25,7 +25,7 @@ If you haven't already, please make sure that `/usr/local/bin` is in your path.
 
 The `nex node preflight` command is here to help you bootstrap your system and ensure that you have all of the elements you need to start and operate Nex nodes.
 
-The pre-flight check requires a configuration file so it can perform the appropriate checks. If you don't already have a configuration file, then Nex's `preflight` command will generate a new one for you in `./config.json`, as shown below:
+The pre-flight check requires a configuration file so it can perform the appropriate checks. If you don't already have a configuration file, then Nex's `preflight --init` flag will generate a new one for you in `./config.json`, as shown below:
 
 ```json
 {
@@ -50,7 +50,33 @@ The pre-flight check requires a configuration file so it can perform the appropr
 Run the following command to get everything set up using the above defaults:
 
 ```
-$ nex node preflight
+$ nex node preflight --init sandbox
+```
+
+## Workload Types
+By default, only _native_ type workloads are enabled on a nex node.  To control what workloads are allowed to run on your node, use the `workload_types` option in the configuration file.  
+```json
+{
+    "default_resource_dir":"/tmp/wd",
+    "machine_pool_size": 1,
+    "cni": {
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },
+    "tags": {
+        "simple": "true"
+    },
+    "no_sandbox": false,
+    "workload_types": [
+        "native",
+        "v8",
+        "wasm"
+    ]
+}
 ```
 
 ## Nex Components
