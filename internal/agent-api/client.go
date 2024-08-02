@@ -57,7 +57,7 @@ type AgentClient struct {
 	execTotalNanos    int64
 	workloadStartedAt time.Time
 
-	deployRequest    *AgentWorkloadInfo
+	workloadInfo     *AgentWorkloadInfo
 	workloadBytes    uint64
 	subz             []*nats.Subscription
 	deployRetryCount uint
@@ -169,7 +169,7 @@ func (a *AgentClient) DeployWorkload(request *AgentWorkloadInfo) (*DeployRespons
 		return nil, err
 	}
 
-	a.deployRequest = request
+	a.workloadInfo = request
 	a.workloadStartedAt = time.Now().UTC()
 	a.workloadBytes = uint64(request.TotalBytes)
 	return &deployResponse, nil
@@ -258,8 +258,8 @@ func (a *AgentClient) UptimeMillis() time.Duration {
 	return time.Since(a.workloadStartedAt)
 }
 
-func (a *AgentClient) DeployRequest() *AgentWorkloadInfo {
-	return a.deployRequest
+func (a *AgentClient) WorkloadInfo() *AgentWorkloadInfo {
+	return a.workloadInfo
 }
 
 func (a *AgentClient) IsSelected() bool {
@@ -294,7 +294,7 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 }
 
 func (a *AgentClient) WorkloadType() controlapi.NexWorkload {
-	return a.deployRequest.WorkloadType
+	return a.workloadInfo.WorkloadType
 }
 
 func (a *AgentClient) awaitHandshake(agentID string) {

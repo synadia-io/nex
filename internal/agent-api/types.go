@@ -73,21 +73,21 @@ type AgentWorkloadInfo struct {
 	Errors []error `json:"errors,omitempty"`
 }
 
-func (request *AgentWorkloadInfo) IsEssential() bool {
-	return request.Essential != nil && *request.Essential
+func (info *AgentWorkloadInfo) IsEssential() bool {
+	return info.Essential != nil && *info.Essential
 }
 
 // Returns true if the run request supports essential flag
-func (request *AgentWorkloadInfo) SupportsEssential() bool {
-	return request.WorkloadType == controlapi.NexWorkloadNative ||
-		request.WorkloadType == controlapi.NexWorkloadOCI
+func (info *AgentWorkloadInfo) SupportsEssential() bool {
+	return info.WorkloadType == controlapi.NexWorkloadNative ||
+		info.WorkloadType == controlapi.NexWorkloadOCI
 }
 
 // Returns true if the run request supports trigger subjects
-func (request *AgentWorkloadInfo) SupportsTriggerSubjects() bool {
-	return (request.WorkloadType == controlapi.NexWorkloadV8 ||
-		request.WorkloadType == controlapi.NexWorkloadWasm) &&
-		len(request.TriggerSubjects) > 0
+func (info *AgentWorkloadInfo) SupportsTriggerSubjects() bool {
+	return (info.WorkloadType == controlapi.NexWorkloadV8 ||
+		info.WorkloadType == controlapi.NexWorkloadWasm) &&
+		len(info.TriggerSubjects) > 0
 }
 
 func (r *AgentWorkloadInfo) Validate() error {

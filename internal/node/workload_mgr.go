@@ -222,7 +222,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 	if w.config.AllowDuplicateWorkloads != nil && !*w.config.AllowDuplicateWorkloads {
 		for _, agentClient := range w.liveAgents {
-			if strings.EqualFold(agentClient.DeployRequest().Hash, request.Hash) {
+			if strings.EqualFold(agentClient.WorkloadInfo().Hash, request.Hash) {
 				w.log.Warn("Attempted to deploy duplicate workload",
 					slog.String("workload_name", *request.WorkloadName),
 					slog.String("workload_type", string(request.WorkloadType)),
@@ -320,7 +320,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 // Note that this means "pending" agents are not considered by lookups
 func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.AgentWorkloadInfo, error) {
 	if agentClient, ok := w.liveAgents[workloadID]; ok {
-		return agentClient.DeployRequest(), nil
+		return agentClient.WorkloadInfo(), nil
 	}
 
 	return nil, fmt.Errorf("workload doesn't exist: %s", workloadID)
@@ -331,7 +331,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 	summaries := make([]controlapi.MachineSummary, 0)
 
 	for id, agentClient := range w.liveAgents {
-		deployRequest := agentClient.DeployRequest()
+		deployRequest := agentClient.WorkloadInfo()
 
 		uptimeFriendly := myUptime(agentClient.UptimeMillis())
 		runtimeFriendly := "--"
