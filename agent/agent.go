@@ -260,8 +260,8 @@ func (a *Agent) dispatchLogs() {
 // bucket, write it to tmp, initialize the execution provider per the
 // request, and then validate and deploy a workload
 func (a *Agent) handleDeploy(m *nats.Msg) {
-	var request agentapi.AgentWorkloadInfo
-	err := json.Unmarshal(m.Data, &request)
+	var info agentapi.AgentWorkloadInfo
+	err := json.Unmarshal(m.Data, &info)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to unmarshal deploy request: %s", err)
 		a.submitLog(msg, slog.LevelError)
@@ -269,19 +269,19 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	err = request.Validate()
+	err = info.Validate()
 	if err != nil {
 		_ = a.workAck(m, false, fmt.Sprintf("%v", err)) // FIXME-- this message can be formatted prettier
 		return
 	}
 
-	tmpFile, err := a.cacheExecutableArtifact(&request)
+	tmpFile, err := a.cacheExecutableArtifact(&info)
 	if err != nil {
 		_ = a.workAck(m, false, err.Error())
 		return
 	}
 
-	params, err := a.newExecutionProviderParams(&request, *tmpFile)
+	params, err := a.newExecutionProviderParams(&info, *tmpFile)
 	if err != nil {
 		_ = a.workAck(m, false, err.Error())
 		return
@@ -297,7 +297,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	a.provider = provider
 
 	shouldValidate := true
-	if !a.sandboxed && request.WorkloadType == controlapi.NexWorkloadNative {
+	if !a.sandboxed && info.WorkloadType == controlapi.NexWorkloadNative {
 		shouldValidate = false
 	}
 
@@ -455,19 +455,19 @@ func (a *Agent) installSignalHandlers() {
 
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
-func (a *Agent) newExecutionProviderParams(req *agentapi.AgentWorkloadInfo, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
+func (a *Agent) newExecutionProviderParams(info *agentapi.AgentWorkloadInfo, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
 	if a.md.VmID == nil {
 		return nil, errors.New("vm id is required to initialize execution provider params")
 	}
 
-	if req.WorkloadName == nil {
+	if info.WorkloadName == nil {
 		return nil, errors.New("workload name is required to initialize execution provider params")
 	}
 
 	params := &agentapi.ExecutionProviderParams{
-		AgentWorkloadInfo: *req,
-		Stderr:            &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
-		Stdout:            &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
+		AgentWorkloadInfo: *info,
+		Stderr:            &logEmitter{stderr: true, name: *info.WorkloadName, logs: a.agentLogs},
+		Stdout:            &logEmitter{stderr: false, name: *info.WorkloadName, logs: a.agentLogs},
 		TmpFilename:       &tmpFile,
 		VmID:              *a.md.VmID,
 
@@ -476,7 +476,7 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.AgentWorkloadInfo, tmpF
 		Exit: make(chan int),
 
 		NATSConn:        a.nc,
-		TriggerSubjects: req.TriggerSubjects,
+		TriggerSubjects: info.TriggerSubjects,
 		PluginPath:      a.md.PluginPath,
 	}
 
