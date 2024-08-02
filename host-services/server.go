@@ -162,8 +162,13 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 	}
 
 	span.AddEvent("RPC Request Completed")
+	var serverMsg *nats.Msg
+	if result.IsError() {
+		serverMsg = serverFailMessage(msg.Reply, result.Code, result.Message)
+	} else {
+		serverMsg = serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
+	}
 
-	serverMsg := serverSuccessMessage(msg.Reply, result.Code, result.Data, messageOk)
 	_ = msg.RespondMsg(serverMsg)
 }
 

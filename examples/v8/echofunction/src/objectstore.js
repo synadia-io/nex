@@ -1,10 +1,10 @@
 (subject, payload) => {
-  this.hostServices.objectStore.put('hello', payload);
-  this.hostServices.objectStore.delete('hello');
+  this.objectStore("testObjBucket").put('hello', payload);
+  this.objectStore("testObjBucket").delete('hello');
 
-  this.hostServices.objectStore.put('hello2', payload);
+  this.objectStore("testObjBucket").put('hello2', payload);
   return {
-    list: this.hostServices.objectStore.list(),
-    hello2: String.fromCharCode(...this.hostServices.objectStore.get('hello2'))
+    list: this.objectStore("testObjBucket").list(),
+    hello2: String.fromCharCode(...this.objectStore("testObjBucket").get('hello2'))
   }
 };

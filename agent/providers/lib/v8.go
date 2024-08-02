@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	hostServicesObjectName = "hostServices"
-
 	hostServicesHTTPObjectName         = "http"
 	hostServicesHTTPGetFunctionName    = "get"
 	hostServicesHTTPPostFunctionName   = "post"
@@ -295,12 +293,31 @@ func (v *V8) initUtils() {
 func (v *V8) newV8Context(ctx context.Context) (*v8.Context, error) {
 	global := v8.NewObjectTemplate(v.iso)
 
-	hostServices, err := v.newHostServicesTemplate(ctx)
+	err := global.Set(hostServicesHTTPObjectName, v.newHTTPObjectTemplate(ctx))
 	if err != nil {
 		return nil, err
 	}
 
-	err = global.Set(hostServicesObjectName, hostServices)
+	bucketedKv, err := v.newBucketedKeyValueFunctionTemplate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = global.Set(hostServicesKVObjectName, bucketedKv)
+	if err != nil {
+		return nil, err
+	}
+
+	err = global.Set(hostServicesMessagingObjectName, v.newMessagingObjectTemplate(ctx))
+	if err != nil {
+		return nil, err
+	}
+
+	bucketedObj, err := v.newBucketedObjectStoreFunctionTemplate(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = global.Set(hostServicesObjectStoreObjectName, bucketedObj)
 	if err != nil {
 		return nil, err
 	}
@@ -308,35 +325,50 @@ func (v *V8) newV8Context(ctx context.Context) (*v8.Context, error) {
 	return v8.NewContext(v.iso, global), nil
 }
 
-func (v *V8) newHostServicesTemplate(ctx context.Context) (*v8.ObjectTemplate, error) {
-	hostServices := v8.NewObjectTemplate(v.iso)
+// obj := this.obj("bucket")
+func (v *V8) newBucketedObjectStoreFunctionTemplate(ctx context.Context) (*v8.FunctionTemplate, error) {
+	bucketFunc := v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "bucket name is required")
+			return v.iso.ThrowException(val)
+		}
 
-	err := hostServices.Set(hostServicesHTTPObjectName, v.newHTTPObjectTemplate(ctx))
-	if err != nil {
-		return nil, err
-	}
+		obj := v.newObjectStoreObjectTemplate(ctx, args[0].String())
+		val, err := obj.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
 
-	err = hostServices.Set(hostServicesKVObjectName, v.newKeyValueObjectTemplate(ctx))
-	if err != nil {
-		return nil, err
-	}
+		return val.Value
 
-	err = hostServices.Set(hostServicesMessagingObjectName, v.newMessagingObjectTemplate(ctx))
-	if err != nil {
-		return nil, err
-	}
+	})
 
-	err = hostServices.Set(hostServicesObjectStoreObjectName, v.newObjectStoreObjectTemplate(ctx))
-	if err != nil {
-		return nil, err
-	}
+	return bucketFunc, nil
+}
 
-	err = hostServices.Set(hostServicesRawObjectName, v.newRawObjectTemplate(ctx))
-	if err != nil {
-		return nil, err
-	}
+// kv := this.kv("bucket")
+func (v *V8) newBucketedKeyValueFunctionTemplate(ctx context.Context) (*v8.FunctionTemplate, error) {
+	bucketFunc := v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
+		args := info.Args()
+		if len(args) == 0 {
+			val, _ := v8.NewValue(v.iso, "bucket name is required")
+			return v.iso.ThrowException(val)
+		}
 
-	return hostServices, nil
+		kv := v.newKeyValueObjectTemplate(ctx, args[0].String())
+		val, err := kv.NewInstance(v.ctx)
+		if err != nil {
+			val, _ := v8.NewValue(v.iso, err.Error())
+			return v.iso.ThrowException(val)
+		}
+
+		return val.Value
+
+	})
+
+	return bucketFunc, nil
 }
 
 func (v *V8) newHTTPObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
@@ -446,7 +478,8 @@ func (v *V8) genHttpClientFunc(ctx context.Context, method string) func(info *v8
 	}
 }
 
-func (v *V8) newKeyValueObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
+func (v *V8) newKeyValueObjectTemplate(ctx context.Context, bucketName string) *v8.ObjectTemplate {
+
 	kv := v8.NewObjectTemplate(v.iso)
 
 	_ = kv.Set(hostServicesKVGetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
@@ -458,7 +491,7 @@ func (v *V8) newKeyValueObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		resp, err := v.builtins.KVGet(ctx, key)
+		resp, err := v.builtins.KVGet(ctx, bucketName, key)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -489,7 +522,7 @@ func (v *V8) newKeyValueObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 			return v.iso.ThrowException(val)
 		}
 
-		kvresp, err := v.builtins.KVSet(ctx, key, value)
+		kvresp, err := v.builtins.KVSet(ctx, bucketName, key, value)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -512,7 +545,7 @@ func (v *V8) newKeyValueObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 
 		key := args[0].String()
 
-		kvresp, err := v.builtins.KVDelete(ctx, key)
+		kvresp, err := v.builtins.KVDelete(ctx, bucketName, key)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -528,7 +561,7 @@ func (v *V8) newKeyValueObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
 
 	_ = kv.Set(hostServicesKVKeysFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
 
-		resp, err := v.builtins.KVKeys(ctx)
+		resp, err := v.builtins.KVKeys(ctx, bucketName)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -733,7 +766,7 @@ func (v *V8) newMessagingObjectTemplate(ctx context.Context) *v8.ObjectTemplate 
 	return messaging
 }
 
-func (v *V8) newObjectStoreObjectTemplate(ctx context.Context) *v8.ObjectTemplate {
+func (v *V8) newObjectStoreObjectTemplate(ctx context.Context, bucketName string) *v8.ObjectTemplate {
 	objectStore := v8.NewObjectTemplate(v.iso)
 
 	_ = objectStore.Set(hostServicesObjectStoreGetFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
@@ -744,7 +777,7 @@ func (v *V8) newObjectStoreObjectTemplate(ctx context.Context) *v8.ObjectTemplat
 		}
 
 		name := args[0].String()
-		resp, err := v.builtins.ObjectGet(ctx, name)
+		resp, err := v.builtins.ObjectGet(ctx, bucketName, name)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -775,7 +808,7 @@ func (v *V8) newObjectStoreObjectTemplate(ctx context.Context) *v8.ObjectTemplat
 			return v.iso.ThrowException(val)
 		}
 
-		resp, err := v.builtins.ObjectPut(ctx, name, value)
+		resp, err := v.builtins.ObjectPut(ctx, bucketName, name, value)
 
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
@@ -802,7 +835,7 @@ func (v *V8) newObjectStoreObjectTemplate(ctx context.Context) *v8.ObjectTemplat
 		}
 
 		name := args[0].String()
-		err := v.builtins.ObjectDelete(ctx, name)
+		err := v.builtins.ObjectDelete(ctx, bucketName, name)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -812,7 +845,7 @@ func (v *V8) newObjectStoreObjectTemplate(ctx context.Context) *v8.ObjectTemplat
 	}))
 
 	_ = objectStore.Set(hostServicesObjectStoreListFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
-		resp, err := v.builtins.ObjectList(ctx)
+		resp, err := v.builtins.ObjectList(ctx, bucketName)
 		if err != nil {
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)

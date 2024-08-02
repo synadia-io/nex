@@ -246,6 +246,12 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		slog.String("status", w.ncint.Status().String()),
 	)
 
+	if w.config.HostServicesConfig != nil && request.WorkloadType == controlapi.NexWorkloadNative {
+		request.Environment["NEX_HOSTSERVICES_NATS_SERVER"] = w.config.HostServicesConfig.NatsUrl
+		request.Environment["NEX_HOSTSERVICES_NATS_USER_JWT"] = w.config.HostServicesConfig.NatsUserJwt
+		request.Environment["NEX_HOSTSERVICES_NATS_USER_SEED"] = w.config.HostServicesConfig.NatsUserSeed
+	}
+
 	deployResponse, err := agentClient.DeployWorkload(request)
 	if err != nil {
 		delete(w.poolAgents, workloadID) // FIXME!!! does this leak running agents??
@@ -261,38 +267,40 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		w.liveAgents[workloadID] = agentClient
 		delete(w.poolAgents, workloadID)
 
-		ncHostServices, err := w.createHostServicesConnection(request)
-		if err != nil {
-			w.log.Error("Failed to establish host services connection for workload",
-				slog.Any("error", err),
-			)
-			return err
-		}
+		if request.WorkloadType != controlapi.NexWorkloadNative {
+			ncHostServices, err := w.createHostServicesConnection(request)
+			if err != nil {
+				w.log.Error("Failed to establish host services connection for workload",
+					slog.Any("error", err),
+				)
+				return err
+			}
 
-		w.hostServices.server.SetHostServicesConnection(workloadID, ncHostServices)
+			w.hostServices.server.SetHostServicesConnection(workloadID, ncHostServices)
 
-		if request.SupportsTriggerSubjects() {
-			for _, tsub := range request.TriggerSubjects {
-				sub, err := ncHostServices.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
-				if err != nil {
-					w.log.Error("Failed to create trigger subject subscription for deployed workload",
+			if request.SupportsTriggerSubjects() {
+				for _, tsub := range request.TriggerSubjects {
+					sub, err := ncHostServices.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
+					if err != nil {
+						w.log.Error("Failed to create trigger subject subscription for deployed workload",
+							slog.String("workload_id", workloadID),
+							slog.String("trigger_subject", tsub),
+							slog.String("workload_type", string(request.WorkloadType)),
+							slog.Any("err", err),
+						)
+						_ = w.StopWorkload(workloadID, true)
+						return err
+					}
+
+					w.log.Debug("Created trigger subject subscription for deployed workload",
 						slog.String("workload_id", workloadID),
+						slog.String("nats_url", ncHostServices.ConnectedAddr()),
 						slog.String("trigger_subject", tsub),
 						slog.String("workload_type", string(request.WorkloadType)),
-						slog.Any("err", err),
 					)
-					_ = w.StopWorkload(workloadID, true)
-					return err
+
+					w.subz[workloadID] = append(w.subz[workloadID], sub)
 				}
-
-				w.log.Debug("Created trigger subject subscription for deployed workload",
-					slog.String("workload_id", workloadID),
-					slog.String("nats_url", ncHostServices.ConnectedAddr()),
-					slog.String("trigger_subject", tsub),
-					slog.String("workload_type", string(request.WorkloadType)),
-				)
-
-				w.subz[workloadID] = append(w.subz[workloadID], sub)
 			}
 		}
 	} else {
@@ -509,6 +517,9 @@ func (w *WorkloadManager) agentHandshakeTimedOut(id string) {
 }
 
 func (w *WorkloadManager) agentHandshakeSucceeded(workloadID string) {
+	w.poolMutex.Lock()
+	defer w.poolMutex.Unlock()
+
 	now := time.Now().UTC()
 	w.handshakes[workloadID] = now.Format(time.RFC3339)
 }

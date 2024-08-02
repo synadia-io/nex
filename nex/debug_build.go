@@ -44,7 +44,7 @@ func initDebug(logger *slog.Logger) (func() error, error) {
 	}
 
 	go func() {
-		fmt.Println(http.ListenAndServe(fmt.Sprintf(":%d", node_pprof_port), nil))
+		fmt.Println(http.ListenAndServe(fmt.Sprintf(":%d", *node_pprof_port), nil))
 	}()
 
 	logger.Info("******************* DEBUG BUILD *******************")

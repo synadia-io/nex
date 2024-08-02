@@ -1,10 +1,10 @@
 (subject, payload) => {
-  this.hostServices.kv.set('hello', payload);
-  this.hostServices.kv.delete('hello');
+  this.kv("testBucket").set('hello', payload);
+  this.kv("testBucket").delete('hello');
 
-  this.hostServices.kv.set('hello2', payload);
+  this.kv("testBucket").set('hello2', payload);
   return {
-    keys: this.hostServices.kv.keys(),
-    hello2: String.fromCharCode(...this.hostServices.kv.get('hello2'))
+    keys: this.kv("testBucket").keys(),
+    hello2: String.fromCharCode(...this.kv("testBucket").get('hello2'))
   }
 };

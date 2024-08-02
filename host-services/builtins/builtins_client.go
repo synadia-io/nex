@@ -27,9 +27,10 @@ func NewBuiltinServicesClient(hsClient *hostservices.HostServicesClient) *Builti
 	}
 }
 
-func (c *BuiltinServicesClient) KVGet(ctx context.Context, key string) ([]byte, error) {
+func (c *BuiltinServicesClient) KVGet(ctx context.Context, bucket string, key string) ([]byte, error) {
 	metadata := map[string]string{
-		agentapi.KeyValueKeyHeader: key,
+		agentapi.KeyValueKeyHeader:   key,
+		agentapi.BucketContextHeader: bucket,
 	}
 
 	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodGet, []byte{}, metadata)
@@ -44,9 +45,10 @@ func (c *BuiltinServicesClient) KVGet(ctx context.Context, key string) ([]byte, 
 	return resp.Data, nil
 }
 
-func (c *BuiltinServicesClient) KVSet(ctx context.Context, key string, value []byte) (*agentapi.HostServicesKeyValueResponse, error) {
+func (c *BuiltinServicesClient) KVSet(ctx context.Context, bucket string, key string, value []byte) (*agentapi.HostServicesKeyValueResponse, error) {
 	metadata := map[string]string{
-		agentapi.KeyValueKeyHeader: key,
+		agentapi.KeyValueKeyHeader:   key,
+		agentapi.BucketContextHeader: bucket,
 	}
 
 	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodSet, value, metadata)
@@ -66,9 +68,10 @@ func (c *BuiltinServicesClient) KVSet(ctx context.Context, key string, value []b
 	return &kvResponse, nil
 }
 
-func (c *BuiltinServicesClient) KVDelete(ctx context.Context, key string) (*agentapi.HostServicesKeyValueResponse, error) {
+func (c *BuiltinServicesClient) KVDelete(ctx context.Context, bucket string, key string) (*agentapi.HostServicesKeyValueResponse, error) {
 	metadata := map[string]string{
-		agentapi.KeyValueKeyHeader: key,
+		agentapi.KeyValueKeyHeader:   key,
+		agentapi.BucketContextHeader: bucket,
 	}
 
 	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodDelete, []byte{}, metadata)
@@ -88,8 +91,10 @@ func (c *BuiltinServicesClient) KVDelete(ctx context.Context, key string) (*agen
 	return &kvResponse, nil
 }
 
-func (c *BuiltinServicesClient) KVKeys(ctx context.Context) ([]string, error) {
-	metadata := map[string]string{}
+func (c *BuiltinServicesClient) KVKeys(ctx context.Context, bucket string) ([]string, error) {
+	metadata := map[string]string{
+		agentapi.BucketContextHeader: bucket,
+	}
 
 	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameKeyValue, kvServiceMethodKeys, []byte{}, metadata)
 	if err != nil {
@@ -166,9 +171,10 @@ func (c *BuiltinServicesClient) MessagingRequest(ctx context.Context, subject st
 	return resp.Data, nil
 }
 
-func (c *BuiltinServicesClient) ObjectGet(ctx context.Context, objectName string) ([]byte, error) {
+func (c *BuiltinServicesClient) ObjectGet(ctx context.Context, bucket string, objectName string) ([]byte, error) {
 	metadata := map[string]string{
 		agentapi.ObjectStoreObjectNameHeader: objectName,
+		agentapi.BucketContextHeader:         bucket,
 	}
 
 	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodGet, []byte{}, metadata)
@@ -182,8 +188,12 @@ func (c *BuiltinServicesClient) ObjectGet(ctx context.Context, objectName string
 	return resp.Data, nil
 }
 
-func (c *BuiltinServicesClient) ObjectList(ctx context.Context) ([]*nats.ObjectInfo, error) {
-	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodList, []byte{}, make(map[string]string))
+func (c *BuiltinServicesClient) ObjectList(ctx context.Context, bucket string) ([]*nats.ObjectInfo, error) {
+	metadata := map[string]string{
+		agentapi.BucketContextHeader: bucket,
+	}
+
+	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodList, []byte{}, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -200,9 +210,10 @@ func (c *BuiltinServicesClient) ObjectList(ctx context.Context) ([]*nats.ObjectI
 	return theList, nil
 }
 
-func (c *BuiltinServicesClient) ObjectPut(ctx context.Context, objectName string, payload []byte) (*nats.ObjectInfo, error) {
+func (c *BuiltinServicesClient) ObjectPut(ctx context.Context, bucket string, objectName string, payload []byte) (*nats.ObjectInfo, error) {
 	metadata := map[string]string{
 		agentapi.ObjectStoreObjectNameHeader: objectName,
+		agentapi.BucketContextHeader:         bucket,
 	}
 	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodPut, payload, metadata)
 	if err != nil {
@@ -220,9 +231,10 @@ func (c *BuiltinServicesClient) ObjectPut(ctx context.Context, objectName string
 	return &result, nil
 }
 
-func (c *BuiltinServicesClient) ObjectDelete(ctx context.Context, objectName string) error {
+func (c *BuiltinServicesClient) ObjectDelete(ctx context.Context, bucket string, objectName string) error {
 	metadata := map[string]string{
 		agentapi.ObjectStoreObjectNameHeader: objectName,
+		agentapi.BucketContextHeader:         bucket,
 	}
 	resp, err := c.hsClient.PerformRPC(ctx, builtinServiceNameObjectStore, objectStoreServiceMethodDelete, []byte{}, metadata)
 	if err != nil {

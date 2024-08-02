@@ -10,29 +10,55 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	hostservices "github.com/synadia-io/nex/host-services"
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
 const (
-	testNamespace  = "testspace"
-	testWorkload   = "testwork"
-	testWorkloadId = "abc12346"
+	testNamespace     = "testspace"
+	testWorkload      = "testwork"
+	testWorkloadId    = "abc12346"
+	testBucketName    = "testBucket"
+	testObjBucketName = "testObjBucket"
 )
 
-func setupSuite(_ testing.TB, port int) (*nats.Conn, func(tb testing.TB)) {
+func setupSuite(t testing.TB, port int) (*nats.Conn, func(tb testing.TB)) {
 	svr, _ := server.NewServer(&server.Options{
 		Port:      port,
 		Host:      "0.0.0.0",
 		JetStream: true,
 	})
 	svr.Start()
+	ctx := context.Background()
 
 	nc, _ := nats.Connect(svr.ClientURL())
+	js, err := jetstream.New(nc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = js.CreateKeyValue(ctx, jetstream.KeyValueConfig{
+		Bucket:  testBucketName,
+		Storage: jetstream.MemoryStorage,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = js.CreateObjectStore(ctx, jetstream.ObjectStoreConfig{
+		Bucket:  testObjBucketName,
+		Storage: jetstream.MemoryStorage,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Return a function to teardown the test
 	return nc, func(tb testing.TB) {
 		svr.Shutdown()
+		if js != nil {
+			_ = js.DeleteKeyValue(ctx, testBucketName)
+			_ = js.DeleteObjectStore(ctx, testObjBucketName)
+		}
 	}
 }
 
@@ -56,12 +82,12 @@ func TestKvBuiltin(t *testing.T) {
 		t.Fatalf("Failed to start server: %s", err)
 	}
 
-	_, err = bClient.KVSet(context.Background(), "testone", []byte{9, 8, 7, 6, 5})
+	_, err = bClient.KVSet(context.Background(), testBucketName, "testone", []byte{9, 8, 7, 6, 5})
 	if err != nil {
 		t.Fatalf("Got an error setting kv: %s", err.Error())
 	}
 
-	v, err := bClient.KVGet(context.Background(), "testone")
+	v, err := bClient.KVGet(context.Background(), testBucketName, "testone")
 	if err != nil {
 		t.Fatalf("Got an error getting key: %s", err.Error())
 	}
@@ -69,7 +95,7 @@ func TestKvBuiltin(t *testing.T) {
 		t.Fatalf("Didn't get expected byte array back, got %+v", v)
 	}
 
-	keys, err := bClient.KVKeys(context.Background())
+	keys, err := bClient.KVKeys(context.Background(), testBucketName)
 	if err != nil {
 		t.Fatalf("Failed to get bucket keys: %s", err.Error())
 	}
@@ -120,7 +146,7 @@ func TestObjectBuiltin(t *testing.T) {
 	_ = server.AddService("messaging", msgService, []byte{})
 	_ = server.Start()
 
-	res, err := bClient.ObjectPut(context.Background(), "objecttest", []byte{100, 101, 102})
+	res, err := bClient.ObjectPut(context.Background(), testObjBucketName, "objecttest", []byte{100, 101, 102})
 	if err != nil {
 		t.Fatalf("Expected no error, but got %s", err.Error())
 	}
@@ -131,7 +157,7 @@ func TestObjectBuiltin(t *testing.T) {
 		t.Fatalf("Expected to store 3 bytes, got %d", res.Size)
 	}
 
-	res2, err := bClient.ObjectGet(context.Background(), "objecttest")
+	res2, err := bClient.ObjectGet(context.Background(), testObjBucketName, "objecttest")
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %s", err.Error())
 	}
@@ -139,7 +165,7 @@ func TestObjectBuiltin(t *testing.T) {
 		t.Fatalf("Retrieved the wrong bytes, got %v", res2)
 	}
 
-	infos, err := bClient.ObjectList(context.Background())
+	infos, err := bClient.ObjectList(context.Background(), testObjBucketName)
 	if err != nil {
 		t.Fatalf("Failed to list objects in bucket")
 	}
@@ -147,12 +173,12 @@ func TestObjectBuiltin(t *testing.T) {
 		t.Fatalf("Got unexpected list of items in bucket: %+v", infos)
 	}
 
-	err = bClient.ObjectDelete(context.Background(), "objecttest")
+	err = bClient.ObjectDelete(context.Background(), testObjBucketName, "objecttest")
 	if err != nil {
 		t.Fatalf("Failed to delete object: %s", err.Error())
 	}
 
-	res3, err := bClient.ObjectGet(context.Background(), "objecttest")
+	res3, err := bClient.ObjectGet(context.Background(), testObjBucketName, "objecttest")
 	if err == nil {
 		t.Fatalf("Expected to get an error for non-existing object but didn't: %+v", res3)
 	}
