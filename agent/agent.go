@@ -175,7 +175,7 @@ func (a *Agent) Version() string {
 // the executable workload artifact from the cache bucket, write it to a
 // temporary file and make it executable; this method returns the full
 // path to the cached artifact if successful
-func (a *Agent) cacheExecutableArtifact(req *agentapi.DeployRequest) (*string, error) {
+func (a *Agent) cacheExecutableArtifact(req *agentapi.AgentWorkloadInfo) (*string, error) {
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
 
@@ -260,7 +260,7 @@ func (a *Agent) dispatchLogs() {
 // bucket, write it to tmp, initialize the execution provider per the
 // request, and then validate and deploy a workload
 func (a *Agent) handleDeploy(m *nats.Msg) {
-	var request agentapi.DeployRequest
+	var request agentapi.AgentWorkloadInfo
 	err := json.Unmarshal(m.Data, &request)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to unmarshal deploy request: %s", err)
@@ -455,7 +455,7 @@ func (a *Agent) installSignalHandlers() {
 
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
-func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
+func (a *Agent) newExecutionProviderParams(req *agentapi.AgentWorkloadInfo, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
 	if a.md.VmID == nil {
 		return nil, errors.New("vm id is required to initialize execution provider params")
 	}
@@ -465,11 +465,11 @@ func (a *Agent) newExecutionProviderParams(req *agentapi.DeployRequest, tmpFile 
 	}
 
 	params := &agentapi.ExecutionProviderParams{
-		DeployRequest: *req,
-		Stderr:        &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
-		Stdout:        &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
-		TmpFilename:   &tmpFile,
-		VmID:          *a.md.VmID,
+		AgentWorkloadInfo: *req,
+		Stderr:            &logEmitter{stderr: true, name: *req.WorkloadName, logs: a.agentLogs},
+		Stdout:            &logEmitter{stderr: false, name: *req.WorkloadName, logs: a.agentLogs},
+		TmpFilename:       &tmpFile,
+		VmID:              *a.md.VmID,
 
 		Fail: make(chan bool),
 		Run:  make(chan bool),

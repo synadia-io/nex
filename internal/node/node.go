@@ -695,28 +695,23 @@ func (n *Node) shuttingDown() bool {
 
 // For the curious - I tried a number of ways of making a common/shared deploy request and only modeling the differences
 // here, but it made all the code that creates deployment requests look hideous. Will look into cleaning this up again.
-func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.DeployRequest {
-	return &agentapi.DeployRequest{
-		Argv:                 request.Argv,
-		DecodedClaims:        request.DecodedClaims,
-		Description:          request.Description,
-		EncryptedEnvironment: request.Environment,
-		Environment:          request.WorkloadEnvironment,
-		Essential:            request.Essential,
-		Hash:                 hash,
-		HostServicesConfig:   request.HostServicesConfig,
-		ID:                   request.ID,
-		JsDomain:             request.JsDomain,
-		Location:             request.Location,
-		Namespace:            &namespace,
-		RetriedAt:            request.RetriedAt,
-		RetryCount:           request.RetryCount,
-		SenderPublicKey:      request.SenderPublicKey,
-		TargetNode:           request.TargetNode,
-		TotalBytes:           int64(numBytes),
-		TriggerSubjects:      request.TriggerSubjects,
-		WorkloadJwt:          request.WorkloadJWT,
-		WorkloadName:         request.WorkloadName,
-		WorkloadType:         request.WorkloadType,
+func agentDeployRequestFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.AgentWorkloadInfo {
+	return &agentapi.AgentWorkloadInfo{
+		Argv:               request.Argv,
+		DecodedClaims:      request.DecodedClaims,
+		Description:        request.Description,
+		Environment:        request.WorkloadEnvironment,
+		Essential:          request.Essential,
+		Hash:               hash,
+		HostServicesConfig: request.HostServicesConfig,
+		ID:                 request.ID,
+		Location:           request.Location,
+		Namespace:          &namespace,
+		RetriedAt:          request.RetriedAt,
+		RetryCount:         request.RetryCount,
+		TotalBytes:         int64(numBytes),
+		TriggerSubjects:    request.TriggerSubjects,
+		WorkloadName:       request.WorkloadName,
+		WorkloadType:       request.WorkloadType,
 	}
 }

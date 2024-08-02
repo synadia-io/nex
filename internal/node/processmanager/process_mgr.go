@@ -10,7 +10,7 @@ const runloopSleepInterval = 100 * time.Millisecond
 
 // Information about an agent process without regard to the implementation of the agent process manager
 type ProcessInfo struct {
-	DeployRequest *agentapi.DeployRequest
+	DeployRequest *agentapi.AgentWorkloadInfo
 	ID            string
 	Name          string
 	Namespace     string
@@ -37,7 +37,7 @@ type ProcessManager interface {
 
 	// Associate a deploy request with the given workload id, and perform any
 	// just in time initialization of resources if necessary
-	PrepareWorkload(id string, request *agentapi.DeployRequest) error
+	PrepareWorkload(id string, request *agentapi.AgentWorkloadInfo) error
 
 	// Start the process manager and allocate a pool of agents based on an implementation-specific
 	// strategy, delegating callbacks to the given delegate

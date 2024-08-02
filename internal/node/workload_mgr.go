@@ -216,7 +216,7 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 
 // Deploy a workload as specified by the given deploy request to an available
 // agent in the configured pool
-func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *agentapi.DeployRequest) error {
+func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *agentapi.AgentWorkloadInfo) error {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
@@ -318,7 +318,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
 // Note that this means "pending" agents are not considered by lookups
-func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.DeployRequest, error) {
+func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.AgentWorkloadInfo, error) {
 	if agentClient, ok := w.liveAgents[workloadID]; ok {
 		return agentClient.DeployRequest(), nil
 	}
@@ -532,7 +532,7 @@ func (w *WorkloadManager) agentContactLost(workloadID string) {
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
-func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
+func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *agentapi.AgentWorkloadInfo) func(msg *nats.Msg) {
 	agentClient, ok := w.liveAgents[workloadID]
 	if !ok {
 		w.log.Error("Attempted to generate trigger handler for non-existent agent client")
@@ -632,7 +632,7 @@ func (w *WorkloadManager) startInternalNATS() error {
 	return nil
 }
 
-func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployRequest) (*nats.Conn, error) {
+func (w *WorkloadManager) createHostServicesConnection(request *agentapi.AgentWorkloadInfo) (*nats.Conn, error) {
 	natsOpts := []nats.Option{
 		nats.Name("nex-hostservices"),
 	}

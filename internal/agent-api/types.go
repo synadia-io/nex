@@ -21,7 +21,7 @@ const DefaultRunloopSleepTimeoutMillis = 25
 
 // ExecutionProviderParams parameters for initializing a specific execution provider
 type ExecutionProviderParams struct {
-	DeployRequest
+	AgentWorkloadInfo
 	TriggerSubjects []string `json:"trigger_subjects"`
 
 	// Fail channel receives bool upon command failing to start
@@ -45,8 +45,8 @@ type ExecutionProviderParams struct {
 	PluginPath *string `json:"-"`
 }
 
-// DeployRequest processed by the agent
-type DeployRequest struct {
+// AgentWorkloadInfo processed by the agent
+type AgentWorkloadInfo struct {
 	Argv          []string          `json:"argv,omitempty"`
 	DecodedClaims jwt.GenericClaims `json:"-"`
 	Description   *string           `json:"description"`
@@ -68,34 +68,29 @@ type DeployRequest struct {
 	Stdout      io.Writer `json:"-"`
 	TmpFilename *string   `json:"-"`
 
-	EncryptedEnvironment *string  `json:"-"`
-	JsDomain             *string  `json:"-"`
-	Location             *url.URL `json:"-"`
-	SenderPublicKey      *string  `json:"-"`
-	TargetNode           *string  `json:"-"`
-	WorkloadJwt          *string  `json:"-"`
+	Location *url.URL `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }
 
-func (request *DeployRequest) IsEssential() bool {
+func (request *AgentWorkloadInfo) IsEssential() bool {
 	return request.Essential != nil && *request.Essential
 }
 
 // Returns true if the run request supports essential flag
-func (request *DeployRequest) SupportsEssential() bool {
+func (request *AgentWorkloadInfo) SupportsEssential() bool {
 	return request.WorkloadType == controlapi.NexWorkloadNative ||
 		request.WorkloadType == controlapi.NexWorkloadOCI
 }
 
 // Returns true if the run request supports trigger subjects
-func (request *DeployRequest) SupportsTriggerSubjects() bool {
+func (request *AgentWorkloadInfo) SupportsTriggerSubjects() bool {
 	return (request.WorkloadType == controlapi.NexWorkloadV8 ||
 		request.WorkloadType == controlapi.NexWorkloadWasm) &&
 		len(request.TriggerSubjects) > 0
 }
 
-func (r *DeployRequest) Validate() error {
+func (r *AgentWorkloadInfo) Validate() error {
 	var err error
 
 	if r.Namespace == nil {

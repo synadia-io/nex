@@ -13,7 +13,7 @@ func TestNoopPluginLoad(t *testing.T) {
 	plugPath := "../../test/fixtures"
 	wName := "echofunctionjs"
 	params := &agentapi.ExecutionProviderParams{
-		DeployRequest: agentapi.DeployRequest{
+		AgentWorkloadInfo: agentapi.AgentWorkloadInfo{
 			WorkloadName: &wName,
 			WorkloadType: "noop",
 		},
