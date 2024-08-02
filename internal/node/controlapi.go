@@ -386,7 +386,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		return
 	}
 
-	agentDeployRequest := agentDeployRequestFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
+	agentDeployRequest := agentWorkloadInfoFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
 
 	api.log.
 		Info("Submitting workload to agent",

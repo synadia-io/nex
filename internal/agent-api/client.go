@@ -27,6 +27,7 @@ type ContactLostCallback func(string)
 
 const (
 	defaultAgentPingIntervalMillis = 5000
+	maxRetryAttempts               = 3
 
 	NexTriggerSubject = "x-nex-trigger-subject"
 	NexRuntimeNs      = "x-nex-runtime-ns"
@@ -56,9 +57,10 @@ type AgentClient struct {
 	execTotalNanos    int64
 	workloadStartedAt time.Time
 
-	deployRequest *DeployRequest
-	workloadBytes uint64
-	subz          []*nats.Subscription
+	workloadInfo     *AgentWorkloadInfo
+	workloadBytes    uint64
+	subz             []*nats.Subscription
+	deployRetryCount uint
 
 	selected bool // FIXME-- rename...
 }
@@ -82,6 +84,7 @@ func NewAgentClient(
 		handshakeSucceeded: onSuccess,
 		log:                log,
 		logReceived:        onLog,
+		deployRetryCount:   0,
 		nc:                 nc,
 		pingTimeout:        pingTimeout,
 		subz:               make([]*nats.Subscription, 0),
@@ -130,7 +133,11 @@ func (a *AgentClient) Start(agentID string) error {
 	return nil
 }
 
-func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, error) {
+func (a *AgentClient) DeployWorkload(request *AgentWorkloadInfo) (*DeployResponse, error) {
+	if a.deployRetryCount > maxRetryAttempts {
+		return nil, fmt.Errorf("exceeded maximum number of agent workload deploy attempts: %d", maxRetryAttempts)
+	}
+
 	bytes, err := json.Marshal(request)
 	if err != nil {
 		return nil, err
@@ -148,6 +155,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 			return nil, errors.New("timed out waiting for acknowledgement of workload deployment")
 		} else if errors.Is(err, nats.ErrNoResponders) {
 			time.Sleep(time.Millisecond * 100)
+			a.deployRetryCount += 1
 			return a.DeployWorkload(request)
 		} else {
 			return nil, fmt.Errorf("failed to submit request for workload deployment: %s", err)
@@ -161,7 +169,7 @@ func (a *AgentClient) DeployWorkload(request *DeployRequest) (*DeployResponse, e
 		return nil, err
 	}
 
-	a.deployRequest = request
+	a.workloadInfo = request
 	a.workloadStartedAt = time.Now().UTC()
 	a.workloadBytes = uint64(request.TotalBytes)
 	return &deployResponse, nil
@@ -250,8 +258,8 @@ func (a *AgentClient) UptimeMillis() time.Duration {
 	return time.Since(a.workloadStartedAt)
 }
 
-func (a *AgentClient) DeployRequest() *DeployRequest {
-	return a.deployRequest
+func (a *AgentClient) WorkloadInfo() *AgentWorkloadInfo {
+	return a.workloadInfo
 }
 
 func (a *AgentClient) IsSelected() bool {
@@ -286,7 +294,7 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 }
 
 func (a *AgentClient) WorkloadType() controlapi.NexWorkload {
-	return a.deployRequest.WorkloadType
+	return a.workloadInfo.WorkloadType
 }
 
 func (a *AgentClient) awaitHandshake(agentID string) {

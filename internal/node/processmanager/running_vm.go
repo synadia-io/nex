@@ -32,7 +32,7 @@ type runningFirecracker struct {
 
 	closing         uint32
 	config          *nexmodels.NodeConfiguration
-	deployRequest   *agentapi.DeployRequest
+	deployRequest   *agentapi.AgentWorkloadInfo
 	ip              net.IP
 	log             *slog.Logger
 	machine         *firecracker.Machine

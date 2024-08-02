@@ -39,7 +39,7 @@ type FirecrackerProcessManager struct {
 	natsint *internalnats.InternalNatsServer
 
 	delegate       ProcessDelegate
-	deployRequests map[string]*agentapi.DeployRequest
+	deployRequests map[string]*agentapi.AgentWorkloadInfo
 }
 
 func NewFirecrackerProcessManager(
@@ -61,7 +61,7 @@ func NewFirecrackerProcessManager(
 		allVMs:         make(map[string]*runningFirecracker),
 		poolVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
 		stopMutex:      make(map[string]*sync.Mutex),
-		deployRequests: make(map[string]*agentapi.DeployRequest),
+		deployRequests: make(map[string]*agentapi.AgentWorkloadInfo),
 	}, nil
 }
 
@@ -95,7 +95,7 @@ func (f *FirecrackerProcessManager) EnterLameDuck() error {
 }
 
 // Preparing a workload reads from the warmVMs channel
-func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.DeployRequest) error {
+func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.AgentWorkloadInfo) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 

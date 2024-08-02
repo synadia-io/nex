@@ -216,13 +216,13 @@ func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.D
 
 // Deploy a workload as specified by the given deploy request to an available
 // agent in the configured pool
-func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *agentapi.DeployRequest) error {
+func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, request *agentapi.AgentWorkloadInfo) error {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
 	if w.config.AllowDuplicateWorkloads != nil && !*w.config.AllowDuplicateWorkloads {
 		for _, agentClient := range w.liveAgents {
-			if strings.EqualFold(agentClient.DeployRequest().Hash, request.Hash) {
+			if strings.EqualFold(agentClient.WorkloadInfo().Hash, request.Hash) {
 				w.log.Warn("Attempted to deploy duplicate workload",
 					slog.String("workload_name", *request.WorkloadName),
 					slog.String("workload_type", string(request.WorkloadType)),
@@ -318,9 +318,9 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 // Locates a given workload by its workload ID and returns the deployment request associated with it
 // Note that this means "pending" agents are not considered by lookups
-func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.DeployRequest, error) {
+func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.AgentWorkloadInfo, error) {
 	if agentClient, ok := w.liveAgents[workloadID]; ok {
-		return agentClient.DeployRequest(), nil
+		return agentClient.WorkloadInfo(), nil
 	}
 
 	return nil, fmt.Errorf("workload doesn't exist: %s", workloadID)
@@ -331,7 +331,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 	summaries := make([]controlapi.MachineSummary, 0)
 
 	for id, agentClient := range w.liveAgents {
-		deployRequest := agentClient.DeployRequest()
+		deployRequest := agentClient.WorkloadInfo()
 
 		uptimeFriendly := myUptime(agentClient.UptimeMillis())
 		runtimeFriendly := "--"
@@ -532,7 +532,7 @@ func (w *WorkloadManager) agentContactLost(workloadID string) {
 }
 
 // Generate a NATS subscriber function that is used to trigger function-type workloads
-func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *agentapi.DeployRequest) func(msg *nats.Msg) {
+func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string, request *agentapi.AgentWorkloadInfo) func(msg *nats.Msg) {
 	agentClient, ok := w.liveAgents[workloadID]
 	if !ok {
 		w.log.Error("Attempted to generate trigger handler for non-existent agent client")
@@ -632,7 +632,7 @@ func (w *WorkloadManager) startInternalNATS() error {
 	return nil
 }
 
-func (w *WorkloadManager) createHostServicesConnection(request *agentapi.DeployRequest) (*nats.Conn, error) {
+func (w *WorkloadManager) createHostServicesConnection(request *agentapi.AgentWorkloadInfo) (*nats.Conn, error) {
 	natsOpts := []nats.Option{
 		nats.Name("nex-hostservices"),
 	}

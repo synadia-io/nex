@@ -15,16 +15,17 @@ import (
 )
 
 func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
-	deployRequest, _ := w.LookupWorkload(agentId)
-	if deployRequest == nil {
+	agentWorkloadInfo, _ := w.LookupWorkload(agentId)
+	if agentWorkloadInfo == nil {
 		// got an event from a process that doesn't yet have a workload (deployment request) associated
 		// with it
 		return
 	}
-	evt.SetSource(fmt.Sprintf("%s-%s", *deployRequest.TargetNode, agentId))
-	evt.SetExtension(controlapi.EventExtensionNamespace, *deployRequest.Namespace)
 
-	err := PublishCloudEvent(w.nc, *deployRequest.Namespace, evt, w.log)
+	evt.SetSource(fmt.Sprintf("%s-%s", w.publicKey, agentId))
+	evt.SetExtension(controlapi.EventExtensionNamespace, *agentWorkloadInfo.Namespace)
+
+	err := PublishCloudEvent(w.nc, *agentWorkloadInfo.Namespace, evt, w.log)
 	if err != nil {
 		w.log.Error("Failed to publish cloudevent", slog.Any("err", err))
 		return
@@ -46,22 +47,22 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 			return
 		}
 
-		if deployRequest.IsEssential() && workloadStatus.Code != 0 {
+		if agentWorkloadInfo.IsEssential() && workloadStatus.Code != 0 {
 			w.log.Debug("Essential workload stopped with non-zero exit code",
-				slog.String("namespace", *deployRequest.Namespace),
-				slog.String("workload", *deployRequest.WorkloadName),
+				slog.String("namespace", *agentWorkloadInfo.Namespace),
+				slog.String("workload", *agentWorkloadInfo.WorkloadName),
 				slog.String("workload_id", agentId),
-				slog.String("workload_type", string(deployRequest.WorkloadType)))
+				slog.String("workload_type", string(agentWorkloadInfo.WorkloadType)))
 
-			if deployRequest.RetryCount == nil {
+			if agentWorkloadInfo.RetryCount == nil {
 				retryCount := uint(0)
-				deployRequest.RetryCount = &retryCount
+				agentWorkloadInfo.RetryCount = &retryCount
 			}
 
-			*deployRequest.RetryCount += 1
+			*agentWorkloadInfo.RetryCount += 1
 
 			retriedAt := time.Now().UTC()
-			deployRequest.RetriedAt = &retriedAt
+			agentWorkloadInfo.RetriedAt = &retriedAt
 
 			// generate a new uuid for this deploy request
 			reqUUID, err := uuid.NewRandom()
@@ -77,13 +78,13 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 				return
 			}
 
-			bucket, err := js.ObjectStore(deployRequest.Location.Hostname())
+			bucket, err := js.ObjectStore(agentWorkloadInfo.Location.Hostname())
 			if err != nil {
 				w.log.Error("Failed to resolve workload object store", slog.Any("err", err))
 				return
 			}
 
-			artifact := deployRequest.Location.Path[1:len(deployRequest.Location.Path)]
+			artifact := agentWorkloadInfo.Location.Path[1:len(agentWorkloadInfo.Location.Path)]
 
 			info, err := bucket.GetInfo(artifact)
 			if err != nil {
@@ -93,26 +94,21 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 			digest := controlapi.SanitizeNATSDigest(info.Digest)
 
 			req, _ := json.Marshal(&controlapi.DeployRequest{
-				Argv:            deployRequest.Argv,
-				Description:     deployRequest.Description,
+				Argv:            agentWorkloadInfo.Argv,
+				Description:     agentWorkloadInfo.Description,
 				Hash:            &digest,
-				Environment:     deployRequest.EncryptedEnvironment,
-				Essential:       deployRequest.Essential,
+				Essential:       agentWorkloadInfo.Essential,
 				ID:              &id,
-				JsDomain:        deployRequest.JsDomain,
-				Location:        deployRequest.Location,
-				RetriedAt:       deployRequest.RetriedAt,
-				RetryCount:      deployRequest.RetryCount,
-				SenderPublicKey: deployRequest.SenderPublicKey,
-				TargetNode:      deployRequest.TargetNode,
-				TriggerSubjects: deployRequest.TriggerSubjects,
-				WorkloadName:    deployRequest.WorkloadName,
-				WorkloadJWT:     deployRequest.WorkloadJwt,
-				WorkloadType:    deployRequest.WorkloadType,
+				Location:        agentWorkloadInfo.Location,
+				RetriedAt:       agentWorkloadInfo.RetriedAt,
+				RetryCount:      agentWorkloadInfo.RetryCount,
+				TriggerSubjects: agentWorkloadInfo.TriggerSubjects,
+				WorkloadName:    agentWorkloadInfo.WorkloadName,
+				WorkloadType:    agentWorkloadInfo.WorkloadType,
 			})
 
 			nodeID := w.publicKey
-			subject := fmt.Sprintf("%s.DEPLOY.%s.%s", controlapi.APIPrefix, *deployRequest.Namespace, nodeID)
+			subject := fmt.Sprintf("%s.DEPLOY.%s.%s", controlapi.APIPrefix, *agentWorkloadInfo.Namespace, nodeID)
 			_, err = w.nc.Request(subject, req, time.Millisecond*2500)
 			if err != nil {
 				w.log.Error("Failed to redeploy essential workload", slog.Any("err", err))

@@ -38,14 +38,14 @@ type SpawningProcessManager struct {
 	natsint *internalnats.InternalNatsServer
 
 	delegate       ProcessDelegate
-	deployRequests map[string]*agentapi.DeployRequest
+	deployRequests map[string]*agentapi.AgentWorkloadInfo
 
 	log *slog.Logger
 }
 
 type spawnedProcess struct {
 	cmd             *exec.Cmd
-	deployRequest   *agentapi.DeployRequest
+	deployRequest   *agentapi.AgentWorkloadInfo
 	workloadStarted time.Time
 
 	ID string
@@ -74,7 +74,7 @@ func NewSpawningProcessManager(
 
 		stopMutexes: make(map[string]*sync.Mutex),
 
-		deployRequests: make(map[string]*agentapi.DeployRequest),
+		deployRequests: make(map[string]*agentapi.AgentWorkloadInfo),
 		allProcs:       make(map[string]*spawnedProcess),
 		poolProcs:      make(chan *spawnedProcess, config.MachinePoolSize),
 	}, nil
@@ -110,7 +110,7 @@ func (s *SpawningProcessManager) EnterLameDuck() error {
 }
 
 // Attaches a deployment request to a running process. Until a process is prepared, it's just an empty agent
-func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.DeployRequest) error {
+func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.AgentWorkloadInfo) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
