@@ -116,6 +116,12 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 	return req, nil
 }
 
+// Returns true if the run request supports trigger subjects
+func (request *DeployRequest) SupportsTriggerSubjects() bool {
+	return request.WorkloadType == NexWorkloadV8 ||
+		request.WorkloadType == NexWorkloadWasm
+}
+
 // This will validate a request's workload JWT and return the parsed claims
 func (request *DeployRequest) Validate() (*jwt.GenericClaims, error) {
 	claims, err := jwt.DecodeGeneric(*request.WorkloadJWT)
