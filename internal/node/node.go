@@ -445,15 +445,10 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		var hash string
-		if workloadHash != nil {
-			hash = *workloadHash // HACK!!! for agent-local workloads, this should be read from the release manifest
-		}
-
-		agentWorkloadInfo := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, hash)
+		agentWorkloadInfo := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 
 		agentWorkloadInfo.TotalBytes = int64(numBytes)
-		agentWorkloadInfo.Hash = hash
+		agentWorkloadInfo.Hash = *workloadHash
 
 		agentWorkloadInfo.Environment = autostart.Environment // HACK!!! we need to fix autostart config to allow encrypted environment...
 
