@@ -445,11 +445,14 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		agentDeployRequest := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
-		agentDeployRequest.TotalBytes = int64(numBytes)
-		agentDeployRequest.Hash = *workloadHash
+		agentWorkloadInfo := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
 
-		err = n.manager.DeployWorkload(agentClient, agentDeployRequest)
+		agentWorkloadInfo.TotalBytes = int64(numBytes)
+		agentWorkloadInfo.Hash = *workloadHash
+
+		agentWorkloadInfo.Environment = autostart.Environment // HACK!!! we need to fix autostart config to allow encrypted environment...
+
+		err = n.manager.DeployWorkload(agentClient, agentWorkloadInfo)
 		if err != nil {
 			n.log.Error("Failed to deploy autostart workload",
 				slog.Any("error", err),
@@ -695,21 +698,24 @@ func (n *Node) shuttingDown() bool {
 
 func agentWorkloadInfoFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.AgentWorkloadInfo {
 	return &agentapi.AgentWorkloadInfo{
-		Argv:               request.Argv,
-		DecodedClaims:      request.DecodedClaims,
-		Description:        request.Description,
-		Environment:        request.WorkloadEnvironment,
-		Essential:          request.Essential,
-		Hash:               hash,
-		HostServicesConfig: request.HostServicesConfig,
-		ID:                 request.ID,
-		Location:           request.Location,
-		Namespace:          &namespace,
-		RetriedAt:          request.RetriedAt,
-		RetryCount:         request.RetryCount,
-		TotalBytes:         int64(numBytes),
-		TriggerSubjects:    request.TriggerSubjects,
-		WorkloadName:       request.WorkloadName,
-		WorkloadType:       request.WorkloadType,
+		Argv:                 request.Argv,
+		DecodedClaims:        request.DecodedClaims,
+		Description:          request.Description,
+		EncryptedEnvironment: request.Environment,
+		Environment:          request.WorkloadEnvironment, // HACK!!! we need to fix autostart config to allow encrypted environment...
+		Essential:            request.Essential,
+		Hash:                 hash,
+		HostServicesConfig:   request.HostServicesConfig,
+		ID:                   request.ID,
+		Location:             request.Location,
+		Namespace:            &namespace,
+		RetriedAt:            request.RetriedAt,
+		RetryCount:           request.RetryCount,
+		SenderPublicKey:      request.SenderPublicKey,
+		TotalBytes:           int64(numBytes),
+		TriggerSubjects:      request.TriggerSubjects,
+		WorkloadJWT:          request.WorkloadJWT,
+		WorkloadName:         request.WorkloadName,
+		WorkloadType:         request.WorkloadType,
 	}
 }

@@ -27,7 +27,7 @@ type ContactLostCallback func(string)
 
 const (
 	defaultAgentPingIntervalMillis = 5000
-	maxRetryAttempts               = 3
+	maxRetryAttempts               = 10
 
 	NexTriggerSubject = "x-nex-trigger-subject"
 	NexRuntimeNs      = "x-nex-runtime-ns"

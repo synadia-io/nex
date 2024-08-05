@@ -284,8 +284,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		return
 	}
 
-	if len(request.TriggerSubjects) > 0 && (request.WorkloadType != controlapi.NexWorkloadV8 &&
-		request.WorkloadType != controlapi.NexWorkloadWasm) { // FIXME -- workload type comparison
+	if len(request.TriggerSubjects) > 0 && !request.SupportsTriggerSubjects() { // FIXME -- workload type comparison
 		span.SetStatus(codes.Error, "Unsupported workload type for trigger subjects")
 		api.log.Error("Workload type does not support trigger subject registration", slog.String("trigger_subjects", string(request.WorkloadType)))
 		respondFail(controlapi.RunResponseType, m, fmt.Sprintf("Unsupported workload type for trigger subject registration: %s", string(request.WorkloadType)))
@@ -393,6 +392,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 			slog.String("namespace", namespace),
 			slog.String("workload", *agentDeployRequest.WorkloadName),
 			slog.String("workload_id", workloadID),
+			slog.String("workload_location", agentDeployRequest.Location.String()),
 			slog.Uint64("workload_size", numBytes),
 			slog.String("workload_sha256", *workloadHash),
 			slog.String("type", string(request.WorkloadType)),

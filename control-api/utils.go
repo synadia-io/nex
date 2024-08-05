@@ -2,6 +2,7 @@ package controlapi
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"strings"
 )
 
@@ -17,5 +18,5 @@ func SanitizeNATSDigest(input string) string {
 		return after
 	}
 
-	return string(h)
+	return hex.EncodeToString(h)
 }

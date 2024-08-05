@@ -94,17 +94,22 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 			digest := controlapi.SanitizeNATSDigest(info.Digest)
 
 			req, _ := json.Marshal(&controlapi.DeployRequest{
-				Argv:            agentWorkloadInfo.Argv,
-				Description:     agentWorkloadInfo.Description,
-				Hash:            &digest,
-				Essential:       agentWorkloadInfo.Essential,
-				ID:              &id,
-				Location:        agentWorkloadInfo.Location,
-				RetriedAt:       agentWorkloadInfo.RetriedAt,
-				RetryCount:      agentWorkloadInfo.RetryCount,
-				TriggerSubjects: agentWorkloadInfo.TriggerSubjects,
-				WorkloadName:    agentWorkloadInfo.WorkloadName,
-				WorkloadType:    agentWorkloadInfo.WorkloadType,
+				Argv:               agentWorkloadInfo.Argv,
+				Description:        agentWorkloadInfo.Description,
+				Hash:               &digest,
+				Environment:        agentWorkloadInfo.EncryptedEnvironment,
+				Essential:          agentWorkloadInfo.Essential,
+				HostServicesConfig: agentWorkloadInfo.HostServicesConfig,
+				ID:                 &id,
+				JsDomain:           agentWorkloadInfo.JsDomain,
+				Location:           agentWorkloadInfo.Location,
+				RetriedAt:          agentWorkloadInfo.RetriedAt,
+				RetryCount:         agentWorkloadInfo.RetryCount,
+				SenderPublicKey:    agentWorkloadInfo.SenderPublicKey,
+				TriggerSubjects:    agentWorkloadInfo.TriggerSubjects,
+				WorkloadJWT:        agentWorkloadInfo.WorkloadJWT,
+				WorkloadName:       agentWorkloadInfo.WorkloadName,
+				WorkloadType:       agentWorkloadInfo.WorkloadType,
 			})
 
 			nodeID := w.publicKey

@@ -54,6 +54,7 @@ type AgentWorkloadInfo struct {
 	Essential     *bool             `json:"essential,omitempty"`
 	Hash          string            `json:"hash,omitempty"`
 	ID            *string           `json:"id"`
+	Location      *url.URL          `json:"location"`
 	Namespace     *string           `json:"namespace,omitempty"`
 	RetriedAt     *time.Time        `json:"retried_at,omitempty"`
 	RetryCount    *uint             `json:"retry_count,omitempty"`
@@ -68,7 +69,10 @@ type AgentWorkloadInfo struct {
 	Stdout      io.Writer `json:"-"`
 	TmpFilename *string   `json:"-"`
 
-	Location *url.URL `json:"-"`
+	EncryptedEnvironment *string `json:"-"`
+	JsDomain             *string `json:"-"`
+	SenderPublicKey      *string `json:"-"`
+	WorkloadJWT          *string `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`
 }
@@ -107,6 +111,10 @@ func (r *AgentWorkloadInfo) Validate() error {
 
 	if r.Hash == "" { // FIXME--- this should probably be checked against *string
 		err = errors.Join(err, errors.New("hash is required"))
+	}
+
+	if r.Location == nil {
+		err = errors.Join(err, errors.New("location is required"))
 	}
 
 	if r.TotalBytes == 0 { // FIXME--- this should probably be checked against *string
