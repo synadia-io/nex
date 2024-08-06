@@ -279,6 +279,9 @@ func WorkloadDescription(name string) RequestOption {
 func Environment(env map[string]string) RequestOption {
 	return func(o requestOptions) requestOptions {
 		o.env = env
+		if o.env == nil {
+			o.env = make(map[string]string)
+		}
 		return o
 	}
 }
