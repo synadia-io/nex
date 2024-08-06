@@ -247,6 +247,9 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 	)
 
 	if w.config.HostServicesConfig != nil && request.WorkloadType == controlapi.NexWorkloadNative {
+		if request.Environment == nil {
+			request.Environment = make(map[string]string)
+		}
 		request.Environment["NEX_HOSTSERVICES_NATS_SERVER"] = w.config.HostServicesConfig.NatsUrl
 		request.Environment["NEX_HOSTSERVICES_NATS_USER_JWT"] = w.config.HostServicesConfig.NatsUserJwt
 		request.Environment["NEX_HOSTSERVICES_NATS_USER_SEED"] = w.config.HostServicesConfig.NatsUserSeed
