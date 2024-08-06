@@ -357,7 +357,12 @@ func (n *Node) handleAutostarts() {
 		// functions cannot be essential
 		essential := autostart.Essential && autostart.WorkloadType == controlapi.NexWorkloadNative
 
-		js, err := n.nc.JetStream()
+		jsOpts := []nats.JSOpt{}
+		if autostart.JsDomain != nil {
+			jsOpts = append(jsOpts, nats.Domain(*autostart.JsDomain))
+		}
+
+		js, err := n.nc.JetStream(jsOpts...)
 		if err != nil {
 			n.log.Error("failed to resolve jetstream",
 				slog.String("error", err.Error()),

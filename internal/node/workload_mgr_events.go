@@ -72,31 +72,10 @@ func (w *WorkloadManager) agentEvent(agentId string, evt cloudevents.Event) {
 			}
 			id := reqUUID.String()
 
-			js, err := w.nc.JetStream()
-			if err != nil {
-				w.log.Error("Failed to resolve jetstream", slog.Any("err", err))
-				return
-			}
-
-			bucket, err := js.ObjectStore(agentWorkloadInfo.Location.Hostname())
-			if err != nil {
-				w.log.Error("Failed to resolve workload object store", slog.Any("err", err))
-				return
-			}
-
-			artifact := agentWorkloadInfo.Location.Path[1:len(agentWorkloadInfo.Location.Path)]
-
-			info, err := bucket.GetInfo(artifact)
-			if err != nil {
-				w.log.Error("Failed to resolve workload artifact: %s; %s", artifact, slog.Any("err", err))
-				return
-			}
-			digest := controlapi.SanitizeNATSDigest(info.Digest)
-
 			req, _ := json.Marshal(&controlapi.DeployRequest{
 				Argv:               agentWorkloadInfo.Argv,
 				Description:        agentWorkloadInfo.Description,
-				Hash:               &digest,
+				Hash:               &agentWorkloadInfo.Hash,
 				Environment:        agentWorkloadInfo.EncryptedEnvironment,
 				Essential:          agentWorkloadInfo.Essential,
 				HostServicesConfig: agentWorkloadInfo.HostServicesConfig,
