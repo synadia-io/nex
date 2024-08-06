@@ -123,13 +123,20 @@ func (api *Client) EnterLameDuck(nodeId string) (*LameDuckResponse, error) {
 // then use PingNodes
 func (api *Client) PingWorkloads(workloadID string) ([]WorkloadPingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
-	defer cancel()
+	var sub *nats.Subscription
+	var err error
+	defer func() {
+		cancel()
+		if sub != nil {
+			_ = sub.Unsubscribe()
+		}
+	}()
 
 	workloadID = strings.TrimSpace(workloadID)
 
 	responses := make([]WorkloadPingResponse, 0)
 
-	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+	sub, err = api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
 		if len(m.Data) == 0 {
 			return
 		}
@@ -178,11 +185,19 @@ func (api *Client) PingWorkloads(workloadID string) ([]WorkloadPingResponse, err
 // Attempts to resolve viable candidate nodes where a proposed workload can be deployed
 func (api *Client) Auction(req *AuctionRequest) ([]AuctionResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
-	defer cancel()
+	var sub *nats.Subscription
+	var err error
+
+	defer func() {
+		cancel()
+		if sub != nil {
+			_ = sub.Unsubscribe()
+		}
+	}()
 
 	responses := make([]AuctionResponse, 0)
 
-	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+	sub, err = api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
 		if len(m.Data) == 0 {
 			return
 		}
@@ -233,11 +248,18 @@ func (api *Client) Auction(req *AuctionRequest) ([]AuctionResponse, error) {
 // of the namespaces of their running workloads
 func (api *Client) PingNodes() ([]PingResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), api.timeout)
-	defer cancel()
+	var sub *nats.Subscription
+	var err error
+	defer func() {
+		cancel()
+		if sub != nil {
+			_ = sub.Unsubscribe()
+		}
+	}()
 
 	responses := make([]PingResponse, 0)
 
-	sub, err := api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
+	sub, err = api.nc.Subscribe(api.nc.NewRespInbox(), func(m *nats.Msg) {
 		if len(m.Data) == 0 {
 			return
 		}
@@ -387,7 +409,7 @@ func handleLogEntry(api *Client, ch chan EmittedLog) func(m *nats.Msg) {
 		var logEntry RawLog
 		err := json.Unmarshal(m.Data, &logEntry)
 		if err != nil {
-			api.log.Error("Log entry deserialization failure", err)
+			api.log.Error("log entry deserialization failure", slog.Any("error", err))
 			return
 		}
 
