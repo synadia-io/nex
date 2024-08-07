@@ -13,10 +13,15 @@ func TestEncryption(t *testing.T) {
 
 	recipientKey, _ := nkeys.CreateCurveKeys()
 	recipientPk, _ := recipientKey.PublicKey()
-
 	issuerAccount, _ := nkeys.CreateAccount()
 
 	request, _ := NewDeployRequest(
+		HostServicesConfig(
+			NatsJwtConnectionInfo{
+				NatsUrl:      "nats://1.2.3.4",
+				NatsUserJwt:  "eyJ0eXAiOi...",
+				NatsUserSeed: "SUAP6AZZJC35W42XYP5RRABRDWFMD6ZF3WTHQ7NTXEYPHTBRFU7XOQ2D2E",
+			}),
 		WorkloadName("testworkload"),
 		WorkloadDescription("testy mctesto"),
 		Hash("hashbrowns"),
@@ -41,4 +46,7 @@ func TestEncryption(t *testing.T) {
 		t.Fatalf("Expected no error, but got one: %s", err)
 	}
 
+	if request.WorkloadEnvironment["NEX_HOSTSERVICES_NATS_SERVER"] != "nats://1.2.3.4" {
+		t.Fatalf("Hostservices config was not properly configured. Expected %s, Got: '%s'", "nats://1.2.3.4", request.WorkloadEnvironment["NEX_HOSTSERVICES_NATS_SERVER"])
+	}
 }
