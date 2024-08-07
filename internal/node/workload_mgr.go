@@ -246,10 +246,15 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		slog.String("status", w.ncint.Status().String()),
 	)
 
-	if w.config.HostServicesConfig != nil && request.WorkloadType == controlapi.NexWorkloadNative {
-		request.Environment["NEX_HOSTSERVICES_NATS_SERVER"] = w.config.HostServicesConfig.NatsUrl
-		request.Environment["NEX_HOSTSERVICES_NATS_USER_JWT"] = w.config.HostServicesConfig.NatsUserJwt
-		request.Environment["NEX_HOSTSERVICES_NATS_USER_SEED"] = w.config.HostServicesConfig.NatsUserSeed
+	hostServicesNatsConfig := w.config.HostServicesConfig.NatsConfig
+	if request.HostServicesConfig != nil {
+		hostServicesNatsConfig = request.HostServicesConfig
+	}
+
+	if hostServicesNatsConfig != nil && request.WorkloadType == controlapi.NexWorkloadNative {
+		request.Environment["NEX_HOSTSERVICES_NATS_SERVER"] = hostServicesNatsConfig.NatsUrl
+		request.Environment["NEX_HOSTSERVICES_NATS_USER_JWT"] = hostServicesNatsConfig.NatsUserJwt
+		request.Environment["NEX_HOSTSERVICES_NATS_USER_SEED"] = hostServicesNatsConfig.NatsUserSeed
 	}
 
 	deployResponse, err := agentClient.DeployWorkload(request)
@@ -649,12 +654,13 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.AgentWo
 	} else if w.config.HostServicesConfig != nil {
 		// FIXME-- check to ensure NATS user JWT and seed are present
 		natsOpts = append(natsOpts,
-			nats.UserJWTAndSeed(w.config.HostServicesConfig.NatsUserJwt,
-				w.config.HostServicesConfig.NatsUserSeed,
+			nats.UserJWTAndSeed(
+				w.config.HostServicesConfig.NatsConfig.NatsUserJwt,
+				w.config.HostServicesConfig.NatsConfig.NatsUserSeed,
 			))
 
-		if w.config.HostServicesConfig.NatsUrl != "" {
-			url = w.config.HostServicesConfig.NatsUrl
+		if w.config.HostServicesConfig.NatsConfig.NatsUrl != "" {
+			url = w.config.HostServicesConfig.NatsConfig.NatsUrl
 		} else {
 			url = w.nc.Servers()[0]
 		}

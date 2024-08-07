@@ -22,6 +22,7 @@ func TestEncryption(t *testing.T) {
 				NatsUserJwt:  "eyJ0eXAiOi...",
 				NatsUserSeed: "SUAP6AZZJC35W42XYP5RRABRDWFMD6ZF3WTHQ7NTXEYPHTBRFU7XOQ2D2E",
 			}),
+		WorkloadType(NexWorkloadNative),
 		WorkloadName("testworkload"),
 		WorkloadDescription("testy mctesto"),
 		Hash("hashbrowns"),
