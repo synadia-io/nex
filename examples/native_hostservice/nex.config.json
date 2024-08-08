@@ -20,8 +20,10 @@
   },
   "no_sandbox": false,
   "host_services_config": {
-    "nats_url": "nats://demo.nats.io",
-    "nats_user_jwt": "somelongjwt",
-    "nats_user_seed": "SUAPYJ2YY4AVNKV5QNPZO3C55GUDCK2FXOQYPGP7IRCD67R4ZXELCXFYSQ"
+    "nats": {
+      "nats_url": "nats://demo.nats.io",
+      "nats_user_jwt": "somelongjwt",
+      "nats_user_seed": "SUAPYJ2YY4AVNKV5QNPZO3C55GUDCK2FXOQYPGP7IRCD67R4ZXELCXFYSQ"
+    }
   }
 }

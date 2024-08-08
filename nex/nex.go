@@ -123,6 +123,9 @@ func init() {
 	yeet.Flag("stop", "Indicates whether to stop pre-existing workloads during launch. Disable with caution").Default("true").BoolVar(&DevRunOpts.AutoStop)
 	yeet.Flag("bucketmaxbytes", "Overrides the default max bytes if the dev object store bucket is created").UintVar(&DevRunOpts.DevBucketMaxBytes)
 	yeet.Flag("type", "Type of workload").Default("native").StringVar(&workloadType)
+	yeet.Flag("hs_url", "Override the URL used for host services for this workload").StringVar(&RunOpts.HsUrl)
+	yeet.Flag("hs_jwt", "Set the user JWT for override host services connection").StringVar(&RunOpts.HsUserJwt)
+	yeet.Flag("hs_seed", "Set the user seed for override host services connection").StringVar(&RunOpts.HsUserSeed)
 
 	stop.Arg("id", "Public key of the target node on which to stop the workload").Required().StringVar(&StopOpts.TargetNode)
 	stop.Arg("workload_id", "Unique ID of the workload to be stopped").Required().StringVar(&StopOpts.WorkloadId)
