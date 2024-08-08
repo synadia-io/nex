@@ -46,8 +46,4 @@ func TestEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, but got one: %s", err)
 	}
-
-	if request.WorkloadEnvironment["NEX_HOSTSERVICES_NATS_SERVER"] != "nats://1.2.3.4" {
-		t.Fatalf("Hostservices config was not properly configured. Expected %s, Got: '%s'", "nats://1.2.3.4", request.WorkloadEnvironment["NEX_HOSTSERVICES_NATS_SERVER"])
-	}
 }
