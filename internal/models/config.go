@@ -85,10 +85,8 @@ type NodeConfiguration struct {
 
 // FIXME-- these properties should probably be *string 👀
 type HostServicesConfig struct {
-	NatsUrl      string                   `json:"nats_url"`
-	NatsUserJwt  string                   `json:"nats_user_jwt"`
-	NatsUserSeed string                   `json:"nats_user_seed"`
-	Services     map[string]ServiceConfig `json:"services"`
+	NatsConfig *controlapi.NatsJwtConnectionInfo `json:"nats"`
+	Services   map[string]ServiceConfig          `json:"services"`
 }
 
 type NodeLimitsConfig struct {
@@ -181,9 +179,11 @@ func DefaultNodeConfiguration() NodeConfiguration {
 			Subnet:        StringOrNil(DefaultCNISubnet),
 		},
 		HostServicesConfig: &HostServicesConfig{
-			NatsUrl:      "", // this will trigger logic to re-use the main connection
-			NatsUserJwt:  "",
-			NatsUserSeed: "",
+			NatsConfig: &controlapi.NatsJwtConnectionInfo{
+				NatsUrl:      "", // this will trigger logic to re-use the main connection
+				NatsUserJwt:  "",
+				NatsUserSeed: "",
+			},
 			Services: map[string]ServiceConfig{
 				"http": {
 					Enabled:       true,

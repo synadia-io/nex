@@ -13,10 +13,16 @@ func TestEncryption(t *testing.T) {
 
 	recipientKey, _ := nkeys.CreateCurveKeys()
 	recipientPk, _ := recipientKey.PublicKey()
-
 	issuerAccount, _ := nkeys.CreateAccount()
 
 	request, _ := NewDeployRequest(
+		HostServicesConfig(
+			&NatsJwtConnectionInfo{
+				NatsUrl:      "nats://1.2.3.4",
+				NatsUserJwt:  "eyJ0eXAiOi...",
+				NatsUserSeed: "SUAP6AZZJC35W42XYP5RRABRDWFMD6ZF3WTHQ7NTXEYPHTBRFU7XOQ2D2E",
+			}),
+		WorkloadType(NexWorkloadNative),
 		WorkloadName("testworkload"),
 		WorkloadDescription("testy mctesto"),
 		Hash("hashbrowns"),
@@ -40,5 +46,4 @@ func TestEncryption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Expected no error, but got one: %s", err)
 	}
-
 }
