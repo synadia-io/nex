@@ -246,9 +246,9 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		slog.String("status", w.ncint.Status().String()),
 	)
 
-	hostServicesNatsConfig := w.config.HostServicesConfig.NatsConfig
-	if request.HostServicesConfig != nil {
-		hostServicesNatsConfig = request.HostServicesConfig
+	hostServicesNatsConfig := request.HostServicesConfig
+	if hostServicesNatsConfig == nil {
+		hostServicesNatsConfig = w.config.HostServicesConfig.NatsConfig
 	}
 
 	if hostServicesNatsConfig != nil && request.WorkloadType == controlapi.NexWorkloadNative {

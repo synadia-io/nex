@@ -115,9 +115,19 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 		argv = strings.Split(RunOpts.Argv, " ")
 	}
 
+	var hsConfig *controlapi.NatsJwtConnectionInfo
+	if RunOpts.HsUrl != "" {
+		hsConfig = &controlapi.NatsJwtConnectionInfo{
+			NatsUrl:      RunOpts.HsUrl,
+			NatsUserSeed: RunOpts.HsUserSeed,
+			NatsUserJwt:  RunOpts.HsUserJwt,
+		}
+	}
+
 	request, err := controlapi.NewDeployRequest(
 		controlapi.Argv(argv),
 		controlapi.Hash(controlapi.SanitizeNATSDigest(info.Digest)),
+		controlapi.HostServicesConfig(hsConfig),
 		controlapi.Environment(RunOpts.Env),
 		controlapi.Essential(RunOpts.Essential),
 		controlapi.Issuer(issuerKp),

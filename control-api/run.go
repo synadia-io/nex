@@ -80,12 +80,6 @@ func NewDeployRequest(opts ...RequestOption) (*DeployRequest, error) {
 		return nil, err
 	}
 
-	if reqOpts.hostServicesConfig != nil && reqOpts.workloadType == NexWorkloadNative {
-		reqOpts.env["NEX_HOSTSERVICES_NATS_SERVER"] = reqOpts.hostServicesConfig.NatsUrl
-		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_JWT"] = reqOpts.hostServicesConfig.NatsUserJwt
-		reqOpts.env["NEX_HOSTSERVICES_NATS_USER_SEED"] = reqOpts.hostServicesConfig.NatsUserSeed
-	}
-
 	encryptedEnv, err := EncryptRequestEnvironment(reqOpts.senderXkey, reqOpts.targetPublicXKey, reqOpts.env)
 	if err != nil {
 		return nil, err
@@ -215,9 +209,9 @@ func Argv(argv []string) RequestOption {
 }
 
 // When set, overrides the node's host services configuration
-func HostServicesConfig(config NatsJwtConnectionInfo) RequestOption {
+func HostServicesConfig(config *NatsJwtConnectionInfo) RequestOption {
 	return func(o requestOptions) requestOptions {
-		o.hostServicesConfig = &config
+		o.hostServicesConfig = config
 		return o
 	}
 }

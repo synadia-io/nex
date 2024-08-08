@@ -17,7 +17,7 @@ func TestEncryption(t *testing.T) {
 
 	request, _ := NewDeployRequest(
 		HostServicesConfig(
-			NatsJwtConnectionInfo{
+			&NatsJwtConnectionInfo{
 				NatsUrl:      "nats://1.2.3.4",
 				NatsUserJwt:  "eyJ0eXAiOi...",
 				NatsUserSeed: "SUAP6AZZJC35W42XYP5RRABRDWFMD6ZF3WTHQ7NTXEYPHTBRFU7XOQ2D2E",
