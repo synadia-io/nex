@@ -112,6 +112,20 @@ func (c *BuiltinServicesClient) KVKeys(ctx context.Context, bucket string) ([]st
 	return results, err
 }
 
+func (c *BuiltinServicesClient) RawCall(ctx context.Context, serviceName string, methodName string, payload []byte) ([]byte, error) {
+	metadata := map[string]string{}
+
+	resp, err := c.hsClient.PerformRPC(ctx, serviceName, methodName, payload, metadata)
+	if err != nil {
+		return nil, err
+	}
+	if resp.IsError() {
+		return nil, resp.Error()
+	}
+
+	return resp.Data, nil
+}
+
 func (c *BuiltinServicesClient) MessagingPublish(ctx context.Context, subject string, payload []byte) error {
 	metadata := map[string]string{
 		agentapi.MessagingSubjectHeader: subject,
