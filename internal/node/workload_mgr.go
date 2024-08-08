@@ -638,8 +638,11 @@ func (w *WorkloadManager) startInternalNATS() error {
 }
 
 func (w *WorkloadManager) createHostServicesConnection(request *agentapi.AgentWorkloadInfo) (*nats.Conn, error) {
-	natsOpts := []nats.Option{
-		nats.Name("nex-hostservices"),
+	natsOpts := []nats.Option{}
+	if request.WorkloadName != nil {
+		natsOpts = append(natsOpts, nats.Name("nex-hostservices-"+*request.WorkloadName))
+	} else {
+		natsOpts = append(natsOpts, nats.Name("nex-hostservices"))
 	}
 
 	var url string
