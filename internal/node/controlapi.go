@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"errors"
+
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/pkg/errors"
 	controlapi "github.com/synadia-io/nex/control-api"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 	"go.opentelemetry.io/otel/attribute"
@@ -180,38 +181,48 @@ func (api *ApiListener) handleAuction(ctx context.Context, span trace.Span, m *n
 
 	var req *controlapi.AuctionRequest
 	err := json.Unmarshal(m.Data, &req)
+
+	reasons := errors.New("did not respond to auction")
+
 	if err == nil {
 		// PING request was successfully parsed
 		if req.Arch != nil && !strings.EqualFold(api.node.config.Tags[controlapi.TagArch], *req.Arch) {
 			filter = true
+			reasons = errors.Join(reasons, fmt.Errorf("architecture mismatch: %s", *req.Arch))
 		}
 
 		if req.OS != nil && !strings.EqualFold(api.node.config.Tags[controlapi.TagOS], *req.OS) {
 			filter = true
+			reasons = errors.Join(reasons, fmt.Errorf("os mismatch: %s", *req.OS))
 		}
 
 		if req.Sandboxed != nil && api.node.config.NoSandbox != !*req.Sandboxed {
 			filter = true
+			reasons = errors.Join(reasons, fmt.Errorf("sandbox mismatch, required? %v", *req.Sandboxed))
 		}
 
 		for tag := range req.Tags {
 			val, ok := api.node.config.Tags[tag]
 			if !ok {
 				filter = true
+				reasons = errors.Join(reasons, fmt.Errorf("tag mismatch: %s", tag))
 			} else if !strings.EqualFold(val, req.Tags[tag]) {
 				filter = true
+				reasons = errors.Join(reasons, fmt.Errorf("tag mismatch: %s", tag))
 			}
 		}
 
 		for _, workloadType := range req.WorkloadTypes {
 			if !slices.Contains(api.node.config.WorkloadTypes, workloadType) {
 				filter = true
+				reasons = errors.Join(reasons, fmt.Errorf("workload type mismatch: %s", workloadType))
 			}
 		}
 	}
 
 	if filter {
-		api.log.Debug("Node not viable for deploy request specified at auction")
+		api.log.Debug("Node received auction request but did not respond",
+			slog.Any("match_result", reasons))
 		span.SetStatus(codes.Ok, "Node did not match auction parameters")
 		return
 	}
@@ -237,7 +248,7 @@ func (api *ApiListener) handleAuction(ctx context.Context, span trace.Span, m *n
 	raw, err := json.Marshal(res)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
-		api.log.Error("Failed to marshal ping response", slog.Any("err", err))
+		api.log.Error("Failed to marshal auction response", slog.Any("err", err))
 	} else {
 		span.SetStatus(codes.Ok, "Responded to auction")
 		_ = m.Respond(raw)
@@ -775,7 +786,7 @@ func extractNamespace(subject string) (string, error) {
 	// we need at least $NEX.{op}.{namespace}
 	if len(tokens) < 3 {
 		// this shouldn't ever happen if our subscriptions are defined properly
-		return "", errors.Errorf("Invalid subject - could not detect a namespace")
+		return "", fmt.Errorf("Invalid subject - could not detect a namespace")
 	}
 	return tokens[2], nil
 }

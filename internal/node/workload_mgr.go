@@ -222,9 +222,13 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 	if w.config.AllowDuplicateWorkloads != nil && !*w.config.AllowDuplicateWorkloads {
 		for _, agentClient := range w.liveAgents {
-			if strings.EqualFold(agentClient.WorkloadInfo().Hash, request.Hash) {
+			// if the hash AND namespace match, then reject the dupe
+			if strings.EqualFold(agentClient.WorkloadInfo().Hash, request.Hash) &&
+				request.Namespace != nil &&
+				strings.EqualFold(*agentClient.WorkloadInfo().Namespace, *request.Namespace) {
 				w.log.Warn("Attempted to deploy duplicate workload",
 					slog.String("workload_name", *request.WorkloadName),
+					slog.String("hash", request.Hash),
 					slog.String("workload_type", string(request.WorkloadType)),
 				)
 
