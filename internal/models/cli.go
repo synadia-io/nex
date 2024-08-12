@@ -131,6 +131,8 @@ type NodeOptions struct {
 	ListFull  bool   `json:"-"`
 	NexusName string `json:"-"`
 
+	Tags map[string]string `json:"-"`
+
 	Errors []error `json:"errors,omitempty"`
 }
 
