@@ -66,7 +66,7 @@ var (
 	DevRunOpts = &models.DevRunOptions{}
 	StopOpts   = &models.StopOptions{}
 	WatchOpts  = &models.WatchOptions{}
-	NodeOpts   = &models.NodeOptions{}
+	NodeOpts   = &models.NodeOptions{Tags: make(map[string]string)}
 	RootfsOpts = &models.RootfsOptions{}
 
 	workloadType string
