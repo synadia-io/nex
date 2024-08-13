@@ -129,6 +129,7 @@ type NodeOptions struct {
 	PreflightYes            bool   `json:"-"`
 
 	ListFull  bool   `json:"-"`
+	OutJSON   bool   `json:"-"`
 	NexusName string `json:"-"`
 
 	NoSandbox bool              `json:"-"`
