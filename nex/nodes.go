@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -29,7 +30,7 @@ func PingNodes(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	renderNodeList(nodes, NodeOpts.ListFull)
+	renderNodeList(nodes, NodeOpts.ListFull, NodeOpts.OutJSON)
 
 	return nil
 
@@ -70,7 +71,7 @@ func LameDuck(ctx context.Context, logger *slog.Logger) error {
 }
 
 // Uses a control API client to retrieve info on a single node
-func NodeInfo(ctx context.Context, nodeid string, full bool) error {
+func NodeInfo(ctx context.Context, nodeid string, full bool, json bool) error {
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	nc, err := models.GenerateConnectionFromOpts(Opts, log)
 	if err != nil {
@@ -81,7 +82,7 @@ func NodeInfo(ctx context.Context, nodeid string, full bool) error {
 	if err != nil {
 		return err
 	}
-	renderNodeInfo(nodeInfo, nodeid, full)
+	renderNodeInfo(nodeInfo, nodeid, full, json)
 
 	return nil
 }
@@ -89,143 +90,159 @@ func NodeInfo(ctx context.Context, nodeid string, full bool) error {
 func render(cols *columns.Writer) {
 	_ = cols.Frender(os.Stdout)
 }
-func renderNodeInfo(info *controlapi.InfoResponse, id string, full bool) {
-	cols := newColumns("NEX Node Information")
+func renderNodeInfo(info *controlapi.InfoResponse, id string, full, jsonOut bool) {
+	if !jsonOut {
+		cols := newColumns("NEX Node Information")
 
-	cols.AddRow("Node", id)
-	cols.AddRowf("Xkey", info.PublicXKey)
-	cols.AddRow("Version", info.Version)
-	cols.AddRow("Uptime", info.Uptime)
-	cols.AddRow("Available Agents", info.AvailableAgents)
+		cols.AddRow("Node", id)
+		cols.AddRowf("Xkey", info.PublicXKey)
+		cols.AddRow("Version", info.Version)
+		cols.AddRow("Uptime", info.Uptime)
+		cols.AddRow("Available Agents", info.AvailableAgents)
 
-	taglist := make([]string, 0)
-	for k, v := range info.Tags {
-		taglist = append(taglist, fmt.Sprintf("%s=%s", k, v))
-	}
-	cols.AddRow("Tags", strings.Join(taglist, ", "))
-
-	if info.Memory != nil {
-		cols.AddSectionTitle("Memory in kB")
-		cols.Indent(2)
-
-		cols.Println()
-		cols.AddRow("Free", info.Memory.MemFree)
-		cols.AddRow("Available", info.Memory.MemAvailable)
-		cols.AddRow("Total", info.Memory.MemTotal)
-
-		cols.Indent(0)
-	}
-	cols.Println()
-	render(cols)
-
-	if len(info.Machines) > 0 {
-		if full {
-			cols.AddSectionTitle("Workloads")
-			cols.Indent(2)
-			for _, m := range info.Machines {
-				cols.Println()
-				cols.AddRow("Id", m.Id)
-				cols.AddRow("Type", m.Workload.WorkloadType)
-				cols.AddRow("Runtime", m.Workload.Runtime)
-				cols.AddRow("Name", m.Workload.Name)
-				cols.AddRow("Description", m.Workload.Description)
-			}
-			cols.Indent(0)
-			render(cols)
-		} else {
-			t := table.NewWriter()
-			t.SetStyle(table.StyleRounded)
-
-			t.SetTitle("Workloads")
-			t.Style().Title.Align = text.AlignCenter
-			t.AppendHeader(table.Row{"", "ID", "Type", "Name", "Uptime", "Runtime"})
-
-			for _, m := range info.Machines {
-				health := func() string {
-					if m.Healthy {
-						return "🟢"
-					}
-					return "🔴"
-				}()
-
-				t.AppendRow(table.Row{health, m.Id, m.Workload.WorkloadType, m.Workload.Name, m.Workload.Uptime, m.Workload.Runtime})
-			}
-
-			fmt.Println(t.Render())
+		taglist := make([]string, 0)
+		for k, v := range info.Tags {
+			taglist = append(taglist, fmt.Sprintf("%s=%s", k, v))
 		}
+		cols.AddRow("Tags", strings.Join(taglist, ", "))
+
+		if info.Memory != nil {
+			cols.AddSectionTitle("Memory in kB")
+			cols.Indent(2)
+
+			cols.Println()
+			cols.AddRow("Free", info.Memory.MemFree)
+			cols.AddRow("Available", info.Memory.MemAvailable)
+			cols.AddRow("Total", info.Memory.MemTotal)
+
+			cols.Indent(0)
+		}
+		cols.Println()
+		render(cols)
+
+		if len(info.Machines) > 0 {
+			if full {
+				cols.AddSectionTitle("Workloads")
+				cols.Indent(2)
+				for _, m := range info.Machines {
+					cols.Println()
+					cols.AddRow("Id", m.Id)
+					cols.AddRow("Type", m.Workload.WorkloadType)
+					cols.AddRow("Runtime", m.Workload.Runtime)
+					cols.AddRow("Name", m.Workload.Name)
+					cols.AddRow("Description", m.Workload.Description)
+				}
+				cols.Indent(0)
+				render(cols)
+			} else {
+				t := table.NewWriter()
+				t.SetStyle(table.StyleRounded)
+
+				t.SetTitle("Workloads")
+				t.Style().Title.Align = text.AlignCenter
+				t.AppendHeader(table.Row{"", "ID", "Type", "Name", "Uptime", "Runtime"})
+
+				for _, m := range info.Machines {
+					health := func() string {
+						if m.Healthy {
+							return "🟢"
+						}
+						return "🔴"
+					}()
+
+					t.AppendRow(table.Row{health, m.Id, m.Workload.WorkloadType, m.Workload.Name, m.Workload.Uptime, m.Workload.Runtime})
+				}
+
+				fmt.Println(t.Render())
+			}
+		}
+	} else {
+		out, err := json.Marshal(info)
+		if err != nil {
+			fmt.Printf("Error: %s\n", err.Error())
+		}
+		fmt.Println(string(out))
 	}
 }
 
-func renderNodeList(nodes []controlapi.PingResponse, listFull bool) {
-	if len(nodes) == 0 {
-		fmt.Println("No nodes discovered")
-		return
-	}
+func renderNodeList(nodes []controlapi.PingResponse, listFull, jsonOut bool) {
+	if !jsonOut {
+		if len(nodes) == 0 {
+			fmt.Println("No nodes discovered")
+			return
+		}
 
-	tbl := newTableWriter("NATS Execution Nodes")
-	if !listFull {
-		tbl.AddHeaders("ID (* = Lameduck Mode)", "Name", "Version", "Workloads")
+		tbl := newTableWriter("NATS Execution Nodes")
+		if !listFull {
+			tbl.AddHeaders("ID (* = Lameduck Mode)", "Name", "Version", "Workloads")
+		} else {
+			tbl.AddHeaders("Nexus", "ID (* = Lameduck Mode)", "Name", "Version", "Workloads", "Uptime", "Sandboxed", "OS", "Arch")
+		}
+
+		for _, node := range nodes {
+			nodeName, ok := node.Tags["node_name"]
+			if !ok {
+				nodeName = "no-name"
+			}
+
+			ld, ok := node.Tags["nex.lameduck"]
+			if !ok {
+				ld = "false"
+			}
+			lameduck, err := strconv.ParseBool(ld)
+			if err != nil {
+				lameduck = false
+			}
+
+			nodeId := func() string {
+				if lameduck {
+					return node.NodeId + "*"
+				}
+				return node.NodeId
+			}()
+
+			row := []any{nodeId, nodeName, node.Version, node.RunningMachines}
+
+			if listFull {
+				nodeUnsafe, ok := node.Tags["nex.unsafe"]
+				if !ok {
+					nodeUnsafe = "false"
+				}
+				nUnsafe, _ := strconv.ParseBool(nodeUnsafe)
+				nodeOS, ok := node.Tags["nex.os"]
+				if !ok {
+					nodeOS = "unknown"
+				}
+
+				nodeArch, ok := node.Tags["nex.arch"]
+				if !ok {
+					nodeArch = "unknown"
+				}
+
+				nodeNexus, ok := node.Tags["nexus"]
+				if !ok {
+					nodeNexus = ""
+				}
+
+				row = append(row, node.Uptime, !nUnsafe, nodeOS, nodeArch)
+				row = append([]any{nodeNexus}, row...)
+			}
+
+			tbl.AddRow(row...)
+		}
+
+		tbl.writer.SortBy([]table.SortBy{
+			{Name: "Nexus", Mode: table.Asc},
+			{Name: "Name", Mode: table.Asc},
+		})
+		fmt.Println(tbl.Render())
 	} else {
-		tbl.AddHeaders("Nexus", "ID (* = Lameduck Mode)", "Name", "Version", "Workloads", "Uptime", "Sandboxed", "OS", "Arch")
-	}
-
-	for _, node := range nodes {
-		nodeName, ok := node.Tags["node_name"]
-		if !ok {
-			nodeName = "no-name"
-		}
-
-		ld, ok := node.Tags["nex.lameduck"]
-		if !ok {
-			ld = "false"
-		}
-		lameduck, err := strconv.ParseBool(ld)
+		out, err := json.Marshal(nodes)
 		if err != nil {
-			lameduck = false
+			fmt.Printf("Error: %s\n", err.Error())
 		}
-
-		nodeId := func() string {
-			if lameduck {
-				return node.NodeId + "*"
-			}
-			return node.NodeId
-		}()
-
-		row := []any{nodeId, nodeName, node.Version, node.RunningMachines}
-
-		if listFull {
-			nodeUnsafe, ok := node.Tags["nex.unsafe"]
-			if !ok {
-				nodeUnsafe = "false"
-			}
-			nUnsafe, _ := strconv.ParseBool(nodeUnsafe)
-			nodeOS, ok := node.Tags["nex.os"]
-			if !ok {
-				nodeOS = "unknown"
-			}
-
-			nodeArch, ok := node.Tags["nex.arch"]
-			if !ok {
-				nodeArch = "unknown"
-			}
-
-			nodeNexus, ok := node.Tags["nexus"]
-			if !ok {
-				nodeNexus = ""
-			}
-
-			row = append(row, node.Uptime, !nUnsafe, nodeOS, nodeArch)
-			row = append([]any{nodeNexus}, row...)
-		}
-
-		tbl.AddRow(row...)
+		fmt.Println(string(out))
 	}
-
-	tbl.writer.SortBy([]table.SortBy{
-		{Name: "Nexus", Mode: table.Asc},
-		{Name: "Name", Mode: table.Asc},
-	})
-	fmt.Println(tbl.Render())
 }
 
 func renderWorkloadPingList(nodes []controlapi.WorkloadPingResponse) {

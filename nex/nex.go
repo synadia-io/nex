@@ -59,6 +59,7 @@ var (
 
 	node_info_id_arg = nodesInfo.Arg("id", "Public key of the node you're interested in").Required().String()
 	node_info_full   = nodesInfo.Flag("full", "Long form output").Default("false").UnNegatableBool()
+	node_info_json   = nodesInfo.Flag("json", "Output JSON").Default("false").UnNegatableBool()
 
 	Opts       = &models.Options{}
 	GuiOpts    = &models.UiOptions{}
@@ -145,6 +146,7 @@ func init() {
 	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 
 	nodesLs.Flag("full", "List more detailed table").Default("false").UnNegatableBoolVar(&NodeOpts.ListFull)
+	nodesLs.Flag("json", "Output JSON").Default("false").UnNegatableBoolVar(&NodeOpts.OutJSON)
 
 	// one day when we refactor, let's get rid of all of these global structs. Such ugly
 	nodesProbe.Flag("workload", "Only query nodes currently running the given workload (id or name)").StringVar(&RunOpts.Name)
@@ -275,7 +277,7 @@ func main() {
 			logger.Error("Failed to list workloads", slog.Any("err", err))
 		}
 	case nodesInfo.FullCommand():
-		err := NodeInfo(ctx, *node_info_id_arg, *node_info_full)
+		err := NodeInfo(ctx, *node_info_id_arg, *node_info_full, *node_info_json)
 		if err != nil {
 			logger.Error("Failed to get node info", slog.Any("err", err))
 		}
