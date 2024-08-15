@@ -36,7 +36,7 @@ jobs:
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             synadia/nex:main 
-            synadia/nex:${SHORT_SHA}
+            synadia/nex:${{ env.SHORT_SHA }}
       -
         name: Build and push
         uses: docker/build-push-action@v6
@@ -46,5 +46,5 @@ jobs:
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |
             synadia/nex:main_ci 
-            synadia/nex:${SHORT_SHA}_ci
+            synadia/nex:${{ env.SHORT_SHA }}_ci
 
