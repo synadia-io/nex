@@ -73,6 +73,8 @@ nfpms:
     description: |-
       The NATS execution engine
     license: Apache 2.0
+    builds:
+      - nex
     formats:
       - deb 
       - rpm
