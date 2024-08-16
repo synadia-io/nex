@@ -500,9 +500,7 @@ func (n *Node) loadNodeConfig() error {
 		n.config.OtelMetricsPort = n.nodeOpts.OtelMetricsPort
 		n.config.OtelTraces = n.nodeOpts.OtelTraces
 		n.config.OtelTracesExporter = n.nodeOpts.OtelTracesExporter
-		if n.nodeOpts.NoSandbox != nil {
-			n.config.NoSandbox = *n.nodeOpts.NoSandbox
-		}
+		n.config.NoSandbox = n.nodeOpts.NoSandbox
 		for k, v := range n.nodeOpts.Tags {
 			n.config.Tags[k] = v
 		}
