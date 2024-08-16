@@ -18,5 +18,9 @@
     "tags": {
         "simple": "true"
     },
-    "no_sandbox": false
+    "no_sandbox": false,
+    "workload_types": [
+        "native",
+        "v8"
+    ]
 }
