@@ -503,7 +503,6 @@ func (n *Node) loadNodeConfig() error {
 		if n.nodeOpts.NoSandbox {
 			n.config.NoSandbox = true
 		}
-		n.config.NoSandbox = n.nodeOpts.NoSandbox
 		for k, v := range n.nodeOpts.Tags {
 			n.config.Tags[k] = v
 		}
