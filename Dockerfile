@@ -21,7 +21,7 @@ COPY --from=nexbuilder /nex/nexcli /usr/local/bin/nex
 COPY --from=agentbuilder /agent/nexagent /usr/local/bin/nex-agent
 
 FROM nex AS ci
-COPY ./examples/nodeconfigs/simple.json nex.json
+COPY ./_scripts/docker/nex.json nex.json
 ENTRYPOINT ["nex", "node", "up", "--config", "nex.json"]
 
 FROM nex

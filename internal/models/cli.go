@@ -132,7 +132,7 @@ type NodeOptions struct {
 	OutJSON   bool   `json:"-"`
 	NexusName string `json:"-"`
 
-	NoSandbox *bool             `json:"-"`
+	NoSandbox bool              `json:"-"`
 	Tags      map[string]string `json:"-"`
 
 	Errors []error `json:"errors,omitempty"`

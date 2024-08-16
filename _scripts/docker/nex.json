@@ -20,6 +20,7 @@
     },
     "no_sandbox": false,
     "workload_types": [
-        "native"
+        "native",
+        "v8"
     ]
 }
