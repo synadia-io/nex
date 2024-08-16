@@ -289,7 +289,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 
 			if request.SupportsTriggerSubjects() {
 				for _, tsub := range request.TriggerSubjects {
-					sub, err := ncHostServices.Subscribe(tsub, w.generateTriggerHandler(workloadID, tsub, request))
+					sub, err := ncHostServices.QueueSubscribe(tsub, tsub, w.generateTriggerHandler(workloadID, tsub, request))
 					if err != nil {
 						w.log.Error("Failed to create trigger subject subscription for deployed workload",
 							slog.String("workload_id", workloadID),
