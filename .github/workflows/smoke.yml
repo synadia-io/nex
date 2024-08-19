@@ -1,0 +1,104 @@
+name: Smoke Test
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  GO_VER: '1.22.4'
+
+jobs:
+  start_nexus:
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        nex-version: ["", "main"]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    services:
+      nats-server:
+        image: jordanrash/nats:latest
+        ports:
+          - 4222:4222
+          - 7422:7422
+      eventcounter:
+        image: jordanrash/eventcounter:latest
+        options: >-
+          --env NATS_URL=nats://nats-server
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ matrix.nex-version }}
+      -
+        name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VER }}
+      -
+        name: Install NATS CLI
+        run: |
+          go install github.com/nats-io/natscli/nats@main
+      -
+        name: Install nex cli
+        working-directory: ./nex
+        run: |
+          go install -v
+      -
+        name: Install nex agent
+        working-directory: ./agent/cmd/nex-agent
+        run: |
+          go install -v
+      -
+        name: NEX node preflight
+        run: |
+          nex node preflight --init nosandbox 
+      -
+        name: Start NEX node 
+        run: |
+          nex node up &
+      -
+        name: Wait for healthy node
+        timeout-minutes: 1
+        run: |
+          while [ "$(nats req "eventcounter" "" | jq '.node_started // 0')" -ne 1 ]; do
+            echo "Waiting for node_started to equal 1..."
+            sleep 3
+          done
+      -
+        name: Print nex nex nodes
+        run: |
+          nex node ls
+          echo "NEX_NODE_ID=$(nex node ls --json | jq -r '.[] | .node_id')" >> $GITHUB_ENV
+      -
+        name: Start echoservice
+        timeout-minutes: 1
+        working-directory: ./examples/echoservice
+        run: | 
+          CGO_ENABLED=0 go build -tags netgo --ldflags '-extldflags "-static"'
+          nex devrun ./echoservice
+      -
+        name: Wait for healthy service
+        timeout-minutes: 1
+        run: |
+          while [ "$(nats req "eventcounter" "" | jq '.workload_deployed // 0')" -ne 1 ]; do
+            echo "Waiting for workload_deployed to equal 1..."
+            sleep 3
+          done
+      -
+        name: Trigger Workload
+        timeout-minutes: 1
+        run: |
+          while [ $(nats req -r svc.echo "test") != 'test' ]; do
+            echo "Attempting to trigger workload..."
+            nats req -r svc.echo "test"
+            sleep 3
+          done
+      -
+        name: Show count of events
+        run: |
+          nats req "eventcounter" ""
+
+
