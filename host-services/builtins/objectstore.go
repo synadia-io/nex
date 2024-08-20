@@ -109,6 +109,8 @@ func (o *ObjectStoreService) HandleRequest(
 	}
 }
 
+// TODO: stop bleeding jetstream ObjectInfo type in the JSON payload
+// and use a more abstract, host-services type
 func (o *ObjectStoreService) handleGet(
 	ctx context.Context,
 	objectStore jetstream.ObjectStore,
