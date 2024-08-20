@@ -35,10 +35,10 @@ func main() {
 	kv := inmem.NewInmemKeyValueService(log)
 	obj := inmem.NewInmemObjectStore(log)
 
-	hsServer.AddService("http", http, []byte{})
-	hsServer.AddService("messaging", messaging, []byte{})
-	hsServer.AddService("kv", kv, []byte{})
-	hsServer.AddService("objectstore", obj, []byte{})
+	_ = hsServer.AddService("http", http, []byte{})
+	_ = hsServer.AddService("messaging", messaging, []byte{})
+	_ = hsServer.AddService("kv", kv, []byte{})
+	_ = hsServer.AddService("objectstore", obj, []byte{})
 
 	_ = hsServer.Start()
 
