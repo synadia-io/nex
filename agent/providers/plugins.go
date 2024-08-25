@@ -1,112 +1,106 @@
 package providers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path"
-	"plugin"
-	"runtime"
 
+	"github.com/synadia-io/nex/agent/providers/lib"
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
 
-type workloadPlugin struct {
-	plugin   *plugin.Plugin
-	provider ExecutionProvider
+type PluginExecutable struct {
+	inner  *lib.NativeExecutable
+	params *agentapi.ExecutionProviderParams
 }
 
-func MaybeLoadPluginProvider(params *agentapi.ExecutionProviderParams) (wp *workloadPlugin, err error) {
-	var actualPath string
+// NOTE: executable plugin "runner providers" are actually just native executables that
+// take the path of the artifact on argv... so we just create a wrapper around the existing
+// native runner for plugins
+func InitNexExecutionProviderPlugin(params *agentapi.ExecutionProviderParams, md *agentapi.MachineMetadata) (*PluginExecutable, error) {
+	err := adjustParamsForPlugin(params)
+	if err != nil {
+		fmt.Printf("Failed to adjust provider parameters for plugin: %s\n", err)
+		return nil, err
+	}
+	inner, err := lib.InitNexExecutionProviderNative(params)
+	if err != nil {
+		return nil, err
+	}
+	return &PluginExecutable{
+		inner,
+		params,
+	}, nil
+}
+
+// this shouldn't get called unless sandbox mode is enabled, in which case
+// it'll validate that the plugin runner is a 64-bit elf, which is what we want
+func (p *PluginExecutable) Validate() error {
+	return p.inner.Validate()
+}
+
+func (p *PluginExecutable) Name() string {
+	return fmt.Sprintf("Plugin Provider - %s", p.params.WorkloadType)
+}
+
+func (p *PluginExecutable) Deploy() (err error) {
+	return p.inner.Deploy()
+}
+
+func (p *PluginExecutable) Undeploy() error {
+	return p.inner.Undeploy()
+}
+
+func adjustParamsForPlugin(params *agentapi.ExecutionProviderParams) error {
+	var pluginExecutablePath string
+	var err error
+
+	artifactPath := *params.TmpFilename
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.Join(err, fmt.Errorf("Plugin loader recovered from panic, attempting load of %s", actualPath))
+			err = errors.Join(err, fmt.Errorf("plugin loader recovered from panic, attempting load of %s", pluginExecutablePath))
 		}
 	}()
 
 	if params.PluginPath == nil {
 		err = errors.New("invalid execution provider specified")
 		logError(params.Stderr, fmt.Sprintf("invalid execution provider specified: %s", string(params.WorkloadType)))
-		return
+		return err
+	}
+	if params.Namespace == nil {
+		err = errors.New("workload needs a namespace to execute")
+		logError(params.Stderr, "workload needs a namespace to execute")
+		return err
+	}
+	if params.WorkloadName == nil {
+		err = errors.New("workload needs a name to execute")
+		logError(params.Stderr, "workload needs a name to execute")
+		return err
 	}
 
-	// This will end up with something like `./plugins/noop.so`
-	actualPath = path.Join(*params.PluginPath, string(params.WorkloadType))
-	slog.Debug("Attempting provider plugin load", slog.String("path", actualPath))
+	// This will end up with something like `./plugins/wasm`
+	pluginExecutablePath = path.Join(*params.PluginPath, string(params.WorkloadType))
 
-	switch runtime.GOOS {
-	case "windows":
-		err = errors.New("windows agents do not support workload provider plugins")
-		return
-	case "linux":
-		actualPath = actualPath + ".so"
-	case "darwin":
-		actualPath = actualPath + ".dylib"
-	}
-
-	if _, err = os.Stat(actualPath); errors.Is(err, os.ErrNotExist) {
+	if _, err = os.Stat(pluginExecutablePath); errors.Is(err, os.ErrNotExist) {
 		// path does not exist
-		err = fmt.Errorf("plugin path was specified but the file (%s) does not exist", actualPath)
-		return
+		err = fmt.Errorf("plugin path was specified but the file (%s) does not exist",
+			pluginExecutablePath)
+		return err
+	} else if err != nil {
+		return err
 	}
 
-	plug, err := plugin.Open(actualPath)
-	if err != nil {
-		logError(params.Stderr, fmt.Sprintf("failed to open plugin: %s", err.Error()))
-		return
+	// the tempfilename we get at the start of the func is the path of the artifact. Here we need
+	// to make tmpfilename the path of the plugin, and pass the path of
+	// the artifact as the last parameter.
+	params.TmpFilename = &pluginExecutablePath
+	params.Argv = []string{
+		*params.Namespace,
+		*params.WorkloadName,
+		artifactPath,
 	}
-
-	symPlugin, err := plug.Lookup("ExecutionProvider")
-	if err != nil {
-		logError(params.Stderr, fmt.Sprintf("failed to lookup plugin symbol: %s", err.Error()))
-		return
-	}
-
-	var provider ExecutionProvider
-	provider, ok := symPlugin.(ExecutionProvider)
-	if !ok {
-		err = errors.New("unexpected type from module symbol 'ExecutionProvider'")
-		logError(params.Stderr, "failed to typecast plugin")
-		return
-	}
-
-	wp = &workloadPlugin{
-		plugin:   plug,
-		provider: provider,
-	}
-
-	return
-
-}
-
-func (w *workloadPlugin) Name() string {
-	return w.provider.Name()
-}
-
-func (w *workloadPlugin) Deploy() (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = errors.New("deploy recovered from panic")
-		}
-	}()
-
-	return nil
-}
-
-func (w *workloadPlugin) Undeploy() error {
-	return nil
-}
-
-func (w *workloadPlugin) Execute(ctx context.Context, payload []byte) ([]byte, error) {
-	return nil, errors.New("Native execution provider does not support execution via trigger subjects")
-}
-
-// Validate the underlying artifact to be a 64-bit linux native ELF
-// binary that is statically-linked
-func (w *workloadPlugin) Validate() error {
 	return nil
 }
 

@@ -106,6 +106,7 @@ type RootfsOptions struct {
 	BuildScriptPath string
 	OutName         string
 	RootFSSize      int
+	Plugins         []string
 }
 
 // Node configuration is used to configure the node process as well

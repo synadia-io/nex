@@ -1,9 +1,7 @@
 package providers
 
 import (
-	"context"
 	"errors"
-	"fmt"
 
 	"github.com/synadia-io/nex/agent/providers/lib"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -17,9 +15,6 @@ type ExecutionProvider interface {
 	// Deploy a service (e.g., "elf" and "oci" types) or executable function (e.g., "v8" and "wasm" types)
 	Deploy() error
 
-	// Execute a deployed function, if supported by the execution provider implementation (e.g., "v8" and "wasm" types)
-	Execute(ctx context.Context, payload []byte) ([]byte, error)
-
 	// Undeploy a workload, giving it a chance to gracefully clean up after itself (if applicable)
 	Undeploy() error
 
@@ -32,28 +27,16 @@ type ExecutionProvider interface {
 }
 
 // NewExecutionProvider initializes and returns an execution provider for a given work request
-func NewExecutionProvider(params *agentapi.ExecutionProviderParams) (ExecutionProvider, error) {
+func NewExecutionProvider(params *agentapi.ExecutionProviderParams,
+	md *agentapi.MachineMetadata) (ExecutionProvider, error) {
 
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Printf("Failed to create execution provider: %+v\n", r)
-		}
-	}()
-	// if params.WorkloadType == nil {
-	// 	return nil, errors.New("execution provider factory requires a workload type parameter")
-	// }
+	if len(params.WorkloadType) == 0 {
+		return nil, errors.New("execution provider factory requires a workload type parameter")
+	}
 
-	switch params.WorkloadType {
-	case controlapi.NexWorkloadNative:
+	if params.WorkloadType == controlapi.NexWorkloadNative {
 		return lib.InitNexExecutionProviderNative(params)
-	case controlapi.NexWorkloadV8:
-		return lib.InitNexExecutionProviderV8(params)
-	case controlapi.NexWorkloadOCI:
-		// TODO-- return lib.InitNexExecutionProviderOCI(params), nil
-		return nil, errors.New("oci execution provider not yet implemented")
-	case controlapi.NexWorkloadWasm:
-		return lib.InitNexExecutionProviderWasm(params)
-	default:
-		return MaybeLoadPluginProvider(params)
+	} else {
+		return InitNexExecutionProviderPlugin(params, md)
 	}
 }

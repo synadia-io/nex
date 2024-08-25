@@ -1,0 +1,28 @@
+{
+    "default_resource_dir": "/tmp/nex_resources",
+    "bin_path": [
+        "/usr/local/bin"
+    ],
+    "agent_plugin_path": "/usr/local/bin",
+    "machine_pool_size": 1,
+    "agent_ping_timeout_ms": 3000,
+    "cni": {
+        "bin_path": [
+            "/opt/cni/bin"
+        ],
+        "network_name": "fcnet",
+        "interface_name": "veth0"
+    },
+    "machine_template": {
+        "vcpu_count": 1,
+        "memsize_mib": 256
+    },    
+    "tags": {
+        "simple": "true"
+    },
+    "no_sandbox": true,
+    "workload_types": [
+        "native",
+        "wasm"
+    ]
+}

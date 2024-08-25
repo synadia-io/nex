@@ -492,6 +492,7 @@ func (w *WorkloadManager) OnProcessStarted(id string) {
 
 	agentClient := agentapi.NewAgentClient(
 		clientConn,
+		w.natsint.Connection(),
 		w.log,
 		w.handshakeTimeout,
 		w.pingTimeout,

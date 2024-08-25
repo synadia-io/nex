@@ -143,6 +143,7 @@ func init() {
 	rootfs.Flag("script", "Additional boot script ran during initialization").PlaceHolder("script.sh").StringVar(&RootfsOpts.BuildScriptPath)
 	rootfs.Flag("image", "Base image for rootfs build").Default("synadia/nex-rootfs:alpine").StringVar(&RootfsOpts.BaseImage)
 	rootfs.Flag("agent", "Path to agent binary").PlaceHolder("../path/to/nex-agent").Required().StringVar(&RootfsOpts.AgentBinaryPath)
+	rootfs.Flag("plugin", "Specify path to additional plugins").StringsVar(&RootfsOpts.Plugins)
 	rootfs.Flag("size", "Size of rootfs filesystem").Default(strconv.Itoa(1024 * 1024 * 150)).IntVar(&RootfsOpts.RootFSSize) // 150MB default
 
 	nodesLs.Flag("full", "List more detailed table").Default("false").UnNegatableBoolVar(&NodeOpts.ListFull)

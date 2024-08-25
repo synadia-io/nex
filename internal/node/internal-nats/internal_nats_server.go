@@ -255,6 +255,9 @@ func (s *InternalNatsServer) ConnectionByID(id string) (*nats.Conn, error) {
 }
 
 func (s *InternalNatsServer) ConnectionWithCredentials(creds *credentials) (*nats.Conn, error) {
+	s.log.Info("Minting creds on internal server",
+		slog.String("id", creds.ID),
+		slog.String("seed", creds.NkeySeed))
 	pair, err := nkeys.FromSeed([]byte(creds.NkeySeed))
 	if err != nil {
 		return nil, err

@@ -41,6 +41,7 @@ const (
 
 type AgentClient struct {
 	nc                *nats.Conn
+	ncInternal        *nats.Conn
 	log               *slog.Logger
 	agentID           string
 	handshakeTimeout  time.Duration
@@ -66,7 +67,8 @@ type AgentClient struct {
 }
 
 func NewAgentClient(
-	nc *nats.Conn,
+	nc *nats.Conn, // connection into workload's private account
+	ncInternal *nats.Conn, // connection into the root user's (nex) account
 	log *slog.Logger,
 	handshakeTimeout, pingTimeout time.Duration,
 	onTimedOut HandshakeCallback,
@@ -86,6 +88,7 @@ func NewAgentClient(
 		logReceived:        onLog,
 		deployRetryCount:   0,
 		nc:                 nc,
+		ncInternal:         ncInternal,
 		pingTimeout:        pingTimeout,
 		subz:               make([]*nats.Subscription, 0),
 	}
@@ -236,9 +239,12 @@ func (a *AgentClient) Ping() error {
 	subject := fmt.Sprintf("agentint.%s.ping", a.agentID)
 	// a.log.Debug("pinging agent", slog.String("subject", subject))
 
-	_, err := a.nc.Request(subject, []byte{}, a.pingTimeout)
+	_, err := a.ncInternal.Request(subject, []byte{}, a.pingTimeout)
 	if err != nil && !a.shuttingDown() {
-		a.log.Warn("agent failed to respond to ping", slog.Any("error", err))
+		a.log.Warn("agent failed to respond to ping",
+			slog.Any("error", err),
+			slog.String("workload_id", a.agentID),
+		)
 		return err
 	}
 
@@ -275,7 +281,12 @@ func (a *AgentClient) MarkUnselected() {
 }
 
 func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
-	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
+	triggerSub := fmt.Sprintf("agentint.%s.trigger", a.agentID)
+	a.log.Info("Triggering function",
+		slog.String("subject", triggerSub),
+		slog.String("url", a.nc.ConnectedUrl()),
+	)
+	intmsg := nats.NewMsg(triggerSub)
 	intmsg.Header.Add(string(NexTriggerSubject), subject)
 	intmsg.Data = data
 
@@ -287,7 +298,7 @@ func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subje
 
 	otel.GetTextMapPropagator().Inject(cctx, propagation.HeaderCarrier(intmsg.Header))
 
-	resp, err := a.nc.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
+	resp, err := a.ncInternal.RequestMsg(intmsg, time.Millisecond*10000) // FIXME-- make timeout configurable
 	childSpan.End()
 
 	return resp, err

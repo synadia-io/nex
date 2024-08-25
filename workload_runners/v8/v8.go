@@ -1,13 +1,11 @@
-//go:build linux && amd64
-
-package lib
+package main
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"strconv"
@@ -65,19 +63,13 @@ const (
 
 // V8 execution provider implementation
 type V8 struct {
-	environment map[string]string
 	name        string
 	namespace   string
 	tmpFilename string
 	totalBytes  int32
 	vmID        string
 
-	fail chan bool
-	run  chan bool
-	exit chan int
-
-	stderr io.Writer
-	stdout io.Writer
+	logger *slog.Logger
 
 	builtins *builtins.BuiltinServicesClient
 
@@ -103,7 +95,7 @@ func (v *V8) Deploy() error {
 		startTime := time.Now()
 		val, err := v.Execute(ctx, msg.Data)
 		if err != nil {
-			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to execute function on trigger subject %s: %s", subject, err.Error())))
+			fmt.Fprintf(os.Stderr, "failed to execute function on trigger subject %s: %s", subject, err.Error())
 			return
 		}
 
@@ -119,7 +111,7 @@ func (v *V8) Deploy() error {
 			Header: header,
 		})
 		if err != nil {
-			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to write %d-byte response: %s", len(val), err.Error())))
+			fmt.Fprintf(os.Stderr, "failed to write %d-byte response: %s", len(val), err.Error())
 			return
 		}
 	})
@@ -127,7 +119,6 @@ func (v *V8) Deploy() error {
 		return fmt.Errorf("failed to subscribe to trigger: %s", err)
 	}
 
-	v.run <- true
 	return nil
 }
 
@@ -176,12 +167,12 @@ func (v *V8) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 
 		argv2, err := v.toUInt8ArrayValue(payload)
 		if err != nil {
-			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(payload), err.Error())))
+			fmt.Fprintf(os.Stderr, "failed to convert raw %d-length []byte to Uint8[]: %s\n", len(payload), err.Error())
 			errs <- err
 			return
 		}
 
-		_, _ = v.stdout.Write([]byte(fmt.Sprintf("calling js function via trigger subject: %s", subject)))
+		fmt.Printf("calling js function via trigger subject: %s\n", subject)
 		val, err = fn.Call(v8ctx.Global(), argv1, argv2)
 		if err != nil {
 			errs <- err
@@ -201,7 +192,7 @@ func (v *V8) Execute(ctx context.Context, payload []byte) ([]byte, error) {
 		}
 		return retval, nil
 	case err := <-errs:
-		_, _ = v.stderr.Write([]byte(fmt.Sprintf("v8 execution failed with error: %s", err.Error())))
+		fmt.Fprintf(os.Stderr, "v8 execution failed with error: %s\n", err.Error())
 		return nil, err
 	case <-time.After(time.Millisecond * v8ExecutionTimeoutMillis):
 		// if err != nil {
@@ -408,7 +399,7 @@ func (v *V8) genHttpClientFunc(ctx context.Context, method string) func(info *v8
 
 		url, err := url.Parse(args[0].String())
 		if err != nil {
-			_, _ = v.stderr.Write([]byte(fmt.Sprintf("failed to parse url: %s", err.Error())))
+			fmt.Fprintf(os.Stderr, "failed to parse url: %s", err.Error())
 
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
@@ -441,7 +432,7 @@ func (v *V8) genHttpClientFunc(ctx context.Context, method string) func(info *v8
 			var headers map[string][]string
 			err = json.Unmarshal(*httpresp.Headers, &headers)
 			if err != nil {
-				_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to unmarshal response headers for http request: %s", err.Error())))
+				fmt.Printf("failed to unmarshal response headers for http request: %s\n", err.Error())
 
 				val, _ := v8.NewValue(v.iso, err.Error())
 				return v.iso.ThrowException(val)
@@ -463,7 +454,7 @@ func (v *V8) genHttpClientFunc(ctx context.Context, method string) func(info *v8
 			_ = respobj.Set("response", nil)
 		}
 
-		_, _ = v.stdout.Write([]byte(fmt.Sprintf("received %d-byte response (%d status) for http %s request", len(httpresp.Body), httpresp.Status, method)))
+		fmt.Printf("received %d-byte response (%d status) for http %s request\n", len(httpresp.Body), httpresp.Status, method)
 
 		val, err := respobj.NewInstance(v.ctx)
 		if err != nil {
@@ -496,7 +487,7 @@ func (v *V8) newKeyValueObjectTemplate(ctx context.Context, bucketName string) *
 
 		val, err := v.toUInt8ArrayValue(resp)
 		if err != nil {
-			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp), err.Error())))
+			fmt.Printf("failed to convert raw %d-length []byte to Uint8[]: %s\n", len(resp), err.Error())
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -583,7 +574,7 @@ func (v *V8) newMessagingObjectTemplate(ctx context.Context) *v8.ObjectTemplate 
 	messaging := v8.NewObjectTemplate(v.iso)
 
 	_ = messaging.Set(hostServicesMessagingPublishFunctionName, v8.NewFunctionTemplate(v.iso, func(info *v8.FunctionCallbackInfo) *v8.Value {
-		_, _ = v.stdout.Write([]byte(fmt.Sprintf("attempting to publish msg via %s", v.nc.Servers()[0])))
+		fmt.Printf("attempting to publish msg via %s\n", v.nc.Servers()[0])
 
 		args := info.Args()
 		if len(args) != 2 {
@@ -629,7 +620,7 @@ func (v *V8) newMessagingObjectTemplate(ctx context.Context) *v8.ObjectTemplate 
 
 		val, err := v.toUInt8ArrayValue(resp)
 		if err != nil {
-			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp), err.Error())))
+			fmt.Printf("failed to convert raw %d-length []byte to Uint8[]: %s\n", len(resp), err.Error())
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -742,7 +733,7 @@ func (v *V8) newObjectStoreObjectTemplate(ctx context.Context, bucketName string
 
 		val, err := v.toUInt8ArrayValue(resp)
 		if err != nil {
-			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to convert raw %d-length []byte to Uint8[]: %s", len(resp), err.Error())))
+			fmt.Printf("failed to convert raw %d-length []byte to Uint8[]: %s\n", len(resp), err.Error())
 			val, _ := v8.NewValue(v.iso, err.Error())
 			return v.iso.ThrowException(val)
 		}
@@ -855,21 +846,21 @@ func (v *V8) toUInt8ArrayValue(val []byte) (*v8.Value, error) {
 		// initialize a v8 value representing the current byte offset in our native Uint8Array
 		_i, err := v8.NewValue(v.iso, uint64(i))
 		if err != nil {
-			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast i index value to uint32: %s", err.Error())))
+			fmt.Printf("failed to cast i index value to uint32: %s\n", err.Error())
 			return nil, err
 		}
 
 		// pack 8 bits into a uint32, as this is needed when initializing a v8.Value
 		_val, err := v8.NewValue(v.iso, uint32(_uint))
 		if err != nil {
-			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to cast byte to uint32: %s", err.Error())))
+			fmt.Printf("failed to cast byte to uint32: %s\n", err.Error())
 			return nil, err
 		}
 
 		// write 8 bits to the current byte offset in the native Uint8Array
 		nativeUint8Arr, err = v.utils[v8FunctionUInt8ArraySetIdx].Call(v.ctx.Global(), nativeUint8Arr, _i, _val)
 		if err != nil {
-			_, _ = v.stdout.Write([]byte(fmt.Sprintf("failed to call %s: %s", v8FunctionUInt8ArraySetIdx, err.Error())))
+			fmt.Printf("failed to call %s: %s\n", v8FunctionUInt8ArraySetIdx, err.Error())
 			return nil, err
 		}
 	}
@@ -878,43 +869,36 @@ func (v *V8) toUInt8ArrayValue(val []byte) (*v8.Value, error) {
 }
 
 // convenience method to initialize a V8 execution provider
-func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, error) {
-	if params.WorkloadName == nil {
+func InitNexExecutionProviderV8(nc *nats.Conn, wi *WorkloadInfo, logger *slog.Logger) (*V8, error) {
+	if len(wi.WorkloadName) == 0 {
 		return nil, errors.New("V8 execution provider requires a workload name parameter")
 	}
 
-	if params.TmpFilename == nil {
-		return nil, errors.New("V8 execution provider requires a temporary filename parameter")
+	if len(wi.ArtifactPath) == 0 {
+		return nil, errors.New("V8 execution provider requires a filename parameter")
 	}
 
 	hsclient := hostservices.NewHostServicesClient(
-		params.NATSConn,
+		nc,
 		time.Second*5, // FIXME-- make configurable
-		*params.Namespace,
-		*params.WorkloadName,
-		params.VmID,
+		wi.Namespace,
+		wi.WorkloadName,
+		wi.VmID,
 	)
 
 	builtins := builtins.NewBuiltinServicesClient(hsclient)
 
 	return &V8{
-		environment: params.Environment,
-		name:        *params.WorkloadName,
-		namespace:   *params.Namespace,
-		tmpFilename: *params.TmpFilename,
+		logger:      logger,
+		name:        wi.WorkloadName,
+		namespace:   wi.Namespace,
+		tmpFilename: wi.ArtifactPath,
 		totalBytes:  0, // FIXME
-		vmID:        params.VmID,
-
-		stderr: params.Stderr,
-		stdout: params.Stdout,
-
-		fail: params.Fail,
-		run:  params.Run,
-		exit: params.Exit,
+		vmID:        wi.VmID,
 
 		builtins: builtins,
 
-		nc:  params.NATSConn,
+		nc:  nc,
 		ctx: nil,
 		iso: v8.NewIsolate(),
 

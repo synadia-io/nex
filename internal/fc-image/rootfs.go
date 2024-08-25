@@ -15,7 +15,7 @@ import (
 	"dagger.io/dagger"
 )
 
-func Build(outname, buildScript, baseImg, agentPath string, fsSize int) error {
+func Build(outname, buildScript, baseImg, agentPath string, plugins []string, fsSize int) error {
 	if os.Getuid() != 0 {
 		return errors.New("Please run as root")
 	}
@@ -63,6 +63,18 @@ func Build(outname, buildScript, baseImg, agentPath string, fsSize int) error {
 		return err
 	}
 
+	for _, runnerPlugin := range plugins {
+		input, err := os.ReadFile(runnerPlugin)
+		if err != nil {
+			return err
+		}
+
+		err = os.WriteFile(filepath.Join(tempdir, filepath.Base(runnerPlugin)), input, 0644)
+		if err != nil {
+			return err
+		}
+	}
+
 	fs, err := os.Create(filepath.Join(tempdir, "rootfs.ext4"))
 	if err != nil {
 		return err
@@ -103,10 +115,10 @@ func Build(outname, buildScript, baseImg, agentPath string, fsSize int) error {
 		return errors.New(string(output) + "\n\n" + err.Error())
 	}
 
-	return build(context.Background(), tempdir, mountPoint, baseImg, outname, bS != nil)
+	return build(context.Background(), tempdir, mountPoint, baseImg, outname, plugins, bS != nil)
 }
 
-func build(ctx context.Context, tempdir, mountPoint, baseImg, outname string, withBuildScript bool) error {
+func build(ctx context.Context, tempdir, mountPoint, baseImg, outname string, plugins []string, withBuildScript bool) error {
 	client, err := dagger.Connect(ctx,
 		dagger.WithLogOutput(os.Stderr),
 		dagger.WithWorkdir(tempdir),
@@ -120,17 +132,28 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg, outname string, wi
 	nexagent := client.Host().File("nex-agent")
 	rootfs := client.Host().Directory("rootfs-mount")
 
+	pluginFiles := make([]*dagger.File, 0)
+	for _, pluginFile := range plugins {
+		pluginFiles = append(pluginFiles, client.Host().File(filepath.Base(pluginFile)))
+	}
+
 	var c *dagger.Container
+	c = client.Container(
+		dagger.ContainerOpts{
+			Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH),
+		},
+	).From(baseImg).
+		WithEnvVariable("CACHEBUSTER", time.Now().String()).
+		WithUser("root").
+		WithDirectory("/tmp/rootfs", rootfs).
+		WithMountedFile("/usr/local/bin/agent", nexagent)
+	for idx, pf := range pluginFiles {
+		fn := filepath.Base(plugins[idx])
+		c = c.WithMountedFile(fmt.Sprintf("/usr/local/bin/%s", fn), pf)
+	}
+
 	if !withBuildScript {
-		c = client.Container(
-			dagger.ContainerOpts{
-				Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH),
-			},
-		).From(baseImg).
-			WithEnvVariable("CACHEBUSTER", time.Now().String()).
-			WithUser("root").
-			WithDirectory("/tmp/rootfs", rootfs).
-			WithMountedFile("/usr/local/bin/agent", nexagent).
+		c = c.
 			WithFile("/copy_fs.sh", copyFsScript).
 			WithExec([]string{"sh", "/copy_fs.sh"}).
 			WithExec([]string{"chown", "1000:1000", "/etc/init.d/agent"}).
@@ -139,15 +162,7 @@ func build(ctx context.Context, tempdir, mountPoint, baseImg, outname string, wi
 
 	} else {
 		buildScript := client.Host().File("buildscript.sh")
-		c = client.Container(
-			dagger.ContainerOpts{
-				Platform: dagger.Platform(runtime.GOOS + "/" + runtime.GOARCH),
-			},
-		).From(baseImg).
-			WithEnvVariable("CACHEBUSTER", time.Now().String()).
-			WithUser("root").
-			WithDirectory("/tmp/rootfs", rootfs).
-			WithMountedFile("/usr/local/bin/agent", nexagent).
+		c = c.
 			WithFile("/buildscript.sh", buildScript).
 			WithExec([]string{"sh", "/buildscript.sh"}).
 			WithFile("/copy_fs.sh", copyFsScript).

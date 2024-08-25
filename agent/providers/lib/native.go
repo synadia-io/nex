@@ -1,16 +1,13 @@
 package lib
 
 import (
-	"context"
 	"debug/elf"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strings"
 	"sync"
-	"time"
 
 	agentapi "github.com/synadia-io/nex/internal/agent-api"
 )
@@ -37,6 +34,7 @@ type NativeExecutable struct {
 
 // Deploy the ELF binary
 func (e *NativeExecutable) Deploy() (err error) {
+	fmt.Printf("Deploying executable: %s '%v'\n", e.tmpFilename, e.argv)
 	defer func() {
 		if r := recover(); r != nil {
 			err = errors.New("deploy recovered from panic")
@@ -50,34 +48,26 @@ func (e *NativeExecutable) Deploy() (err error) {
 
 	cmd.Env = make([]string, len(e.environment))
 	for k, v := range e.environment {
-		item := fmt.Sprintf("%s=%s", strings.ToUpper(k), v)
+		item := fmt.Sprintf("%s=%s", strings.TrimSpace(strings.ToUpper(k)), v)
 		cmd.Env = append(cmd.Env, item)
 	}
 
+	e.cmd = cmd
+	fmt.Printf("%+v\n", cmd)
+	fmt.Printf("ENV: %+v\n", cmd.Env)
 	err = cmd.Start()
 	if err != nil {
+		fmt.Printf("failed to start shell command: %s", err)
 		e.fail <- true
 		return
 	}
 
-	e.cmd = cmd
-
 	go func() {
-		go func() {
-			for {
-				if cmd.Process != nil {
-					e.run <- true
-					return
-				}
-
-				// TODO-- implement a timeout after which we dispatch e.fail
-
-				time.Sleep(time.Millisecond * agentapi.DefaultRunloopSleepTimeoutMillis)
-			}
-		}()
 
 		// This has to be backgrounded because the workload could be a long-running process/service
 		if err = cmd.Wait(); err != nil { // blocking until exit
+			fmt.Printf("failed to wait for process: %s", err.Error())
+			_, _ = e.stderr.Write([]byte(err.Error()))
 			if exitError, ok := err.(*exec.ExitError); ok {
 				e.exit <- exitError.ExitCode() // this is here for now for review but can likely be simplified to one line: `e.exit <- cmd.ProcessState.ExitCode()``
 			}
@@ -94,11 +84,7 @@ func (e *NativeExecutable) Deploy() (err error) {
 }
 
 func (e *NativeExecutable) removeWorkload() {
-	_ = os.Remove(e.tmpFilename)
-}
-
-func (e *NativeExecutable) Execute(ctx context.Context, payload []byte) ([]byte, error) {
-	return nil, errors.New("native execution provider does not support execution via trigger subjects")
+	//_ = os.Remove(e.tmpFilename)
 }
 
 // Validate the underlying artifact to be a 64-bit linux native ELF

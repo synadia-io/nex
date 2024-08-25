@@ -1,0 +1,39 @@
+package nexagent:wasm;
+
+interface keyvalue {
+    set: func(bucket: string, key: string, value: string) -> result<bool, string>;
+    get: func(bucket: string, key: string) -> result<list<u8>, string>;
+    delete: func(bucket: string, key: string) -> result<bool, string>;
+    keys: func(bucket: string) -> result<list<string>, string>;
+}
+
+interface messaging {
+    publish: func(subject: string, payload: list<u8>) -> result<bool, string>;
+    request: func(subject: string, payload: list<u8>) -> result<list<u8>, string>;
+}
+
+interface blobstore {
+    record object-info {
+        nuid: string,
+        size: u64,
+        digest: string,
+        bucket: string
+    }
+
+    get: func(bucket: string, key: string) -> result<list<u8>, string>;
+    items: func(bucket: string) -> result<list<object-info>, string>;
+    put: func(bucket: string, key: string, payload: list<u8>) -> result<object-info, string>;
+    delete: func(bucket: string, key: string) -> result<bool, string>;
+}
+
+interface nexfunction {
+    run: func(payload: list<u8>) -> result<list<u8>, string>;
+}
+
+world nex-component {
+    import keyvalue;
+    import blobstore;
+    import messaging;
+
+    export nexfunction;
+}

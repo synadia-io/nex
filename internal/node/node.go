@@ -513,7 +513,9 @@ func (n *Node) loadNodeConfig() error {
 
 func (n *Node) ncClosedHandler(conn *nats.Conn) {
 	attrs := make([]any, 0)
-	attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+	if len(conn.Servers()) > 0 {
+		attrs = append(attrs, slog.String("url", conn.Servers()[0]))
+	}
 
 	if conn.Opts.Name != "" {
 		attrs = append(attrs, slog.String("name", conn.Opts.Name))

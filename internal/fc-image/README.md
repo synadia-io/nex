@@ -13,3 +13,6 @@ The files in this directory are what are used to generate the default `rootfs.ex
 `sudo go run . ../path/to/nex-agent`
 
 Should drop `rootfs.ext4.gz` in working directory
+
+### Plugins
+When building a rootfs, you will need to include plugins if you want to run anything other than native binaries. To include these plugin runners, make sure you use the `--plugin` option. Also make sure the file names match _exactly_ the workload type they represent (e.g. `v8`, `wasm`). We have two first-party workload runners at the moment for `v8` and `wasm`.

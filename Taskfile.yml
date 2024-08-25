@@ -69,6 +69,29 @@ tasks:
     cmds:
       - go build -tags netgo -ldflags '-extldflags "-static"'
 
+  kvecho-wasm:
+    dir: examples/wasm/kvecho
+    sources:
+      - "*.rs"
+      - "Cargo.toml"
+    cmds:
+      - cargo component build
+
+  wasm-runner:
+    dir: workload_runners/wasm
+    sources:
+      - "*.rs"
+      - "Cargo.toml"
+    cmds:
+      - cargo build
+
+  v8-runner:
+    dir: workload_runners/v8
+    sources:
+      - "*.go"
+    cmds:
+      - go build -tags netgo -ldflags '-extldflags "-static"'
+
   unit-test:
     deps: [clean]
     cmds:

@@ -13,6 +13,7 @@ func CreateRootFS(ctx context.Context, logger *slog.Logger) error {
 		RootfsOpts.BuildScriptPath,
 		RootfsOpts.BaseImage,
 		RootfsOpts.AgentBinaryPath,
+		RootfsOpts.Plugins,
 		RootfsOpts.RootFSSize,
 	)
 }

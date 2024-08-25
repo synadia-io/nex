@@ -1,0 +1,26 @@
+[package]
+name = "nex-runner-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wasm"
+
+
+[dependencies]
+anyhow = "1.0.86"
+reqwest = "0.12.5"
+tokio = {version = "1.39.2", features = ["full"] }
+serde = {version = "1.0.204", features = ["derive"]}
+serde_json = "1.0.122"
+async-nats = "0.35.1"
+env_logger = "0.11.5"
+log = "0.4.22"
+futures = "0.3.30"
+ctrlc = "3.4.4"
+chrono = "0.4.38"
+nkeys = "0.4.3"
+
+wasmtime =  {version = "23.0.1"}
+wasmtime-wasi = {version = "23.0.1"}
+async-trait = "0.1.81"

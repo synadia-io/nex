@@ -1,0 +1,2 @@
+# WebAssembly Component Workload Runner Plugin
+This executable is a Nex workload runner plugin that supports executing WebAssembly _components_. This plugin runner will _not_ run vanilla WebAssembly components. This plugin can run any WebAssembly component that was produced using `wit-bindgent` against the [world.wit](./wit/world.wit) file.

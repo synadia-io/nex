@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -260,6 +261,7 @@ func (a *Agent) dispatchLogs() {
 // bucket, write it to tmp, initialize the execution provider per the
 // request, and then validate and deploy a workload
 func (a *Agent) handleDeploy(m *nats.Msg) {
+	a.submitLog("Received deployment request", slog.LevelInfo)
 	var info agentapi.AgentWorkloadInfo
 	err := json.Unmarshal(m.Data, &info)
 	if err != nil {
@@ -287,8 +289,9 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	provider, err := providers.NewExecutionProvider(params)
+	provider, err := providers.NewExecutionProvider(params, a.md)
 	if err != nil {
+		fmt.Printf("failed to initialize workload provider: %s\n", err)
 		msg := fmt.Sprintf("Failed to initialize workload execution provider; %s", err)
 		a.submitLog(msg, slog.LevelError)
 		_ = a.workAck(m, false, msg)
@@ -296,10 +299,10 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	}
 	a.provider = provider
 
-	shouldValidate := true
-	if !a.sandboxed && info.WorkloadType == controlapi.NexWorkloadNative {
-		shouldValidate = false
-	}
+	shouldValidate := a.sandboxed
+	// if !a.sandboxed { && info.WorkloadType == controlapi.NexWorkloadNative {
+	// 	shouldValidate = false
+	// }
 
 	if shouldValidate {
 		err = a.provider.Validate()
@@ -455,7 +458,8 @@ func (a *Agent) installSignalHandlers() {
 
 // newExecutionProviderParams initializes new execution provider params
 // for the given work request and starts a goroutine listening
-func (a *Agent) newExecutionProviderParams(info *agentapi.AgentWorkloadInfo, tmpFile string) (*agentapi.ExecutionProviderParams, error) {
+func (a *Agent) newExecutionProviderParams(info *agentapi.AgentWorkloadInfo,
+	tmpFile string) (*agentapi.ExecutionProviderParams, error) {
 	if a.md.VmID == nil {
 		return nil, errors.New("vm id is required to initialize execution provider params")
 	}
@@ -463,6 +467,12 @@ func (a *Agent) newExecutionProviderParams(info *agentapi.AgentWorkloadInfo, tmp
 	if info.WorkloadName == nil {
 		return nil, errors.New("workload name is required to initialize execution provider params")
 	}
+
+	env := make(map[string]string)
+	env["NEX_WORKLOADID"] = *a.md.VmID
+	env["NEX_NODE_NATS_HOST"] = *a.md.NodeNatsHost
+	env["NEX_NODE_NATS_PORT"] = strconv.Itoa(*a.md.NodeNatsPort)
+	env["NEX_NODE_NATS_NKEY_SEED"] = *a.md.NodeNatsNkeySeed
 
 	params := &agentapi.ExecutionProviderParams{
 		AgentWorkloadInfo: *info,
@@ -479,6 +489,7 @@ func (a *Agent) newExecutionProviderParams(info *agentapi.AgentWorkloadInfo, tmp
 		TriggerSubjects: info.TriggerSubjects,
 		PluginPath:      a.md.PluginPath,
 	}
+	params.Environment = env
 
 	go func() {
 		sleepMillis := agentapi.DefaultRunloopSleepTimeoutMillis
@@ -546,6 +557,7 @@ func (a *Agent) shuttingDown() bool {
 }
 
 func (a *Agent) submitLog(msg string, lvl slog.Level) {
+	fmt.Println(msg)
 	a.agentLogs <- &agentapi.LogEntry{
 		Source: NexEventSourceNexAgent,
 		Level:  lvl,
