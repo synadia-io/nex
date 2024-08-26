@@ -367,6 +367,7 @@ func (w *WorkloadManager) RunningWorkloads() ([]controlapi.MachineSummary, error
 			Uptime:    uptimeFriendly,
 			Namespace: *deployRequest.Namespace,
 			Workload: controlapi.WorkloadSummary{
+				ID:           id,
 				Name:         *deployRequest.WorkloadName,
 				Description:  *deployRequest.Description,
 				Hash:         deployRequest.Hash,
