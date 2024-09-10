@@ -1,0 +1,205 @@
+asyncapi: 3.0.0
+info:
+  title: Nex Agent API
+  version: 1.0.0
+  description: |-
+    Nex Agent API
+    All operations are from the perspective of the agent.
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+defaultContentType: application/json
+servers:
+  internal-nats:
+    host: 0.0.0.0:{random}
+    protocol: nats
+    description: >-
+      Internal NATS server used for communication between the Nex node and the
+      agents
+    security:
+      - $ref: '#/components/securitySchemes/nkeys'
+    tags:
+      - name: visibility:private
+        description: This resource is private and only available to certain users
+channels:
+  startWorkload:
+    address: agentint.{agent-id}.startworkload
+    messages:
+      startWorkload:
+        $ref: '#/components/messages/startWorkload'
+  startWorkloadReply:
+    address: null
+    messages:
+      startWorkloadReply:
+        $ref: '#/components/messages/startWorkloadReply'
+  registerAgent:
+    address: hostint.{agent-id}.register
+    messages:
+      registerAgent:
+        $ref: '#/components/messages/registerAgent'
+  registerAgentReply:
+    address: null
+    messages:
+      registerAgentReply:
+        $ref: '#/components/messages/registerAgentReply'
+operations:
+  startWorkload:
+    action: receive
+    channel:
+      $ref: '#/channels/startWorkload'
+    reply:
+      address:
+        description: Reply-To indicated in request
+        location: $message.header#/replyTo
+      channel:
+        $ref: '#/channels/startWorkloadReply'
+    summary: >-
+      Requests that an agent start a workload according to the supplied
+      specification
+  registerAgent:
+    action: send
+    channel:
+      $ref: '#/channels/registerAgent'
+    reply:
+      address:
+        description: ''
+        location: $message.header#/replyTo
+      channel:
+        $ref: '#/channels/registerAgentReply'
+    summary: >-
+      Upon first starting up, an agent will make a request containing its
+      metadata. The Nex node host will await this registration before continuing
+components:
+  messages:
+    startWorkload:
+      name: StartWorkload
+      title: Start Workload
+      summary: Start workload..
+      payload:
+        $ref: '#/components/schemas/startWorkload'
+    startWorkloadReply:
+      name: StartWorkloadReply
+      title: Start Workload Reply
+      summary: Start workload reply...
+      payload:
+        $ref: '#/components/schemas/startWorkloadReply'
+    registerAgent:
+      name: RegisterAgent
+      title: Register Agent
+      summary: >-
+        A message sent by an agent to a Nex node to supply required agent
+        metadata
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/registerAgent'
+    registerAgentReply:
+      name: RegisterAgentReply
+      title: Register Agent Reply
+      summary: TBD
+      contentType: application/json
+      payload:
+        $ref: '#/components/schemas/registerAgentReply'
+  schemas:
+    startWorkload:
+      type: object
+      properties:
+        id:
+          type: string
+          description: >-
+            Unique ID of the workload. Note that if multi-tenant, a single agent
+            can be responsible for multiple workload IDs
+        name:
+          type: string
+          description: Name of the workload
+        namespace:
+          type: string
+          description: Namespace in which the workload is running
+        total-bytes:
+          type: number
+          description: Size of the workload artifact in bytes
+        hash:
+          type: string
+          description: Hex encoded SHA-256 digest for the workload
+        trigger-subjects:
+          type: array
+          items:
+            type: string
+          description: >-
+            List of subjects on which this workload can be triggered (if
+            applicable). Note the agent does NOT subscribe to these, this is for
+            information and validation only. Only the Nex node can subscribe to
+            the trigger subjejcts.
+        workload-type:
+          type: string
+          description: Mime type of this workload
+        argv:
+          type: array
+          items:
+            type: string
+          description: Command line arguments (if applicable)
+        env:
+          type: array
+          items:
+            type: string
+          description: Environment variables (if applicable)
+    startWorkloadReply:
+      type: object
+      properties:
+        foo:
+          type: integer
+    registerAgent:
+      type: object
+      properties:
+        mime-types:
+          type: array
+          items:
+            type: string
+          description: >-
+            List of mime types supported by this agent. Note that at least one
+            mime type mapping already had to exist in the Nex node configuration
+            for the agent to have been started in the first place.
+        name:
+          type: string
+          description: The name of the agent
+        description:
+          type: string
+          description: Description of the agent
+        multi-tenant:
+          type: boolean
+          description: >-
+            Indicates whether the agent supports running multiple workloads
+            within a single agent. If this is true, the Nex node will know not
+            to create more agents of this type
+    registerAgentReply:
+      type: object
+      properties:
+        foo:
+          type: integer
+          description: blah
+  securitySchemes:
+    nkeys:
+      type: userPassword
+      description: Provide an nkey to authenticate
+    certs:
+      type: X509
+      description: Download the certificate files from service provider
+  parameters:
+    streetlightId:
+      description: The ID of the streetlight.
+  messageTraits:
+    commonHeaders:
+      headers:
+        type: object
+        properties:
+          my-app-header:
+            type: integer
+            minimum: 0
+            maximum: 100
+  operationTraits:
+    kafka:
+      bindings:
+        kafka:
+          clientId:
+            type: string
+            enum:
+              - my-app-id
