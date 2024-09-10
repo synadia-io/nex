@@ -184,22 +184,5 @@ components:
       type: X509
       description: Download the certificate files from service provider
   parameters:
-    streetlightId:
-      description: The ID of the streetlight.
-  messageTraits:
-    commonHeaders:
-      headers:
-        type: object
-        properties:
-          my-app-header:
-            type: integer
-            minimum: 0
-            maximum: 100
-  operationTraits:
-    kafka:
-      bindings:
-        kafka:
-          clientId:
-            type: string
-            enum:
-              - my-app-id
+    agent-id:
+      description: The ID of the agent
