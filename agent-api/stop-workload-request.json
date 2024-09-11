@@ -1,0 +1,24 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/synadia-io/nex/agent-api/stop-workload-request.json",
+    "title": "StopWorkloadRequest",
+    "type": "object",
+    "properties": {
+      "workloadId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "The unique identifier of the workload to stop."
+      },
+      "reason": {
+        "type": "string",
+        "description": "Optional reason for stopping the workload"
+      },
+      "immediate": {
+        "type": "boolean",
+        "description": "Indicates whether the stoppage should be immediate or graceful"
+      }
+    },    
+    "required": ["workloadId"],
+    "additionalProperties": false
+}
+  
