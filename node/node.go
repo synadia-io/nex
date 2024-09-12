@@ -172,6 +172,10 @@ func (nn *nexNode) Validate() error {
 		}
 	}
 
+	if !nn.microVMMode {
+		// FIX: check for agent binaries here
+	}
+
 	errs = errors.Join(errs, nn.validateOS())
 
 	return errs

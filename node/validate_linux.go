@@ -43,8 +43,6 @@ func (nn *nexNode) validateOS() error {
 		}
 
 		// FIX: check for cni plugins here
-
-		// FIX: check for agent binaries here
 	}
 	return errs
 }
