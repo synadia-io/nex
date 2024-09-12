@@ -186,13 +186,13 @@ func (nn *nexNode) Validate() error {
 		if nn.otelOptions.MetricsPort <= 0 || nn.otelOptions.MetricsPort > 65535 {
 			errs = errors.Join(errs, errors.New("invalid metrics port"))
 		}
-		if nn.otelOptions.MetricsExporter == "" || slices.Contains([]string{"file", "prometheus"}, nn.otelOptions.MetricsExporter) {
+		if nn.otelOptions.MetricsExporter == "" || !slices.Contains([]string{"file", "prometheus"}, nn.otelOptions.MetricsExporter) {
 			errs = errors.Join(errs, errors.New("invalid metrics exporter"))
 		}
 	}
 
 	if nn.otelOptions.TracesEnabled {
-		if nn.otelOptions.TracesExporter == "" || slices.Contains([]string{"file", "http", "grpc"}, nn.otelOptions.TracesExporter) {
+		if nn.otelOptions.TracesExporter == "" || !slices.Contains([]string{"file", "http", "grpc"}, nn.otelOptions.TracesExporter) {
 			errs = errors.Join(errs, errors.New("invalid traces exporter"))
 		}
 		if nn.otelOptions.TracesExporter == "http" || nn.otelOptions.TracesExporter == "grpc" {
