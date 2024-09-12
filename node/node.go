@@ -10,38 +10,43 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-type NexNode struct {
+type Node interface {
+	Validate() error
+	Start()
+}
+
+type nexNode struct {
 	nc *nats.Conn
 
 	logger *slog.Logger
 }
 
-type NexOption func(*NexNode)
+type NexOption func(*nexNode)
 
-func NewNexNode(nc *nats.Conn, opts ...NexOption) (*NexNode, error) {
+func NewNexNode(nc *nats.Conn, opts ...NexOption) (Node, error) {
 	if nc == nil {
 		return nil, fmt.Errorf("no nats connection provided")
 	}
 
-	nexNode := &NexNode{
+	nn := &nexNode{
 		nc:     nc,
 		logger: slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 	}
 
 	for _, opt := range opts {
-		opt(nexNode)
+		opt(nn)
 	}
 
-	return nexNode, nil
+	return nn, nil
 }
 
-func (nn NexNode) Validate() error {
+func (nn *nexNode) Validate() error {
 	var errs error
 
 	return errs
 }
 
-func (NexNode) Start() {
+func (nn *nexNode) Start() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
