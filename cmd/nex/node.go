@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"time"
 
-	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+
+	"github.com/synadia-io/nex/node"
 )
 
 type Node struct {
@@ -226,19 +226,20 @@ func (u Up) Run(ctx context.Context, globals Globals) error {
 
 	logger := configureLogger(globals, nc, pubKey)
 
-	err = NewNexNode(ctx, logger, nc)
+	nexNode, err := node.NewNexNode(nc, node.WithLogger(logger))
 	if err != nil {
 		return err
 	}
 
-	// node.Start()
-	// <-ctx.Done()
+	err = nexNode.Validate()
+	if err != nil {
+		return err
+	}
 
-	return nil
-}
+	logger.Info("Starting Nex Node")
+	nexNode.Start()
+	logger.Info("Shutting down Nex Node")
 
-// TODO: DELETE ME
-func NewNexNode(_ context.Context, _ *slog.Logger, _ *nats.Conn) error {
 	return nil
 }
 

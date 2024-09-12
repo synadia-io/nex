@@ -2,6 +2,8 @@ module github.com/synadia-io/nex/cmd/nex
 
 go 1.23.0
 
+replace github.com/synadia-io/nex => ../..
+
 require (
 	disorder.dev/shandler v0.0.0-20240826142832-c3d20720c9db
 	github.com/alecthomas/kong v0.9.0
@@ -9,6 +11,7 @@ require (
 	github.com/nats-io/jsm.go v0.1.2
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
+	github.com/synadia-io/nex v0.0.0-00010101000000-000000000000
 )
 
 require (
