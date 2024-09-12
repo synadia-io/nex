@@ -17,7 +17,7 @@ func configureNatsConnection(cfg Globals) (*nats.Conn, error) {
 	}
 
 	// If a nats context is provided, it takes priority
-	if !natscontext.IsKnown(cfg.NatsContext) {
+	if natscontext.IsKnown(cfg.NatsContext) {
 		nc, err := natscontext.Connect(cfg.NatsContext, opts...)
 		if err != nil {
 			return nil, err
