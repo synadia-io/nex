@@ -226,7 +226,46 @@ func (u Up) Run(ctx context.Context, globals Globals) error {
 
 	logger := configureLogger(globals, nc, pubKey)
 
-	nexNode, err := node.NewNexNode(nc, node.WithLogger(logger))
+	nexNode, err := node.NewNexNode(nc,
+		node.WithLogger(logger),
+		node.WithAgentHandshakeTimeout(u.AgentHandshakeTimeoutMillisecond),
+		node.WithResourceDirectory(u.DefaultResourceDir),
+		node.WithInternalNodeNATHost(u.InternalNodeHost, u.InternalNodePort),
+		node.WithMicroVMMode(u.MicroVM),
+		node.WithPreserveNetwork(u.PreserveNetwork),
+		node.WithKernelFilepath(u.KernelFilepath),
+		node.WithRootFsFilepath(u.RootFsFilepath),
+		node.WithNodeTags(u.Tags),
+		node.WithValidIssuers(u.ValidIssuers),
+		node.WithCNIOptions(node.CNIOptions{
+			BinPaths:      u.CNIDefinition.CniBinPaths,
+			InterfaceName: u.CNIDefinition.CniInterfaceName,
+			NetworkName:   u.CNIDefinition.CniNetworkName,
+			Subnet:        u.CNIDefinition.CniSubnet,
+		}),
+		node.WithFirecrackerOptions(node.FirecrackerOptions{
+			VcpuCount: u.MachineTemplate.FirecrackerVcpuCount,
+			MemoryMiB: u.MachineTemplate.FirecrackerMemSizeMib,
+		}),
+		node.WithBandwidthOptions(node.BandwithOptions{
+			OneTimeBurst: u.Limiters.Bandwidth.OneTimeBurst,
+			RefillTime:   u.Limiters.Bandwidth.RefillTime,
+			Size:         u.Limiters.Bandwidth.Size,
+		}),
+		node.WithOperationsOptions(node.OperationsOptions{
+			OneTimeBurst: u.Limiters.Operations.OneTimeBurst,
+			RefillTime:   u.Limiters.Operations.RefillTime,
+			Size:         u.Limiters.Operations.Size,
+		}),
+		node.WithOTelOptions(node.OTelOptions{
+			MetricsEnabled:   u.OtelConfig.OtelMetrics,
+			MetricsPort:      u.OtelConfig.OtelMetricsPort,
+			MetricsExporter:  u.OtelConfig.OtelMetricsExporter,
+			TracesEnabled:    u.OtelConfig.OtelTraces,
+			TracesExporter:   u.OtelConfig.OtelTracesExporter,
+			ExporterEndpoint: u.OtelConfig.OtlpExporterUrl,
+		}),
+	)
 	if err != nil {
 		return err
 	}
