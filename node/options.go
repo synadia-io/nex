@@ -6,7 +6,9 @@ import (
 
 func WithLogger(s *slog.Logger) NexOption {
 	return func(n *nexNode) {
-		n.logger = s
+		if s != nil {
+			n.logger = s
+		}
 	}
 }
 
