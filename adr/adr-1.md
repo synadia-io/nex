@@ -72,9 +72,9 @@ Poorly formed or invalid archives should be rejected by the agent in response to
 
 All agents are spawned by the `Nex` node process at startup and must _not_ be started manually outside the Nex node process (e.g. they are _not_ sidecars). Each agent will be supplied with the following environment variables which allow it to connect to the Nex internal NATS "bus":
 
-* `INT_NATS_HOST` - Host (IP) of the Nex internal NATS server. This will almost always be `0.0.0.0` or `127.0.0.1`, and is determined by the node configuration file.
-* `INT_NATS_PORT` - Nex starts the internal NATS server on a _random_ port. This environment variable contains that port number.
-* `INT_NATS_NKEY_SEED` - The **nkey _seed_** used by the agent to connect to the internal server. This seed is dynamically generated every time the Nex node starts.
+* `NEX_NATS_HOST` - Host (IP) of the Nex internal NATS server. This will almost always be `0.0.0.0` or `127.0.0.1`, and is determined by the node configuration file.
+* `NEX_NATS_PORT` - Nex starts the internal NATS server on a _random_ port. This environment variable contains that port number.
+* `NEX_NATS_NKEY_SEED` - The **nkey _seed_** used by the agent to connect to the internal server. This seed is dynamically generated every time the Nex node starts.
 
 Agents can also be passed environment variables and command line arguments via the `env` and `argv` fields in the agent's section of the node config.
 
@@ -104,21 +104,23 @@ The WebAssembly agent is responsible for executing WebAssembly _components_. We 
 The WebAssembly agent is responsible for exposing host services to each function, proxying access to the host services API exposed on the internal NATS server.
 
 ### OCI Agent
-The OCI agent will be responsible for running images from an indicated container registry. This effectively gives Nex nodes the ability to schedule and start docker images.
+The OCI agent will be responsible for running images from an indicated container registry. This effectively gives Nex nodes the ability to schedule and start Docker images.
 
-Information on how to connect to the appropriate host services URL/creds will be provided to the workload. OCI workloads are considered long-lived services and as such do not require a host services proxy.
+Environment variables allowing the agent's workload to connect to the appropriate host services URL/creds will be provided. OCI workloads are services capable of making network connections, so they can connect directly to host services instead of using the proxy.
 
 ## New Agent Protocol
 Every agent is required to adhere to this agent protocol. The agents _must_ connect to the internal NATS server embedded in the Nex node host and this is the _only_ way that agents and Nex nodes communicate with each other other than when the Nex node initially spawns an agent.
 
-Note that in the table below, _direction_ is relative to the _agent_. `hostint.>` is an export from the Nex node account, while `agentint.>` is an export from the agent's user/account. All communications in the table below happens on the internal connection, _agents should not communicate with any NATS servers other than the Nex node host_.
+Note that in the table below, _direction_ is relative to the _agent_. `host.>` is an export from the Nex node account, while `agent.>` is an export from the agent's user/account. All communications in the table below happens on the internal connection, _agents should not communicate with any NATS servers other than the Nex node host_.
+
+The schemas for the payloads for these operations and their replies can be found in the [agent-api](../agent-api/README.md) folder.
 
 | Subject | Direction | Description |
 |--|--|:--|
-| `hostint.{workload-type}.register` | **request** | Registers the agent information with the Nex node host. Here `workload-type` is the name of the workload type this agent handles, e.g. `native` or `javascript` |
-| `hostint.{workload-type}.logs` | **publish** | Emits logs from running workloads for the Nex node to capture and potentially re-broadcast |
-| `hostint.{workload-type}.events.{event-type}` | **publish** | Emits a cloud event from the agent to the Nex node |
-| `hostint.hostservices.<service>.<method>` | **request** | When proxying host services calls, the agent will use this subject. The calling workload will be indicated with `x-agent-workloadid`, `x-agent-workloadtype`, and `x-agent-namespace` headers. The raw payload is passed directly. For example, a JavaScript function making a key-value `get` request would make a request on `hostint.hostservices.keyvalue.get`. Additional headers for e.g. metrics/tracing or for specific host services can also be passed. |
-| `agentint.{workload-type}.startworkload` | **reply** | Handles a request from the Nex node to start a workload |
-| `agentint.{workload-type}.stopworkload` | **reply** | Handles a request from the Nex node to stop a workload | 
-| `agentint.{workload-type}.workloads.get` | **reply** | Handles a request from the Nex node for a list of all running workloads and their state, if applicable | 
+| `host.{workload-type}.register` | **request** | Registers the agent information with the Nex node host. Here `workload-type` is the name of the workload type this agent handles, e.g. `native` or `javascript` |
+| `host.{workload-type}.logs` | **publish** | Emits logs from running workloads to the Nex node to capture and potentially re-broadcast |
+| `host.{workload-type}.events.{event-type}` | **publish** | Emits a cloud event from the agent to the Nex node |
+| `host.services.<workload-type>.<workload-name>.<workload-id>.<service>.<method>` | **request** | When proxying host services calls, the agent will use this subject. The raw payload is passed directly. For example, a JavaScript function making a key-value `get` request would make a request on `host.services.keyvalue.get`. Additional headers for e.g. metrics/tracing or for specific host services can also be passed. |
+| `agent.{workload-type}.startworkload` | **reply** | Handles a request from the Nex node to start a workload |
+| `agent.{workload-type}.stopworkload` | **reply** | Handles a request from the Nex node to stop a workload | 
+| `agent.{workload-type}.workloads.list` | **reply** | Handles a request from the Nex node for a list of all running workloads and their state, if applicable | 
