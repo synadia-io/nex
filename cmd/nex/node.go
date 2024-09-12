@@ -180,7 +180,7 @@ type Up struct {
 	AgentHandshakeTimeoutMillisecond int               `default:"5000" group:"Nex Node Up Configuration" json:"up_agent_handshake_timeout_ms"`
 	DefaultResourceDir               string            `default:"./resources" group:"Nex Node Up Configuration" json:"up_default_resource_dir"`
 	FirecrackerBinPath               string            `default:"/usr/local/bin/firecracker" group:"Nex Node Up Configuration" json:"up_firecracker_bin"`
-	InternalNodeHost                 string            `default:"192.168.127.1" group:"Nex Node Up Configuration" json:"up_internal_node_host"`
+	InternalNodeHost                 string            `default:"nats://192.168.127.1" group:"Nex Node Up Configuration" json:"up_internal_node_host"`
 	InternalNodePort                 int               `default:"9222" group:"Nex Node Up Configuration" json:"up_internal_node_port"`
 	KernelFilepath                   string            `group:"Nex Node Up Configuration" json:"up_kernel_filepath"`
 	MachinePoolSize                  int               `default:"1" group:"Nex Node Up Configuration" json:"up_machine_pool_size"`
@@ -270,6 +270,12 @@ func (u Up) Run(ctx context.Context, globals Globals) error {
 		return err
 	}
 
+	err = nexNode.Validate()
+	if err != nil {
+		return err
+	}
+
+	logger.Info("Validating Nex Node")
 	err = nexNode.Validate()
 	if err != nil {
 		return err
