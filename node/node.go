@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
@@ -117,16 +118,25 @@ func (nn *nexNode) Validate() error {
 			if _, err := os.Stat(nn.resourceDirectory); os.IsNotExist(err) {
 				errs = errors.Join(errs, errors.New("resource directory does not exist"))
 			}
-		} else {
-			if nn.kernelFilepath != "" {
-				if _, err := os.Stat(nn.kernelFilepath); os.IsNotExist(err) {
-					errs = errors.Join(errs, errors.New("kernel file does not exist"))
+			if nn.kernelFilepath == "" {
+				if _, err := os.Stat(filepath.Join(nn.resourceDirectory, "vmlinux")); os.IsNotExist(err) {
+					errs = errors.Join(errs, errors.New("did not find kernel file: "+filepath.Join(nn.resourceDirectory, "vmlinux")))
 				}
 			}
-			if nn.rootFsFilepath != "" {
-				if _, err := os.Stat(nn.rootFsFilepath); os.IsNotExist(err) {
-					errs = errors.Join(errs, errors.New("rootfs file does not exist"))
+			if nn.rootFsFilepath == "" {
+				if _, err := os.Stat(filepath.Join(nn.resourceDirectory, "rootfs.ext4")); os.IsNotExist(err) {
+					errs = errors.Join(errs, errors.New("did not find rootfs file: "+filepath.Join(nn.resourceDirectory, "rootfs.ext4")))
 				}
+			}
+		}
+		if nn.kernelFilepath != "" {
+			if _, err := os.Stat(nn.kernelFilepath); os.IsNotExist(err) {
+				errs = errors.Join(errs, errors.New("kernel file does not exist"))
+			}
+		}
+		if nn.rootFsFilepath != "" {
+			if _, err := os.Stat(nn.rootFsFilepath); os.IsNotExist(err) {
+				errs = errors.Join(errs, errors.New("rootfs file does not exist"))
 			}
 		}
 	}
