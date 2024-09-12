@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
@@ -13,7 +14,9 @@ import (
 
 func startNatsServer(t testing.TB) *nats.Conn {
 	t.Helper()
-	opts := &server.Options{}
+	opts := &server.Options{
+		Port: -1,
+	}
 	ns, err := server.NewServer(opts)
 	if err != nil {
 		t.Fatal("failed to start nats server", err)
@@ -21,6 +24,8 @@ func startNatsServer(t testing.TB) *nats.Conn {
 	defer ns.Shutdown()
 
 	go ns.Start()
+	time.Sleep(500 * time.Millisecond)
+
 	nc, err := nats.Connect(ns.ClientURL())
 	if err != nil {
 		t.Fatal("failed to connect to nats server", err)
