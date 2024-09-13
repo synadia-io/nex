@@ -9,8 +9,8 @@
   },
   "workload_types": [
     {
-      "name": "CONFIGWORKLOAD",
-      "agenturi": "nats://uri/config",
+      "name": "native",
+      "agenturi": "nats://nex_workload/native",
       "argv": [],
       "env": {
         "FOO": "BAR"
