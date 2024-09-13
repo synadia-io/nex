@@ -56,8 +56,6 @@ func (u Up) Table() []table.Row {
 	return []table.Row{
 		{"Agent Handshake Timeout Millisecond", u.AgentHandshakeTimeoutMillisecond, reflect.TypeOf(u.AgentHandshakeTimeoutMillisecond).String()},
 		{"Default Resource Directory", u.DefaultResourceDir, reflect.TypeOf(u.DefaultResourceDir).String()},
-		{"Internal Node NAT Host", u.InternalNodeHost, reflect.TypeOf(u.InternalNodeHost).String()},
-		{"Internal Node NATS Port", u.InternalNodePort, reflect.TypeOf(u.InternalNodePort).String()},
 		{"Nexus Name", u.NexusName, reflect.TypeOf(u.NexusName)},
 		{"Tags", u.Tags, reflect.TypeOf(u.Tags).String()},
 		{"Valid Issuers", u.ValidIssuers, reflect.TypeOf(u.ValidIssuers).String()},

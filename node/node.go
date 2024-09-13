@@ -25,8 +25,6 @@ type nexNode struct {
 	logger                *slog.Logger
 	agentHandshakeTimeout int
 	resourceDirectory     string
-	internalNodeNATSHost  string
-	internalNodeNATSPort  int
 	tags                  map[string]string
 	validIssuers          []string
 	otelOptions           OTelOptions
@@ -46,8 +44,6 @@ func NewNexNode(nc *nats.Conn, opts ...NexOption) (Node, error) {
 		logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 		agentHandshakeTimeout: 5000,
 		resourceDirectory:     "./resources",
-		internalNodeNATSHost:  "127.0.0.1",
-		internalNodeNATSPort:  -1,
 		tags:                  make(map[string]string),
 		validIssuers:          []string{},
 		otelOptions: OTelOptions{
