@@ -1,0 +1,20 @@
+{
+  "logger": {
+    "color": true,
+    "level": "info"
+  },
+  "nexus_name": "mynexus",
+  "tags": {
+    "foo": "bar"
+  },
+  "workload_types": [
+    {
+      "name": "CONFIGWORKLOAD",
+      "agenturi": "nats://uri/config",
+      "argv": [],
+      "env": {
+        "FOO": "BAR"
+      }
+    }
+  ]
+}
