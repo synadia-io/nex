@@ -182,7 +182,6 @@ type Up struct {
 	InternalNodeHost                 string            `default:"nats://192.168.127.1"`
 	InternalNodePort                 int               `default:"9222"`
 	NexusName                        string            `default:"nexus" help:"Nexus name"`
-	PublicNATSServer                 []byte            `placeholder:"./path/to/nats_server.conf" type:"filecontent" help:"Path to nats server config to be used for userland NATS server. JSON format"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
 	WorkloadTypes                    []WorkloadConfig  `help:"Workload types configurations for nex node to initialize"`
@@ -194,7 +193,7 @@ type Up struct {
 func (u Up) Validate() error {
 	var errs error
 	if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
-		errs = errors.Join(errs, errors.New("attempting to start nex node with no workloads configured. Please provide at least 1 workload configuration"))
+		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration"))
 	}
 	return errs
 }
