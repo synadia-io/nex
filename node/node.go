@@ -142,7 +142,6 @@ func (nn *nexNode) initializeSupervisionTree() {
 	options.Applications = apps
 
 	// disable default logger to get rid of multiple logging to the os.Stdout
-	// TODO: figure out how to get logs to show up in the observer... not seeing any yet
 	options.Log.DefaultLogger.Disable = true
 
 	// https://docs.ergo.services/basics/logging#process-logger
