@@ -192,9 +192,9 @@ type Up struct {
 
 func (u Up) Validate() error {
 	var errs error
-	// if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
-	// 	errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration"))
-	// }
+	if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
+		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration"))
+	}
 	return errs
 }
 
