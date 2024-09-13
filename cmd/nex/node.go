@@ -203,8 +203,6 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 		return printTable("Node Up Configuration", append(globals.Table(), u.Table()...)...)
 	}
 
-	fmt.Println(globals.NatsServers)
-
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
