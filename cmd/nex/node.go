@@ -7,10 +7,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"reflect"
 	"time"
 
-	"github.com/alecthomas/kong"
 	"github.com/nats-io/nkeys"
 
 	"github.com/synadia-io/nex/node"
@@ -186,7 +184,7 @@ type Up struct {
 	NexusName                        string            `default:"nexus" help:"Nexus name"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
-	WorkloadTypes                    WorkloadConfigs   `type:"workloadConfigs" help:"Workload types configurations for nex node to initialize"`
+	WorkloadTypes                    WorkloadConfigs   `help:"Workload types configurations for nex node to initialize"`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
 	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
@@ -244,7 +242,7 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 			for i, e := range u.WorkloadTypes {
 				ret[i] = node.WorkloadOptions{
 					Name:     e.Name,
-					AgentURI: e.AgentURI,
+					AgentUri: e.AgentUri,
 					Argv:     e.Argv,
 					Env:      e.Env,
 				}
@@ -314,12 +312,8 @@ type ServiceConfig struct {
 
 type WorkloadConfig struct {
 	Name     string            `help:"Name of the workload type" placeholder:"javascript"`
-	AgentURI string            `help:"URI to the agent binary to download and install in resource directory" placeholder:"nats://bucket/key"`
+	AgentUri string            `name:"agenturi" help:"URI to the agent binary to download and install in resource directory" placeholder:"nats://bucket/key"`
 	Argv     []string          `help:"Arguments to pass to the agent. Comma seperated" placeholder:"--foo=bar,--true"`
 	Env      map[string]string `help:"Environment variables to pass to the agent" placeholder:"NAME=derp"`
 }
 type WorkloadConfigs []WorkloadConfig
-
-func (w WorkloadConfigs) Decode(ctx *kong.DecodeContext, val reflect.Value) error {
-	return nil
-}

@@ -14,7 +14,7 @@ import (
 func TestCLISimple(t *testing.T) {
 	nex := new(NexCLI)
 
-	parser := kong.Must(nex, kong.Vars(map[string]string{"versionOnly": "testing"}))
+	parser := kong.Must(nex, kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}))
 	kp, err := nkeys.CreatePair(nkeys.PrefixByteServer)
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +36,23 @@ func TestCLISimple(t *testing.T) {
 
 func TestCLIWithConfig(t *testing.T) {
 	config := `{
-    "namespace": "derp"
+    "namespace": "derp",
+    "workload_types": [
+      {
+        "name": "CONFIGWORKLOAD",
+        "agenturi": "nats://uri/config",
+        "argv": [],
+        "env": {
+          "FOO": "BAR"
+        }
+      },
+      {
+        "name": "CONFIGWORKLOAD_TWO",
+        "agenturi": "nats://uri/config2",
+        "argv": ["--arg", "foo"],
+        "env": {}
+      }
+    ]
   }`
 
 	dir := t.TempDir()
@@ -48,7 +64,7 @@ func TestCLIWithConfig(t *testing.T) {
 	defer f.Close()
 
 	nex := new(NexCLI)
-	parser := kong.Must(nex, kong.Vars(map[string]string{"versionOnly": "testing"}), kong.Configuration(kong.JSON, f.Name()))
+	parser := kong.Must(nex, kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}), kong.Configuration(kong.JSON, f.Name()))
 	parser.LoadConfig(f.Name())
 
 	_, err = parser.Parse([]string{"node", "up", "--config", f.Name()})
@@ -65,5 +81,9 @@ func TestCLIWithConfig(t *testing.T) {
 
 	if nex.Globals.Namespace != "derp" {
 		t.Fatalf("Expected nats servers to be %v, got %v", "derp", nex.Globals.Namespace)
+	}
+
+	if len(nex.Node.Up.WorkloadTypes) != 2 {
+		t.Fatalf("Expected 2 workload types, got %d", len(nex.Node.Up.WorkloadTypes))
 	}
 }

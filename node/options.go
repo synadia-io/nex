@@ -73,7 +73,7 @@ type OTelOptions struct {
 
 type WorkloadOptions struct {
 	Name     string
-	AgentURI string
+	AgentUri string
 	Argv     []string
 	Env      map[string]string
 }

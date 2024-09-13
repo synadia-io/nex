@@ -45,7 +45,6 @@ func main() {
 			"versionOnly":         VERSION,
 			"defaultResourcePath": userResourcePath,
 		},
-		kong.NamedMapper("workloadConfigs", WorkloadConfigs{}),
 	)
 
 	ctx.BindTo(context.Background(), (*context.Context)(nil))
