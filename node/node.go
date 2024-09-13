@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"path/filepath"
 	"slices"
 	"time"
 
@@ -28,16 +27,8 @@ type nexNode struct {
 	resourceDirectory     string
 	internalNodeNATHost   string
 	internalNodeNATPort   int
-	microVMMode           bool
-	preserveNetwork       bool
-	kernelFilepath        string
-	rootFsFilepath        string
 	tags                  map[string]string
 	validIssuers          []string
-	cniOptions            CNIOptions
-	firecrackerOptions    FirecrackerOptions
-	bandwidthOptions      BandwithOptions
-	operationsOptions     OperationsOptions
 	otelOptions           OTelOptions
 }
 
@@ -55,30 +46,8 @@ func NewNexNode(nc *nats.Conn, opts ...NexOption) (Node, error) {
 		resourceDirectory:     "./resources",
 		internalNodeNATHost:   nats.DefaultURL,
 		internalNodeNATPort:   4222,
-		microVMMode:           false,
-		preserveNetwork:       true,
 		tags:                  make(map[string]string),
 		validIssuers:          []string{},
-		cniOptions: CNIOptions{
-			BinPaths:      []string{"/opt/cni/bin"},
-			InterfaceName: "veth0",
-			NetworkName:   "fcnet",
-			Subnet:        "192.168.127.0/24",
-		},
-		firecrackerOptions: FirecrackerOptions{
-			VcpuCount: 1,
-			MemoryMiB: 256,
-		},
-		bandwidthOptions: BandwithOptions{
-			OneTimeBurst: 0,
-			RefillTime:   0,
-			Size:         0,
-		},
-		operationsOptions: OperationsOptions{
-			OneTimeBurst: 0,
-			RefillTime:   0,
-			Size:         0,
-		},
 		otelOptions: OTelOptions{
 			MetricsEnabled:   false,
 			MetricsPort:      8085,
@@ -111,33 +80,9 @@ func (nn *nexNode) Validate() error {
 		errs = errors.Join(errs, errors.New("agent handshake timeout must be greater than 0"))
 	}
 
-	if nn.resourceDirectory == "" && (nn.kernelFilepath == "" || nn.rootFsFilepath == "") {
-		errs = errors.Join(errs, errors.New("must provide a resourceDirectory or a location for kernel and rootfs"))
-	} else {
-		if nn.resourceDirectory != "" {
-			if _, err := os.Stat(nn.resourceDirectory); os.IsNotExist(err) {
-				errs = errors.Join(errs, errors.New("resource directory does not exist"))
-			}
-			if nn.kernelFilepath == "" {
-				if _, err := os.Stat(filepath.Join(nn.resourceDirectory, "vmlinux")); os.IsNotExist(err) {
-					errs = errors.Join(errs, errors.New("did not find kernel file: "+filepath.Join(nn.resourceDirectory, "vmlinux")))
-				}
-			}
-			if nn.rootFsFilepath == "" {
-				if _, err := os.Stat(filepath.Join(nn.resourceDirectory, "rootfs.ext4")); os.IsNotExist(err) {
-					errs = errors.Join(errs, errors.New("did not find rootfs file: "+filepath.Join(nn.resourceDirectory, "rootfs.ext4")))
-				}
-			}
-		}
-		if nn.kernelFilepath != "" {
-			if _, err := os.Stat(nn.kernelFilepath); os.IsNotExist(err) {
-				errs = errors.Join(errs, errors.New("kernel file does not exist"))
-			}
-		}
-		if nn.rootFsFilepath != "" {
-			if _, err := os.Stat(nn.rootFsFilepath); os.IsNotExist(err) {
-				errs = errors.Join(errs, errors.New("rootfs file does not exist"))
-			}
+	if nn.resourceDirectory != "" {
+		if _, err := os.Stat(nn.resourceDirectory); os.IsNotExist(err) {
+			errs = errors.Join(errs, errors.New("resource directory does not exist"))
 		}
 	}
 
@@ -171,12 +116,6 @@ func (nn *nexNode) Validate() error {
 			}
 		}
 	}
-
-	if !nn.microVMMode {
-		// FIX: check for agent binaries here
-	}
-
-	errs = errors.Join(errs, nn.validateOS())
 
 	return errs
 }

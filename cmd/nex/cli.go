@@ -13,7 +13,7 @@ type Globals struct {
 
 	Config    kong.ConfigFlag  `help:"Configuration file to load" placeholder:"./nex.config.json"`
 	Version   kong.VersionFlag `help:"Print version information"`
-	Namespace string           `env:"NEX_NAMESPACE" placeholder:"default" help:"Specifies namespace when running nex commands" json:"globals_namespace"`
+	Namespace string           `env:"NEX_NAMESPACE" placeholder:"default" help:"Specifies namespace when running nex commands"`
 	Check     bool             `optional:"" help:"Print the current configuration"`
 }
 

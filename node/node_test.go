@@ -1,8 +1,6 @@
 package node_test
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -39,8 +37,6 @@ func TestDefaultConfigNodeValidation(t *testing.T) {
 	defer nc.Close()
 
 	tDir := t.TempDir()
-	os.Create(filepath.Join(tDir, "vmlinux"))
-	os.Create(filepath.Join(tDir, "rootfs.ext4"))
 
 	node, err := node.NewNexNode(nc, node.WithResourceDirectory(tDir))
 	if err != nil {

@@ -1,1 +1,3 @@
-{}
+{
+  "globals.natsServers": ["nats://derp"]
+}
