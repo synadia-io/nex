@@ -38,7 +38,7 @@ func TestDefaultConfigNodeValidation(t *testing.T) {
 
 	tDir := t.TempDir()
 
-	node, err := node.NewNexNode(nc, node.WithResourceDirectory(tDir))
+	node, err := node.NewNexNode(nc, node.WithResourceDirectory(tDir), node.WithWorkloadTypes([]node.WorkloadOptions{{Name: "test", AgentUri: "https://derp.com", Argv: []string{}, Env: map[string]string{}}}))
 	if err != nil {
 		t.Fatal("failed to create new nex node", err)
 	}
