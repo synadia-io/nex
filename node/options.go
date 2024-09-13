@@ -1,6 +1,7 @@
 package node
 
 import (
+	"encoding/json"
 	"log/slog"
 )
 
@@ -49,6 +50,18 @@ func WithOTelOptions(o OTelOptions) NexOption {
 	}
 }
 
+func WithWorkloadTypes(w []WorkloadOptions) NexOption {
+	return func(n *nexNode) {
+		n.workloadOptions = w
+	}
+}
+
+func WithHostServiceOptions(h HostServiceOptions) NexOption {
+	return func(n *nexNode) {
+		n.hostServiceOptions = h
+	}
+}
+
 type OTelOptions struct {
 	MetricsEnabled   bool
 	MetricsExporter  string
@@ -56,4 +69,23 @@ type OTelOptions struct {
 	TracesEnabled    bool
 	TracesExporter   string
 	ExporterEndpoint string
+}
+
+type WorkloadOptions struct {
+	Name      string
+	AgentPath string
+	Argv      []string
+	Env       map[string]string
+}
+
+type HostServiceOptions struct {
+	NatsUrl      string
+	NatsUserJwt  string
+	NatsUserSeed string
+	Services     map[string]ServiceConfig
+}
+
+type ServiceConfig struct {
+	Enabled       bool
+	Configuration json.RawMessage
 }

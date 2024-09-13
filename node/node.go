@@ -30,6 +30,8 @@ type nexNode struct {
 	tags                  map[string]string
 	validIssuers          []string
 	otelOptions           OTelOptions
+	workloadOptions       []WorkloadOptions
+	hostServiceOptions    HostServiceOptions
 }
 
 type NexOption func(*nexNode)
@@ -55,6 +57,10 @@ func NewNexNode(nc *nats.Conn, opts ...NexOption) (Node, error) {
 			TracesEnabled:    false,
 			TracesExporter:   "file",
 			ExporterEndpoint: "127.0.0.1:14532",
+		},
+		workloadOptions: []WorkloadOptions{},
+		hostServiceOptions: HostServiceOptions{
+			Services: make(map[string]ServiceConfig),
 		},
 	}
 

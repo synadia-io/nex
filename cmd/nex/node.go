@@ -177,31 +177,26 @@ func (i Info) Run(ctx context.Context, globals Globals) error {
 
 // ----- Up Command -----
 type Up struct {
-	AgentHandshakeTimeoutMillisecond int               `default:"5000" group:"Nex Node Up Configuration" json:"up_agent_handshake_timeout_ms"`
-	DefaultResourceDir               string            `default:"./resources" group:"Nex Node Up Configuration" json:"up_default_resource_dir"`
-	FirecrackerBinPath               string            `default:"/usr/local/bin/firecracker" group:"Nex Node Up Configuration" json:"up_firecracker_bin"`
-	InternalNodeHost                 string            `default:"nats://192.168.127.1" group:"Nex Node Up Configuration" json:"up_internal_node_host"`
-	InternalNodePort                 int               `default:"9222" group:"Nex Node Up Configuration" json:"up_internal_node_port"`
-	KernelFilepath                   string            `group:"Nex Node Up Configuration" json:"up_kernel_filepath"`
-	MachinePoolSize                  int               `default:"1" group:"Nex Node Up Configuration" json:"up_machine_pool_size"`
-	MicroVM                          bool              `default:"false" group:"Nex Node Up Configuration" json:"up_microvm"`
-	NexusName                        string            `optional:"" help:"Nexus name" default:"nexus"`
-	PreserveNetwork                  bool              `default:"true" group:"Nex Node Up Configuration" json:"up_preserve_network"`
-	PublicNATSServer                 []byte            `placeholder:"./path/to/nats_server.conf" type:"filecontent" help:"Path to nats server config to be used for userland NATS server. JSON format" group:"Nex Node Up Configuration"`
-	RootFsFilepath                   string            `group:"Nex Node Up Configuration" json:"up_rootfs_filepath"`
-	Tags                             map[string]string `placeholder:"nex:iscool;..." group:"Nex Node Up Configuration" json:"up_tags"`
-	ValidIssuers                     []string          `group:"Nex Node Up Configuration" json:"up_valid_issuers"`
-	//WorkloadTypes                    []models.NexWorkload `default:"native" enum:"native,function,container,wasm" group:"Nex Node Up Configuration" json:"up_workload_types"`
+	AgentHandshakeTimeoutMillisecond int               `default:"5000"`
+	DefaultResourceDir               string            `default:"./resources"`
+	InternalNodeHost                 string            `default:"nats://192.168.127.1"`
+	InternalNodePort                 int               `default:"9222"`
+	NexusName                        string            `default:"nexus" help:"Nexus name"`
+	PublicNATSServer                 []byte            `placeholder:"./path/to/nats_server.conf" type:"filecontent" help:"Path to nats server config to be used for userland NATS server. JSON format"`
+	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
+	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
+	WorkloadTypes                    []WorkloadConfig  `help:"Workload types configurations for nex node to initialize"`
 
-	CNIDefinition      *CNIDefinition      `embed:"" group:"CNI Configuration"`
-	MachineTemplate    *MachineTemplate    `embed:"" group:"Firecracker Machine Configuration"`
-	Limiters           *Limiters           `embed:"" prefix:"limiter_" group:"Limiter Configuration"`
-	HostServicesConfig *HostServicesConfig `embed:"" group:"Host Services Configuration"`
-	OtelConfig         *OtelConfig         `embed:"" group:"OpenTelemetry Configuration"`
+	HostServicesConfig HostServicesConfig `embed:"" group:"Host Services Configuration"`
+	OtelConfig         OtelConfig         `embed:"" group:"OpenTelemetry Configuration"`
 }
 
 func (u Up) Validate() error {
-	return nil
+	var errs error
+	if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
+		errs = errors.Join(errs, errors.New("attempting to start nex node with no workloads configured. Please provide at least 1 workload configuration"))
+	}
+	return errs
 }
 
 func (u Up) Run(ctx context.Context, globals Globals) error {
@@ -243,6 +238,35 @@ func (u Up) Run(ctx context.Context, globals Globals) error {
 			TracesExporter:   u.OtelConfig.OtelTracesExporter,
 			ExporterEndpoint: u.OtelConfig.OtlpExporterUrl,
 		}),
+		node.WithWorkloadTypes(func() []node.WorkloadOptions {
+			ret := make([]node.WorkloadOptions, len(u.WorkloadTypes))
+			for i, e := range u.WorkloadTypes {
+				ret[i] = node.WorkloadOptions{
+					Name:      e.Name,
+					AgentPath: e.AgentPath,
+					Argv:      e.Argv,
+					Env:       e.Env,
+				}
+			}
+			return ret
+		}()),
+		node.WithHostServiceOptions(func() node.HostServiceOptions {
+			return node.HostServiceOptions{
+				NatsUrl:      u.HostServicesConfig.NatsUrl,
+				NatsUserJwt:  u.HostServicesConfig.NatsUserJwt,
+				NatsUserSeed: u.HostServicesConfig.NatsUserSeed,
+				Services: func() map[string]node.ServiceConfig {
+					ret := make(map[string]node.ServiceConfig, len(u.HostServicesConfig.Services))
+					for k, v := range u.HostServicesConfig.Services {
+						ret[k] = node.ServiceConfig{
+							Enabled:       v.Enabled,
+							Configuration: v.Configuration,
+						}
+					}
+					return ret
+				}(),
+			}
+		}()),
 	)
 	if err != nil {
 		return err
@@ -287,38 +311,9 @@ type ServiceConfig struct {
 	Configuration json.RawMessage `group:"Services Configuration" json:"service_config"`
 }
 
-type Limiters struct {
-	Bandwidth  *TokenBucket `embed:"" prefix:"bandwidth_" json:"limiters_bandwidth"`
-	Operations *TokenBucket `embed:"" prefix:"operations_" json:"limiters_operations"`
-}
-
-// Defines a reference to the CNI network name, which is defined and configured in a {network}.conflist file, as per
-// CNI convention
-type CNIDefinition struct {
-	CniBinPaths      []string `type:"existingdir" default:"/opt/cni/bin" json:"cni_bin_paths"`
-	CniInterfaceName string   `default:"veth0" json:"cni_interface_name"`
-	CniNetworkName   string   `default:"fcnet" json:"cni_network_name"`
-	CniSubnet        string   `default:"192.168.127.0/24" json:"cni_subnet"`
-}
-
-// Defines the CPU and memory usage of a machine to be configured when it is added to the pool
-type MachineTemplate struct {
-	FirecrackerVcpuCount  int `default:"1" json:"machine_template_firecracker_cpu_count"`
-	FirecrackerMemSizeMib int `default:"256" json:"machine_template_firecracker_mem_size_mib"`
-}
-
-type TokenBucket struct {
-	// The initial size of a token bucket.
-	// Minimum: 0
-	OneTimeBurst int64 `placeholder:"0" json:"token_bucket_one_time_burst"`
-
-	// The amount of milliseconds it takes for the bucket to refill.
-	// Required: true
-	// Minimum: 0
-	RefillTime int64 `placeholder:"0" json:"token_bucket_refill_time"`
-
-	// The total number of tokens this bucket can hold.
-	// Required: true
-	// Minimum: 0
-	Size int64 `placeholder:"0" json:"token_bucket_size"`
+type WorkloadConfig struct {
+	Name      string            `help:"Name of the workload type" placeholder:"javascript"`
+	AgentPath string            `help:"Path to the agent binary" placeholder:"/path/to/agent"` // TODO:(jr) this doesnt feel right
+	Argv      []string          `help:"Arguments to pass to the agent. Comma seperated" placeholder:"--foo=bar,--true"`
+	Env       map[string]string `help:"Environment variables to pass to the agent" placeholder:"NAME=derp"`
 }
