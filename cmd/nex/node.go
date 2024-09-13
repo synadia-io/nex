@@ -24,13 +24,12 @@ type Node struct {
 
 // ----- Preflight Command -----
 type Preflight struct {
-	Force          bool     `optional:"" help:"Force the preflight check to run. All artifacts are (re-)installed"`
-	Yes            bool     `optional:"" short:"y" help:"Answer yes to all prompts"`
-	GenConfig      bool     `optional:"" help:"Creates a default configuration file in your current directory"`
-	Status         bool     `optional:"" help:"Check the status of the node requirements without installing anything"`
-	InstallVersion string   `optional:"" help:"Bypasses checking 'latest' and installs a specific version of NEX.  Must be valid release tag in Github" placeholder:"v0.3.0"`
-	CniNS          []string `optional:"" help:"The DNS nameservers to add to CNI config.  If blank, MicroVMs will not be able to do DNS lookups" placeholder:"1.1.1.1"`
-	GithubPAT      string   `optional:"" help:"GitHub Personal Access Token. Can be provided if rate limits are hit pulling data from Github" placeholder:"ghp_abc123..."`
+	Force          bool   `optional:"" help:"Force the preflight check to run. All artifacts are (re-)installed"`
+	Yes            bool   `optional:"" short:"y" help:"Answer yes to all prompts"`
+	GenConfig      bool   `optional:"" help:"Creates a default configuration file in your current directory"`
+	Status         bool   `optional:"" help:"Check the status of the node requirements without installing anything"`
+	InstallVersion string `optional:"" help:"Bypasses checking 'latest' and installs a specific version of NEX.  Must be valid release tag in Github" placeholder:"v0.3.0"`
+	GithubPAT      string `optional:"" help:"GitHub Personal Access Token. Can be provided if rate limits are hit pulling data from Github" placeholder:"ghp_abc123..."`
 }
 
 func (p Preflight) Validate() error {
@@ -281,7 +280,7 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 	}
 
 	logger.Info("Starting Nex Node")
-	nexNode.Start()
+	nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
 	logger.Info("Shutting down Nex Node")
 
 	return nil

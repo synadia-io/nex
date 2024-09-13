@@ -25,8 +25,8 @@ type nexNode struct {
 	logger                *slog.Logger
 	agentHandshakeTimeout int
 	resourceDirectory     string
-	internalNodeNATHost   string
-	internalNodeNATPort   int
+	internalNodeNATSHost  string
+	internalNodeNATSPort  int
 	tags                  map[string]string
 	validIssuers          []string
 	otelOptions           OTelOptions
@@ -46,8 +46,8 @@ func NewNexNode(nc *nats.Conn, opts ...NexOption) (Node, error) {
 		logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 		agentHandshakeTimeout: 5000,
 		resourceDirectory:     "./resources",
-		internalNodeNATHost:   nats.DefaultURL,
-		internalNodeNATPort:   4222,
+		internalNodeNATSHost:  nats.DefaultURL,
+		internalNodeNATSPort:  4222,
 		tags:                  make(map[string]string),
 		validIssuers:          []string{},
 		otelOptions: OTelOptions{
@@ -96,7 +96,7 @@ func (nn *nexNode) Validate() error {
 		}
 	}
 
-	_, err := url.Parse(fmt.Sprintf("%s:%d", nn.internalNodeNATHost, nn.internalNodeNATPort))
+	_, err := url.Parse(fmt.Sprintf("%s:%d", nn.internalNodeNATSHost, nn.internalNodeNATSPort))
 	if err != nil {
 		errs = errors.Join(errs, errors.New("invalid nats url: "+err.Error()))
 	}
