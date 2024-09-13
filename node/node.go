@@ -86,6 +86,10 @@ func (nn *nexNode) Validate() error {
 		errs = errors.Join(errs, errors.New("agent handshake timeout must be greater than 0"))
 	}
 
+	if len(nn.workloadOptions) <= 0 {
+		errs = errors.Join(errs, errors.New("node required at least 1 workload type be configured in order to start"))
+	}
+
 	if nn.resourceDirectory != "" {
 		if _, err := os.Stat(nn.resourceDirectory); os.IsNotExist(err) {
 			errs = errors.Join(errs, errors.New("resource directory does not exist"))
