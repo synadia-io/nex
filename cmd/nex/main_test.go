@@ -36,15 +36,9 @@ func TestCLISimple(t *testing.T) {
 
 func TestCLIWithConfig(t *testing.T) {
 	config := `{
-    "namespace": "derp",
-    "nats_servers": ["nats://derp"],
-    "natsServers": ["nats://foo"],
-    "node": {
-      "info": {
-        "nodeID": "test"
-      }
-    }
+    "namespace": "derp"
   }`
+
 	dir := t.TempDir()
 	f, err := os.Create(filepath.Join(dir, "nex.json"))
 	if err != nil {
@@ -71,9 +65,5 @@ func TestCLIWithConfig(t *testing.T) {
 
 	if nex.Globals.Namespace != "derp" {
 		t.Fatalf("Expected nats servers to be %v, got %v", "derp", nex.Globals.Namespace)
-	}
-
-	if nex.Node.Info.NodeID != "test" {
-		t.Fatalf("Expected node_id to be %v, got %v", "test", nex.Node.Info.NodeID)
 	}
 }

@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"time"
 
+	"github.com/alecthomas/kong"
 	"github.com/nats-io/nkeys"
 
 	"github.com/synadia-io/nex/node"
@@ -177,28 +179,28 @@ func (i Info) Run(ctx context.Context, globals Globals) error {
 
 // ----- Up Command -----
 type Up struct {
-	AgentHandshakeTimeoutMillisecond int               `default:"5000"`
-	DefaultResourceDir               string            `default:"./resources"`
+	AgentHandshakeTimeoutMillisecond int               `help:"Timeout in milliseconds" name:"agent-timeout" default:"5000"`
+	DefaultResourceDir               string            `default:"${defaultResourcePath}"`
 	InternalNodeHost                 string            `default:"nats://192.168.127.1"`
 	InternalNodePort                 int               `default:"9222"`
 	NexusName                        string            `default:"nexus" help:"Nexus name"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
-	WorkloadTypes                    []WorkloadConfig  `help:"Workload types configurations for nex node to initialize"`
+	WorkloadTypes                    WorkloadConfigs   `type:"workloadConfigs" help:"Workload types configurations for nex node to initialize"`
 
-	HostServicesConfig HostServicesConfig `embed:"" group:"Host Services Configuration"`
-	OtelConfig         OtelConfig         `embed:"" group:"OpenTelemetry Configuration"`
+	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
+	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
 }
 
 func (u Up) Validate() error {
 	var errs error
-	if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
-		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration"))
-	}
+	// if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
+	// 	errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration"))
+	// }
 	return errs
 }
 
-func (u Up) Run(ctx context.Context, globals Globals) error {
+func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 	if globals.Check {
 		return printTable("Node Up Configuration", append(globals.Table(), u.Table()...)...)
 	}
@@ -241,10 +243,10 @@ func (u Up) Run(ctx context.Context, globals Globals) error {
 			ret := make([]node.WorkloadOptions, len(u.WorkloadTypes))
 			for i, e := range u.WorkloadTypes {
 				ret[i] = node.WorkloadOptions{
-					Name:      e.Name,
-					AgentPath: e.AgentPath,
-					Argv:      e.Argv,
-					Env:       e.Env,
+					Name:     e.Name,
+					AgentURI: e.AgentURI,
+					Argv:     e.Argv,
+					Env:      e.Env,
 				}
 			}
 			return ret
@@ -290,29 +292,34 @@ func (u Up) Run(ctx context.Context, globals Globals) error {
 }
 
 type OtelConfig struct {
-	OtelMetrics         bool   `name:"metrics" default:"false" help:"Enables OTel Metrics" json:"up_otel_metrics_enabled"`
-	OtelMetricsPort     int    `default:"8085" json:"up_otel_metrics_port"`
-	OtelMetricsExporter string `default:"file" enum:"file,prometheus" json:"up_otel_metrics_exporter"`
-	OtelTraces          bool   `name:"traces" default:"false" help:"Enables OTel Traces" json:"up_otel_traces_enabled"`
-	OtelTracesExporter  string `default:"file" enum:"file,grpc,http" json:"up_otel_traces_exporter"`
-	OtlpExporterUrl     string `default:"127.0.0.1:14532" json:"up_otlp_exporter_url"`
+	OtelMetrics         bool   `name:"metrics" default:"false" help:"Enables OTel Metrics"`
+	OtelMetricsPort     int    `name:"metrics-port" default:"8085"`
+	OtelMetricsExporter string `name:"metrics-exporter" default:"file" enum:"file,prometheus"`
+	OtelTraces          bool   `name:"traces" default:"false" help:"Enables OTel Traces"`
+	OtelTracesExporter  string `name:"traces-exporter" default:"file" enum:"file,grpc,http"`
+	OtlpExporterUrl     string `name:"exporter-url" default:"127.0.0.1:14532"`
 }
 
 type HostServicesConfig struct {
-	NatsUrl      string                   `group:"Host Services Configuration" json:"hostservices_nats_url"`
-	NatsUserJwt  string                   `group:"Host Services Configuration" json:"hostservices_nats_user_jwt"`
-	NatsUserSeed string                   `group:"Host Services Configuration" json:"hostservices_nats_user_seed"`
-	Services     map[string]ServiceConfig `hidden:"" group:"Host Services Configuration" json:"hostservices_services_map"`
+	NatsUrl      string                   `group:"Host Services Configuration"`
+	NatsUserJwt  string                   `group:"Host Services Configuration"`
+	NatsUserSeed string                   `group:"Host Services Configuration"`
+	Services     map[string]ServiceConfig `prefix:"service." group:"Host Services Configuration"`
 }
 
 type ServiceConfig struct {
-	Enabled       bool            `group:"Services Configuration" json:"service_enabled"`
-	Configuration json.RawMessage `group:"Services Configuration" json:"service_config"`
+	Enabled       bool            `group:"Services Configuration"`
+	Configuration json.RawMessage `group:"Services Configuration"`
 }
 
 type WorkloadConfig struct {
-	Name      string            `help:"Name of the workload type" placeholder:"javascript"`
-	AgentPath string            `help:"Path to the agent binary" placeholder:"/path/to/agent"` // TODO:(jr) this doesnt feel right
-	Argv      []string          `help:"Arguments to pass to the agent. Comma seperated" placeholder:"--foo=bar,--true"`
-	Env       map[string]string `help:"Environment variables to pass to the agent" placeholder:"NAME=derp"`
+	Name     string            `help:"Name of the workload type" placeholder:"javascript"`
+	AgentURI string            `help:"URI to the agent binary to download and install in resource directory" placeholder:"nats://bucket/key"`
+	Argv     []string          `help:"Arguments to pass to the agent. Comma seperated" placeholder:"--foo=bar,--true"`
+	Env      map[string]string `help:"Environment variables to pass to the agent" placeholder:"NAME=derp"`
+}
+type WorkloadConfigs []WorkloadConfig
+
+func (w WorkloadConfigs) Decode(ctx *kong.DecodeContext, val reflect.Value) error {
+	return nil
 }

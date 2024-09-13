@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -25,6 +27,12 @@ var (
 )
 
 func main() {
+	userConfigPath, err := os.UserConfigDir()
+	if err != nil {
+		userConfigPath = "."
+	}
+	userResourcePath := filepath.Join(userConfigPath, ".nex", "bin")
+
 	nex := new(NexCLI)
 	ctx := kong.Parse(nex,
 		kong.Name("nex"),
@@ -33,14 +41,16 @@ func main() {
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true, NoExpandSubcommands: true, FlagsLast: true}),
 		kong.Configuration(kong.JSON),
 		kong.Vars{
-			"version":     fmt.Sprintf("%s [%s] | Built: %s", VERSION, COMMIT, BUILDDATE),
-			"versionOnly": VERSION,
+			"version":             fmt.Sprintf("%s [%s] | Built: %s", VERSION, COMMIT, BUILDDATE),
+			"versionOnly":         VERSION,
+			"defaultResourcePath": userResourcePath,
 		},
+		kong.NamedMapper("workloadConfigs", WorkloadConfigs{}),
 	)
 
 	ctx.BindTo(context.Background(), (*context.Context)(nil))
 	ctx.BindTo(nex.Globals, (*Globals)(nil))
 
-	err := ctx.Run()
+	err = ctx.Run()
 	ctx.FatalIfErrorf(err)
 }

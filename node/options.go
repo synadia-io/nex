@@ -72,10 +72,10 @@ type OTelOptions struct {
 }
 
 type WorkloadOptions struct {
-	Name      string
-	AgentPath string
-	Argv      []string
-	Env       map[string]string
+	Name     string
+	AgentURI string
+	Argv     []string
+	Env      map[string]string
 }
 
 type HostServiceOptions struct {

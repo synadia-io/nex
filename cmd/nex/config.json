@@ -1,0 +1,33 @@
+{
+  "namespace": "kevin",
+  "nats": {
+    "servers": [
+      "nats://derp:4222"
+    ]
+  },
+  "logger": {
+    "target": [
+      "file"
+    ],
+    "json": true
+  },
+  "agent_timeout": 10000000000,
+  "default_resource_dir": "./set_by_config",
+  "internal_node_host": "nats://config",
+  "internal_node_port": 1222,
+  "nexus_name": "config_nexus",
+  "tags": {
+    "nex": "configtag"
+  },
+  "valid_issuers": [
+    "CONFIGISSUER"
+  ],
+  "workload_types": [
+    {
+      "name": "CONFIGWORKLOAD",
+      "agent_uri": "nats://uri/config",
+      "argv": [],
+      "env": {}
+    }
+  ]
+}

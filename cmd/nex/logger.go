@@ -54,11 +54,11 @@ func configureLogger(cfg Globals, nc *nats.Conn, serverPublicKey string) *slog.L
 	stdoutWriters := []io.Writer{}
 	stderrWriters := []io.Writer{}
 
-	if slices.Contains(cfg.Logger, "std") {
+	if slices.Contains(cfg.Target, "std") {
 		stdoutWriters = append(stdoutWriters, os.Stdout)
 		stderrWriters = append(stderrWriters, os.Stderr)
 	}
-	if slices.Contains(cfg.Logger, "file") {
+	if slices.Contains(cfg.Target, "file") {
 		stdout, err := os.Create("nex.log")
 		if err == nil {
 			stderr, err := os.Create("nex.err")
@@ -68,7 +68,7 @@ func configureLogger(cfg Globals, nc *nats.Conn, serverPublicKey string) *slog.L
 			}
 		}
 	}
-	if slices.Contains(cfg.Logger, "nats") {
+	if slices.Contains(cfg.Target, "nats") {
 		natsLogSubject := fmt.Sprintf("$NEX.logs.%s.stdout", serverPublicKey)
 		natsErrLogSubject := fmt.Sprintf("$NEX.logs.%s.stderr", serverPublicKey)
 		stdoutWriters = append(stdoutWriters, NewNatsLogger(nc, natsLogSubject))
