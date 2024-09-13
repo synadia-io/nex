@@ -1,0 +1,55 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/synadia-io/nex/agent-api/start-workload-request",
+    "title": "StartWorkloadRequest",
+    "type": "object",
+    "properties": {
+      "workloadId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "The unique identifier of the workload to start."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name of the workload"
+      },
+      "namespace": {
+        "type": "string",
+        "description": "Namespace of the workload"
+      },
+      "totalBytes": {
+        "type": "integer",
+        "description": "Byte size of the workload artifact",
+        "minimum": 1
+      },
+      "hash": {
+        "type": "string",        
+        "description": "A hex encoded SHA-256 hash of the artifact file bytes"
+      },
+      "triggerSubjects": {
+        "type": "array",
+        "description": "A list of trigger subjects for the workload, if applicable. Note these are NOT subscribed to by the agent, only used for information and validation",
+        "items": {
+          "type": "string"
+        }        
+      },
+      "workloadType": {
+        "type": "string",
+        "description": "Type of the workload"
+      },
+      "argv": {
+        "type": "array",
+        "description": "Command line arguments to be passed when the workload is a native/service type",
+        "items": {
+          "type": "string"
+        }
+      },
+      "env": {
+        "type": "object",
+        "description": "A map containing environment variables, applicable for native workload types"
+      }      
+    },
+    "required": ["workloadId", "name", "namespace", "totalBytes", "hash", "workloadType"],
+    "additionalProperties": false
+  }
+  
