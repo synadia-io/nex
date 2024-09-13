@@ -46,8 +46,8 @@ func NewNexNode(nc *nats.Conn, opts ...NexOption) (Node, error) {
 		logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 		agentHandshakeTimeout: 5000,
 		resourceDirectory:     "./resources",
-		internalNodeNATSHost:  nats.DefaultURL,
-		internalNodeNATSPort:  4222,
+		internalNodeNATSHost:  "127.0.0.1",
+		internalNodeNATSPort:  -1,
 		tags:                  make(map[string]string),
 		validIssuers:          []string{},
 		otelOptions: OTelOptions{
@@ -94,11 +94,6 @@ func (nn *nexNode) Validate() error {
 		if _, err := os.Stat(nn.resourceDirectory); os.IsNotExist(err) {
 			errs = errors.Join(errs, errors.New("resource directory does not exist"))
 		}
-	}
-
-	_, err := url.Parse(fmt.Sprintf("%s:%d", nn.internalNodeNATSHost, nn.internalNodeNATSPort))
-	if err != nil {
-		errs = errors.Join(errs, errors.New("invalid nats url: "+err.Error()))
 	}
 
 	for _, vi := range nn.validIssuers {

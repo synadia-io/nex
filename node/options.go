@@ -25,13 +25,6 @@ func WithResourceDirectory(d string) NexOption {
 	}
 }
 
-func WithInternalNodeNATHost(h string, p int) NexOption {
-	return func(n *nexNode) {
-		n.internalNodeNATSHost = h
-		n.internalNodeNATSPort = p
-	}
-}
-
 func WithNodeTags(t map[string]string) NexOption {
 	return func(n *nexNode) {
 		n.tags = t

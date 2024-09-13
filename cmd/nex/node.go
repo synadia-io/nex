@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -76,14 +75,6 @@ func (p Preflight) Validate() error {
 			}
 		}
 		return fmt.Errorf("Did not find prefered install version in Github")
-	}
-
-	if len(p.CniNS) > 0 {
-		for _, ns := range p.CniNS {
-			if ip := net.ParseIP(ns); ip == nil {
-				errs = errors.Join(errs, fmt.Errorf("invalid IP address provided to CNI Nameserver setting: %s", ns))
-			}
-		}
 	}
 
 	return errs
@@ -223,7 +214,6 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 		node.WithLogger(logger),
 		node.WithAgentHandshakeTimeout(u.AgentHandshakeTimeoutMillisecond),
 		node.WithResourceDirectory(u.DefaultResourceDir),
-		node.WithInternalNodeNATHost(u.InternalNodeHost, u.InternalNodePort),
 		node.WithNodeTags(u.Tags),
 		node.WithValidIssuers(u.ValidIssuers),
 		node.WithOTelOptions(node.OTelOptions{

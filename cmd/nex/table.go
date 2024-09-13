@@ -78,7 +78,6 @@ func (p Preflight) Table() []table.Row {
 		{"Generate Configuration File", p.GenConfig, reflect.TypeOf(p.GenConfig).String()},
 		{"Status", p.Status, reflect.TypeOf(p.Status).String()},
 		{"Install Version Override", p.InstallVersion, reflect.TypeOf(p.InstallVersion).String()},
-		{"CNI DNS Nameservers", p.CniNS, reflect.TypeOf(p.CniNS).String()},
 		{"Github PAT", p.GithubPAT, reflect.TypeOf(p.GithubPAT).String()},
 	}
 }
