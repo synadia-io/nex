@@ -1,17 +1,19 @@
 package node
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"os"
 	"slices"
-	"time"
 
+	"ergo.services/application/observer"
+	"ergo.services/ergo"
+	"ergo.services/ergo/gen"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/synadia-io/nex/node/actors"
 )
 
 type Node interface {
@@ -122,8 +124,49 @@ func (nn *nexNode) Validate() error {
 }
 
 func (nn *nexNode) Start() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	// defer cancel()
 
-	<-ctx.Done()
+	// <-ctx.Done()
+	nn.initializeSupervisionTree()
+}
+
+func (nn *nexNode) initializeSupervisionTree() {
+	var options gen.NodeOptions
+
+	// create applications that must be started
+	apps := []gen.ApplicationBehavior{
+		observer.CreateApp(observer.Options{}), // TODO: opt out of this via config
+		actors.CreateNodeApp(),
+	}
+	options.Applications = apps
+
+	// disable default logger to get rid of multiple logging to the os.Stdout
+	// TODO: figure out how to get logs to show up in the observer... not seeing any yet
+	options.Log.DefaultLogger.Disable = true
+
+	// https://docs.ergo.services/basics/logging#process-logger
+	// https://docs.ergo.services/tools/observer#log-process-page
+
+	nodeName := "nex@localhost"
+
+	// starting node
+	node, err := ergo.StartNode(gen.Atom(nodeName), options)
+	if err != nil {
+		fmt.Printf("Unable to start node '%s': %s\n", nodeName, err)
+		return
+	}
+
+	logger, err := node.Spawn(actors.CreateNodeLogger, gen.ProcessOptions{})
+	if err != nil {
+		panic(err) // TODO: no panic
+	}
+
+	// NOTE: the supervised processes won't log their startup (Init) calls because the
+	// logger won't have been in place. However, they will log stuff afterward
+	node.LoggerAddPID(logger, "nexlogger")
+
+	node.Log().Info("Nex node started")
+	node.Log().Info("Observer Application started and available at http://localhost:9911")
+	node.Wait()
 }
