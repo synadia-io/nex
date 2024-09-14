@@ -1,19 +1,16 @@
 package node
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
-	"slices"
 
 	"ergo.services/application/observer"
 	"ergo.services/ergo"
 	"ergo.services/ergo/gen"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/node/actors"
+	"github.com/synadia-io/nex/node/options"
 )
 
 type Node interface {
@@ -24,110 +21,60 @@ type Node interface {
 type nexNode struct {
 	nc *nats.Conn
 
-	logger                *slog.Logger
-	agentHandshakeTimeout int
-	resourceDirectory     string
-	tags                  map[string]string
-	validIssuers          []string
-	otelOptions           OTelOptions
-	workloadOptions       []WorkloadOptions
-	hostServiceOptions    HostServiceOptions
+	// NOTE on refactor: the node struct for an operational node (state) should be
+	// separate from the options that started it, so the options can be passed around
+	// freely
+	options *options.NodeOptions
 }
 
-type NexOption func(*nexNode)
-
-func NewNexNode(nc *nats.Conn, opts ...NexOption) (Node, error) {
+func NewNexNode(nc *nats.Conn, opts ...options.NodeOption) (Node, error) {
 	if nc == nil {
 		return nil, fmt.Errorf("no nats connection provided")
 	}
 
 	nn := &nexNode{
-		nc:                    nc,
-		logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
-		agentHandshakeTimeout: 5000,
-		resourceDirectory:     "./resources",
-		tags:                  make(map[string]string),
-		validIssuers:          []string{},
-		otelOptions: OTelOptions{
-			MetricsEnabled:   false,
-			MetricsPort:      8085,
-			MetricsExporter:  "file",
-			TracesEnabled:    false,
-			TracesExporter:   "file",
-			ExporterEndpoint: "127.0.0.1:14532",
-		},
-		workloadOptions: []WorkloadOptions{},
-		hostServiceOptions: HostServiceOptions{
-			Services: make(map[string]ServiceConfig),
+		nc: nc,
+		options: &options.NodeOptions{
+			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
+			AgentHandshakeTimeout: 5000,
+			ResourceDirectory:     "./resources",
+			Tags:                  make(map[string]string),
+			ValidIssuers:          []string{},
+			OtelOptions: options.OTelOptions{
+				MetricsEnabled:   false,
+				MetricsPort:      8085,
+				MetricsExporter:  "file",
+				TracesEnabled:    false,
+				TracesExporter:   "file",
+				ExporterEndpoint: "127.0.0.1:14532",
+			},
+			WorkloadOptions: []options.WorkloadOptions{},
+			HostServiceOptions: options.HostServiceOptions{
+				Services: make(map[string]options.ServiceConfig),
+			},
 		},
 	}
 
 	for _, opt := range opts {
-		opt(nn)
+		opt(nn.options)
+	}
+
+	err := nn.options.Validate()
+	if err != nil {
+		return nil, err
 	}
 
 	return nn, nil
 }
 
 func (nn *nexNode) Validate() error {
-	var errs error
+	// already rejected nil nats connection, so no "node state"
+	// validation needed.
 
-	if nn.nc == nil {
-		errs = errors.Join(errs, errors.New("nats connection is nil"))
-	}
-
-	if nn.logger == nil {
-		errs = errors.Join(errs, errors.New("logger is nil"))
-	}
-
-	if nn.agentHandshakeTimeout <= 0 {
-		errs = errors.Join(errs, errors.New("agent handshake timeout must be greater than 0"))
-	}
-
-	if len(nn.workloadOptions) <= 0 {
-		errs = errors.Join(errs, errors.New("node required at least 1 workload type be configured in order to start"))
-	}
-
-	if nn.resourceDirectory != "" {
-		if _, err := os.Stat(nn.resourceDirectory); os.IsNotExist(err) {
-			errs = errors.Join(errs, errors.New("resource directory does not exist"))
-		}
-	}
-
-	for _, vi := range nn.validIssuers {
-		if !nkeys.IsValidPublicServerKey(vi) {
-			errs = errors.Join(errs, errors.New("invalid issuer public key: "+vi))
-		}
-	}
-
-	if nn.otelOptions.MetricsEnabled {
-		if nn.otelOptions.MetricsPort <= 0 || nn.otelOptions.MetricsPort > 65535 {
-			errs = errors.Join(errs, errors.New("invalid metrics port"))
-		}
-		if nn.otelOptions.MetricsExporter == "" || !slices.Contains([]string{"file", "prometheus"}, nn.otelOptions.MetricsExporter) {
-			errs = errors.Join(errs, errors.New("invalid metrics exporter"))
-		}
-	}
-
-	if nn.otelOptions.TracesEnabled {
-		if nn.otelOptions.TracesExporter == "" || !slices.Contains([]string{"file", "http", "grpc"}, nn.otelOptions.TracesExporter) {
-			errs = errors.Join(errs, errors.New("invalid traces exporter"))
-		}
-		if nn.otelOptions.TracesExporter == "http" || nn.otelOptions.TracesExporter == "grpc" {
-			if _, err := url.Parse(nn.otelOptions.ExporterEndpoint); err != nil {
-				errs = errors.Join(errs, errors.New("invalid traces exporter endpoint"))
-			}
-		}
-	}
-
-	return errs
+	return nn.options.Validate()
 }
 
 func (nn *nexNode) Start() {
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	// defer cancel()
-
-	// <-ctx.Done()
 	nn.initializeSupervisionTree()
 }
 
@@ -137,7 +84,7 @@ func (nn *nexNode) initializeSupervisionTree() {
 	// create applications that must be started
 	apps := []gen.ApplicationBehavior{
 		observer.CreateApp(observer.Options{}), // TODO: opt out of this via config
-		actors.CreateNodeApp(),
+		actors.CreateNodeApp(*nn.options),      // copy options
 	}
 	options.Applications = apps
 

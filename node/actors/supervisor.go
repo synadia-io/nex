@@ -3,6 +3,7 @@ package actors
 import (
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
+	"github.com/synadia-io/nex/node/options"
 )
 
 func createNexSupervisor() gen.ProcessBehavior {
@@ -17,6 +18,8 @@ type NexSupervisor struct {
 func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	var spec act.SupervisorSpec
 
+	nodeOptions := args[0].(options.NodeOptions)
+
 	// set supervisor type
 	spec.Type = act.SupervisorTypeOneForOne
 
@@ -24,6 +27,7 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		{
 			Name:    "internal_nats_server",
 			Factory: createInternalNatsServer,
+			Args:    []any{nodeOptions},
 		},
 		{
 			Name:    "host_services",
@@ -36,6 +40,7 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		{
 			Name:    "agent_manager",
 			Factory: createAgentManager,
+			Args:    []any{nodeOptions},
 		},
 	}
 
