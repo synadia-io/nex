@@ -3,6 +3,7 @@ package actors
 import (
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
+	"github.com/synadia-io/nex/node/options"
 )
 
 func createAgentManager() gen.ProcessBehavior {
@@ -14,9 +15,13 @@ func createAgentManager() gen.ProcessBehavior {
 // registration
 type agentManager struct {
 	act.Actor
+
+	nodeOptions options.NodeOptions
 }
 
 func (mgr *agentManager) Init(args ...any) error {
+	mgr.nodeOptions = args[0].(options.NodeOptions)
+	mgr.Send(mgr.PID(), "post_init")
 	return nil
 }
 
@@ -27,5 +32,34 @@ func (mgr *agentManager) Init(args ...any) error {
 // HandleInspect invoked on the request made with gen.Process.Inspect(...)
 func (mgr *agentManager) HandleInspect(from gen.PID, item ...string) map[string]string {
 	mgr.Log().Info("agent manager got inspect request from %s", from)
+	return nil
+}
+
+func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
+	switch message {
+	case "post_init":
+		// making subscription using MonitorEvent of the gen.Process interface
+		if _, err := mgr.MonitorEvent(InternalNatsServerReadyName); err != nil {
+			return err
+		}
+		mgr.Log().Info("successfully subscribed to: %s", InternalNatsServerReadyName)
+	}
+	return nil
+}
+
+func (mgr *agentManager) HandleEvent(event gen.MessageEvent) error {
+	mgr.Log().Info("received event %s", event.Event)
+
+	switch event.Event.Name {
+	case InternalNatsServerReady:
+		return mgr.startWorkloadAgents(event.Message.(InternalNatsServerReadyEvent))
+	}
+	return nil
+}
+
+func (mgr *agentManager) startWorkloadAgents(evt InternalNatsServerReadyEvent) error {
+	mgr.Log().Info("starting %d agent binaries..", len(evt.AgentCredentials))
+	// TODO:
+	// start all the agent binaries for supported workload types
 	return nil
 }

@@ -1,12 +1,19 @@
 package actors
 
-import "ergo.services/ergo/gen"
+import (
+	"ergo.services/ergo/gen"
+	"github.com/synadia-io/nex/node/options"
+)
 
-func CreateNodeApp() gen.ApplicationBehavior {
-	return &NodeApp{}
+// NOTE: intentionally forcing a copy here so these options aren't mutable
+// by the node
+func CreateNodeApp(opts options.NodeOptions) gen.ApplicationBehavior {
+	return &NodeApp{opts}
 }
 
-type NodeApp struct{}
+type NodeApp struct {
+	opts options.NodeOptions
+}
 
 // Load invoked on loading application using method ApplicationLoad of gen.Node interface.
 func (app *NodeApp) Load(node gen.Node, args ...any) (gen.ApplicationSpec, error) {
@@ -18,6 +25,7 @@ func (app *NodeApp) Load(node gen.Node, args ...any) (gen.ApplicationSpec, error
 			{
 				Name:    "nexsup",
 				Factory: createNexSupervisor,
+				Args:    []any{app.opts},
 			},
 		},
 	}, nil

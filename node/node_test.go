@@ -8,6 +8,7 @@ import (
 	"github.com/nats-io/nats.go"
 
 	"github.com/synadia-io/nex/node"
+	"github.com/synadia-io/nex/node/options"
 )
 
 func startNatsServer(t testing.TB) *nats.Conn {
@@ -38,7 +39,8 @@ func TestDefaultConfigNodeValidation(t *testing.T) {
 
 	tDir := t.TempDir()
 
-	node, err := node.NewNexNode(nc, node.WithResourceDirectory(tDir), node.WithWorkloadTypes([]node.WorkloadOptions{{Name: "test", AgentUri: "https://derp.com", Argv: []string{}, Env: map[string]string{}}}))
+	node, err := node.NewNexNode(nc, options.WithResourceDirectory(tDir),
+		options.WithWorkloadTypes([]options.WorkloadOptions{{Name: "test", AgentUri: "https://derp.com", Argv: []string{}, Env: map[string]string{}}}))
 	if err != nil {
 		t.Fatal("failed to create new nex node", err)
 	}
