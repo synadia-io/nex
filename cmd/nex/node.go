@@ -257,11 +257,6 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 		return err
 	}
 
-	err = nexNode.Validate()
-	if err != nil {
-		return err
-	}
-
 	logger.Info("Validating Nex Node")
 	err = nexNode.Validate()
 	if err != nil {
