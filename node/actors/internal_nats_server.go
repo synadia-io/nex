@@ -47,8 +47,8 @@ func (ns *internalNatsServer) Init(args ...any) error {
 }
 
 func (ns *internalNatsServer) HandleMessage(from gen.PID, message any) error {
-	eventStart := gen.MessageEventStart{Name: InternalNatsServerReady}
-	eventStop := gen.MessageEventStop{Name: InternalNatsServerReady}
+	eventStart := gen.MessageEventStart{Name: InternalNatsServerReadyName}
+	eventStop := gen.MessageEventStop{Name: InternalNatsServerReadyName}
 
 	switch message {
 	case "post_init":
@@ -57,21 +57,21 @@ func (ns *internalNatsServer) HandleMessage(from gen.PID, message any) error {
 			// a consumer before we publish an event. No more sleep-and-hope pattern.
 			Notify: true,
 		}
-		token, err := ns.RegisterEvent(InternalNatsServerReady, evOptions)
+		token, err := ns.RegisterEvent(InternalNatsServerReadyName, evOptions)
 		if err != nil {
 			return err
 		}
-		ns.tokens[InternalNatsServerReady] = token
-		ns.Log().Info("registered publishable event %s, waiting for consumers...", InternalNatsServerReady)
+		ns.tokens[InternalNatsServerReadyName] = token
+		ns.Log().Info("registered publishable event %s, waiting for consumers...", InternalNatsServerReadyName)
 	case eventStart:
-		ns.Log().Info("publisher got first consumer for %s. start producing events...", InternalNatsServerReady)
+		ns.Log().Info("publisher got first consumer for %s. start producing events...", InternalNatsServerReadyName)
 		ns.haveConsumers = true
-		err := ns.SendEvent(InternalNatsServerReady, ns.tokens[InternalNatsServerReady], InternalNatsServerReadyEvent{AgentCredentials: ns.creds})
+		err := ns.SendEvent(InternalNatsServerReadyName, ns.tokens[InternalNatsServerReadyName], InternalNatsServerReadyEvent{AgentCredentials: ns.creds})
 		if err != nil {
 			return err
 		}
 	case eventStop: // handle gen.MessageEventStop message
-		ns.Log().Info("no consumers for %s", InternalNatsServerReady)
+		ns.Log().Info("no consumers for %s", InternalNatsServerReadyName)
 		ns.haveConsumers = false
 	}
 	return nil

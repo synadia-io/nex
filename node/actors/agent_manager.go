@@ -39,10 +39,10 @@ func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
 	switch message {
 	case "post_init":
 		// making subscription using MonitorEvent of the gen.Process interface
-		if _, err := mgr.MonitorEvent(InternalNatsServerReadyName); err != nil {
+		if _, err := mgr.MonitorEvent(InternalNatsServerReady); err != nil {
 			return err
 		}
-		mgr.Log().Info("successfully subscribed to: %s", InternalNatsServerReadyName)
+		mgr.Log().Info("successfully subscribed to: %s", InternalNatsServerReady)
 	}
 	return nil
 }
@@ -51,7 +51,7 @@ func (mgr *agentManager) HandleEvent(event gen.MessageEvent) error {
 	mgr.Log().Info("received event %s", event.Event)
 
 	switch event.Event.Name {
-	case InternalNatsServerReady:
+	case InternalNatsServerReadyName:
 		return mgr.startWorkloadAgents(event.Message.(InternalNatsServerReadyEvent))
 	}
 	return nil
