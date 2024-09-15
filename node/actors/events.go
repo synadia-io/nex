@@ -5,11 +5,11 @@ import (
 )
 
 const (
-	InternalNatsServerReady = gen.Atom("internal_nats_server_ready")
+	InternalNatsServerReadyName = gen.Atom("internal_nats_server_ready")
 )
 
 var (
-	InternalNatsServerReadyName = gen.Event{Name: InternalNatsServerReady, Node: "nex@localhost"}
+	InternalNatsServerReady = gen.Event{Name: InternalNatsServerReadyName, Node: "nex@localhost"}
 )
 
 type InternalNatsServerReadyEvent struct {
