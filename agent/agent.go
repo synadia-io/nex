@@ -28,7 +28,7 @@ import (
 
 const (
 	defaultAgentHandshakeAttempts       = 5
-	defaultAgentHandshakeTimeoutMillis  = 500
+	defaultAgentHandshakeTimeoutMillis  = 5000
 	runloopSleepInterval                = 250 * time.Millisecond
 	runloopTickInterval                 = 2500 * time.Millisecond
 	workloadExecutionSleepTimeoutMillis = 50

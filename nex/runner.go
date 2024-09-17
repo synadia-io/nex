@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -55,7 +56,7 @@ func RunWorkload(ctx context.Context, logger *slog.Logger) error {
 		return err
 	}
 
-	nodeClient := controlapi.NewApiClientWithNamespace(nc, Opts.Timeout, Opts.Namespace, logger)
+	nodeClient := controlapi.NewApiClientWithNamespace(nc, time.Millisecond*25000, Opts.Namespace, logger)
 
 	// Get node info so we can get public xkey from the target for env encryption
 	nodeInfo, err := nodeClient.NodeInfo(RunOpts.TargetNode)
