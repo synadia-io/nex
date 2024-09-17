@@ -4,7 +4,7 @@ import (
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nex/node/options"
+	"github.com/synadia-io/nex/models"
 )
 
 func createInternalNatsServer() gen.ProcessBehavior {
@@ -17,7 +17,7 @@ type internalNatsServer struct {
 	haveConsumers bool
 
 	creds       []agentCredential
-	nodeOptions options.NodeOptions
+	nodeOptions models.NodeOptions
 }
 
 type agentCredential struct {
@@ -30,7 +30,7 @@ func (ns *internalNatsServer) Init(args ...any) error {
 
 	ns.Log().Info("Internal NATS server started")
 
-	ns.nodeOptions = args[0].(options.NodeOptions)
+	ns.nodeOptions = args[0].(models.NodeOptions)
 
 	creds, err := ns.buildAgentCredentials()
 	if err != nil {

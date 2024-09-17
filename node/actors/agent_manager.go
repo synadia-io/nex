@@ -3,7 +3,7 @@ package actors
 import (
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
-	"github.com/synadia-io/nex/node/options"
+	"github.com/synadia-io/nex/models"
 )
 
 func createAgentManager() gen.ProcessBehavior {
@@ -16,11 +16,11 @@ func createAgentManager() gen.ProcessBehavior {
 type agentManager struct {
 	act.Actor
 
-	nodeOptions options.NodeOptions
+	nodeOptions models.NodeOptions
 }
 
 func (mgr *agentManager) Init(args ...any) error {
-	mgr.nodeOptions = args[0].(options.NodeOptions)
+	mgr.nodeOptions = args[0].(models.NodeOptions)
 	mgr.Send(mgr.PID(), "post_init")
 	return nil
 }

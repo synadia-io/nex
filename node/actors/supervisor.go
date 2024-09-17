@@ -3,7 +3,7 @@ package actors
 import (
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
-	"github.com/synadia-io/nex/node/options"
+	"github.com/synadia-io/nex/models"
 )
 
 func createNexSupervisor() gen.ProcessBehavior {
@@ -18,7 +18,7 @@ type NexSupervisor struct {
 func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	var spec act.SupervisorSpec
 
-	nodeOptions := args[0].(options.NodeOptions)
+	nodeOptions := args[0].(models.NodeOptions)
 
 	// set supervisor type
 	spec.Type = act.SupervisorTypeOneForOne

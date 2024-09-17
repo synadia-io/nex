@@ -1,11 +1,9 @@
-package options
+package models
 
 import (
 	"encoding/json"
 	"log/slog"
 )
-
-type NodeOption func(*NodeOptions)
 
 type NodeOptions struct {
 	Logger                *slog.Logger
@@ -17,6 +15,8 @@ type NodeOptions struct {
 	WorkloadOptions       []WorkloadOptions
 	HostServiceOptions    HostServiceOptions
 }
+
+type NodeOption func(*NodeOptions)
 
 func WithLogger(s *slog.Logger) NodeOption {
 	return func(n *NodeOptions) {

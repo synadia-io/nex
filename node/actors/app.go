@@ -2,17 +2,17 @@ package actors
 
 import (
 	"ergo.services/ergo/gen"
-	"github.com/synadia-io/nex/node/options"
+	"github.com/synadia-io/nex/models"
 )
 
 // NOTE: intentionally forcing a copy here so these options aren't mutable
 // by the node
-func CreateNodeApp(opts options.NodeOptions) gen.ApplicationBehavior {
+func CreateNodeApp(opts models.NodeOptions) gen.ApplicationBehavior {
 	return &NodeApp{opts}
 }
 
 type NodeApp struct {
-	opts options.NodeOptions
+	opts models.NodeOptions
 }
 
 // Load invoked on loading application using method ApplicationLoad of gen.Node interface.
