@@ -41,7 +41,7 @@ func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiList
 	efftags := config.Tags
 	efftags[controlapi.TagOS] = runtime.GOOS
 	efftags[controlapi.TagArch] = runtime.GOARCH
-	efftags[controlapi.TagCPUs] = strconv.FormatInt(int64(runtime.NumCPU()), 10)
+	efftags[controlapi.TagCPUs] = strconv.FormatInt(int64(runtime.GOMAXPROCS(0)), 10)
 	if node.config.NoSandbox {
 		efftags[controlapi.TagUnsafe] = "true"
 	}
@@ -421,16 +421,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 	}
 	span.AddEvent("Agent deploy request accepted")
 
-	if _, ok := api.mgr.handshakes[workloadID]; !ok {
-		span.SetStatus(codes.Error, "Tried to deploy into non-handshaked agent")
-		api.log.Error("Attempted to deploy workload into bad process (no handshake)",
-			slog.String("workload_id", workloadID),
-		)
-		respondFail(controlapi.RunResponseType, m, "Could not deploy workload, agent pool did not initialize properly")
-		return
-	}
 	span.SetAttributes(attribute.String("workload_name", *request.WorkloadName))
-
 	api.log.Info("Workload deployed", slog.String("workload", *request.WorkloadName), slog.String("workload_id", workloadID))
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
