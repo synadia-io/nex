@@ -11,6 +11,7 @@ import (
 	"github.com/nats-io/nkeys"
 
 	"github.com/synadia-io/nex/node"
+	"github.com/synadia-io/nex/node/options"
 )
 
 type Node struct {
@@ -209,12 +210,12 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 	logger := configureLogger(globals, nc, pubKey)
 
 	nexNode, err := node.NewNexNode(nc,
-		node.WithLogger(logger),
-		node.WithAgentHandshakeTimeout(u.AgentHandshakeTimeoutMillisecond),
-		node.WithResourceDirectory(u.DefaultResourceDir),
-		node.WithNodeTags(u.Tags),
-		node.WithValidIssuers(u.ValidIssuers),
-		node.WithOTelOptions(node.OTelOptions{
+		options.WithLogger(logger),
+		options.WithAgentHandshakeTimeout(u.AgentHandshakeTimeoutMillisecond),
+		options.WithResourceDirectory(u.DefaultResourceDir),
+		options.WithNodeTags(u.Tags),
+		options.WithValidIssuers(u.ValidIssuers),
+		options.WithOTelOptions(options.OTelOptions{
 			MetricsEnabled:   u.OtelConfig.OtelMetrics,
 			MetricsPort:      u.OtelConfig.OtelMetricsPort,
 			MetricsExporter:  u.OtelConfig.OtelMetricsExporter,
@@ -222,10 +223,10 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 			TracesExporter:   u.OtelConfig.OtelTracesExporter,
 			ExporterEndpoint: u.OtelConfig.OtlpExporterUrl,
 		}),
-		node.WithWorkloadTypes(func() []node.WorkloadOptions {
-			ret := make([]node.WorkloadOptions, len(u.WorkloadTypes))
+		options.WithWorkloadTypes(func() []options.WorkloadOptions {
+			ret := make([]options.WorkloadOptions, len(u.WorkloadTypes))
 			for i, e := range u.WorkloadTypes {
-				ret[i] = node.WorkloadOptions{
+				ret[i] = options.WorkloadOptions{
 					Name:     e.Name,
 					AgentUri: e.AgentUri,
 					Argv:     e.Argv,
@@ -234,15 +235,15 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 			}
 			return ret
 		}()),
-		node.WithHostServiceOptions(func() node.HostServiceOptions {
-			return node.HostServiceOptions{
+		options.WithHostServiceOptions(func() options.HostServiceOptions {
+			return options.HostServiceOptions{
 				NatsUrl:      u.HostServicesConfig.NatsUrl,
 				NatsUserJwt:  u.HostServicesConfig.NatsUserJwt,
 				NatsUserSeed: u.HostServicesConfig.NatsUserSeed,
-				Services: func() map[string]node.ServiceConfig {
-					ret := make(map[string]node.ServiceConfig, len(u.HostServicesConfig.Services))
+				Services: func() map[string]options.ServiceConfig {
+					ret := make(map[string]options.ServiceConfig, len(u.HostServicesConfig.Services))
 					for k, v := range u.HostServicesConfig.Services {
-						ret[k] = node.ServiceConfig{
+						ret[k] = options.ServiceConfig{
 							Enabled:       v.Enabled,
 							Configuration: v.Configuration,
 						}
@@ -252,11 +253,6 @@ func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
 			}
 		}()),
 	)
-	if err != nil {
-		return err
-	}
-
-	err = nexNode.Validate()
 	if err != nil {
 		return err
 	}
