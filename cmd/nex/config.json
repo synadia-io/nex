@@ -1,8 +1,7 @@
-{
-  "namespace": "kevin",
+{  
   "nats": {
     "servers": [
-      "nats://derp:4222"
+      "nats://localhost:4222"
     ]
   },
   "logger": {
