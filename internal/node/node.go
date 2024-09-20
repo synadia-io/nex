@@ -41,7 +41,7 @@ const (
 // Nex node process
 type Node struct {
 	api     *ApiListener
-	manager *WorkloadManager
+	manager *AgentManager
 
 	cancelF  context.CancelFunc
 	closing  uint32
@@ -167,7 +167,7 @@ func (n *Node) Start() {
 func (n *Node) EnterLameDuck() error {
 	if atomic.AddUint32(&n.lameduck, 1) == 1 {
 		n.config.Tags[controlapi.TagLameDuck] = "true"
-		err := n.manager.procMan.EnterLameDuck()
+		err := n.manager.EnterLameDuck()
 		if err != nil {
 			return err
 		}
@@ -273,7 +273,7 @@ func (n *Node) init() error {
 			n.setConnectionCallbackHandler(n.nc)
 		}
 
-		n.manager, _err = NewWorkloadManager(
+		n.manager, _err = NewAgentManager(
 			n.ctx,
 			n.cancelF,
 			n.keypair,
@@ -337,7 +337,7 @@ func (n *Node) handleAutostarts() {
 
 		retry := 0
 		for agentClient == nil {
-			agentClient, err = n.manager.SelectRandomAgent()
+			agentClient, err = n.manager.SelectAgent(autostart.WorkloadType)
 			if err != nil {
 				n.log.Warn("Failed to resolve agent for autostart", slog.String("error", err.Error()))
 				time.Sleep(50 * time.Millisecond)

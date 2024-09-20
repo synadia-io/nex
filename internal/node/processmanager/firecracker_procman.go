@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"path"
@@ -33,8 +34,9 @@ type FirecrackerProcessManager struct {
 	stopMutex map[string]*sync.Mutex
 	t         *observability.Telemetry
 
-	allVMs  map[string]*runningFirecracker
-	poolVMs chan *runningFirecracker
+	allVMs   map[string]*runningFirecracker
+	poolVMs  chan *runningFirecracker
+	poolSize int
 
 	natsint *internalnats.InternalNatsServer
 
@@ -48,18 +50,20 @@ func NewFirecrackerProcessManager(
 	config *models.NodeConfiguration,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
+	poolSize int,
 ) (*FirecrackerProcessManager, error) {
 
 	return &FirecrackerProcessManager{
-		config:  config,
-		ctx:     ctx,
-		natsint: intnats,
-		log:     log,
-		mutex:   &sync.Mutex{},
-		t:       telemetry,
+		config:   config,
+		ctx:      ctx,
+		natsint:  intnats,
+		log:      log,
+		mutex:    &sync.Mutex{},
+		t:        telemetry,
+		poolSize: poolSize,
 
 		allVMs:         make(map[string]*runningFirecracker),
-		poolVMs:        make(chan *runningFirecracker, config.MachinePoolSize),
+		poolVMs:        make(chan *runningFirecracker, int(math.Max(1, float64(poolSize)))),
 		stopMutex:      make(map[string]*sync.Mutex),
 		deployRequests: make(map[string]*agentapi.AgentWorkloadInfo),
 	}, nil
@@ -95,15 +99,26 @@ func (f *FirecrackerProcessManager) EnterLameDuck() error {
 }
 
 // Preparing a workload reads from the warmVMs channel
-func (f *FirecrackerProcessManager) PrepareWorkload(workloadId string, deployRequest *agentapi.AgentWorkloadInfo) error {
+func (f *FirecrackerProcessManager) PrepareWorkload(workloadID string, deployRequest *agentapi.AgentWorkloadInfo) error {
 	f.mutex.Lock()
 	defer f.mutex.Unlock()
 
-	vm := <-f.poolVMs
+	var vm *runningFirecracker
+
+	if f.poolSize == 0 {
+		for id := range f.allVMs {
+			vm = f.allVMs[id]
+			break
+		}
+	} else {
+		vm = <-f.poolVMs
+	}
+
 	if vm == nil {
 		return fmt.Errorf("could not prepare workload, no available firecracker VM")
 	}
 
+	// FIXME-- need to attach multiple deploy requests here
 	vm.deployRequest = deployRequest
 	vm.namespace = *deployRequest.Namespace
 	vm.workloadStarted = time.Now().UTC()
@@ -146,11 +161,67 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 		}
 	}()
 
-	if !f.config.PreserveNetwork {
-		err := f.resetCNI()
+	// FIXME -- this needs to only happen once
+	// if !f.config.PreserveNetwork {
+	// err := f.resetCNI()
+	// if err != nil {
+	// 	f.log.Warn("Failed to reset network.", slog.Any("err", err))
+	// 	return err
+	// }
+	// }
+
+	createVM := func() (*runningFirecracker, error) {
+		vmmUUID, err := uuid.NewRandom()
 		if err != nil {
-			f.log.Warn("Failed to reset network.", slog.Any("err", err))
+			f.log.Error("Failed to generate uuid", slog.Any("err", err))
+			return nil, err
 		}
+		vmmID := vmmUUID.String()
+
+		workloadKey, err := f.natsint.CreateCredentials(vmmID)
+		if err != nil {
+			f.log.Error("Failed to create workload user", slog.Any("err", err))
+			return nil, err
+		}
+
+		vm, err := createAndStartVM(context.TODO(), vmmID, f.config, f.log)
+		if err != nil {
+			f.log.Warn("Failed to create VM", slog.Any("err", err))
+			return nil, err
+		}
+
+		workloadSeed, err := workloadKey.Seed()
+		if err != nil {
+			f.log.Error("Failed to resolve seed from workload key", slog.Any("err", err))
+			return nil, err
+		}
+
+		err = f.setMetadata(vm, string(workloadSeed))
+		if err != nil {
+			f.log.Warn("Failed to set metadata on VM for warming pool.", slog.Any("err", err))
+			return nil, err
+		}
+
+		f.allVMs[vm.vmmID] = vm
+		f.stopMutex[vm.vmmID] = &sync.Mutex{}
+
+		f.t.VmCounter.Add(f.ctx, 1)
+
+		go f.delegate.OnProcessStarted(vm.vmmID)
+		return vm, nil
+	}
+
+	if f.poolSize == 0 {
+		// multi-tenant
+		vm, err := createVM()
+		if err != nil {
+			return err
+		}
+
+		f.log.Debug("Adding multi-tenant VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
+		f.poolVMs <- vm // If the pool is full, this line will block until a slot is available.
+
+		return nil
 	}
 
 	for !f.stopping() {
@@ -158,50 +229,17 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 		case <-f.ctx.Done():
 			return nil
 		default:
-			if len(f.poolVMs) == f.config.MachinePoolSize {
+			if len(f.poolVMs) == f.poolSize && f.poolSize > 0 {
 				time.Sleep(runloopSleepInterval)
 				continue
 			}
 
-			vmmUUID, err := uuid.NewRandom()
+			vm, err := createVM()
 			if err != nil {
-				f.log.Error("Failed to generate uuid", slog.Any("err", err))
-				continue
-			}
-			vmmID := vmmUUID.String()
-
-			workloadKey, err := f.natsint.CreateCredentials(vmmID)
-			if err != nil {
-				f.log.Error("Failed to create workload user", slog.Any("err", err))
 				continue
 			}
 
-			vm, err := createAndStartVM(context.TODO(), vmmID, f.config, f.log)
-			if err != nil {
-				f.log.Warn("Failed to create VMM for warming pool.", slog.Any("err", err))
-				continue
-			}
-
-			workloadSeed, err := workloadKey.Seed()
-			if err != nil {
-				f.log.Error("Failed to resolve seed from workload key", slog.Any("err", err))
-				continue
-			}
-
-			err = f.setMetadata(vm, string(workloadSeed))
-			if err != nil {
-				f.log.Warn("Failed to set metadata on VM for warming pool.", slog.Any("err", err))
-				continue
-			}
-
-			f.allVMs[vm.vmmID] = vm
-			f.stopMutex[vm.vmmID] = &sync.Mutex{}
-
-			f.t.VmCounter.Add(f.ctx, 1)
-
-			go f.delegate.OnProcessStarted(vm.vmmID)
-
-			f.log.Debug("Adding new VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
+			f.log.Debug("Adding VM to warm pool", slog.Any("ip", vm.ip), slog.String("vmid", vm.vmmID))
 			f.poolVMs <- vm // If the pool is full, this line will block until a slot is available.
 		}
 	}

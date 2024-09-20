@@ -154,7 +154,7 @@ func (a *AgentClient) DeployWorkload(request *AgentWorkloadInfo) (*DeployRespons
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			return nil, errors.New("timed out waiting for acknowledgement of workload deployment")
 		} else if errors.Is(err, nats.ErrNoResponders) {
-			time.Sleep(time.Millisecond * 100)
+			time.Sleep(time.Millisecond * 250)
 			a.deployRetryCount += 1
 			return a.DeployWorkload(request)
 		} else {
@@ -183,6 +183,10 @@ func (a *AgentClient) WorkloadBytes() uint64 {
 // with the agent client
 func (a *AgentClient) Drain() error {
 	for _, sub := range a.subz {
+		if !sub.IsValid() {
+			continue
+		}
+
 		err := sub.Drain()
 		if err != nil {
 			a.log.Warn("failed to drain subscription associated with agent client",

@@ -26,7 +26,7 @@ func (n *NodeProxy) APIListener() *ApiListener {
 	return n.n.api
 }
 
-func (n *NodeProxy) WorkloadManager() *WorkloadManager {
+func (n *NodeProxy) AgentManager() *AgentManager {
 	return n.n.manager
 }
 
@@ -42,60 +42,60 @@ func (n *NodeProxy) Telemetry() *observability.Telemetry {
 	return n.n.telemetry
 }
 
-type WorkloadManagerProxy struct {
-	m *WorkloadManager
+type AgentManagerProxy struct {
+	m *AgentManager
 }
 
-func NewWorkloadManagerProxyWith(manager *WorkloadManager) *WorkloadManagerProxy {
-	return &WorkloadManagerProxy{m: manager}
+func NewAgentManagerProxyWith(manager *AgentManager) *AgentManagerProxy {
+	return &AgentManagerProxy{m: manager}
 }
 
-func (m *WorkloadManagerProxy) Log() *slog.Logger {
+func (m *AgentManagerProxy) Log() *slog.Logger {
 	return m.m.log
 }
 
-func (m *WorkloadManagerProxy) NodeConfiguration() *models.NodeConfiguration {
+func (m *AgentManagerProxy) NodeConfiguration() *models.NodeConfiguration {
 	return m.m.config
 }
 
-func (m *WorkloadManagerProxy) InternalNATS() *internalnats.InternalNatsServer {
+func (m *AgentManagerProxy) InternalNATS() *internalnats.InternalNatsServer {
 	return m.m.natsint
 }
 
-func (m *WorkloadManagerProxy) InternalNATSConn() *nats.Conn {
+func (m *AgentManagerProxy) InternalNATSConn() *nats.Conn {
 	return m.m.ncint
 }
 
-func (m *WorkloadManagerProxy) Telemetry() *observability.Telemetry {
+func (m *AgentManagerProxy) Telemetry() *observability.Telemetry {
 	return m.m.t
 }
 
-func (w *WorkloadManagerProxy) AllAgents() map[string]*processmanager.ProcessInfo {
-	agentsmap := make(map[string]*processmanager.ProcessInfo)
+// func (w *AgentManagerProxy) AllAgents() map[string]*processmanager.ProcessInfo {
+// 	agentsmap := make(map[string]*processmanager.ProcessInfo)
 
-	for _, agent := range w.Agents() {
-		agentsmap[agent.ID] = agent
-	}
+// 	for _, agent := range w.Agents() {
+// 		agentsmap[agent.ID] = agent
+// 	}
 
-	for _, agent := range w.PoolAgents() {
-		agentsmap[agent.ID] = agent
-	}
+// 	for _, agent := range w.PoolAgents() {
+// 		agentsmap[agent.ID] = agent
+// 	}
 
-	return agentsmap
-}
+// 	return agentsmap
+// }
 
-func (w *WorkloadManagerProxy) Agents() map[string]*processmanager.ProcessInfo {
-	agentsmap := make(map[string]*processmanager.ProcessInfo)
+// func (w *AgentManagerProxy) Agents() map[string]*processmanager.ProcessInfo {
+// 	agentsmap := make(map[string]*processmanager.ProcessInfo)
 
-	agents, _ := w.m.procMan.ListProcesses()
-	for _, agent := range agents {
-		agentsmap[agent.ID] = &agent
-	}
+// 	agents, _ := w.m.procMan.ListProcesses()
+// 	for _, agent := range agents {
+// 		agentsmap[agent.ID] = &agent
+// 	}
 
-	return agentsmap
-}
+// 	return agentsmap
+// }
 
-func (w *WorkloadManagerProxy) PoolAgents() map[string]*processmanager.ProcessInfo {
+func (w *AgentManagerProxy) PoolAgents() map[string]*processmanager.ProcessInfo {
 	// FIXME-- this is no longer exposed
 	return map[string]*processmanager.ProcessInfo{}
 }

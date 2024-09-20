@@ -357,7 +357,7 @@ var _ = Describe("nex node", func() {
 					})
 
 					It("should initialize a machine manager to manage firecracker VMs and communicate with running agents", func(ctx SpecContext) {
-						Expect(nodeProxy.WorkloadManager()).ToNot(BeNil())
+						Expect(nodeProxy.AgentManager()).ToNot(BeNil())
 					})
 
 					It("should initialize an API listener", func(ctx SpecContext) {
@@ -373,8 +373,8 @@ var _ = Describe("nex node", func() {
 					// })
 
 					Describe("machine manager", func() {
-						var manager *nexnode.WorkloadManager
-						var managerProxy *nexnode.WorkloadManagerProxy
+						var manager *nexnode.AgentManager
+						var managerProxy *nexnode.AgentManagerProxy
 
 						AfterEach(func() {
 							manager = nil
@@ -382,8 +382,8 @@ var _ = Describe("nex node", func() {
 						})
 
 						JustBeforeEach(func() {
-							manager = nodeProxy.WorkloadManager()
-							managerProxy = nexnode.NewWorkloadManagerProxyWith(manager)
+							manager = nodeProxy.AgentManager()
+							managerProxy = nexnode.NewAgentManagerProxyWith(manager)
 						})
 
 						It("should use the provided logger instance", func(ctx SpecContext) {
@@ -409,7 +409,7 @@ var _ = Describe("nex node", func() {
 						Describe("VM pool", func() {
 							Context("when no workloads have been deployed", func() {
 								It("should complete an agent handshake for each VM in the configured pool size", func(ctx SpecContext) {
-									workloads, _ := nodeProxy.WorkloadManager().RunningWorkloads()
+									workloads, _ := nodeProxy.AgentManager().RunningWorkloads()
 									for _, workload := range workloads {
 										subsz, _ := managerProxy.InternalNATS().Subsz(&server.SubszOptions{
 											Subscriptions: true,

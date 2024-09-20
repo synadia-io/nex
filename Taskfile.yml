@@ -43,7 +43,7 @@ tasks:
     sources:
       - "*.go"
     cmds:
-      - go build -tags netgo,debug -ldflags '-extldflags "-static"'
+      - go build -tags netgo -ldflags '-extldflags "-static"'
 
   rootfs:
     dir: nex

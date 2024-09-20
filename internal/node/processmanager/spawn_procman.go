@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
@@ -34,6 +35,7 @@ type SpawningProcessManager struct {
 
 	allProcs  map[string]*spawnedProcess
 	poolProcs chan *spawnedProcess
+	poolSize  int
 
 	natsint *internalnats.InternalNatsServer
 
@@ -63,20 +65,22 @@ func NewSpawningProcessManager(
 	config *models.NodeConfiguration,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
+	poolSize int,
 ) (*SpawningProcessManager, error) {
 	return &SpawningProcessManager{
-		config:  config,
-		ctx:     ctx,
-		natsint: intNats,
-		log:     log,
-		mutex:   &sync.Mutex{},
-		t:       telemetry,
+		config:   config,
+		ctx:      ctx,
+		natsint:  intNats,
+		log:      log,
+		mutex:    &sync.Mutex{},
+		poolSize: poolSize,
+		t:        telemetry,
 
 		stopMutexes: make(map[string]*sync.Mutex),
 
 		deployRequests: make(map[string]*agentapi.AgentWorkloadInfo),
 		allProcs:       make(map[string]*spawnedProcess),
-		poolProcs:      make(chan *spawnedProcess, config.MachinePoolSize),
+		poolProcs:      make(chan *spawnedProcess, int(math.Max(1, float64(poolSize)))),
 	}, nil
 }
 
@@ -151,31 +155,47 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 	s.delegate = delegate
 	s.log.Info("Spawning (no sandbox) process manager starting")
 
+	spawnProc := func() (*spawnedProcess, error) {
+		p, err := s.spawn()
+		if err != nil {
+			s.log.Error("Failed to spawn nex-agent for pool", slog.Any("error", err))
+			time.Sleep(runloopSleepInterval)
+			return nil, err
+		}
+
+		s.allProcs[p.ID] = p
+		s.stopMutexes[p.ID] = &sync.Mutex{}
+
+		go s.delegate.OnProcessStarted(p.ID)
+		return p, nil
+	}
+
 	for !s.stopping() {
 		select {
 		case <-s.ctx.Done():
 			return nil
 		default:
-			if len(s.poolProcs) == s.config.MachinePoolSize {
+			if len(s.poolProcs) == s.poolSize && s.poolSize > 0 {
 				time.Sleep(runloopSleepInterval)
+				continue
+			} else if s.poolSize == 0 && len(s.allProcs) == 0 {
+				// FIXME-- DRY this up a bit
+				p, err := spawnProc()
+				if err != nil {
+					continue
+				}
+
+				s.log.Info("Adding multi-tenant agent process to warm pool", slog.String("workload_id", p.ID))
+				s.poolProcs <- p // If the pool is full, this line will block until a slot is available.
 				continue
 			}
 
-			p, err := s.spawn()
+			p, err := spawnProc()
 			if err != nil {
-				s.log.Error("Failed to spawn nex-agent for pool", slog.Any("error", err))
-				time.Sleep(runloopSleepInterval)
 				continue
 			}
 
-			s.allProcs[p.ID] = p
-			s.stopMutexes[p.ID] = &sync.Mutex{}
-
-			go s.delegate.OnProcessStarted(p.ID)
-
-			s.log.Info("Adding new agent process to warm pool",
-				slog.String("workload_id", p.ID))
-
+			s.log.Info("Adding agent process to warm pool", slog.String("workload_id", p.ID))
 			s.poolProcs <- p // If the pool is full, this line will block until a slot is available.
 		}
 	}

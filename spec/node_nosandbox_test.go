@@ -337,7 +337,7 @@ var _ = Describe("nex node", func() {
 
 					Describe("machine manager", func() {
 						var manager *nexnode.WorkloadManager
-						var managerProxy *nexnode.WorkloadManagerProxy
+						var managerProxy *nexnode.AgentManagerProxy
 
 						AfterEach(func() {
 							manager = nil
@@ -346,7 +346,7 @@ var _ = Describe("nex node", func() {
 
 						JustBeforeEach(func() {
 							manager = nodeProxy.WorkloadManager()
-							managerProxy = nexnode.NewWorkloadManagerProxyWith(manager)
+							managerProxy = nexnode.NewAgentManagerProxyWith(manager)
 						})
 
 						It("should use the provided logger instance", func(ctx SpecContext) {

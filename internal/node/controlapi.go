@@ -26,7 +26,7 @@ import (
 // The API listener is the command and control interface for the node server
 type ApiListener struct {
 	node  *Node
-	mgr   *WorkloadManager
+	mgr   *AgentManager
 	log   *slog.Logger
 	start time.Time
 	xk    nkeys.KeyPair
@@ -35,7 +35,7 @@ type ApiListener struct {
 }
 
 // FIXME-- stop passing node here
-func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiListener {
+func NewApiListener(log *slog.Logger, mgr *AgentManager, node *Node) *ApiListener {
 	config := node.config
 
 	efftags := config.Tags
@@ -71,6 +71,10 @@ func NewApiListener(log *slog.Logger, mgr *WorkloadManager, node *Node) *ApiList
 
 func (api *ApiListener) Drain() error {
 	for _, sub := range api.subz {
+		if !sub.IsValid() {
+			continue
+		}
+
 		err := sub.Drain()
 		if err != nil {
 			api.log.Warn("failed to drain subscription associated with api listener",
@@ -227,21 +231,13 @@ func (api *ApiListener) handleAuction(ctx context.Context, span trace.Span, m *n
 		return
 	}
 
-	machines, err := api.mgr.RunningWorkloads()
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		api.log.Error("Failed to query running machines", slog.Any("error", err))
-		respondFail(controlapi.AuctionResponseType, m, "Failed to query running machines on node")
-		return
-	}
-
 	res := controlapi.NewEnvelope(controlapi.AuctionResponseType, controlapi.AuctionResponse{
 		NodeId:          api.PublicKey(),
 		Nexus:           api.node.nexus,
 		Version:         Version(),
 		TargetXkey:      api.PublicXKey(),
 		Uptime:          myUptime(now.Sub(api.start)),
-		RunningMachines: len(machines),
+		RunningMachines: api.mgr.RunningWorkloadCount(),
 		Tags:            api.node.config.Tags,
 	}, nil)
 
@@ -345,7 +341,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 
 	retry := 0
 	for agentClient == nil {
-		agentClient, err = api.mgr.SelectRandomAgent()
+		agentClient, err = api.mgr.SelectAgent(request.WorkloadType)
 		if err != nil {
 			api.log.Warn("Failed to resolve agent for attempted deploy",
 				slog.String("error", err.Error()),
@@ -444,20 +440,13 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 func (api *ApiListener) handlePing(m *nats.Msg) {
 	now := time.Now().UTC()
 
-	machines, err := api.mgr.RunningWorkloads()
-	if err != nil {
-		api.log.Error("Failed to query running machines", slog.Any("error", err))
-		respondFail(controlapi.PingResponseType, m, "Failed to query running machines on node")
-		return
-	}
-
 	res := controlapi.NewEnvelope(controlapi.PingResponseType, controlapi.PingResponse{
 		NodeId:          api.PublicKey(),
 		Nexus:           api.node.nexus,
 		Version:         Version(),
 		TargetXkey:      api.PublicXKey(),
 		Uptime:          myUptime(now.Sub(api.start)),
-		RunningMachines: len(machines),
+		RunningMachines: api.mgr.RunningWorkloadCount(),
 		Tags:            api.node.config.Tags,
 	}, nil)
 
@@ -656,7 +645,7 @@ func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats
 
 	res := controlapi.NewEnvelope(controlapi.InfoResponseType, controlapi.InfoResponse{
 		AllowDuplicateWorkloads: api.mgr.config.AllowDuplicateWorkloads,
-		AvailableAgents:         len(api.mgr.poolAgents),
+		AvailableAgents:         api.mgr.AvailableAgentsCount(),
 		Machines:                namespaceWorkloads,
 		Memory:                  stats,
 		PublicXKey:              pubX,
@@ -678,7 +667,7 @@ func (api *ApiListener) handleInfo(ctx context.Context, span trace.Span, m *nats
 
 func (api *ApiListener) exceedsMaxWorkloadCount() bool {
 	return api.node.config.NodeLimits.MaxWorkloads > 0 &&
-		len(api.mgr.liveAgents) >= api.node.config.NodeLimits.MaxWorkloads
+		api.mgr.RunningWorkloadCount() >= int32(api.node.config.NodeLimits.MaxWorkloads)
 }
 
 func (api *ApiListener) exceedsMaxWorkloadSize(bytes uint64) bool {

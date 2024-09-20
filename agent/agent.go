@@ -517,6 +517,10 @@ func (a *Agent) shutdown() {
 		_ = a.deleteExecutableArtifact()
 
 		for _, sub := range a.subz {
+			if !sub.IsValid() {
+				continue
+			}
+
 			_ = sub.Drain()
 		}
 

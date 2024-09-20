@@ -2,13 +2,9 @@ package nexnode
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -68,6 +64,8 @@ type WorkloadManager struct {
 	handshakeTimeout time.Duration
 	pingTimeout      time.Duration
 
+	runningWorkloadCount atomic.Int32
+
 	hostServices *HostServices
 
 	poolMutex *sync.Mutex
@@ -76,19 +74,24 @@ type WorkloadManager struct {
 	// Subscriptions created on behalf of functions that cannot subscribe internallly
 	subz map[string][]*nats.Subscription
 
-	publicKey string
+	publicKey    string
+	workloadType controlapi.NexWorkload
 }
 
 // Initialize a new workload manager instance to manage and communicate with agents
 func NewWorkloadManager(
 	ctx context.Context,
 	cancel context.CancelFunc,
+	hostServices *HostServices,
 	nodeKeypair nkeys.KeyPair,
 	publicKey string,
 	nc *nats.Conn,
+	natsint *internalnats.InternalNatsServer,
+	ncint *nats.Conn,
 	config *models.NodeConfiguration,
 	log *slog.Logger,
 	telemetry *observability.Telemetry,
+	workloadType controlapi.NexWorkload,
 ) (*WorkloadManager, error) {
 	// Validate the node config
 	if !config.Validate() {
@@ -101,13 +104,17 @@ func NewWorkloadManager(
 		ctx:              ctx,
 		handshakes:       make(map[string]string),
 		handshakeTimeout: time.Duration(config.AgentHandshakeTimeoutMillisecond) * time.Millisecond,
+		hostServices:     hostServices,
 		kp:               nodeKeypair,
 		log:              log,
+		natsint:          natsint,
 		nc:               nc,
+		ncint:            ncint,
 		poolMutex:        &sync.Mutex{},
 		pingTimeout:      time.Duration(config.AgentPingTimeoutMillisecond) * time.Millisecond,
 		publicKey:        publicKey,
 		t:                telemetry,
+		workloadType:     workloadType,
 
 		poolAgents: make(map[string]*agentapi.AgentClient),
 		liveAgents: make(map[string]*agentapi.AgentClient),
@@ -118,23 +125,13 @@ func NewWorkloadManager(
 
 	var err error
 
-	// start internal NATS server
-	err = w.startInternalNATS()
-	if err != nil {
-		w.log.Error("Failed to start internal NATS server", slog.Any("err", err))
-		return nil, err
-	} else {
-		w.log.Debug("Internal NATS server started", slog.String("client_url", w.natsint.ClientURL()))
+	poolSize := w.config.MachinePoolSize
+	if w.workloadType != controlapi.NexWorkloadNative {
+		// multi-tenant process for non-native workloads have no pooled resources
+		poolSize = 0
 	}
 
-	w.hostServices = NewHostServices(w.ncint, config.HostServicesConfig, w.log, w.t.Tracer)
-	err = w.hostServices.init()
-	if err != nil {
-		w.log.Warn("Failed to initialize host services", slog.Any("err", err))
-		return nil, err
-	}
-
-	w.procMan, err = processmanager.NewProcessManager(w.natsint, w.log, w.config, w.t, w.ctx)
+	w.procMan, err = processmanager.NewProcessManager(w.natsint, w.log, w.config, w.t, w.ctx, poolSize)
 	if err != nil {
 		w.log.Error("Failed to initialize agent process manager", slog.Any("error", err))
 		return nil, err
@@ -144,74 +141,16 @@ func NewWorkloadManager(
 }
 
 // Start the workload manager, which in turn starts the configured agent process manager
-func (w *WorkloadManager) Start() {
+func (w *WorkloadManager) Start() error {
 	w.log.Debug("Workload manager starting")
 
 	err := w.procMan.Start(w)
 	if err != nil {
 		w.log.Error("Agent process manager failed to start", slog.Any("error", err))
-		w.cancel()
-	}
-}
-
-func (m *WorkloadManager) CacheWorkload(workloadID string, request *controlapi.DeployRequest) (uint64, *string, error) {
-	bucket := request.Location.Host
-	key := strings.Trim(request.Location.Path, "/")
-
-	jsLogAttr := []any{slog.String("bucket", bucket), slog.String("key", key)}
-	opts := []nats.JSOpt{}
-	if request.JsDomain != nil {
-		opts = append(opts, nats.Domain(*request.JsDomain))
-
-		jsLogAttr = append(jsLogAttr, slog.String("jsdomain", *request.JsDomain))
+		return err
 	}
 
-	m.log.Info("Attempting object store download", jsLogAttr...)
-
-	js, err := m.nc.JetStream(opts...)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	store, err := js.ObjectStore(bucket)
-	if err != nil {
-		m.log.Error("Failed to bind to source object store", slog.Any("err", err), slog.String("bucket", bucket))
-		return 0, nil, err
-	}
-
-	_, err = store.GetInfo(key)
-	if err != nil {
-		m.log.Error("Failed to locate workload binary in source object store", slog.Any("err", err), slog.String("key", key), slog.String("bucket", bucket))
-		return 0, nil, err
-	}
-
-	started := time.Now()
-	workload, err := store.GetBytes(key)
-	if err != nil {
-		m.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
-		return 0, nil, err
-	}
-	finished := time.Since(started)
-	dlRate := float64(len(workload)) / finished.Seconds()
-	m.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.String("duration", fmt.Sprintf("%.2f sec", finished.Seconds())), slog.String("rate", fmt.Sprintf("%s/sec", byteConvert(dlRate))))
-
-	err = m.natsint.StoreFileForID(workloadID, workload)
-	if err != nil {
-		m.log.Error("Failed to store bytes from source object store in cache", slog.Any("err", err), slog.String("key", key))
-	}
-
-	workloadHash := sha256.New()
-	workloadHash.Write(workload)
-	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
-
-	m.log.Info("Successfully stored workload in internal object store",
-		slog.String("workload_name", *request.WorkloadName),
-		slog.String("workload_id", workloadID),
-		slog.String("workload_hash", workloadHashString),
-		slog.Int("bytes", len(workload)),
-	)
-
-	return uint64(len(workload)), &workloadHashString, nil
+	return nil
 }
 
 // Deploy a workload as specified by the given deploy request to an available
@@ -275,6 +214,7 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 		// move the client from pool to pending
 		w.liveAgents[workloadID] = agentClient
 		delete(w.poolAgents, workloadID)
+		w.runningWorkloadCount.Add(1)
 
 		if request.WorkloadType != controlapi.NexWorkloadNative {
 			ncHostServices, err := w.createHostServicesConnection(request)
@@ -325,6 +265,10 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 	return nil
 }
 
+func (w *WorkloadManager) EnterLameDuck() error {
+	return w.procMan.EnterLameDuck()
+}
+
 // Locates a given workload by its workload ID and returns the deployment request associated with it
 // Note that this means "pending" agents are not considered by lookups
 func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.AgentWorkloadInfo, error) {
@@ -333,6 +277,11 @@ func (w *WorkloadManager) LookupWorkload(workloadID string) (*agentapi.AgentWork
 	}
 
 	return nil, fmt.Errorf("workload doesn't exist: %s", workloadID)
+}
+
+// Retrieve a list of deployed, running workloads
+func (w *WorkloadManager) RunningWorkloadCount() int32 {
+	return w.runningWorkloadCount.Load()
 }
 
 // Retrieve a list of deployed, running workloads
@@ -402,12 +351,6 @@ func (w *WorkloadManager) Stop() error {
 			return err
 		}
 
-		_ = w.ncint.Drain()
-		for !w.ncint.IsClosed() {
-			time.Sleep(time.Millisecond * 25)
-		}
-
-		w.natsint.Shutdown()
 		w.log.Debug("Workload manager stopped")
 	}
 
@@ -431,6 +374,10 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	w.log.Debug("Attempting to stop workload", slog.String("workload_id", id), slog.Bool("undeploy", undeploy))
 
 	for _, sub := range w.subz[id] {
+		if !sub.IsValid() {
+			continue
+		}
+
 		err := sub.Drain()
 		if err != nil {
 			w.log.Warn("failed to drain subscription to subject associated with workload",
@@ -472,7 +419,9 @@ func (w *WorkloadManager) StopWorkload(id string, undeploy bool) error {
 	delete(w.liveAgents, id)
 	delete(w.poolAgents, id)
 	delete(w.stopMutex, id)
+
 	w.hostServices.server.RemoveHostServicesConnection(id)
+	w.runningWorkloadCount.Add(-1)
 
 	return nil
 }
@@ -623,25 +572,6 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID string, tsub string,
 	}
 }
 
-func (w *WorkloadManager) startInternalNATS() error {
-	storeDir := filepath.Join(os.TempDir(), defaultInternalNatsStoreDir)
-	if w.config.InternalNodeStoreDir != nil {
-		storeDir = *w.config.InternalNodeStoreDir
-	}
-
-	var err error
-	w.natsint, err = internalnats.NewInternalNatsServer(w.log, storeDir, w.config.InternalNodeDebug, w.config.InternalNodeTrace)
-	if err != nil {
-		return err
-	}
-
-	p := w.natsint.Port()
-	w.config.InternalNodePort = &p
-	w.ncint = w.natsint.Connection()
-
-	return nil
-}
-
 func (w *WorkloadManager) createHostServicesConnection(request *agentapi.AgentWorkloadInfo) (*nats.Conn, error) {
 	natsOpts := []nats.Option{}
 	if request.WorkloadName != nil {
@@ -707,7 +637,7 @@ func (w *WorkloadManager) createHostServicesConnection(request *agentapi.AgentWo
 }
 
 // Picks a pending agent from the pool that will receive the next deployment
-func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
+func (w *WorkloadManager) SelectAgent(reuse bool) (*agentapi.AgentClient, error) {
 	w.poolMutex.Lock()
 	defer w.poolMutex.Unlock()
 
@@ -720,6 +650,13 @@ func (w *WorkloadManager) SelectRandomAgent() (*agentapi.AgentClient, error) {
 
 		agentClient.MarkSelected()
 		return agentClient, nil
+	}
+
+	if reuse {
+		for _, agentClient := range w.liveAgents {
+			w.log.Debug("Reusing agent client", slog.String("id", agentClient.ID()))
+			return agentClient, nil
+		}
 	}
 
 	return nil, errors.New("no available agent client in pool")
