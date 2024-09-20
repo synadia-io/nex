@@ -21,7 +21,7 @@ const (
 	DefaultNodeMemSizeMib                   = 256
 	DefaultNodeVcpuCount                    = 1
 	DefaultOtelExporterUrl                  = "127.0.0.1:14532"
-	DefaultAgentHandshakeTimeoutMillisecond = 5000
+	DefaultAgentHandshakeTimeoutMillisecond = 25000
 	DefaultAgentPingTimeoutMillisecond      = 750
 )
 
