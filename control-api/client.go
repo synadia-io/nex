@@ -33,7 +33,7 @@ type Client struct {
 	log       *slog.Logger
 }
 
-// Creates a new client to communicate with a group of NEX nodes, using the
+// Creates a new client to communicate with a group of Nex nodes, using the
 // namespace of 'default' for applicable requests
 func NewApiClient(nc *nats.Conn, timeout time.Duration, log *slog.Logger) *Client {
 	return NewApiClientWithNamespace(nc, timeout, "default", log)

@@ -183,7 +183,7 @@ func (m HomeModel) View() string {
 				lipgloss.Top,
 				lipgloss.JoinVertical(
 					lipgloss.Left,
-					"NEX Nodes",
+					"Nex Nodes",
 					ss.Render(m.nodeList.View()),
 				),
 				lipgloss.JoinVertical(

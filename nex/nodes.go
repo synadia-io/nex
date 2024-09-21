@@ -92,7 +92,7 @@ func render(cols *columns.Writer) {
 }
 func renderNodeInfo(info *controlapi.InfoResponse, id string, full, jsonOut bool) {
 	if !jsonOut {
-		cols := newColumns("NEX Node Information")
+		cols := newColumns("Nex Node Information")
 
 		cols.AddRow("Node", id)
 		cols.AddRowf("Xkey", info.PublicXKey)

@@ -64,7 +64,7 @@ func RunDevWorkload(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	// developer mode can have a smaller discovery timeout, since we're assuming there's a NEX
+	// developer mode can have a smaller discovery timeout, since we're assuming there's a Nex
 	// node "nearby"
 	nodeClient := controlapi.NewApiClientWithNamespace(nc, 750*time.Millisecond, Opts.Namespace, logger)
 
@@ -215,7 +215,7 @@ func uploadWorkload(nc *nats.Conn, devOpts models.DevRunOptions) (string, string
 	if err != nil {
 		bucket, err = js.CreateObjectStore(&nats.ObjectStoreConfig{
 			Bucket:      objectStoreName,
-			Description: "Ad hoc object storage for NEX CLI developer mode uploads",
+			Description: "Ad hoc object storage for Nex CLI developer mode uploads",
 			MaxBytes:    int64(maxBytes),
 		})
 		if err != nil {

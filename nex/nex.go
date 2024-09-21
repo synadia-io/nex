@@ -46,7 +46,7 @@ var (
 	evts    = ncli.Command("events", "Live monitor events from nex nodes")
 	rootfs  = ncli.Command("rootfs", "Build custom rootfs").Alias("fs")
 	lame    = ncli.Command("lameduck", "Command a node to enter lame duck mode")
-	upgrade = ncli.Command("upgrade", "Upgrade the NEX CLI to the latest version")
+	upgrade = ncli.Command("upgrade", "Upgrade the Nex CLI to the latest version")
 
 	nodesLs   = nodes.Command("ls", "List nodes")
 	nodesInfo = nodes.Command("info", "Get information for an engine node")

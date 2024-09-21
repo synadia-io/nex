@@ -8,20 +8,22 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/synadia-io/nex.svg)](https://pkg.go.dev/github.com/synadia-io/nex)
 
 # NATS Execution Engine
+
 Leverage and extend your investment in NATS infrastructure to deploy functions and services, turning NATS into the ultimate platform for building distributed applications.
 
 ## Quickstart
+
 The easiest way to get started with Nex is to check out our [Using Nex](https://docs.nats.io/using-nats/nex) section in the NATS documentation.
 
 If you're already familiar with Nex and how it works, then you can get going quickly by installing the Nex CLI:
 
 ```
-curl -sSf https://nex.synadia.com/install.sh | sh 
+curl -sSf https://nex.synadia.com/install.sh | sh
 ```
 
 ## Preflight Check
 
-If you haven't already, please make sure that `/usr/local/bin` is in your path. 
+If you haven't already, please make sure that `/usr/local/bin` is in your path.
 
 The `nex node preflight` command is here to help you bootstrap your system and ensure that you have all of the elements you need to start and operate Nex nodes.
 
@@ -29,21 +31,21 @@ The pre-flight check requires a configuration file so it can perform the appropr
 
 ```json
 {
-    "default_resource_dir":"/tmp/wd",
-    "machine_pool_size": 1,
-    "cni": {
-        "network_name": "fcnet",
-        "interface_name": "veth0"
-    },
-    "machine_template": {
-        "vcpu_count": 1,
-        "memsize_mib": 256
-    },
-    "tags": {
-        "simple": "true"
-    },
-    "no_sandbox": false,
-    "otlp_exporter_url": null
+  "default_resource_dir": "/tmp/wd",
+  "machine_pool_size": 1,
+  "cni": {
+    "network_name": "fcnet",
+    "interface_name": "veth0"
+  },
+  "machine_template": {
+    "vcpu_count": 1,
+    "memsize_mib": 256
+  },
+  "tags": {
+    "simple": "true"
+  },
+  "no_sandbox": false,
+  "otlp_exporter_url": null
 }
 ```
 
@@ -54,43 +56,43 @@ $ nex node preflight --init sandbox
 ```
 
 ## Workload Types
-By default, only _native_ type workloads are enabled on a nex node.  To control what workloads are allowed to run on your node, use the `workload_types` option in the configuration file.  
+
+By default, only _native_ type workloads are enabled on a nex node. To control what workloads are allowed to run on your node, use the `workload_types` option in the configuration file.
+
 ```json
 {
-    "default_resource_dir":"/tmp/wd",
-    "machine_pool_size": 1,
-    "cni": {
-        "network_name": "fcnet",
-        "interface_name": "veth0"
-    },
-    "machine_template": {
-        "vcpu_count": 1,
-        "memsize_mib": 256
-    },
-    "tags": {
-        "simple": "true"
-    },
-    "no_sandbox": false,
-    "workload_types": [
-        "native",
-        "v8",
-        "wasm"
-    ]
+  "default_resource_dir": "/tmp/wd",
+  "machine_pool_size": 1,
+  "cni": {
+    "network_name": "fcnet",
+    "interface_name": "veth0"
+  },
+  "machine_template": {
+    "vcpu_count": 1,
+    "memsize_mib": 256
+  },
+  "tags": {
+    "simple": "true"
+  },
+  "no_sandbox": false,
+  "workload_types": ["native", "v8", "wasm"]
 }
 ```
 
 ## Nex Components
+
 Nex is made up of the following components
 
-* [agent](./agent) - Agent that runs inside a Firecracker VM, responsible for running untrusted workloads. Not something end users need to interact with.
-* [node](./internal/node) - Service running on a NEX node. Exposes a control API, starts/stops firecracker processes, communicates with the agent inside each process.
-* [nex](./nex) - CLI for communicating with NEX nodes
-* [tui](./nex/tui) - Interactive user interface for viewing the status of NEX nodes in a terminal. BETA feature, not yet fully functional.
+- [agent](./agent) - Agent that runs inside a Firecracker VM, responsible for running untrusted workloads. Not something end users need to interact with.
+- [node](./internal/node) - Service running on a Nex node. Exposes a control API, starts/stops firecracker processes, communicates with the agent inside each process.
+- [nex](./nex) - CLI for communicating with Nex nodes
+- [tui](./nex/tui) - Interactive user interface for viewing the status of Nex nodes in a terminal. BETA feature, not yet fully functional.
 
 ## Telemetry Data
-Nex comes prewired with [OpenTelemetry](https://opentelemetry.io) support for traces and metrics.  
 
-In order to enable OTel support, you will first need to provide the Nex node with access to an OTel exporter.  We have provided a docker-compose solution for local development.  In order to start the OTel evironment, you will need navigate to the `_scripts/otel` directory and run `docker compose up`.  The following ports will be exposed:
+Nex comes prewired with [OpenTelemetry](https://opentelemetry.io) support for traces and metrics.
+
+In order to enable OTel support, you will first need to provide the Nex node with access to an OTel exporter. We have provided a docker-compose solution for local development. In order to start the OTel evironment, you will need navigate to the `_scripts/otel` directory and run `docker compose up`. The following ports will be exposed:
 
 ```
 Web UI (grafana)      -> 127.0.0.1:14524
@@ -104,16 +106,19 @@ Prometheus            -> 127.0.0.1:14534
 In order to view the metrics and traces, you will need to navigate to `http://localhost:14524` in your browser.
 
 ### Traces
+
 ```bash
 nex node up \
   --traces \                      # enables traces
   --otel_traces_exporter grpc     # controls where how traces are exported to collector
 ```
 
-Valid exporters are `grpc`, `http`, and `file`.  The file exporter will write traces to a file in the current working directory called `traces.log`.
+Valid exporters are `grpc`, `http`, and `file`. The file exporter will write traces to a file in the current working directory called `traces.log`.
 
 ### Metrics
+
 To enable metrics, include the flags when starting the node
+
 ```bash
 nex node up \
   --metrics \                      # enables metrics
@@ -121,10 +126,11 @@ nex node up \
   --metrics_port 8085              # exposes prometheus data on provided port
 ```
 
-Valid exporters are `http` and `prometheus`.  The file exporter will write metrics to a file in the current working directory called `metrics.log`.
+Valid exporters are `http` and `prometheus`. The file exporter will write metrics to a file in the current working directory called `metrics.log`.
 
 ## Using NATS Context with `nex`
-In order to use your NATS context with Nex, you will need to set the `XDG_CONFIG_HOME` environment variable.  On linux, this is typically `$HOME/.config`, but specifically, it will be wherever your `nats/` configuration directory is located.  This  will allow `nex` to use the same configuration as your NATS context.
+
+In order to use your NATS context with Nex, you will need to set the `XDG_CONFIG_HOME` environment variable. On linux, this is typically `$HOME/.config`, but specifically, it will be wherever your `nats/` configuration directory is located. This will allow `nex` to use the same configuration as your NATS context.
 
 ```bash
 // Example usage
@@ -132,7 +138,9 @@ XDG_CONFIG_HOME=/home/jordan/.config sudo -E nex node up --loglevel debug --cont
 ```
 
 ## Running a nex node in Docker
-We provide a Dockerfile that can be used for local development.  If you choose to run a nex node in docker, it MUST run in no-sandbox mode.
+
+We provide a Dockerfile that can be used for local development. If you choose to run a nex node in docker, it MUST run in no-sandbox mode.
+
 ```bash
 docker build -t nex .
 
@@ -150,4 +158,5 @@ docker run --net nex --rm nex node ls -s nats://nats-server:4222
 ```
 
 ## Contributing
+
 For information on how to contribute to Nex, please read our [contributing](./CONTRIBUTING.md) guide.
