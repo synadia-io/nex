@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"runtime"
 	"slices"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
@@ -371,7 +373,7 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 	)
 
 	span.AddEvent("Started workload download")
-	numBytes, workloadHash, err := api.mgr.CacheWorkload(workloadID, &request)
+	numBytes, location, workloadHash, err := api.mgr.CacheWorkload(workloadID, &request)
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
 		api.log.Error("Failed to cache workload bytes", slog.Any("err", err))
@@ -392,18 +394,21 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 		return
 	}
 
-	agentDeployRequest := agentWorkloadInfoFromControlDeployRequest(&request, namespace, numBytes, *workloadHash)
+	agentDeployRequest := agentWorkloadInfoFromControlDeployRequest(&request, namespace, numBytes, location, *workloadHash)
 
-	api.log.
-		Info("Submitting workload to agent",
-			slog.String("namespace", namespace),
-			slog.String("workload", *agentDeployRequest.WorkloadName),
-			slog.String("workload_id", workloadID),
-			slog.String("workload_location", agentDeployRequest.Location.String()),
-			slog.Uint64("workload_size", numBytes),
-			slog.String("workload_sha256", *workloadHash),
-			slog.String("type", string(request.WorkloadType)),
-		)
+	attrs := []any{
+		slog.String("namespace", namespace),
+		slog.String("workload", *agentDeployRequest.WorkloadName),
+		slog.String("workload_id", workloadID),
+		slog.String("workload_location", agentDeployRequest.Location.String()),
+		slog.Uint64("workload_size", numBytes),
+		slog.String("workload_sha256", *workloadHash),
+		slog.String("type", string(request.WorkloadType)),
+	}
+	if agentDeployRequest.FunctionID != nil {
+		attrs = append(attrs, slog.String("function_id", *agentDeployRequest.FunctionID))
+	}
+	api.log.Info("Submitting workload to agent", attrs...)
 
 	span.AddEvent("Created agent deploy request")
 	err = api.mgr.DeployWorkload(agentClient, agentDeployRequest)
@@ -418,13 +423,26 @@ func (api *ApiListener) handleDeploy(ctx context.Context, span trace.Span, m *na
 	span.AddEvent("Agent deploy request accepted")
 
 	span.SetAttributes(attribute.String("workload_name", *request.WorkloadName))
-	api.log.Info("Workload deployed", slog.String("workload", *request.WorkloadName), slog.String("workload_id", workloadID))
+
+	attrs = []any{
+		slog.String("workload_name", *request.WorkloadName),
+		slog.String("workload_id", workloadID),
+	}
+	if agentDeployRequest.FunctionID != nil {
+		attrs = append(attrs, slog.String("function_id", *agentDeployRequest.FunctionID))
+	}
+	api.log.Info("Workload deployed", attrs...)
+
+	id := workloadID
+	if agentDeployRequest.FunctionID != nil {
+		id = *agentDeployRequest.FunctionID
+	}
 
 	res := controlapi.NewEnvelope(controlapi.RunResponseType, controlapi.RunResponse{
 		Started: true,
 		Name:    *request.WorkloadName,
 		Issuer:  request.DecodedClaims.Issuer,
-		ID:      workloadID,
+		ID:      id,
 	}, nil)
 
 	raw, err := json.Marshal(res)
@@ -769,4 +787,36 @@ func extractNamespace(subject string) (string, error) {
 		return "", fmt.Errorf("Invalid subject - could not detect a namespace")
 	}
 	return tokens[2], nil
+}
+
+func agentWorkloadInfoFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, location *url.URL, hash string) *agentapi.AgentWorkloadInfo {
+	workload := &agentapi.AgentWorkloadInfo{
+		Argv:                 request.Argv,
+		DecodedClaims:        request.DecodedClaims,
+		Description:          request.Description,
+		EncryptedEnvironment: request.Environment,
+		Environment:          request.WorkloadEnvironment, // HACK!!! we need to fix autostart config to allow encrypted environment...
+		Essential:            request.Essential,
+		Hash:                 hash,
+		HostServicesConfig:   request.HostServicesConfig,
+		ID:                   request.ID,
+		Location:             location,
+		Namespace:            &namespace,
+		RetriedAt:            request.RetriedAt,
+		RetryCount:           request.RetryCount,
+		SenderPublicKey:      request.SenderPublicKey,
+		TotalBytes:           int64(numBytes),
+		TriggerSubjects:      request.TriggerSubjects,
+		WorkloadJWT:          request.WorkloadJWT,
+		WorkloadName:         request.WorkloadName,
+		WorkloadType:         request.WorkloadType,
+	}
+
+	if request.WorkloadType == controlapi.NexWorkloadV8 {
+		functionUUID, _ := uuid.NewRandom()
+		functionID := functionUUID.String()
+		workload.FunctionID = &functionID
+	}
+
+	return workload
 }

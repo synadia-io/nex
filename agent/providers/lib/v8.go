@@ -70,7 +70,9 @@ type V8 struct {
 	namespace   string
 	tmpFilename string
 	totalBytes  int32
-	vmID        string
+
+	vmID string
+	id   *string
 
 	fail chan bool
 	run  chan bool
@@ -95,7 +97,12 @@ func (v *V8) Deploy() error {
 		return fmt.Errorf("invalid state for execution; no compiled code available for vm: %s", v.name)
 	}
 
-	subject := fmt.Sprintf("agentint.%s.trigger", v.vmID)
+	if v.id == nil {
+		return fmt.Errorf("invalid state for execution; no workload id provided: %s", v.name)
+	}
+
+	subject := fmt.Sprintf("agentint.%s.%s.trigger", v.vmID, *v.id)
+
 	_, err := v.nc.Subscribe(subject, func(msg *nats.Msg) {
 		ctx := context.WithValue(context.Background(), agentapi.NexTriggerSubject, msg.Header.Get(agentapi.NexTriggerSubject)) //nolint:all
 		ctx = otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(msg.Header))
@@ -903,7 +910,9 @@ func InitNexExecutionProviderV8(params *agentapi.ExecutionProviderParams) (*V8, 
 		namespace:   *params.Namespace,
 		tmpFilename: *params.TmpFilename,
 		totalBytes:  0, // FIXME
-		vmID:        params.VmID,
+
+		vmID: params.VmID,
+		id:   params.FunctionID,
 
 		stderr: params.Stderr,
 		stdout: params.Stdout,

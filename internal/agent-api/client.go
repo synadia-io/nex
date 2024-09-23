@@ -209,7 +209,7 @@ func (a *AgentClient) Drain() error {
 
 // Stop the agent client instance
 // Currently this method simply sets the stopping flag, e.g., allowing any pending handshakes to be aborted
-func (a *AgentClient) Stop() error {
+func (a *AgentClient) Stop(functionID *string) error {
 	if atomic.AddUint32(&a.stopping, 1) == 1 {
 		return nil
 	}
@@ -217,15 +217,25 @@ func (a *AgentClient) Stop() error {
 	return errors.New("agent client already stopping")
 }
 
-func (a *AgentClient) Undeploy() error {
-	_ = a.Stop()
+func (a *AgentClient) Undeploy(functionID *string) error {
+	_ = a.Stop(functionID)
 
-	subject := fmt.Sprintf("agentint.%s.undeploy", a.agentID)
+	var subject string
 
-	a.log.Debug("sending undeploy request to agent via internal NATS connection",
+	if functionID == nil {
+		subject = fmt.Sprintf("agentint.%s.undeploy", a.agentID)
+	} else {
+		subject = fmt.Sprintf("agentint.%s.%s.undeploy", a.agentID, *functionID)
+	}
+
+	attrs := []any{
 		slog.String("subject", subject),
 		slog.String("agent_id", a.agentID),
-	)
+	}
+	if functionID != nil {
+		attrs = append(attrs, slog.String("function_id", *functionID))
+	}
+	a.log.Debug("sending undeploy request to agent via internal NATS connection", attrs...)
 
 	_, err := a.nc.Request(subject, []byte{}, 500*time.Millisecond) // FIXME-- allow this timeout to be configurable... 500ms is likely not enough
 	if err != nil {
@@ -278,8 +288,15 @@ func (a *AgentClient) MarkUnselected() {
 	a.selected = false
 }
 
-func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, subject string, data []byte) (*nats.Msg, error) {
-	intmsg := nats.NewMsg(fmt.Sprintf("agentint.%s.trigger", a.agentID))
+func (a *AgentClient) RunTrigger(ctx context.Context, tracer trace.Tracer, id *string, subject string, data []byte) (*nats.Msg, error) {
+	var intsub string
+	if id == nil {
+		intsub = fmt.Sprintf("agentint.%s.trigger", a.agentID)
+	} else {
+		intsub = fmt.Sprintf("agentint.%s.%s.trigger", a.agentID, *id)
+	}
+
+	intmsg := nats.NewMsg(intsub)
 	intmsg.Header.Add(string(NexTriggerSubject), subject)
 	intmsg.Data = data
 
@@ -367,6 +384,8 @@ func (a *AgentClient) handleAgentEvent(msg *nats.Msg) {
 	}
 
 	a.log.Info("Received agent event", slog.String("agent_id", agentID), slog.String("type", evt.Type()))
+
+	// FIXME-- send function id if appropriate
 	a.eventReceived(agentID, evt)
 }
 
@@ -382,6 +401,8 @@ func (a *AgentClient) handleAgentLog(msg *nats.Msg) {
 	}
 
 	a.log.Log(context.TODO(), shandler.LevelTrace, "Received agent log", slog.String("agent_id", agentID), slog.String("log", logentry.Text))
+
+	// FIXME-- send function id if appropriate
 	a.logReceived(agentID, logentry)
 }
 

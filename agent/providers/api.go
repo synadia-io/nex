@@ -20,7 +20,7 @@ type ExecutionProvider interface {
 	// Execute a deployed function, if supported by the execution provider implementation (e.g., "v8" and "wasm" types)
 	Execute(ctx context.Context, payload []byte) ([]byte, error)
 
-	// Undeploy a workload, giving it a chance to gracefully clean up after itself (if applicable)
+	// Undeploy a workload (or a single tenant by id), giving it a chance to gracefully clean up after itself (if applicable)
 	Undeploy() error
 
 	// Validate the executable artifact, e.g., specific characteristics of a

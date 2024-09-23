@@ -32,7 +32,7 @@ type runningFirecracker struct {
 
 	closing         uint32
 	config          *nexmodels.NodeConfiguration
-	deployRequest   *agentapi.AgentWorkloadInfo
+	deployRequests  map[string]*agentapi.AgentWorkloadInfo
 	ip              net.IP
 	log             *slog.Logger
 	machine         *firecracker.Machine
@@ -166,6 +166,7 @@ func createAndStartVM(ctx context.Context, vmmID string, config *nexmodels.NodeC
 
 	return &runningFirecracker{
 		config:         config,
+		deployRequests: make(map[string]*agentapi.AgentWorkloadInfo),
 		ip:             ip,
 		log:            log,
 		machine:        m,

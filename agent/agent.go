@@ -46,8 +46,8 @@ type Agent struct {
 	ctx     context.Context
 	sigs    chan os.Signal
 
-	provider providers.ExecutionProvider
-	subz     []*nats.Subscription
+	providers map[string]providers.ExecutionProvider
+	subz      []*nats.Subscription
 
 	cacheBucket nats.ObjectStore
 	md          *agentapi.MachineMetadata
@@ -55,7 +55,7 @@ type Agent struct {
 	started     time.Time
 
 	sandboxed   bool
-	undeploying *atomic.Bool
+	undeploying map[string]*atomic.Bool
 }
 
 // Initialize a new agent to facilitate communications with the host
@@ -79,16 +79,16 @@ func NewAgent(ctx context.Context, cancelF context.CancelFunc) (*Agent, error) {
 	}
 
 	return &Agent{
-		agentLogs: make(chan *agentapi.LogEntry, 64),
-		eventLogs: make(chan *cloudevents.Event, 64),
-		// sandbox defaults to true, only way to override that is with an explicit 'false'
+		agentLogs:   make(chan *agentapi.LogEntry, 64),
+		eventLogs:   make(chan *cloudevents.Event, 64),
 		cancelF:     cancelF,
 		ctx:         ctx,
-		sandboxed:   isSandboxed(),
 		md:          metadata,
+		providers:   make(map[string]providers.ExecutionProvider),
+		sandboxed:   isSandboxed(), // sandbox defaults to true, only way to override that is with an explicit 'false'
 		started:     time.Now().UTC(),
 		subz:        make([]*nats.Subscription, 0),
-		undeploying: &atomic.Bool{},
+		undeploying: make(map[string]*atomic.Bool),
 	}, nil
 }
 
@@ -164,7 +164,7 @@ func (a *Agent) requestHandshake() error {
 		return nil
 	}
 
-	return errors.New("Failed to obtain handshake from host")
+	return errors.New("failed to obtain handshake from host")
 }
 
 func (a *Agent) Version() string {
@@ -176,14 +176,15 @@ func (a *Agent) Version() string {
 // temporary file and make it executable; this method returns the full
 // path to the cached artifact if successful
 func (a *Agent) cacheExecutableArtifact(req *agentapi.AgentWorkloadInfo) (*string, error) {
-	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
-	tempFile := path.Join(os.TempDir(), fileName)
+	// bucket := req.Location.Host
+	key := strings.Trim(req.Location.Path, "/")
+	tempFile := path.Join(os.TempDir(), key)
 
 	if strings.EqualFold(runtime.GOOS, "windows") && req.WorkloadType == controlapi.NexWorkloadNative {
 		tempFile = fmt.Sprintf("%s.exe", tempFile)
 	}
 
-	err := a.cacheBucket.GetFile(*a.md.VmID, tempFile)
+	err := a.cacheBucket.GetFile(key, tempFile)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to get and write workload artifact to temp dir: %s", err)
 		a.submitLog(msg, slog.LevelError)
@@ -205,7 +206,9 @@ func (a *Agent) cacheExecutableArtifact(req *agentapi.AgentWorkloadInfo) (*strin
 func (a *Agent) deleteExecutableArtifact() error {
 	fileName := fmt.Sprintf("workload-%s", *a.md.VmID)
 	tempFile := path.Join(os.TempDir(), fileName)
+	_ = os.Remove(tempFile)
 
+	tempFile = path.Join(os.TempDir(), "workload-*")
 	_ = os.Remove(tempFile)
 
 	if a.cacheBucket != nil {
@@ -275,6 +278,14 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		return
 	}
 
+	var id string
+
+	if info.FunctionID == nil {
+		id = *info.ID
+	} else {
+		id = *info.FunctionID
+	}
+
 	tmpFile, err := a.cacheExecutableArtifact(&info)
 	if err != nil {
 		_ = a.workAck(m, false, err.Error())
@@ -294,7 +305,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		_ = a.workAck(m, false, msg)
 		return
 	}
-	a.provider = provider
+	a.providers[id] = provider
 
 	shouldValidate := true
 	if !a.sandboxed && info.WorkloadType == controlapi.NexWorkloadNative {
@@ -302,7 +313,7 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 	}
 
 	if shouldValidate {
-		err = a.provider.Validate()
+		err = a.providers[id].Validate()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to validate workload: %s", err)
 			a.submitLog(msg, slog.LevelError)
@@ -311,7 +322,9 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 		}
 	}
 
-	err = a.provider.Deploy()
+	a.undeploying[id] = new(atomic.Bool)
+
+	err = a.providers[id].Deploy()
 	if err != nil {
 		a.submitLog(fmt.Sprintf("Failed to deploy workload: %s", err), slog.LevelError)
 	} else {
@@ -320,20 +333,34 @@ func (a *Agent) handleDeploy(m *nats.Msg) {
 }
 
 func (a *Agent) handleUndeploy(m *nats.Msg) {
-	if a.provider == nil {
+	if len(a.providers) == 0 {
 		a.submitLog("Received undeploy workload request on agent without deployed workload", slog.LevelDebug)
 		_ = m.Respond([]byte{})
 		return
 	}
 
-	if a.undeploying.Load() {
+	var id *string // if present, attempts to undeploy a single workload tenant
+
+	tokens := strings.Split(m.Subject, ".")
+	if len(tokens) == 4 {
+		id = &tokens[3]
+	}
+
+	var undeploying *atomic.Bool
+	if id == nil {
+		undeploying = a.undeploying[*a.md.VmID]
+	} else {
+		undeploying = a.undeploying[*id]
+	}
+
+	if undeploying.Load() {
 		a.submitLog("Received additional undeploy workload request on agent", slog.LevelWarn)
 		return
 	}
 
-	a.undeploying.Store(true)
+	undeploying.Store(true)
 
-	err := a.provider.Undeploy()
+	err := a.providers[*id].Undeploy()
 	if err != nil {
 		// don't return an error here so worst-case scenario is an ungraceful shutdown,
 		// not a failure
@@ -354,6 +381,7 @@ func (a *Agent) handlePing(m *nats.Msg) {
 //
 // - agentint.<agent_id>.deploy
 // - agentint.<agent_id>.undeploy
+// - agentint.<agent_id>.<workload_id>.undeploy
 // - agentint.<agent_id>.ping
 func (a *Agent) init() error {
 	a.installSignalHandlers()
@@ -384,6 +412,14 @@ func (a *Agent) init() error {
 	a.subz = append(a.subz, sub)
 
 	udsubject := fmt.Sprintf("agentint.%s.undeploy", *a.md.VmID)
+	sub, err = a.nc.Subscribe(udsubject, a.handleUndeploy)
+	if err != nil {
+		a.submitLog(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err), slog.LevelError)
+		return err
+	}
+	a.subz = append(a.subz, sub)
+
+	udsubject = fmt.Sprintf("agentint.%s.*.undeploy", *a.md.VmID)
 	sub, err = a.nc.Subscribe(udsubject, a.handleUndeploy)
 	if err != nil {
 		a.submitLog(fmt.Sprintf("Failed to subscribe to agent undeploy subject: %s", err), slog.LevelError)
@@ -469,7 +505,9 @@ func (a *Agent) newExecutionProviderParams(info *agentapi.AgentWorkloadInfo, tmp
 		Stderr:            &logEmitter{stderr: true, name: *info.WorkloadName, logs: a.agentLogs},
 		Stdout:            &logEmitter{stderr: false, name: *info.WorkloadName, logs: a.agentLogs},
 		TmpFilename:       &tmpFile,
-		VmID:              *a.md.VmID,
+
+		VmID:       *a.md.VmID,
+		FunctionID: info.FunctionID,
 
 		Fail: make(chan bool),
 		Run:  make(chan bool),
@@ -531,10 +569,12 @@ func (a *Agent) shutdown() {
 			}
 		}
 
-		if a.provider != nil && !a.undeploying.Load() {
-			err := a.provider.Undeploy()
-			if err != nil {
-				fmt.Printf("failed to undeploy workload: %s\n", err)
+		if len(a.providers) > 0 && !a.undeploying[*a.md.VmID].Load() {
+			for id := range a.providers {
+				err := a.providers[id].Undeploy()
+				if err != nil {
+					fmt.Printf("failed to undeploy workload: %s\n", err)
+				}
 			}
 		}
 

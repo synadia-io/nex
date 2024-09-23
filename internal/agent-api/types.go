@@ -37,7 +37,9 @@ type ExecutionProviderParams struct {
 	Stdout io.Writer `json:"-"`
 
 	TmpFilename *string `json:"-"`
-	VmID        string  `json:"-"`
+
+	VmID       string  `json:"-"`
+	FunctionID *string `json:"-"`
 
 	// NATS connections which be injected into the execution provider
 	NATSConn *nats.Conn `json:"-"`
@@ -52,6 +54,7 @@ type AgentWorkloadInfo struct {
 	Description   *string           `json:"description"`
 	Environment   map[string]string `json:"environment"`
 	Essential     *bool             `json:"essential,omitempty"`
+	FunctionID    *string           `json:"function_id,omitempty"`
 	Hash          string            `json:"hash,omitempty"`
 	ID            *string           `json:"id"`
 	Location      *url.URL          `json:"location"`

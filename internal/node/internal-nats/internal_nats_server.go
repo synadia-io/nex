@@ -214,27 +214,26 @@ func (s *InternalNatsServer) Shutdown() {
 	_ = os.Remove(path.Join(os.TempDir(), s.lastOpts.StoreDir))
 }
 
-func (s *InternalNatsServer) StoreFileForID(id string, bytes []byte) error {
+func (s *InternalNatsServer) StoreFileForID(id, name string, bytes []byte) (*jetstream.ObjectInfo, error) {
 	ctx, cancelF := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancelF()
 
 	creds, err := s.FindCredentials(id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	nc, err := s.ConnectionWithCredentials(creds)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	bucket, err := ensureWorkloadObjectStore(nc)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = bucket.PutBytes(ctx, id, bytes)
-	return err
+	return bucket.PutBytes(ctx, name, bytes)
 }
 
 func (s *InternalNatsServer) ConnectionWithID(id string) (*nats.Conn, error) {

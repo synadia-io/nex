@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	controlapi "github.com/synadia-io/nex/control-api"
@@ -151,7 +153,7 @@ func (a *AgentManager) AvailableAgentsCount() int {
 	return availableAgents
 }
 
-func (a *AgentManager) CacheWorkload(workloadID string, request *controlapi.DeployRequest) (uint64, *string, error) {
+func (a *AgentManager) CacheWorkload(workloadID string, request *controlapi.DeployRequest) (uint64, *url.URL, *string, error) {
 	bucket := request.Location.Host
 	key := strings.Trim(request.Location.Path, "/")
 
@@ -167,48 +169,60 @@ func (a *AgentManager) CacheWorkload(workloadID string, request *controlapi.Depl
 
 	js, err := a.nc.JetStream(opts...)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 
 	store, err := js.ObjectStore(bucket)
 	if err != nil {
 		a.log.Error("Failed to bind to source object store", slog.Any("err", err), slog.String("bucket", bucket))
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 
 	_, err = store.GetInfo(key)
 	if err != nil {
 		a.log.Error("Failed to locate workload binary in source object store", slog.Any("err", err), slog.String("key", key), slog.String("bucket", bucket))
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 
 	started := time.Now()
-	workload, err := store.GetBytes(key)
+	workloadBytes, err := store.GetBytes(key)
 	if err != nil {
 		a.log.Error("Failed to download bytes from source object store", slog.Any("err", err), slog.String("key", key))
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 	finished := time.Since(started)
-	dlRate := float64(len(workload)) / finished.Seconds()
+	dlRate := float64(len(workloadBytes)) / finished.Seconds()
 	a.log.Debug("CacheWorkload object store download completed", slog.String("name", key), slog.String("duration", fmt.Sprintf("%.2f sec", finished.Seconds())), slog.String("rate", fmt.Sprintf("%s/sec", byteConvert(dlRate))))
 
-	err = a.natsint.StoreFileForID(workloadID, workload)
+	workloadFilenameUUID, err := uuid.NewRandom()
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	workloadFilename := fmt.Sprintf("workload-%s", workloadFilenameUUID.String())
+
+	info, err := a.natsint.StoreFileForID(workloadID, workloadFilename, workloadBytes)
 	if err != nil {
 		a.log.Error("Failed to store bytes from source object store in cache", slog.Any("err", err), slog.String("key", key))
 	}
 
+	workloadLocation, err := url.Parse(fmt.Sprintf("nats://%s/%s", info.Bucket, info.Name))
+	if err != nil {
+		a.log.Error("Failed to parse object store cache location", slog.Any("err", err), slog.String("key", key))
+	}
+
 	workloadHash := sha256.New()
-	workloadHash.Write(workload)
+	workloadHash.Write(workloadBytes)
 	workloadHashString := hex.EncodeToString(workloadHash.Sum(nil))
 
 	a.log.Info("Successfully stored workload in internal object store",
 		slog.String("workload_name", *request.WorkloadName),
 		slog.String("workload_id", workloadID),
+		slog.String("workload_location", workloadLocation.String()),
 		slog.String("workload_hash", workloadHashString),
-		slog.Int("bytes", len(workload)),
+		slog.Int("bytes", len(workloadBytes)),
 	)
 
-	return uint64(len(workload)), &workloadHashString, nil
+	return uint64(len(workloadBytes)), workloadLocation, &workloadHashString, nil
 }
 
 // FIXME-- we have been leaking AgentClient since one of our previous refactors...

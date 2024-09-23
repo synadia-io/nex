@@ -49,11 +49,12 @@ func (h *HostServicesServer) SetHostServicesConnection(workloadId string, nc *na
 // Adds a secondary host services client used by providers like messaging to connect to the same subject
 // space as the workload's corresponding triggers
 func (h *HostServicesServer) AddHostServicesConnection(workloadId string, purpose string, nc *nats.Conn) {
+	if _, ok := h.hsClientConnections[workloadId]; !ok {
+		h.hsClientConnections[workloadId] = map[string]*nats.Conn{DefaultConnection: nc}
+	}
+
 	if conns, ok := h.hsClientConnections[workloadId]; ok {
 		conns[purpose] = nc
-	} else {
-		h.log.Warn("Attempted to add a host service connection without a default connection")
-		return
 	}
 }
 

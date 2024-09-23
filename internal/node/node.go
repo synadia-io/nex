@@ -438,7 +438,7 @@ func (n *Node) handleAutostarts() {
 		}
 
 		// TODO: add potential backoff and retry to cacheworkload
-		numBytes, workloadHash, err := n.api.mgr.CacheWorkload(agentClient.ID(), request)
+		numBytes, workloadLocation, workloadHash, err := n.api.mgr.CacheWorkload(agentClient.ID(), request)
 		if err != nil {
 			n.api.log.Error("Failed to cache auto-start workload bytes",
 				slog.Any("err", err),
@@ -450,7 +450,7 @@ func (n *Node) handleAutostarts() {
 			continue
 		}
 
-		agentWorkloadInfo := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, *workloadHash)
+		agentWorkloadInfo := agentWorkloadInfoFromControlDeployRequest(request, autostart.Namespace, numBytes, workloadLocation, *workloadHash)
 
 		agentWorkloadInfo.TotalBytes = int64(numBytes)
 		agentWorkloadInfo.Hash = *workloadHash
@@ -705,28 +705,4 @@ func (n *Node) shutdown() {
 
 func (n *Node) shuttingDown() bool {
 	return (atomic.LoadUint32(&n.closing) > 0)
-}
-
-func agentWorkloadInfoFromControlDeployRequest(request *controlapi.DeployRequest, namespace string, numBytes uint64, hash string) *agentapi.AgentWorkloadInfo {
-	return &agentapi.AgentWorkloadInfo{
-		Argv:                 request.Argv,
-		DecodedClaims:        request.DecodedClaims,
-		Description:          request.Description,
-		EncryptedEnvironment: request.Environment,
-		Environment:          request.WorkloadEnvironment, // HACK!!! we need to fix autostart config to allow encrypted environment...
-		Essential:            request.Essential,
-		Hash:                 hash,
-		HostServicesConfig:   request.HostServicesConfig,
-		ID:                   request.ID,
-		Location:             request.Location,
-		Namespace:            &namespace,
-		RetriedAt:            request.RetriedAt,
-		RetryCount:           request.RetryCount,
-		SenderPublicKey:      request.SenderPublicKey,
-		TotalBytes:           int64(numBytes),
-		TriggerSubjects:      request.TriggerSubjects,
-		WorkloadJWT:          request.WorkloadJWT,
-		WorkloadName:         request.WorkloadName,
-		WorkloadType:         request.WorkloadType,
-	}
 }

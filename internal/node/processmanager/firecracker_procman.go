@@ -72,17 +72,20 @@ func NewFirecrackerProcessManager(
 func (f *FirecrackerProcessManager) ListProcesses() ([]ProcessInfo, error) {
 	pinfos := make([]ProcessInfo, 0)
 
-	for workloadId, vm := range f.allVMs {
-		// Ignore "pending" processes that don't have workloads on them yet
-		if vm.deployRequest != nil {
-			pinfo := ProcessInfo{
-				ID:            workloadId,
-				Name:          *vm.deployRequest.WorkloadName,
-				Namespace:     *vm.deployRequest.Namespace,
-				DeployRequest: vm.deployRequest,
+	for workloadID, vm := range f.allVMs {
+		if deployRequest, ok := vm.deployRequests[workloadID]; ok {
+			// Ignore "pending" processes that don't have workloads on them yet
+			if vm.deployRequests[workloadID] != nil {
+				pinfo := ProcessInfo{
+					ID:            workloadID,
+					Name:          *deployRequest.WorkloadName,
+					Namespace:     *deployRequest.Namespace,
+					DeployRequest: deployRequest,
+				}
+				pinfos = append(pinfos, pinfo)
 			}
-			pinfos = append(pinfos, pinfo)
 		}
+
 	}
 
 	return pinfos, nil
@@ -118,8 +121,13 @@ func (f *FirecrackerProcessManager) PrepareWorkload(workloadID string, deployReq
 		return fmt.Errorf("could not prepare workload, no available firecracker VM")
 	}
 
+	id := workloadID
+	if deployRequest.FunctionID != nil {
+		id = *deployRequest.FunctionID
+	}
+
 	// FIXME-- need to attach multiple deploy requests here
-	vm.deployRequest = deployRequest
+	vm.deployRequests[id] = deployRequest
 	vm.namespace = *deployRequest.Namespace
 	vm.workloadStarted = time.Now().UTC()
 
@@ -267,11 +275,13 @@ func (f *FirecrackerProcessManager) StopProcess(workloadID string) error {
 	delete(f.deployRequests, workloadID)
 	delete(f.stopMutex, workloadID)
 
-	if vm.deployRequest != nil {
-		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", string(vm.deployRequest.WorkloadType))))
-		f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", string(vm.deployRequest.WorkloadType))), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
-		f.t.DeployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1)
-		f.t.DeployedByteCounter.Add(f.ctx, vm.deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+	if deployRequest, ok := vm.deployRequests[workloadID]; ok {
+		if vm.deployRequests[workloadID] != nil {
+			f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", string(deployRequest.WorkloadType))))
+			f.t.WorkloadCounter.Add(f.ctx, -1, metric.WithAttributes(attribute.String("workload_type", string(deployRequest.WorkloadType))), metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+			f.t.DeployedByteCounter.Add(f.ctx, deployRequest.TotalBytes*-1)
+			f.t.DeployedByteCounter.Add(f.ctx, deployRequest.TotalBytes*-1, metric.WithAttributes(attribute.String("namespace", vm.namespace)))
+		}
 	}
 
 	f.t.VmCounter.Add(f.ctx, -1)
