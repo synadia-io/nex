@@ -274,15 +274,6 @@ func (r *RootFS) AddFile(src, dest string) error {
 		return err
 	}
 
-	// err = os.Chown(filepath.Join(r.buildDir, "/etc/init.d/agent"), 1000, 1000)
-	// if err != nil {
-	// 	return err
-	// }
-	// err = chownRecursive(filepath.Join(r.buildDir, "/home/nex"), 1000, 1000)
-	// if err != nil {
-	// 	return err
-	// }
-
 	return nil
 }
 
