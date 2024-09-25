@@ -148,6 +148,9 @@ func (a *AgentManager) AvailableAgentsCount() int {
 
 	for id := range a.managers {
 		availableAgents += len(a.managers[id].poolAgents) // FIXME-- denormalize this count on the managers like RunningWorkloadCount()
+		if a.isMultiTenant(a.managers[id].workloadType) && len(a.managers[id].poolAgents) == 0 {
+			availableAgents += 1
+		}
 	}
 
 	return availableAgents

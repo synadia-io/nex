@@ -235,7 +235,11 @@ func (w *WorkloadManager) DeployWorkload(agentClient *agentapi.AgentClient, requ
 				return err
 			}
 
-			w.hostServices.server.AddHostServicesConnection(workloadID, fmt.Sprintf("trigger handler for function %s", *request.FunctionID), ncHostServices)
+			if request.FunctionID == nil {
+				w.hostServices.server.SetHostServicesConnection(workloadID, ncHostServices)
+			} else {
+				w.hostServices.server.AddHostServicesConnection(workloadID, fmt.Sprintf("trigger handler for function %s", *request.FunctionID), ncHostServices)
+			}
 
 			if request.SupportsTriggerSubjects() {
 				for _, tsub := range request.TriggerSubjects {
@@ -546,13 +550,17 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID, tsub string, reques
 		if err != nil {
 			parentSpan.SetStatus(codes.Error, "Internal trigger request failed")
 			parentSpan.RecordError(err)
-			w.log.Error("Failed to request agent execution via internal trigger subject",
+
+			attrs := []any{
 				slog.Any("err", err),
 				slog.String("trigger_subject", tsub),
 				slog.String("workload_type", string(request.WorkloadType)),
 				slog.String("workload_id", workloadID),
-				slog.String("function_id", *request.FunctionID),
-			)
+			}
+			if request.FunctionID != nil {
+				attrs = append(attrs, slog.String("function_id", *request.FunctionID))
+			}
+			w.log.Error("Failed to request agent execution via internal trigger subject", attrs...)
 
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1)
 			w.t.FunctionFailedTriggers.Add(w.ctx, 1, metric.WithAttributes(attribute.String("namespace", *request.Namespace)))
@@ -561,14 +569,18 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID, tsub string, reques
 		} else if resp != nil {
 			parentSpan.SetStatus(codes.Ok, "Trigger succeeded")
 			runtimeNs := resp.Header.Get(agentapi.NexRuntimeNs)
-			w.log.Debug("Received response from execution via trigger subject",
+
+			attrs := []any{
 				slog.String("workload_id", workloadID),
 				slog.String("trigger_subject", tsub),
 				slog.String("workload_type", string(request.WorkloadType)),
-				slog.String("function_id", *request.FunctionID),
 				slog.String("function_run_time_nanosec", runtimeNs),
 				slog.Int("payload_size", len(resp.Data)),
-			)
+			}
+			if request.FunctionID != nil {
+				attrs = append(attrs, slog.String("function_id", *request.FunctionID))
+			}
+			w.log.Debug("Received response from execution via trigger subject", attrs...)
 
 			runTimeNs64, err := strconv.ParseInt(runtimeNs, 10, 64)
 			if err != nil {
@@ -591,13 +603,18 @@ func (w *WorkloadManager) generateTriggerHandler(workloadID, tsub string, reques
 			if err != nil {
 				parentSpan.SetStatus(codes.Error, "Failed to respond to trigger subject")
 				parentSpan.RecordError(err)
-				w.log.Error("Failed to respond to trigger subject subscription request for deployed workload",
+
+				attrs := []any{
 					slog.String("workload_id", workloadID),
 					slog.String("function_id", *request.FunctionID),
 					slog.String("trigger_subject", tsub),
 					slog.String("workload_type", string(request.WorkloadType)),
 					slog.Any("err", err),
-				)
+				}
+				if request.FunctionID != nil {
+					attrs = append(attrs, slog.String("function_id", *request.FunctionID))
+				}
+				w.log.Error("Failed to respond to trigger subject subscription request for deployed workload", attrs...)
 			}
 		}
 	}

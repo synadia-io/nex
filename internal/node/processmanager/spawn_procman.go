@@ -47,7 +47,7 @@ type SpawningProcessManager struct {
 
 type spawnedProcess struct {
 	cmd             *exec.Cmd
-	deployRequest   *agentapi.AgentWorkloadInfo
+	deployRequests  map[string]*agentapi.AgentWorkloadInfo
 	workloadStarted time.Time
 
 	ID string
@@ -89,13 +89,13 @@ func (s *SpawningProcessManager) ListProcesses() ([]ProcessInfo, error) {
 	pinfos := make([]ProcessInfo, 0)
 
 	for workloadID, proc := range s.allProcs {
-		// Ignore pending "unprepared" processes that don't have workloads on them yet
-		if proc.deployRequest != nil {
+		if deployRequest, ok := proc.deployRequests[workloadID]; ok {
+			// Ignore pending "unprepared" processes that don't have workloads on them yet
 			pinfo := ProcessInfo{
 				ID:            workloadID,
-				Name:          *proc.deployRequest.WorkloadName,
-				Namespace:     *proc.deployRequest.Namespace,
-				DeployRequest: proc.deployRequest,
+				Name:          *deployRequest.WorkloadName,
+				Namespace:     *deployRequest.Namespace,
+				DeployRequest: deployRequest,
 			}
 			pinfos = append(pinfos, pinfo)
 		}
@@ -118,12 +118,27 @@ func (s *SpawningProcessManager) PrepareWorkload(workloadID string, deployReques
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	proc := <-s.poolProcs
+	var proc *spawnedProcess
+
+	if s.poolSize == 0 {
+		for id := range s.allProcs {
+			proc = s.allProcs[id]
+			break
+		}
+	} else {
+		proc = <-s.poolProcs
+	}
+
 	if proc == nil {
 		return fmt.Errorf("could not prepare workload, no available agent process")
 	}
 
-	proc.deployRequest = deployRequest
+	id := workloadID
+	if deployRequest.FunctionID != nil {
+		id = *deployRequest.FunctionID
+	}
+
+	proc.deployRequests[id] = deployRequest
 	proc.workloadStarted = time.Now().UTC()
 
 	s.deployRequests[proc.ID] = deployRequest
@@ -170,6 +185,19 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 		return p, nil
 	}
 
+	if s.poolSize == 0 {
+		// multi-tenant
+		p, err := spawnProc()
+		if err != nil {
+			return err
+		}
+
+		s.log.Info("Adding multi-tenant agent process to warm pool", slog.String("workload_id", p.ID))
+		s.poolProcs <- p // If the pool is full, this line will block until a slot is available.
+
+		return nil
+	}
+
 	for !s.stopping() {
 		select {
 		case <-s.ctx.Done():
@@ -177,16 +205,6 @@ func (s *SpawningProcessManager) Start(delegate ProcessDelegate) error {
 		default:
 			if len(s.poolProcs) == s.poolSize && s.poolSize > 0 {
 				time.Sleep(runloopSleepInterval)
-				continue
-			} else if s.poolSize == 0 && len(s.allProcs) == 0 {
-				// FIXME-- DRY this up a bit
-				p, err := spawnProc()
-				if err != nil {
-					continue
-				}
-
-				s.log.Info("Adding multi-tenant agent process to warm pool", slog.String("workload_id", p.ID))
-				s.poolProcs <- p // If the pool is full, this line will block until a slot is available.
 				continue
 			}
 
@@ -271,12 +289,13 @@ func (s *SpawningProcessManager) spawn() (*spawnedProcess, error) {
 	cmd.SysProcAttr = s.sysProcAttr()
 
 	newProc := &spawnedProcess{
-		ID:   workloadID,
-		cmd:  cmd,
-		log:  s.log,
-		Fail: make(chan bool),
-		Run:  make(chan bool),
-		Exit: make(chan int),
+		ID:             workloadID,
+		cmd:            cmd,
+		deployRequests: make(map[string]*agentapi.AgentWorkloadInfo),
+		log:            s.log,
+		Fail:           make(chan bool),
+		Run:            make(chan bool),
+		Exit:           make(chan int),
 	}
 
 	err = cmd.Start()

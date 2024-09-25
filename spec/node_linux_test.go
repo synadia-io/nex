@@ -905,14 +905,18 @@ func awaitPendingAgents(nodeID string, count int, log *slog.Logger) {
 
 	for {
 		info, _ := nodeClient.NodeInfo(nodeID)
-		if info != nil && info.AvailableAgents == count {
+		if info != nil && info.AvailableAgents >= count {
 			fmt.Printf("✅ Reached anticipated number of pending agents (%d) on node: %s", count, nodeID)
 			time.Sleep(time.Millisecond * 3000)
 			return
 		}
 
 		if time.Now().After(timeoutAt) {
-			fmt.Printf("❌ Failed to reach anticipated number of pending agents (%d) on node: %s", count, nodeID)
+			if info != nil {
+				fmt.Printf("❌ Failed to reach anticipated number of pending agents (%d) on node: %s (%d available)", count, nodeID, info.AvailableAgents)
+			} else {
+				fmt.Printf("❌ Failed to reach anticipated number of pending agents (%d) on node: %s", count, nodeID)
+			}
 			return
 		}
 
