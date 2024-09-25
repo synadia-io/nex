@@ -322,7 +322,7 @@ func (a *AgentManager) Start() {
 			err := a.managers[id].Start()
 			if err != nil {
 				a.log.Error("Agent manager failed to start", slog.Any("error", err))
-				a.Stop()
+				_ = a.Stop()
 				a.cancel()
 
 				return

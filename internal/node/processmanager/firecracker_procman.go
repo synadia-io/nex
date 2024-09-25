@@ -25,6 +25,8 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
+var resetNetworkOnce sync.Once
+
 type FirecrackerProcessManager struct {
 	closing   uint32
 	config    *models.NodeConfiguration
@@ -169,14 +171,14 @@ func (f *FirecrackerProcessManager) Start(delegate ProcessDelegate) error {
 		}
 	}()
 
-	// FIXME -- this needs to only happen once
-	// if !f.config.PreserveNetwork {
-	// err := f.resetCNI()
-	// if err != nil {
-	// 	f.log.Warn("Failed to reset network.", slog.Any("err", err))
-	// 	return err
-	// }
-	// }
+	resetNetworkOnce.Do(func() {
+		if !f.config.PreserveNetwork {
+			err := f.resetCNI()
+			if err != nil {
+				f.log.Warn("Failed to reset network.", slog.Any("err", err))
+			}
+		}
+	})
 
 	createVM := func() (*runningFirecracker, error) {
 		vmmUUID, err := uuid.NewRandom()

@@ -88,7 +88,7 @@ func TestInternalNatsServerFileCache(t *testing.T) {
 	seed, _ := keypair.Seed()
 	fmt.Printf("New workload user: %s %s\n", pk, string(seed))
 
-	_, err = server.StoreFileForID(workloadId, []byte{1, 2, 3, 4, 5, 6, 7, 8, 9})
+	_, err = server.StoreFileForID(workloadId, "filename", []byte{1, 2, 3, 4, 5, 6, 7, 8, 9})
 	if err != nil {
 		t.Fatalf("Should have gotten no error but didn't: %s", err)
 	}
@@ -97,7 +97,7 @@ func TestInternalNatsServerFileCache(t *testing.T) {
 	userCn, _ := server.ConnectionWithCredentials(ud)
 	js, _ := jetstream.New(userCn)
 	bucket, _ := js.ObjectStore(ctx, workloadCacheBucketName)
-	workload, err := bucket.GetBytes(ctx, workloadId)
+	workload, err := bucket.GetBytes(ctx, "filename")
 	if err != nil {
 		t.Fatalf("Should have queried the workload bytes, but got error instead: %s", err)
 	}
