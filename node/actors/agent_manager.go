@@ -21,7 +21,7 @@ type agentManager struct {
 
 func (mgr *agentManager) Init(args ...any) error {
 	mgr.nodeOptions = args[0].(models.NodeOptions)
-	mgr.Send(mgr.PID(), "post_init")
+	_ = mgr.Send(mgr.PID(), "post_init")
 	return nil
 }
 

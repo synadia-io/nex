@@ -41,7 +41,7 @@ func (ns *internalNatsServer) Init(args ...any) error {
 	if err != nil {
 		return err
 	}
-	ns.Send(ns.PID(), "post_init")
+	_ = ns.Send(ns.PID(), "post_init")
 
 	return nil
 }

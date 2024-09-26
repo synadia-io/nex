@@ -30,3 +30,4 @@ go.work.sum
 *.err
 
 cmd/nex/nex
+dist/

@@ -156,7 +156,7 @@ func (nn *nexNode) initializeSupervisionTree() {
 
 	// NOTE: the supervised processes won't log their startup (Init) calls because the
 	// logger won't have been in place. However, they will log stuff afterward
-	node.LoggerAddPID(logger, "nexlogger")
+	_ = node.LoggerAddPID(logger, "nexlogger")
 
 	node.Log().Info("Nex node started")
 	node.Log().Info("Observer Application started and available at http://localhost:9911")
