@@ -11,8 +11,10 @@ import (
 
 //TODO: figure out how log messages show up in the observer
 
-func CreateNodeLogger() gen.ProcessBehavior {
-	return &NodeLogger{inner: slog.Default()} // TODO: use the configured logger
+func CreateNodeLogger(logger *slog.Logger) func() gen.ProcessBehavior {
+	return func() gen.ProcessBehavior {
+		return &NodeLogger{inner: logger}
+	}
 }
 
 type NodeLogger struct {
