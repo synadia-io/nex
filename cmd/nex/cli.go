@@ -11,10 +11,12 @@ type Globals struct {
 	GlobalLogger `prefix:"logger." group:"Logger Configuration"`
 	GlobalNats   `prefix:"nats." group:"NATS Configuration"`
 
-	Config    kong.ConfigFlag  `help:"Configuration file to load" placeholder:"./nex.config.json"`
-	Version   kong.VersionFlag `help:"Print version information"`
-	Namespace string           `env:"NEX_NAMESPACE" placeholder:"default" help:"Specifies namespace when running nex commands"`
-	Check     bool             `help:"Print the current configuration"`
+	Config              kong.ConfigFlag  `help:"Configuration file to load" placeholder:"./nex.config.json"`
+	Version             kong.VersionFlag `help:"Print version information"`
+	Namespace           string           `env:"NEX_NAMESPACE" placeholder:"default" help:"Specifies namespace when running nex commands"`
+	Check               bool             `help:"Print the current configuration"`
+	DisableUpgradeCheck bool             `env:"NEX_DISABLE_UPGRADE_CHECK" name:"disable-upgrade-check" help:"Disable the upgrade check"`
+	AutoUpgrade         bool             `env:"NEX_AUTO_UPGRADE" name:"auto-upgrade" help:"Automatically upgrade the nex CLI when a new version is available"`
 }
 
 type GlobalLogger struct {

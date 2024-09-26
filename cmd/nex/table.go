@@ -25,6 +25,8 @@ func printTable(title string, in ...table.Row) error {
 func (g Globals) Table() []table.Row {
 	return []table.Row{
 		{"Config File", g.Config, reflect.TypeOf(g.Config).String()},
+		{"Disable Upgrade Check", g.DisableUpgradeCheck, reflect.TypeOf(g.DisableUpgradeCheck).String()},
+		{"Enable Auto Upgrade ", g.AutoUpgrade, reflect.TypeOf(g.AutoUpgrade).String()},
 		{"Nex Namespace", g.Namespace, reflect.TypeOf(g.Namespace).String()},
 		{"NATS Server", g.NatsServers, reflect.TypeOf(g.NatsServers).String()},
 		{"NATS Context", g.NatsContext, reflect.TypeOf(g.NatsContext).String()},
@@ -98,5 +100,11 @@ func (i Info) Table() []table.Row {
 	return []table.Row{
 		{"Node ID", i.NodeID, reflect.TypeOf(i.NodeID).String()},
 		{"JSON Output", i.JSON, reflect.TypeOf(i.JSON).String()},
+	}
+}
+
+func (u Upgrade) Table() []table.Row {
+	return []table.Row{
+		{"Git Tag", u.GitTag, reflect.TypeOf(u.GitTag).String()},
 	}
 }
