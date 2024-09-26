@@ -1,0 +1,57 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - 
+    id: "nex"
+    dir: "./cmd/nex"
+    main: "."
+    binary: "nex"
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w --X main.VERSION={{.Version}} -X main.COMMIT={{.Commit}} -X main.BUILDDATE={{.Date}}
+      - -extldflags "-static"
+
+archives:
+  - id: binaries
+    format: binary
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    allow_different_binary_count: true
+
+nfpms:
+  - id: linux_packages
+    homepage: https://docs.nats.io/using-nats/nex
+    maintainer: Synadia Communications
+    description: |-
+      The NATS execution engine
+    license: Apache 2.0
+    builds:
+      - nex
+    formats:
+      - deb 
+      - rpm
+
+checksum:
+  split: true
+
+release:
+  make_latest: false
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
