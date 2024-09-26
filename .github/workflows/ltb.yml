@@ -1,0 +1,74 @@
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Lint | Test | Build
+
+on:
+  pull_request:
+    branches: [ "vnext" ]
+
+env:
+  GO_VER: '1.23.0'
+
+
+jobs:
+  lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+    - 
+      uses: actions/checkout@v4
+    - 
+      name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VER }}
+        cache: false
+    - 
+      name: golangci-lint
+      uses: golangci/golangci-lint-action@v6.1.0
+      with:
+        version: v1.61.0
+
+  test:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+    - 
+      uses: actions/checkout@v4
+    - 
+      name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VER }}
+    - 
+      name: Run test suite
+      run: |
+        go test -v ./...
+
+  build:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      -
+        name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VER }}
+      -
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --clean --snapshot
+

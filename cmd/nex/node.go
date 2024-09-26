@@ -10,8 +10,8 @@ import (
 
 	"github.com/nats-io/nkeys"
 
+	options "github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node"
-	"github.com/synadia-io/nex/node/options"
 )
 
 type Node struct {
