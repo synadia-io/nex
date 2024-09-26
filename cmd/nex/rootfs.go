@@ -97,7 +97,8 @@ func (r *RootFS) Initialize() error {
 		Credential: func(ctx context.Context, registry string) (auth.Credential, error) {
 			switch r.ociRef.Repo.Reference.Registry {
 			case "docker.io":
-				authGet, err := http.Get(fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", repo.Reference.Repository))
+				authUrl := fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", repo.Reference.Repository)
+				authGet, err := http.Get(authUrl)
 				if err != nil {
 					return auth.Credential{}, fmt.Errorf("failed to fetch auth token: %w", err)
 				}
@@ -175,7 +176,26 @@ func (r *RootFS) Initialize() error {
 }
 
 func (r *RootFS) Validate() error {
-	return nil
+	var errs error
+	if r.OciRef == "" {
+		errs = errors.Join(errs, errors.New("oci-ref can not be empty"))
+	}
+
+	for file, _ := range r.Files {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			errs = errors.Join(errs, fmt.Errorf("file %s does not exist", file))
+		}
+	}
+
+	if r.Os == "" {
+		errs = errors.Join(errs, errors.New("os can not be empty"))
+	}
+
+	if r.Arch == "" {
+		errs = errors.Join(errs, errors.New("arch can not be empty"))
+	}
+
+	return errs
 }
 
 func (r *RootFS) downloadExtractLayers() error {
