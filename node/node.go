@@ -149,7 +149,7 @@ func (nn *nexNode) initializeSupervisionTree() {
 		return
 	}
 
-	logger, err := node.Spawn(actors.CreateNodeLogger, gen.ProcessOptions{})
+	logger, err := node.Spawn(actors.CreateNodeLogger(nn.options.Logger), gen.ProcessOptions{})
 	if err != nil {
 		panic(err) // TODO: no panic
 	}
