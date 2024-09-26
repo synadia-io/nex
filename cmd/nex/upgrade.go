@@ -49,7 +49,7 @@ func versionCheck() (string, error) {
 
 	if latestTag != VERSION {
 		fmt.Printf(`================================================================
-🎉 There is a newer version [v%s] of the NEX CLI available 🎉
+🎉 There is a newer version [v%s] of the Nex available 🎉
 To update, run:
      nex upgrade
 ================================================================
