@@ -18,6 +18,7 @@ func NewProcessManager(
 	config *models.NodeConfiguration,
 	telemetry *observability.Telemetry,
 	ctx context.Context,
+	poolSize int,
 ) (ProcessManager, error) {
-	return NewSpawningProcessManager(intNats, log, config, telemetry, ctx)
+	return NewSpawningProcessManager(intNats, log, config, telemetry, ctx, poolSize)
 }

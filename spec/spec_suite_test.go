@@ -70,7 +70,7 @@ func cleanupFixtures() {
 
 	os.RemoveAll(_fixtures.natsStoreDir)
 
-	time.Sleep(time.Millisecond * 25)
+	time.Sleep(time.Millisecond * 2500)
 }
 
 func startNATS(storeDir string) (*server.Server, *nats.Conn, *int, error) {
