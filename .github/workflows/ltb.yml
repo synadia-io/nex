@@ -49,6 +49,10 @@ jobs:
       name: Run test suite
       run: |
         go test -v ./...
+    - 
+      name: Run test suite (sudo)
+      run: |
+        sudo go test -v ./... -run TestRootFsSimple
 
   build:
     timeout-minutes: 10
