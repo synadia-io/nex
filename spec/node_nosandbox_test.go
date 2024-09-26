@@ -543,7 +543,7 @@ func cacheWorkloadArtifact(nc *nats.Conn, filename string) (string, string, cont
 	if err != nil {
 		bucket, err = js.CreateObjectStore(&nats.ObjectStoreConfig{
 			Bucket:      agentapi.WorkloadCacheBucket,
-			Description: "Ad hoc object storage for NEX CLI developer mode uploads",
+			Description: "Ad hoc object storage for Nex CLI developer mode uploads",
 		})
 		if err != nil {
 			return "", "", "", err
