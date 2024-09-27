@@ -50,7 +50,8 @@ jobs:
       run: |
         go test -v ./...
     - 
-      name: Run test suite (sudo)
+      name: Run test suite (rootfs | linux only)
+      if: runner.os == 'Linux'
       run: |
         sudo go test -v ./... -run TestRootFsSimple
 
