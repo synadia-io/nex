@@ -11,6 +11,7 @@ require (
 	github.com/nats-io/jsm.go v0.1.2
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
+	github.com/nats-io/nuid v1.0.1
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/splode/fname v0.4.1
 	github.com/synadia-io/nex v0.0.0-00010101000000-000000000000
