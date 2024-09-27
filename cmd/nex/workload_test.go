@@ -10,14 +10,16 @@ func initWorkloadCommand(t testing.TB) (string, error) {
 	t.Helper()
 
 	confDir := t.TempDir()
-	_, err := os.Create(filepath.Join(confDir, "publisher.xk"))
+	f, err := os.Create(filepath.Join(confDir, "publisher.xk"))
 	if err != nil {
 		return "", err
 	}
-	_, err = os.Create(filepath.Join(confDir, "issuer.nk"))
+	defer f.Close()
+	f, err = os.Create(filepath.Join(confDir, "issuer.nk"))
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
 	wl, err := os.Create(filepath.Join(confDir, "workload"))
 	if err != nil {
 		return "", err
