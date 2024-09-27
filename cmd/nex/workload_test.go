@@ -41,7 +41,7 @@ func TestStartWorkload(t *testing.T) {
 
 	w := Workload{
 		Run: RunWorkload{
-			Defaults:     false,
+			Devrun:       false,
 			Name:         "test",
 			TargetId:     "TESTNODE",
 			File:         filepath.Join(confDir, "workload"),
@@ -74,7 +74,7 @@ func TestStopWorkload(t *testing.T) {
 
 	w := Workload{
 		Stop: StopWorkload{
-			Defaults:   false,
+			Devrun:     false,
 			WorkloadId: "somerandomid",
 			TargetId:   "TESTNODE",
 			IssuerKey:  filepath.Join(confDir, "issuer.nk"),

@@ -45,7 +45,7 @@ type RunWorkload struct {
 	HostServicesURL  string         `placeholder:"nats://localhost:4222" default:"" help:"NATS URL to host services"`
 	HostServicesJWT  string         `placeholder:"etahsy..." default:"" help:"NATS Authentication JWT for host services"`
 	HostServicesSeed string         `placeholder:"SUA..." default:"" help:"NATS Authentication Seed for host services"`
-	Defaults         bool           `help:"Use default values for workload; chooses node at random"`
+	Devrun           bool           `help:"Use default values for workload; chooses node at random"`
 }
 
 func (r *RunWorkload) AfterApply() error {
@@ -59,7 +59,7 @@ func (r *RunWorkload) AfterApply() error {
 		r.TriggerSubjects = []string{}
 	}
 
-	if _, err := os.Stat(r.Xkey); r.Defaults && os.IsNotExist(err) {
+	if _, err := os.Stat(r.Xkey); r.Devrun && os.IsNotExist(err) {
 		kp, err := nkeys.CreatePair(nkeys.PrefixByteCurve)
 		if err != nil {
 			return err
@@ -78,7 +78,7 @@ func (r *RunWorkload) AfterApply() error {
 			return err
 		}
 	}
-	if _, err := os.Stat(r.IssuerKey); r.Defaults && os.IsNotExist(err) {
+	if _, err := os.Stat(r.IssuerKey); r.Devrun && os.IsNotExist(err) {
 		kp, err := nkeys.CreatePair(nkeys.PrefixByteAccount)
 		if err != nil {
 			return err
@@ -98,7 +98,7 @@ func (r *RunWorkload) AfterApply() error {
 		}
 	}
 
-	if r.Defaults && r.Name == "" {
+	if r.Devrun && r.Name == "" {
 		rng := fname.NewGenerator()
 		rName, err := rng.Generate()
 		if err != nil {
@@ -121,7 +121,7 @@ func (r RunWorkload) Validate() error {
 	if _, err := os.Stat(r.IssuerKey); os.IsNotExist(err) {
 		errs = errors.Join(errs, errors.New("issuer key file does not exist"))
 	}
-	if !r.Defaults {
+	if !r.Devrun {
 		if r.Name == "" {
 			errs = errors.Join(errs, errors.New("workload name must be provided"))
 		}
@@ -174,7 +174,7 @@ type StopWorkload struct {
 	Reason     string `default:"" help:"Reason for stopping workload"`
 	Immediate  bool   `default:"false" help:"Stop workload immediately; workload will try and gracefully stop otherwise"`
 
-	Defaults bool `help:"Use default values for workload; chooses node at random"`
+	Devrun bool `help:"Use default values for workload; chooses node at random"`
 }
 
 func (r StopWorkload) Validate() error {
@@ -185,7 +185,7 @@ func (r StopWorkload) Validate() error {
 	if _, err := os.Stat(r.IssuerKey); os.IsNotExist(err) {
 		errs = errors.Join(errs, errors.New("issuer key file does not exist"))
 	}
-	if !r.Defaults {
+	if !r.Devrun {
 		if r.TargetId == "" {
 			errs = errors.Join(errs, errors.New("target-id must be specified"))
 		}

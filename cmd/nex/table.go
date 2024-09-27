@@ -127,7 +127,7 @@ func (r RunWorkload) Table() []table.Row {
 		{"Host Services URL", r.HostServicesURL, reflect.TypeOf(r.HostServicesURL).String()},
 		{"Host Services JWT", r.HostServicesJWT, reflect.TypeOf(r.HostServicesJWT).String()},
 		{"Host Services Seed", r.HostServicesSeed, reflect.TypeOf(r.HostServicesSeed).String()},
-		{"Defaults", r.Defaults, reflect.TypeOf(r.Defaults).String()},
+		{"Devrun", r.Devrun, reflect.TypeOf(r.Devrun).String()},
 	}
 }
 
@@ -138,6 +138,6 @@ func (s StopWorkload) Table() []table.Row {
 		{"IssuerKey", s.IssuerKey, reflect.TypeOf(s.IssuerKey).String()},
 		{"Reason", s.Reason, reflect.TypeOf(s.Reason).String()},
 		{"Immediate", s.Immediate, reflect.TypeOf(s.Immediate).String()},
-		{"Defaults", s.Defaults, reflect.TypeOf(s.Defaults).String()},
+		{"Devrun", s.Devrun, reflect.TypeOf(s.Devrun).String()},
 	}
 }
