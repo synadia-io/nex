@@ -27,11 +27,15 @@ var (
 )
 
 func main() {
-	userConfigPath, err := os.UserConfigDir()
+	userHomePath, err := os.UserConfigDir()
 	if err != nil {
-		userConfigPath = "."
+		userHomePath = "."
 	}
-	userResourcePath := filepath.Join(userConfigPath, ".nex", "bin")
+	defaultConfigPath := filepath.Join(userHomePath, "nex")
+	err = os.MkdirAll(defaultConfigPath, 0755)
+	if err != nil {
+		defaultConfigPath = "."
+	}
 
 	nex := new(NexCLI)
 	ctx := kong.Parse(nex,
@@ -43,7 +47,8 @@ func main() {
 		kong.Vars{
 			"version":             fmt.Sprintf("%s [%s] | Built: %s", VERSION, COMMIT, BUILDDATE),
 			"versionOnly":         VERSION,
-			"defaultResourcePath": userResourcePath,
+			"defaultConfigPath":   defaultConfigPath,
+			"defaultResourcePath": filepath.Join(defaultConfigPath, "bin"),
 		},
 		kong.BindTo(context.Background(), (*context.Context)(nil)),
 		kong.Bind(&nex.Globals),

@@ -12,6 +12,7 @@ require (
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
 	github.com/opencontainers/image-spec v1.1.0
+	github.com/splode/fname v0.4.1
 	github.com/synadia-io/nex v0.0.0-00010101000000-000000000000
 	oras.land/oras-go/v2 v2.5.0
 )
@@ -37,7 +38,8 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/crypto v0.27.0 // indirect
 	golang.org/x/net v0.27.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 )

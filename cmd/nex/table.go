@@ -22,10 +22,15 @@ func printTable(title string, in ...table.Row) error {
 	return nil
 }
 
+func (n Node) Table() []table.Row {
+	return []table.Row{
+		{"Namespace", n.Namespace, reflect.TypeOf(n.Namespace).String()},
+	}
+}
+
 func (g Globals) Table() []table.Row {
 	return []table.Row{
 		{"Config File", g.Config, reflect.TypeOf(g.Config).String()},
-		{"Nex Namespace", g.Namespace, reflect.TypeOf(g.Namespace).String()},
 		{"NATS Server", g.NatsServers, reflect.TypeOf(g.NatsServers).String()},
 		{"NATS Context", g.NatsContext, reflect.TypeOf(g.NatsContext).String()},
 		{"Logger Targets", g.Target, reflect.TypeOf(g.Target).String()},
@@ -98,5 +103,41 @@ func (i Info) Table() []table.Row {
 	return []table.Row{
 		{"Node ID", i.NodeID, reflect.TypeOf(i.NodeID).String()},
 		{"JSON Output", i.JSON, reflect.TypeOf(i.JSON).String()},
+	}
+}
+
+func (w Workload) Table() []table.Row {
+	return []table.Row{
+		{"Namespace", w.Namespace, reflect.TypeOf(w.Namespace).String()},
+	}
+}
+
+func (r RunWorkload) Table() []table.Row {
+	return []table.Row{
+		{"File", r.File, reflect.TypeOf(r.File).String()},
+		{"Target ID", r.TargetId, reflect.TypeOf(r.TargetId).String()},
+		{"Xkey", r.Xkey, reflect.TypeOf(r.Xkey).String()},
+		{"Issuer Key", r.IssuerKey, reflect.TypeOf(r.IssuerKey).String()},
+		{"Workload Name", r.Name, reflect.TypeOf(r.Name).String()},
+		{"Workload Type", r.WorkloadType, reflect.TypeOf(r.WorkloadType).String()},
+		{"Description", r.Description, reflect.TypeOf(r.Description).String()},
+		{"Arguments", r.Argv, reflect.TypeOf(r.Argv).String()},
+		{"Environment Variables", r.Env, reflect.TypeOf(r.Env).String()},
+		{"Trigger Subjects", r.TriggerSubjects, reflect.TypeOf(r.TriggerSubjects).String()},
+		{"Host Services URL", r.HostServicesURL, reflect.TypeOf(r.HostServicesURL).String()},
+		{"Host Services JWT", r.HostServicesJWT, reflect.TypeOf(r.HostServicesJWT).String()},
+		{"Host Services Seed", r.HostServicesSeed, reflect.TypeOf(r.HostServicesSeed).String()},
+		{"Defaults", r.Defaults, reflect.TypeOf(r.Defaults).String()},
+	}
+}
+
+func (s StopWorkload) Table() []table.Row {
+	return []table.Row{
+		{"WorkloadID", s.WorkloadId, reflect.TypeOf(s.WorkloadId).String()},
+		{"TargetID", s.TargetId, reflect.TypeOf(s.TargetId).String()},
+		{"IssuerKey", s.IssuerKey, reflect.TypeOf(s.IssuerKey).String()},
+		{"Reason", s.Reason, reflect.TypeOf(s.Reason).String()},
+		{"Immediate", s.Immediate, reflect.TypeOf(s.Immediate).String()},
+		{"Defaults", s.Defaults, reflect.TypeOf(s.Defaults).String()},
 	}
 }

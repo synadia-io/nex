@@ -21,6 +21,8 @@ type Node struct {
 	LameDuck  LameDuck  `cmd:"" name:"lameduck" help:"Command a node to enter lame duck mode" aliases:"down"`
 	List      List      `cmd:"" aliases:"ls" help:"List running nodes"`
 	Info      Info      `cmd:"" help:"Provide information about a running node"`
+
+	Namespace string `env:"NEX_NAMESPACE" default:"default" help:"Specifies namespace when running nex commands"`
 }
 
 // ----- Preflight Command -----

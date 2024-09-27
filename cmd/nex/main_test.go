@@ -81,10 +81,6 @@ func TestCLIWithConfig(t *testing.T) {
 		t.Fatal("Expected config to be loaded")
 	}
 
-	if nex.Globals.Namespace != "derp" {
-		t.Fatalf("Expected nats servers to be %v, got %v", "derp", nex.Globals.Namespace)
-	}
-
 	if len(nex.Node.Up.WorkloadTypes) != 2 {
 		t.Fatalf("Expected 2 workload types, got %d", len(nex.Node.Up.WorkloadTypes))
 	}
