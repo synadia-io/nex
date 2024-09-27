@@ -46,9 +46,20 @@ jobs:
       with:
         go-version: ${{ env.GO_VER }}
     - 
-      name: Run test suite
+      name: Run test suite | node
       run: |
         go test -v ./...
+    - 
+      name: Run test suite | CLI
+      working-directory: ./cmd/nex
+      run: |
+        go test -v ./...
+    - 
+      name: Run test suite (rootfs | linux only)
+      if: runner.os == 'Linux'
+      working-directory: ./cmd/nex
+      run: |
+        sudo go test -v ./... -run TestRootFsSimple
 
   build:
     timeout-minutes: 10
