@@ -34,7 +34,7 @@ func (api *controlAPI) Init(args ...any) error {
 	}
 
 	if _, ok := args[0].(*nats.Conn); !ok {
-		err := errors.New("arg[0] must be a valid NATS connection")
+		err := errors.New("args[0] must be a valid NATS connection")
 		api.Log().Error("Failed to start control API", slog.String("error", err.Error()))
 		return err
 	}
