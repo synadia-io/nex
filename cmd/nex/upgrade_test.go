@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/alecthomas/kong"
 )
 
 func setEnvironment(t *testing.T) {
@@ -65,5 +67,19 @@ func TestUpdateNex(t *testing.T) {
 	}
 	if runtime.GOOS == "darwin" && sSum != expectedSha {
 		t.Fatalf("Expected sha256 to be %s; Got %s", expectedSha, sSum)
+	}
+}
+
+func TestDisableAutoUpgradeFlags(t *testing.T) {
+	nex := NexCLI{}
+
+	parser := kong.Must(&nex,
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Bind(&nex.Globals),
+	)
+
+	_, err := parser.Parse([]string{"--disable-upgrade-check", "--auto-upgrade"})
+	if err.Error() != "cannot enable auto-upgrade when upgrade check is disabled" {
+		t.Fatalf("Expected bad configuration error, got %v", err)
 	}
 }

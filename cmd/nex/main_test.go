@@ -89,17 +89,3 @@ func TestCLIWithConfig(t *testing.T) {
 		t.Fatalf("Expected 2 workload types, got %d", len(nex.Node.Up.WorkloadTypes))
 	}
 }
-
-func TestDisableAutoUpgradeFlags(t *testing.T) {
-	nex := NexCLI{}
-
-	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
-		kong.Bind(&nex.Globals),
-	)
-
-	_, err := parser.Parse([]string{"--disable-upgrade-check", "--auto-upgrade"})
-	if err.Error() != "cannot enable auto-upgrade when upgrade check is disabled" {
-		t.Fatalf("Expected bad configuration error, got %v", err)
-	}
-}
