@@ -97,7 +97,7 @@ func (api *controlAPI) shutdown() error {
 		err := sub.Drain()
 		if err != nil {
 			api.Log().Warning("Failed to drain API subscription", slog.String("subject", sub.Subject))
-			err = errors.Join(fmt.Errorf("failed to drain API subscription: %s", sub.Subject))
+			err = errors.Join(err, fmt.Errorf("failed to drain API subscription: %s", sub.Subject))
 		}
 	}
 
