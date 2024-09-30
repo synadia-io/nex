@@ -38,12 +38,13 @@ func TestUpdateNex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
 
 	buf, err := io.ReadAll(f)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	f.Close()
 
 	// https://github.com/synadia-io/nex/releases/download/0.2.7/nex_0.2.7_linux_amd64.sha256
 	var expectedSha string

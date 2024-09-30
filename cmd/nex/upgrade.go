@@ -142,6 +142,10 @@ func (u Upgrade) Run(ctx context.Context, globals *Globals) error {
 	if err != nil {
 		return err
 	}
+	err = nex.Close()
+	if err != nil {
+		return err
+	}
 
 	h := sha256.New()
 	if _, err := io.Copy(h, nex); err != nil {
