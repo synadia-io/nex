@@ -2,6 +2,7 @@ package actors
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"ergo.services/ergo/act"
@@ -86,6 +87,8 @@ func (api *controlAPI) initPublicXKey() error {
 }
 
 func (api *controlAPI) shutdown() error {
+	var err error
+
 	for _, sub := range api.subsz {
 		if !sub.IsValid() {
 			continue
@@ -94,10 +97,11 @@ func (api *controlAPI) shutdown() error {
 		err := sub.Drain()
 		if err != nil {
 			api.Log().Warning("Failed to drain API subscription", slog.String("subject", sub.Subject))
+			err = errors.Join(fmt.Errorf("failed to drain API subscription: %s", sub.Subject))
 		}
 	}
 
-	return nil
+	return err
 }
 
 func (api *controlAPI) subscribe(nc *nats.Conn) error {
