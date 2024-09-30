@@ -94,6 +94,24 @@ func (api *controlAPI) subscribe(nc *nats.Conn) error {
 	}
 	api.subsz = append(api.subsz, sub)
 
+	sub, err = nc.Subscribe(APIPrefix+".DEPLOY.*."+api.publicKey, api.handleDeploy)
+	if err != nil {
+		api.Log().Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
+	}
+	api.subsz = append(api.subsz, sub)
+
+	sub, err = nc.Subscribe(APIPrefix+".INFO.*."+api.publicKey, api.handleInfo)
+	if err != nil {
+		api.Log().Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
+	}
+	api.subsz = append(api.subsz, sub)
+
+	sub, err = nc.Subscribe(APIPrefix+".LAMEDUCK."+api.publicKey, api.handleLameDuck)
+	if err != nil {
+		api.Log().Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.publicKey))
+	}
+	api.subsz = append(api.subsz, sub)
+
 	sub, err = nc.Subscribe(APIPrefix+".PING", api.handlePing)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
@@ -106,35 +124,15 @@ func (api *controlAPI) subscribe(nc *nats.Conn) error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = nc.Subscribe(APIPrefix+".WPING.>", api.handleWorkloadPing)
-	if err != nil {
-		api.Log().Error("Failed to subscribe to workload ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
-	}
-	api.subsz = append(api.subsz, sub)
-
-	// Namespaced subscriptions, the * below is for the namespace
-	sub, err = nc.Subscribe(APIPrefix+".INFO.*."+api.publicKey, api.handleInfo)
-	if err != nil {
-		api.Log().Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = nc.Subscribe(APIPrefix+".DEPLOY.*."+api.publicKey, api.handleDeploy)
-	if err != nil {
-		api.Log().Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
-	}
-	api.subsz = append(api.subsz, sub)
-
-	// FIXME? per contract, this should probably be renamed from STOP to UNDEPLOY
-	sub, err = nc.Subscribe(APIPrefix+".STOP.*."+api.publicKey, api.handleStop)
+	sub, err = nc.Subscribe(APIPrefix+".UNDEPLOY.*."+api.publicKey, api.handleStop)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to stop subject", slog.Any("error", err), slog.String("id", api.publicKey))
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = nc.Subscribe(APIPrefix+".LAMEDUCK."+api.publicKey, api.handleLameDuck)
+	sub, err = nc.Subscribe(APIPrefix+".WPING.>", api.handleWorkloadPing)
 	if err != nil {
-		api.Log().Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		api.Log().Error("Failed to subscribe to workload ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 	}
 	api.subsz = append(api.subsz, sub)
 
