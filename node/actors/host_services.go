@@ -25,7 +25,7 @@ func (hs *hostServicesServer) Init(args ...any) error {
 	}
 
 	if _, ok := args[0].(models.HostServiceOptions); !ok {
-		err := errors.New("arg[0] must be valid host service options")
+		err := errors.New("args[0] must be valid host service options")
 		hs.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return err
 	}
