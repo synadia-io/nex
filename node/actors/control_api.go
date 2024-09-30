@@ -50,7 +50,7 @@ func (api *controlAPI) Init(args ...any) error {
 
 	err = api.subscribe(args[0].(*nats.Conn))
 	if err != nil {
-		api.shutdown()
+		_ = api.shutdown()
 		return err
 	}
 
