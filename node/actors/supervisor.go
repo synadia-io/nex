@@ -6,6 +6,11 @@ import (
 	"github.com/synadia-io/nex/models"
 )
 
+const childActorNameAgentManager = "agent_manager"
+const childActorNameControlAPI = "control_api"
+const childActorNameHostServices = "host_services"
+const childActorNameInternalNATSServer = "internal_nats_server"
+
 func createNexSupervisor() gen.ProcessBehavior {
 	return &NexSupervisor{}
 }
@@ -25,7 +30,7 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 
 	spec.Children = []act.SupervisorChildSpec{
 		{
-			Name:    "internal_nats_server",
+			Name:    childActorNameInternalNATSServer,
 			Factory: createInternalNatsServer,
 			Args: []any{
 				internalNatsServerParams{
@@ -34,15 +39,16 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 			},
 		},
 		{
-			Name:    "host_services",
+			Name:    childActorNameHostServices,
 			Factory: createHostServices,
+			Args:    []any{nodeOptions.HostServiceOptions},
 		},
 		{
-			Name:    "control_api",
+			Name:    childActorNameControlAPI,
 			Factory: createControlAPIServer,
 		},
 		{
-			Name:    "agent_manager",
+			Name:    childActorNameAgentManager,
 			Factory: createAgentManager,
 			Args:    []any{nodeOptions},
 		},

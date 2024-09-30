@@ -1,8 +1,11 @@
 package actors
 
 import (
+	"log/slog"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
+	"github.com/synadia-io/nex/models"
 )
 
 func createHostServices() gen.ProcessBehavior {
@@ -14,7 +17,9 @@ type hostServicesServer struct {
 }
 
 func (hs *hostServicesServer) Init(args ...any) error {
-	hs.Log().Info("Host Services Server started")
+	hostServicesOptions := args[0].(models.HostServiceOptions)
+
+	hs.Log().Info("Host services started", slog.String("nats_url", hostServicesOptions.NatsUrl))
 
 	return nil
 }
