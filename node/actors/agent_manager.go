@@ -1,6 +1,8 @@
 package actors
 
 import (
+	"log/slog"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
 	"github.com/synadia-io/nex/models"
@@ -42,13 +44,13 @@ func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
 		if _, err := mgr.MonitorEvent(InternalNatsServerReady); err != nil {
 			return err
 		}
-		mgr.Log().Info("successfully subscribed to: %s", InternalNatsServerReady)
+		mgr.Log().Info("successfully subscribed to internal nats server", slog.Any("status", InternalNatsServerReady))
 	}
 	return nil
 }
 
 func (mgr *agentManager) HandleEvent(event gen.MessageEvent) error {
-	mgr.Log().Info("received event %s", event.Event)
+	mgr.Log().Info("received event", slog.Any("event", event.Event))
 
 	switch event.Event.Name {
 	case InternalNatsServerReadyName:
@@ -58,7 +60,7 @@ func (mgr *agentManager) HandleEvent(event gen.MessageEvent) error {
 }
 
 func (mgr *agentManager) startWorkloadAgents(evt InternalNatsServerReadyEvent) error {
-	mgr.Log().Info("starting %d agent binaries..", len(evt.AgentCredentials))
+	mgr.Log().Info("starting agent binaries", slog.Int("count", len(evt.AgentCredentials)))
 	// TODO:
 	// start all the agent binaries for supported workload types
 	return nil

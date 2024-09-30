@@ -170,8 +170,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	node.Log().Info("Nex node started")
-	node.Log().Info("Observer Application started and available at http://localhost:9911")
-
+	node.Log().Info("Observer Application started", slog.String("server", "http://localhost:9911"))
 	node.Wait()
 	return nil
 }

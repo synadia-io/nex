@@ -2,9 +2,9 @@ package actors
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
+	"disorder.dev/shandler"
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
 )
@@ -26,7 +26,20 @@ type NodeLogger struct {
 func (nl *NodeLogger) HandleLog(message gen.MessageLog) error {
 	// TODO: this is temporary until we can figure out what we really want
 	// to do with these logs
-	nl.inner.Log(context.Background(), slog.Level(message.Level), fmt.Sprintf(message.Format, message.Args...))
+	switch message.Level {
+	case gen.LogLevelError:
+		nl.inner.Error(message.Format, message.Args...)
+	case gen.LogLevelWarning:
+		nl.inner.Warn(message.Format, message.Args...)
+	case gen.LogLevelInfo:
+		nl.inner.Info(message.Format, message.Args...)
+	case gen.LogLevelDebug:
+		nl.inner.Debug(message.Format, message.Args...)
+	case gen.LogLevelTrace:
+		nl.inner.Log(context.TODO(), shandler.LevelTrace, message.Format, message.Args...)
+	case gen.LogLevelPanic:
+		nl.inner.Log(context.TODO(), shandler.LevelFatal, message.Format, message.Args...)
+	}
 	switch m := message.Source.(type) {
 	case gen.MessageLogNode:
 		// handle message

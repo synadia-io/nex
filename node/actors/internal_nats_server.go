@@ -1,6 +1,8 @@
 package actors
 
 import (
+	"log/slog"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
 	"github.com/nats-io/nkeys"
@@ -67,9 +69,9 @@ func (ns *internalNatsServer) HandleMessage(from gen.PID, message any) error {
 			return err
 		}
 		ns.tokens[InternalNatsServerReadyName] = token
-		ns.Log().Info("registered publishable event %s, waiting for consumers...", InternalNatsServerReadyName)
+		ns.Log().Info("registered publishable event, waiting for consumers...", slog.Any("atom", InternalNatsServerReadyName))
 	case eventStart:
-		ns.Log().Info("publisher got first consumer for %s. start producing events...", InternalNatsServerReadyName)
+		ns.Log().Info("publisher got first consumer. start producing events...", slog.Any("atom", InternalNatsServerReadyName))
 		ns.haveConsumers = true
 		err := ns.SendEvent(InternalNatsServerReadyName, ns.tokens[InternalNatsServerReadyName], InternalNatsServerReadyEvent{AgentCredentials: ns.creds})
 		if err != nil {
