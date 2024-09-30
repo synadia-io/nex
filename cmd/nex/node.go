@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -283,7 +284,10 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 	}
 
 	logger.Info("Starting Nex Node")
-	nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
+	err = nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
+	if err != nil {
+		logger.Error("Failed to start Nex Node", slog.String("error", err.Error()))
+	}
 	logger.Info("Shutting down Nex Node")
 
 	return nil
