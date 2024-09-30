@@ -11,7 +11,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"runtime"
 )
 
 type Upgrade struct {
@@ -117,10 +116,7 @@ func (u Upgrade) Run(ctx context.Context, globals *Globals) error {
 		}
 	}
 
-	_os := runtime.GOOS
-	arch := runtime.GOARCH
-
-	url := fmt.Sprintf("https://github.com/synadia-io/nex/releases/download/%s/nex_%s_%s_%s", u.installVersion, u.installVersion, _os, arch)
+	url := getUpgradeURL(u.installVersion)
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
