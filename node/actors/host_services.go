@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"errors"
 	"log/slog"
 
 	"ergo.services/ergo/act"
@@ -17,9 +18,21 @@ type hostServicesServer struct {
 }
 
 func (hs *hostServicesServer) Init(args ...any) error {
-	hostServicesOptions := args[0].(models.HostServiceOptions)
+	if len(args) != 1 {
+		err := errors.New("host service options are required")
+		hs.Log().Error("Failed to start host services", slog.String("error", err.Error()))
+		return err
+	}
 
-	hs.Log().Info("Host services started", slog.String("nats_url", hostServicesOptions.NatsUrl))
+	if _, ok := args[0].(models.HostServiceOptions); !ok {
+		err := errors.New("arg[0] must be valid host service options")
+		hs.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return err
+	}
+
+	hostServiceOptions := args[0].(models.HostServiceOptions)
+
+	hs.Log().Info("Host services started", slog.String("nats_url", hostServiceOptions.NatsUrl))
 
 	return nil
 }
