@@ -7,6 +7,7 @@ import (
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node"
@@ -38,9 +39,14 @@ func TestDefaultConfigNodeValidation(t *testing.T) {
 	nc := startNatsServer(t)
 	defer nc.Close()
 
+	kp, err := nkeys.CreateServer()
+	if err != nil {
+		t.Fatal("failed to create keypair")
+	}
+
 	tDir := t.TempDir()
 
-	node, err := node.NewNexNode(nc, models.WithResourceDirectory(tDir),
+	node, err := node.NewNexNode(kp, nc, models.WithResourceDirectory(tDir),
 		models.WithWorkloadTypes([]models.WorkloadOptions{{Name: "test", AgentUri: "https://derp.com", Argv: []string{}, Env: map[string]string{}}}))
 	if err != nil {
 		t.Fatal("failed to create new nex node", err)
@@ -54,7 +60,12 @@ func TestNilOptions(t *testing.T) {
 	nc := startNatsServer(t)
 	defer nc.Close()
 
-	_, err := node.NewNexNode(nc, nil)
+	kp, err := nkeys.CreateServer()
+	if err != nil {
+		t.Fatal("failed to create keypair")
+	}
+
+	_, err = node.NewNexNode(kp, nc, nil)
 	if err.Error() != `node required at least 1 workload type be configured in order to start
 resource directory does not exist` {
 		fmt.Printf("'%s'", err.Error())
@@ -66,7 +77,12 @@ func TestNoOptions(t *testing.T) {
 	nc := startNatsServer(t)
 	defer nc.Close()
 
-	_, err := node.NewNexNode(nc)
+	kp, err := nkeys.CreateServer()
+	if err != nil {
+		t.Fatal("failed to create keypair")
+	}
+
+	_, err = node.NewNexNode(kp, nc)
 	if err.Error() != `node required at least 1 workload type be configured in order to start
 resource directory does not exist` {
 		fmt.Printf("'%s'", err.Error())
