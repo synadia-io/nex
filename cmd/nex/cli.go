@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -68,7 +69,7 @@ func (g Globals) Run(ctx *kong.Context) error {
 func (cli NexCLI) Validate() error {
 	var errs error
 	if cli.Globals.DisableUpgradeCheck && cli.Globals.AutoUpgrade {
-		errs = fmt.Errorf("cannot enable auto-upgrade when upgrade check is disabled")
+		errs = errors.Join(errs, errors.New("cannot enable auto-upgrade when upgrade check is disabled"))
 	}
 	return errs
 }
