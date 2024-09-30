@@ -6,6 +6,7 @@ import (
 
 const (
 	InternalNatsServerReadyName = gen.Atom("internal_nats_server_ready")
+	PostInit                    = "post_init"
 )
 
 var (

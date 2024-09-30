@@ -37,7 +37,7 @@ func (mgr *agentManager) HandleInspect(from gen.PID, item ...string) map[string]
 
 func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
 	switch message {
-	case "post_init":
+	case PostInit:
 		// making subscription using MonitorEvent of the gen.Process interface
 		if _, err := mgr.MonitorEvent(InternalNatsServerReady); err != nil {
 			return err
