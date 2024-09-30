@@ -27,27 +27,33 @@ type NexSupervisor struct {
 func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	var spec act.SupervisorSpec
 
-	if len(args) != 2 {
-		err := errors.New("NATS connection and node options are required")
+	if len(args) != 3 {
+		err := errors.New("node id, NATS connection and options are required")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
 
-	if _, ok := args[0].(*nats.Conn); !ok {
+	if _, ok := args[0].(string); !ok {
+		err := errors.New("arg[0] must be a valid node id")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	if _, ok := args[1].(*nats.Conn); !ok {
 		err := errors.New("arg[0] must be a valid NATS connection")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
 
-	if _, ok := args[0].(models.NodeOptions); !ok {
+	if _, ok := args[1].(models.NodeOptions); !ok {
 		err := errors.New("arg[1] must be valid node options")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
 
-	var nodeID string // FIXME-- this needs to be provided as well...
-	nc := args[0].(*nats.Conn)
-	nodeOptions := args[1].(models.NodeOptions)
+	nodeID := args[0].(string)
+	nc := args[1].(*nats.Conn)
+	nodeOptions := args[2].(models.NodeOptions)
 
 	// set supervisor type
 	spec.Type = act.SupervisorTypeOneForOne

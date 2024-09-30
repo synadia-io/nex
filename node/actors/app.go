@@ -12,22 +12,22 @@ const nexSupervisorName = "nexsup"
 
 // NOTE: intentionally forcing a copy here so these options aren't mutable
 // by the node
-func CreateNodeApp(nc *nats.Conn, opts models.NodeOptions) gen.ApplicationBehavior {
+func CreateNodeApp(nodeID string, nc *nats.Conn, opts models.NodeOptions) gen.ApplicationBehavior {
 	return &NodeApp{
 		nc,
+		nodeID,
 		opts,
 	}
 }
 
 type NodeApp struct {
-	nc   *nats.Conn
-	opts models.NodeOptions
+	nc     *nats.Conn
+	nodeID string
+	opts   models.NodeOptions
 }
 
 // Load invoked on loading application using method ApplicationLoad of gen.Node interface.
 func (app *NodeApp) Load(node gen.Node, args ...any) (gen.ApplicationSpec, error) {
-	var nodeID string // FIXME!!! this should be part of the nexNode and NodeApp structs
-
 	return gen.ApplicationSpec{
 		Name:        nexApplicationName,
 		Description: nexApplicationDescription,
@@ -36,7 +36,7 @@ func (app *NodeApp) Load(node gen.Node, args ...any) (gen.ApplicationSpec, error
 			{
 				Name:    nexSupervisorName,
 				Factory: createNexSupervisor,
-				Args:    []any{nodeID, app.nc, app.opts},
+				Args:    []any{app.nodeID, app.nc, app.opts},
 			},
 		},
 	}, nil
