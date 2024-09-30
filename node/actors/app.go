@@ -6,9 +6,11 @@ import (
 	"github.com/synadia-io/nex/models"
 )
 
-const nexApplicationName = "nex"
-const nexApplicationDescription = "Nex Node - A NATS Execution Engine"
-const nexSupervisorName = "nexsup"
+const (
+	nexApplicationName        = "nex"
+	nexApplicationDescription = "Nex Node - A NATS Execution Engine"
+	nexSupervisorName         = "nexsup"
+)
 
 // NOTE: intentionally forcing a copy here so these options aren't mutable
 // by the node
