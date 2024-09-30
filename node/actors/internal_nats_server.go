@@ -103,6 +103,7 @@ func (ns *internalNatsServer) Init(args ...any) error {
 	if err != nil {
 		return err
 	}
+
 	ns.creds = creds
 
 	opts, err := ns.generateConfig()
@@ -114,7 +115,11 @@ func (ns *internalNatsServer) Init(args ...any) error {
 	if err != nil {
 		return err
 	}
-	_ = ns.Send(ns.PID(), "post_init")
+
+	err = ns.Send(ns.PID(), PostInit)
+	if err != nil {
+		return err
+	}
 
 	ns.Log().Info("Internal NATS server started")
 
@@ -126,7 +131,7 @@ func (ns *internalNatsServer) HandleMessage(from gen.PID, message any) error {
 	eventStop := gen.MessageEventStop{Name: InternalNatsServerReadyName}
 
 	switch message {
-	case "post_init":
+	case PostInit:
 		evOptions := gen.EventOptions{
 			// NOTE: notify true allows us to deterministically wait until we have
 			// a consumer before we publish an event. No more sleep-and-hope pattern.
