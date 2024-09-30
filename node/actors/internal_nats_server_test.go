@@ -45,6 +45,9 @@ func TestGenerateConfig(t *testing.T) {
 	if opts == nil {
 		t.Error("failed to generate server config")
 	}
+	if opts.Accounts == nil {
+		t.Error("failed to generate server config")
+	}
 
 	accounts := make([]string, 0)
 	for _, acct := range opts.Accounts {
