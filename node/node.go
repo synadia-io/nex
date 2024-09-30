@@ -23,11 +23,12 @@ type Node interface {
 }
 
 type nexNode struct {
-	nc      *nats.Conn
-	options *models.NodeOptions
+	nc        *nats.Conn
+	options   *models.NodeOptions
+	publicKey nkeys.KeyPair
 }
 
-func NewNexNode(nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
+func NewNexNode(publicKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
 	if nc == nil {
 		return nil, fmt.Errorf("no nats connection provided")
 	}
@@ -53,6 +54,7 @@ func NewNexNode(nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
 				Services: make(map[string]models.ServiceConfig),
 			},
 		},
+		publicKey: publicKey,
 	}
 
 	if len(opts) > 0 && opts[0] != nil {
@@ -126,10 +128,18 @@ func (nn *nexNode) Start() error {
 func (nn *nexNode) initializeSupervisionTree() error {
 	var options gen.NodeOptions
 
+	nodeName := "nex@localhost" // FIXME-- make configurable
+
+	nodeID, err := nn.publicKey.PublicKey()
+	if err != nil {
+		fmt.Printf("Unable to start node '%s': %s\n", nodeName, err)
+		return err
+	}
+
 	// create applications that must be started
 	apps := []gen.ApplicationBehavior{
-		observer.CreateApp(observer.Options{}),   // TODO: opt out of this via config
-		actors.CreateNodeApp(nn.nc, *nn.options), // copy options
+		observer.CreateApp(observer.Options{}),           // TODO: opt out of this via config
+		actors.CreateNodeApp(nodeID, nn.nc, *nn.options), // copy options
 	}
 	options.Applications = apps
 
@@ -138,8 +148,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	// https://docs.ergo.services/basics/logging#process-logger
 	// https://docs.ergo.services/tools/observer#log-process-page
-
-	nodeName := "nex@localhost"
 
 	// starting node
 	node, err := ergo.StartNode(gen.Atom(nodeName), options)
