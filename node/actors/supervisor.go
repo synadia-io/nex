@@ -46,7 +46,7 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	}
 
 	if _, ok := args[2].(models.NodeOptions); !ok {
-		err := errors.New("args[1] must be valid node options")
+		err := errors.New("args[2] must be valid node options")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
