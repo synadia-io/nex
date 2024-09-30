@@ -50,6 +50,7 @@ func (api *controlAPI) Init(args ...any) error {
 
 	err = api.subscribe(args[0].(*nats.Conn))
 	if err != nil {
+		api.shutdown()
 		return err
 	}
 
@@ -84,6 +85,21 @@ func (api *controlAPI) initPublicXKey() error {
 	return nil
 }
 
+func (api *controlAPI) shutdown() error {
+	for _, sub := range api.subsz {
+		if !sub.IsValid() {
+			continue
+		}
+
+		err := sub.Drain()
+		if err != nil {
+			api.Log().Warning("Failed to drain API subscription", slog.String("subject", sub.Subject))
+		}
+	}
+
+	return nil
+}
+
 func (api *controlAPI) subscribe(nc *nats.Conn) error {
 	var sub *nats.Subscription
 	var err error
@@ -91,48 +107,56 @@ func (api *controlAPI) subscribe(nc *nats.Conn) error {
 	sub, err = nc.Subscribe(APIPrefix+".AUCTION", api.handleAuction)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
 	sub, err = nc.Subscribe(APIPrefix+".DEPLOY.*."+api.publicKey, api.handleDeploy)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
 	sub, err = nc.Subscribe(APIPrefix+".INFO.*."+api.publicKey, api.handleInfo)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
 	sub, err = nc.Subscribe(APIPrefix+".LAMEDUCK."+api.publicKey, api.handleLameDuck)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
 	sub, err = nc.Subscribe(APIPrefix+".PING", api.handlePing)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
 	sub, err = nc.Subscribe(APIPrefix+".PING."+api.publicKey, api.handlePing)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to node-specific ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = nc.Subscribe(APIPrefix+".UNDEPLOY.*."+api.publicKey, api.handleStop)
+	sub, err = nc.Subscribe(APIPrefix+".UNDEPLOY.*."+api.publicKey, api.handleUndeploy)
 	if err != nil {
-		api.Log().Error("Failed to subscribe to stop subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		api.Log().Error("Failed to subscribe to undeploy subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
 	sub, err = nc.Subscribe(APIPrefix+".WPING.>", api.handleWorkloadPing)
 	if err != nil {
 		api.Log().Error("Failed to subscribe to workload ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
@@ -160,7 +184,7 @@ func (api *controlAPI) handlePing(m *nats.Msg) {
 	// TODO
 }
 
-func (api *controlAPI) handleStop(m *nats.Msg) {
+func (api *controlAPI) handleUndeploy(m *nats.Msg) {
 	// TODO
 }
 
