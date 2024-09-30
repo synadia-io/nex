@@ -34,19 +34,19 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	}
 
 	if _, ok := args[0].(string); !ok {
-		err := errors.New("arg[0] must be a valid node id")
+		err := errors.New("args[0] must be a valid node id")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
 
 	if _, ok := args[1].(*nats.Conn); !ok {
-		err := errors.New("arg[0] must be a valid NATS connection")
+		err := errors.New("args[1] must be a valid NATS connection")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
 
-	if _, ok := args[1].(models.NodeOptions); !ok {
-		err := errors.New("arg[1] must be valid node options")
+	if _, ok := args[2].(models.NodeOptions); !ok {
+		err := errors.New("args[1] must be valid node options")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
