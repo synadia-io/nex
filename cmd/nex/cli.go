@@ -64,3 +64,11 @@ func (g Globals) Run(ctx *kong.Context) error {
 	}
 	return nil
 }
+
+func (cli NexCLI) Validate() error {
+	var errs error
+	if cli.Globals.DisableUpgradeCheck && cli.Globals.AutoUpgrade {
+		errs = fmt.Errorf("cannot enable auto-upgrade when upgrade check is disabled")
+	}
+	return errs
+}
