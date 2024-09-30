@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 import (
@@ -11,6 +13,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"reflect"
+
+	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 type Upgrade struct {
@@ -170,4 +175,10 @@ func (u Upgrade) Run(ctx context.Context, globals *Globals) error {
 	logger.Info("nex upgrade complete!", slog.String("new_version", u.installVersion))
 
 	return nil
+}
+
+func (u Upgrade) Table() []table.Row {
+	return []table.Row{
+		{"Git Tag", u.GitTag, reflect.TypeOf(u.GitTag).String()},
+	}
 }

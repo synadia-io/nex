@@ -1,3 +1,5 @@
+//go:build !windows
+
 package main
 
 import (
@@ -53,8 +55,6 @@ func TestUpdateNex(t *testing.T) {
 		expectedSha = "143753466f83f744ccdc5dbe7e76e9539a2a5db2130cd8cb44607b55e414ee58"
 	case "darwin":
 		expectedSha = "22e77719ceec3781e1d1f600278095dc724b9f3b4d12f0786b21eb18eb8e0950"
-	case "windows":
-		expectedSha = "90cbf63e5d4078313b0da06ba16faca341833284d5ddea76bbe5d224dbc2452f"
 	}
 
 	s256 := sha256.Sum256(buf)
@@ -64,9 +64,6 @@ func TestUpdateNex(t *testing.T) {
 		t.Fatalf("Expected sha256 to be %s; Got %s", expectedSha, sSum)
 	}
 	if runtime.GOOS == "darwin" && sSum != expectedSha {
-		t.Fatalf("Expected sha256 to be %s; Got %s", expectedSha, sSum)
-	}
-	if runtime.GOOS == "windows" && sSum != expectedSha {
 		t.Fatalf("Expected sha256 to be %s; Got %s", expectedSha, sSum)
 	}
 }
