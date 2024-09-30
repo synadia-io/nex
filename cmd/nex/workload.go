@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
@@ -32,20 +33,20 @@ func (w Workload) Validate() error {
 
 // Workload subcommands
 type RunWorkload struct {
-	File             string         `arg:"" required:"" help:"File containing workload to run"`
-	TargetId         string         `help:"Node to run workload on"`
-	Xkey             string         `default:"${defaultConfigPath}/publisher.xk" help:"Xkey file to use for workload"`
-	IssuerKey        string         `default:"${defaultConfigPath}/issuer.nk" help:"Issuer key file to use for workload"`
-	Name             string         `placeholder:"myworkload" help:"Name of the workload"`
-	WorkloadType     string         `name:"type" default:"native" help:"Type of workload"`
-	Description      string         `help:"Description of the workload"`
-	Argv             []string       `placeholder:"--flag,value,-a,..." default:"" help:"Arguments to pass to the workload"`
-	Env              map[string]any `placeholder:"KEY=VALUE;KEY2=VALUE2;..." default:"" help:"Environment variables to pass to the workload"`
-	TriggerSubjects  []string       `placeholder:"subject1,subject2" default:"" help:"Trigger subjects to register for subsequent workload execution, if supported by the workload type"`
-	HostServicesURL  string         `placeholder:"nats://localhost:4222" default:"" help:"NATS URL to host services"`
-	HostServicesJWT  string         `placeholder:"etahsy..." default:"" help:"NATS Authentication JWT for host services"`
-	HostServicesSeed string         `placeholder:"SUA..." default:"" help:"NATS Authentication Seed for host services"`
-	Devrun           bool           `help:"Use default values for workload; chooses node at random"`
+	File             string            `arg:"" required:"" help:"File containing workload to run"`
+	TargetId         string            `help:"Node to run workload on"`
+	Xkey             string            `default:"${defaultConfigPath}/publisher.xk" help:"Xkey file to use for workload"`
+	IssuerKey        string            `default:"${defaultConfigPath}/issuer.nk" help:"Issuer key file to use for workload"`
+	Name             string            `placeholder:"myworkload" help:"Name of the workload"`
+	WorkloadType     string            `name:"type" default:"native" help:"Type of workload"`
+	Description      string            `help:"Description of the workload"`
+	Argv             []string          `placeholder:"--flag,value,-a,..." default:"" help:"Arguments to pass to the workload"`
+	Env              map[string]any    `placeholder:"KEY=VALUE;KEY2=VALUE2;..." default:"" help:"Environment variables to pass to the workload"`
+	TriggerSubjects  []string          `placeholder:"subject1,subject2" default:"" help:"Trigger subjects to register for subsequent workload execution, if supported by the workload type"`
+	HostServicesURL  string            `placeholder:"nats://localhost:4222" default:"" help:"NATS URL to host services"`
+	HostServicesJWT  string            `placeholder:"etahsy..." default:"" help:"NATS Authentication JWT for host services"`
+	HostServicesSeed string            `placeholder:"SUA..." default:"" help:"NATS Authentication Seed for host services"`
+	Tags             map[string]string `placeholder:"key1=value1;key2=value2" default:"" help:"Tags to associate with the workload"`
 }
 
 func (r *RunWorkload) AfterApply() error {
@@ -58,47 +59,55 @@ func (r *RunWorkload) AfterApply() error {
 	if r.TriggerSubjects == nil {
 		r.TriggerSubjects = []string{}
 	}
-
-	if _, err := os.Stat(r.Xkey); r.Devrun && os.IsNotExist(err) {
-		kp, err := nkeys.CreatePair(nkeys.PrefixByteCurve)
-		if err != nil {
-			return err
-		}
-		seed, err := kp.Seed()
-		if err != nil {
-			return err
-		}
-		f, err := os.Create(r.Xkey)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = f.Write(seed)
-		if err != nil {
-			return err
-		}
+	if r.Tags == nil {
+		r.Tags = make(map[string]string)
 	}
-	if _, err := os.Stat(r.IssuerKey); r.Devrun && os.IsNotExist(err) {
-		kp, err := nkeys.CreatePair(nkeys.PrefixByteAccount)
-		if err != nil {
-			return err
-		}
-		seed, err := kp.Seed()
-		if err != nil {
-			return err
-		}
-		f, err := os.Create(r.IssuerKey)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = f.Write(seed)
-		if err != nil {
-			return err
+
+	if _, err := os.Stat(r.Xkey); os.IsNotExist(err) {
+		if strings.HasPrefix(r.Xkey, defaultConfigPath) {
+			kp, err := nkeys.CreatePair(nkeys.PrefixByteCurve)
+			if err != nil {
+				return err
+			}
+			seed, err := kp.Seed()
+			if err != nil {
+				return err
+			}
+			f, err := os.Create(r.Xkey)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			_, err = f.Write(seed)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	if r.Devrun && r.Name == "" {
+	if _, err := os.Stat(r.IssuerKey); os.IsNotExist(err) {
+		if strings.HasPrefix(r.IssuerKey, defaultConfigPath) {
+			kp, err := nkeys.CreatePair(nkeys.PrefixByteAccount)
+			if err != nil {
+				return err
+			}
+			seed, err := kp.Seed()
+			if err != nil {
+				return err
+			}
+			f, err := os.Create(r.IssuerKey)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			_, err = f.Write(seed)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if r.Name == "" {
 		rng := fname.NewGenerator()
 		rName, err := rng.Generate()
 		if err != nil {
@@ -112,6 +121,7 @@ func (r *RunWorkload) AfterApply() error {
 
 func (r RunWorkload) Validate() error {
 	var errs error
+
 	if _, err := os.Stat(r.File); os.IsNotExist(err) {
 		errs = errors.Join(errs, errors.New("workload file does not exist"))
 	}
@@ -121,17 +131,13 @@ func (r RunWorkload) Validate() error {
 	if _, err := os.Stat(r.IssuerKey); os.IsNotExist(err) {
 		errs = errors.Join(errs, errors.New("issuer key file does not exist"))
 	}
-	if !r.Devrun {
-		if r.Name == "" {
-			errs = errors.Join(errs, errors.New("workload name must be provided"))
-		}
-		if r.TargetId == "" {
-			errs = errors.Join(errs, errors.New("target-id must be specified"))
-		}
-		if r.WorkloadType == "" {
-			errs = errors.Join(errs, errors.New("workload must be specified"))
-		}
+	if r.Name == "" {
+		errs = errors.Join(errs, errors.New("workload name must be provided"))
 	}
+	if r.WorkloadType == "" {
+		errs = errors.Join(errs, errors.New("workload must be specified"))
+	}
+
 	return errs
 }
 func (r RunWorkload) Run(ctx context.Context, globals Globals, workload *Workload) error {

@@ -21,6 +21,8 @@ const (
 )
 
 var (
+	defaultConfigPath string = "."
+
 	VERSION   string = "0.0.0"
 	COMMIT    string = "development"
 	BUILDDATE string = time.Now().Format(time.RFC822)
@@ -31,7 +33,8 @@ func main() {
 	if err != nil {
 		userHomePath = "."
 	}
-	defaultConfigPath := filepath.Join(userHomePath, "nex")
+
+	defaultConfigPath = filepath.Join(userHomePath, "nex")
 	err = os.MkdirAll(defaultConfigPath, 0755)
 	if err != nil {
 		defaultConfigPath = "."

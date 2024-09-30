@@ -127,7 +127,7 @@ func (r RunWorkload) Table() []table.Row {
 		{"Host Services URL", r.HostServicesURL, reflect.TypeOf(r.HostServicesURL).String()},
 		{"Host Services JWT", r.HostServicesJWT, reflect.TypeOf(r.HostServicesJWT).String()},
 		{"Host Services Seed", r.HostServicesSeed, reflect.TypeOf(r.HostServicesSeed).String()},
-		{"Devrun", r.Devrun, reflect.TypeOf(r.Devrun).String()},
+		{"Tags", r.Tags, reflect.TypeOf(r.Tags).String()},
 	}
 }
 

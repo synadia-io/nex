@@ -41,7 +41,6 @@ func TestStartWorkload(t *testing.T) {
 
 	w := Workload{
 		Run: RunWorkload{
-			Devrun:       false,
 			Name:         "test",
 			TargetId:     "TESTNODE",
 			File:         filepath.Join(confDir, "workload"),
@@ -63,7 +62,6 @@ func TestStartWorkload(t *testing.T) {
 	if err = w.Run.Validate(); err != nil {
 		t.Fatalf("Run command failed to validate: %s", err)
 	}
-
 }
 
 func TestStopWorkload(t *testing.T) {
@@ -74,7 +72,6 @@ func TestStopWorkload(t *testing.T) {
 
 	w := Workload{
 		Stop: StopWorkload{
-			Devrun:     false,
 			WorkloadId: "somerandomid",
 			TargetId:   "TESTNODE",
 			IssuerKey:  filepath.Join(confDir, "issuer.nk"),
