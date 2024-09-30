@@ -283,7 +283,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	logger.Info("Starting Nex Node")
+	logger.Info("Starting Nex Node", slog.String("public_key", pubKey))
 	err = nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
 	if err != nil {
 		logger.Error("Failed to start Nex Node", slog.String("error", err.Error()))
