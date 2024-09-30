@@ -1,8 +1,12 @@
 package actors
 
 import (
+	"errors"
+	"log/slog"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/models"
 )
 
@@ -23,7 +27,27 @@ type NexSupervisor struct {
 func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	var spec act.SupervisorSpec
 
-	nodeOptions := args[0].(models.NodeOptions)
+	if len(args) != 2 {
+		err := errors.New("NATS connection and node options are required")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	if _, ok := args[0].(*nats.Conn); !ok {
+		err := errors.New("arg[0] must be a valid NATS connection")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	if _, ok := args[0].(models.NodeOptions); !ok {
+		err := errors.New("arg[1] must be valid node options")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	var nodeID string // FIXME-- this needs to be provided as well...
+	nc := args[0].(*nats.Conn)
+	nodeOptions := args[1].(models.NodeOptions)
 
 	// set supervisor type
 	spec.Type = act.SupervisorTypeOneForOne
@@ -41,7 +65,8 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		},
 		{
 			Name:    childActorNameControlAPI,
-			Factory: createControlAPIServer,
+			Factory: createControlAPI,
+			Args:    []any{nc, nodeID},
 		},
 		{
 			Name:    childActorNameAgentManager,

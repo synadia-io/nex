@@ -19,12 +19,11 @@ import (
 
 type Node interface {
 	Validate() error
-	Start()
+	Start() error
 }
 
 type nexNode struct {
-	nc *nats.Conn
-
+	nc      *nats.Conn
 	options *models.NodeOptions
 }
 
@@ -120,17 +119,17 @@ func (nn *nexNode) Validate() error {
 	return errs
 }
 
-func (nn *nexNode) Start() {
-	nn.initializeSupervisionTree()
+func (nn *nexNode) Start() error {
+	return nn.initializeSupervisionTree()
 }
 
-func (nn *nexNode) initializeSupervisionTree() {
+func (nn *nexNode) initializeSupervisionTree() error {
 	var options gen.NodeOptions
 
 	// create applications that must be started
 	apps := []gen.ApplicationBehavior{
-		observer.CreateApp(observer.Options{}), // TODO: opt out of this via config
-		actors.CreateNodeApp(*nn.options),      // copy options
+		observer.CreateApp(observer.Options{}),   // TODO: opt out of this via config
+		actors.CreateNodeApp(nn.nc, *nn.options), // copy options
 	}
 	options.Applications = apps
 
@@ -146,19 +145,25 @@ func (nn *nexNode) initializeSupervisionTree() {
 	node, err := ergo.StartNode(gen.Atom(nodeName), options)
 	if err != nil {
 		fmt.Printf("Unable to start node '%s': %s\n", nodeName, err)
-		return
+		return err
 	}
 
 	logger, err := node.Spawn(actors.CreateNodeLogger(nn.options.Logger), gen.ProcessOptions{})
 	if err != nil {
-		panic(err) // TODO: no panic
+		return err
 	}
 
 	// NOTE: the supervised processes won't log their startup (Init) calls because the
 	// logger won't have been in place. However, they will log stuff afterward
-	_ = node.LoggerAddPID(logger, "nexlogger")
+	err = node.LoggerAddPID(logger, "nexlogger")
+	if err != nil {
+		node.Log().Error("Failed to add logger", slog.String("error", err.Error()))
+		return err
+	}
 
 	node.Log().Info("Nex node started")
 	node.Log().Info("Observer Application started and available at http://localhost:9911")
+
 	node.Wait()
+	return nil
 }
