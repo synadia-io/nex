@@ -18,14 +18,17 @@ import (
 	"github.com/synadia-io/nex/node/actors"
 )
 
+const defaultNodeName = "nex@localhost"
+
 type Node interface {
 	Validate() error
 	Start() error
 }
 
 type nexNode struct {
-	nc  *nats.Conn
-	ctx context.Context
+	ctx  context.Context
+	nc   *nats.Conn
+	name string
 
 	options   *models.NodeOptions
 	publicKey nkeys.KeyPair
@@ -37,8 +40,10 @@ func NewNexNode(publicKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		nc:  nc,
-		ctx: context.Background(),
+		ctx:  context.Background(),
+		nc:   nc,
+		name: defaultNodeName,
+
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
@@ -132,20 +137,17 @@ func (nn *nexNode) Start() error {
 func (nn *nexNode) initializeSupervisionTree() error {
 	var options gen.NodeOptions
 
-	nodeName := "nex@localhost" // FIXME-- make configurable
-
 	nodeID, err := nn.publicKey.PublicKey()
 	if err != nil {
-		fmt.Printf("Unable to start node '%s': %s\n", nodeName, err)
+		fmt.Printf("Unable to start node '%s': %s\n", nn.name, err)
 		return err
 	}
 
 	// create applications that must be started
-	apps := []gen.ApplicationBehavior{
+	options.Applications = []gen.ApplicationBehavior{
 		observer.CreateApp(observer.Options{}),           // TODO: opt out of this via config
 		actors.CreateNodeApp(nodeID, nn.nc, *nn.options), // copy options
 	}
-	options.Applications = apps
 
 	// disable default logger to get rid of multiple logging to the os.Stdout
 	options.Log.DefaultLogger.Disable = true
@@ -154,9 +156,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	// https://docs.ergo.services/tools/observer#log-process-page
 
 	// starting node
-	node, err := ergo.StartNode(gen.Atom(nodeName), options)
+	node, err := ergo.StartNode(gen.Atom(nn.name), options)
 	if err != nil {
-		fmt.Printf("Unable to start node '%s': %s\n", nodeName, err)
+		fmt.Printf("Unable to start node '%s': %s\n", nn.name, err)
 		return err
 	}
 
