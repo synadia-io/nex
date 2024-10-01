@@ -9,7 +9,7 @@ import (
 
 type GlobalLogger struct {
 	Target         []string `default:"std" help:"Logger output targets" enum:"std,file,nats"`
-	LogLevel       string   `name:"level" default:"error" short:"l" help:"Set log level" enum:"fatal,error,warn,info,debug,trace"`
+	LogLevel       string   `name:"level" default:"info" short:"l" help:"Set log level" enum:"fatal,error,warn,info,debug,trace"`
 	LogJSON        bool     `name:"json" default:"false" help:"Enable JSON formatted logs"`
 	LogColor       bool     `name:"color" default:"true" help:"Enable colorized logs"`
 	LogShortLevels bool     `name:"short" default:"false" help:"Use abbreviated log levels; DEBUG -> DBG"`
