@@ -70,16 +70,6 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		return spec, err
 	}
 
-	if len(args) != 3 {
-		err := errors.New("node id, NATS connection and options are required")
-		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
-		return spec, err
-	}
-
-	nodeID := args[0].(string)
-	nc := args[1].(*nats.Conn)
-	nodeOptions := args[2].(models.NodeOptions)
-
 	// set supervisor type
 	spec.Type = act.SupervisorTypeOneForOne
 
@@ -87,7 +77,7 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		{
 			Name:    actorNameInternalNATSServer,
 			Factory: createInternalNatsServer,
-			Args:    []any{nodeOptions}, // TODO-- merge internal NATS server branch and then add internalNatsServerParams here
+			Args:    []any{params.options}, // TODO-- merge internal NATS server branch and then add internalNatsServerParams here
 		},
 		{
 			Name:    actorNameHostServices,
@@ -103,8 +93,8 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 			Factory: createControlAPI,
 			Args: []any{
 				controlAPIParams{
-					nc:        nc,
-					publicKey: nodeID,
+					nc:        params.nc,
+					publicKey: params.nodeID,
 				},
 			},
 		},
