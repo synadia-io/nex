@@ -1,12 +1,27 @@
 package actors
 
 import (
+	"bytes"
+	"errors"
+	"html/template"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"time"
 
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/models"
+)
+
+const (
+	defaultInternalNatsConfigFile             = "internalconf*"
+	defaultInternalNatsConnectionDrainTimeout = time.Millisecond * 5000
+	defaultInternalNatsStoreDir               = "pnats"
+	workloadCacheBucketName                   = "NEXCACHE"
 )
 
 func createInternalNatsServer() gen.ProcessBehavior {
@@ -19,7 +34,21 @@ type internalNatsServer struct {
 	haveConsumers bool
 
 	creds       []agentCredential
+	hostUser    nkeys.KeyPair
 	nodeOptions models.NodeOptions
+}
+
+type internalNatsServerParams struct {
+	nodeOptions models.NodeOptions
+}
+
+func (p *internalNatsServerParams) Validate() error {
+	var err error
+
+	// insert validations
+	// validate options much?
+
+	return err
 }
 
 type agentCredential struct {
@@ -27,20 +56,61 @@ type agentCredential struct {
 	nkey         nkeys.KeyPair
 }
 
+type configTemplateData struct {
+	Credentials       map[string]*credentials
+	Connections       map[string]*nats.Conn
+	NexHostUserPublic string
+	NexHostUserSeed   string
+}
+
+type credentials struct {
+	WorkloadType string
+	NkeySeed     string
+	NkeyPublic   string
+}
+
 func (ns *internalNatsServer) Init(args ...any) error {
 	ns.tokens = make(map[gen.Atom]gen.Ref)
 
-	ns.Log().Info("Internal NATS server started")
+	if len(args) != 1 {
+		err := errors.New("internal NATS server params are required")
+		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
+		return err
+	}
 
-	ns.nodeOptions = args[0].(models.NodeOptions)
+	if _, ok := args[0].(internalNatsServerParams); !ok {
+		err := errors.New("args[0] must be valid internal NATS server params")
+		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
+		return err
+	}
+
+	params := args[0].(internalNatsServerParams)
+	err := params.Validate()
+	if err != nil {
+		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
+		return err
+	}
+
+	ns.nodeOptions = params.nodeOptions
+
+	hostUser, err := nkeys.CreateUser()
+	if err != nil {
+		return err
+	}
+	ns.hostUser = hostUser
 
 	creds, err := ns.buildAgentCredentials()
 	if err != nil {
 		return err
 	}
-
 	ns.creds = creds
-	err = ns.startNatsServer(creds)
+
+	opts, err := ns.generateConfig()
+	if err != nil {
+		return err
+	}
+
+	err = ns.startNatsServer(opts)
 	if err != nil {
 		return err
 	}
@@ -49,6 +119,8 @@ func (ns *internalNatsServer) Init(args ...any) error {
 	if err != nil {
 		return err
 	}
+
+	ns.Log().Info("Internal NATS server started")
 
 	return nil
 }
@@ -102,8 +174,182 @@ func (ns *internalNatsServer) buildAgentCredentials() ([]agentCredential, error)
 	return creds, nil
 }
 
-func (ns *internalNatsServer) startNatsServer(creds []agentCredential) error {
+func (ns *internalNatsServer) startNatsServer(opts *server.Options) error {
 	ns.Log().Debug("Starting internal NATS server")
-	// TODO!
+
+	s, err := server.NewServer(opts)
+	if err != nil {
+		server.PrintAndDie("nats-server: " + err.Error())
+		return err
+	}
+
+	// FIXME-- read from config
+	// if debug || trace {
+	// 	s.ConfigureLogger()
+	// }
+
+	if err := server.Run(s); err != nil {
+		server.PrintAndDie("nats-server: " + err.Error())
+		return err
+	}
+
 	return nil
 }
+
+func (ns *internalNatsServer) generateConfig() (*server.Options, error) {
+	hostPub, err := ns.hostUser.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	hostSeed, err := ns.hostUser.Seed()
+	if err != nil {
+		return nil, err
+	}
+
+	data := &configTemplateData{
+		Credentials:       make(map[string]*credentials),
+		Connections:       make(map[string]*nats.Conn),
+		NexHostUserPublic: hostPub,
+		NexHostUserSeed:   string(hostSeed),
+	}
+
+	for _, cred := range ns.creds {
+		seed, err := cred.nkey.Seed()
+		if err != nil {
+			return nil, err
+		}
+
+		pubkey, err := cred.nkey.PublicKey()
+		if err != nil {
+			return nil, err
+		}
+
+		data.Credentials[cred.workloadType] = &credentials{
+			WorkloadType: cred.workloadType,
+			NkeySeed:     string(seed),
+			NkeyPublic:   pubkey,
+		}
+	}
+
+	bytes, err := ns.generateTemplate(data)
+	if err != nil {
+		ns.Log().Error("Failed to generate internal nats server config file", slog.Any("error", err))
+		return nil, err
+	}
+
+	opts := &server.Options{
+		JetStream: true,
+		StoreDir:  filepath.Join(os.TempDir(), defaultInternalNatsStoreDir), // FIXME-- use unique temp location
+		Port:      -1,
+		// Debug:     debug, FIXME-- make configurable
+		// Trace:     trace,
+	}
+
+	f, err := os.CreateTemp(os.TempDir(), defaultInternalNatsConfigFile)
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(f.Name()) // clean up
+
+	if _, err := f.Write(bytes); err != nil {
+		ns.Log().Error("Failed to write internal nats server config file", slog.Any("error", err))
+		return nil, err
+	}
+
+	err = opts.ProcessConfigFile(f.Name())
+	if err != nil {
+		ns.Log().Error("Failed to process configuration file", slog.Any("error", err))
+		return nil, err
+	}
+
+	return opts, nil
+}
+
+func (ns *internalNatsServer) generateTemplate(config *configTemplateData) ([]byte, error) {
+	var wr bytes.Buffer
+
+	t := template.Must(template.New("natsconfig").Parse(configTemplate))
+	err := t.Execute(&wr, config)
+	if err != nil {
+		return nil, err
+	}
+
+	// -8 is equivalent to TRACE-ish level
+	// FIXME... .Log() does not exist
+	// ns.Log().Log(context.Background(), -8, "generated NATS config", ns.Log().String("config", wr.String()))
+	return wr.Bytes(), nil
+}
+
+// func getPort(clientUrl string) int {
+// 	u, err := url.Parse(clientUrl)
+// 	if err != nil {
+// 		return -1
+// 	}
+// 	res, err := strconv.Atoi(u.Port())
+// 	if err != nil {
+// 		return -1
+// 	}
+// 	return res
+// }
+
+/*
+ * In the below template, the nexhost (the account used by the host) will
+ * be able to import the following:
+ * *.agentevt.> - agent events streamed from workloads
+ * hostint.> - where the first token after agentint is the account ID from the workload
+ */
+
+const (
+	configTemplate = `
+jetstream: true
+accounts: {
+	nexhost: {
+		jetstream: true
+		users: [
+			{nkey: "{{ .NexHostUserPublic }}"}
+		]
+		exports: [
+			{
+				service: hostint.>
+			}
+		],
+		imports: [
+			{{ range .Credentials }}
+			{
+				service: {subject: "agentint.{{ .WorkloadType }}.>", account: "{{ .WorkloadType }}"}
+			},
+			{
+				stream: {subject: agentevt.>, account: "{{ .WorkloadType }}"}, prefix: "{{ .WorkloadType }}"
+			},
+			{{ end }}
+		]
+	},
+	{{ range .Credentials }}
+	"{{ .WorkloadType }}": {
+		jetstream: true
+		users: [
+			{nkey: "{{ .NkeyPublic }}"}
+		]
+		exports: [
+			{
+				service: "agentint.{{ .WorkloadType }}.>", accounts: [nexhost]
+			}
+			{
+				stream: agentevt.>, accounts: [nexhost]
+			}
+		]
+		imports: [
+			{
+				service: {account: nexhost, subject: "hostint.{{ .WorkloadType }}.>"}, to: "hostint.>"
+			}
+		]
+
+	},
+	{{ end }}
+}
+no_sys_acc: true
+debug: true
+trace: false
+`
+)
