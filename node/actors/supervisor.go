@@ -25,30 +25,53 @@ type NexSupervisor struct {
 	act.Supervisor
 }
 
+type nexSupervisorParams struct {
+	nc      *nats.Conn
+	nodeID  string
+	options models.NodeOptions
+}
+
+func (p *nexSupervisorParams) Validate() error {
+	var err error
+
+	if p.nc == nil {
+		err = errors.Join(err, errors.New("valid NATS connection is required"))
+	}
+
+	if p.nodeID == "" {
+		err = errors.Join(err, errors.New("node id is required"))
+	}
+
+	// validate options much?
+
+	return err
+}
+
 // Init invoked on a spawn Supervisor process. This is a mandatory callback for the implementation
 func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	var spec act.SupervisorSpec
 
+	if len(args) != 1 {
+		err := errors.New("nex supervisor params are required")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	if _, ok := args[0].(nexSupervisorParams); !ok {
+		err := errors.New("args[0] must be valid nex supervisor params")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	params := args[0].(nexSupervisorParams)
+	err := params.Validate()
+	if err != nil {
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
 	if len(args) != 3 {
 		err := errors.New("node id, NATS connection and options are required")
-		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
-		return spec, err
-	}
-
-	if _, ok := args[0].(string); !ok {
-		err := errors.New("args[0] must be a valid node id")
-		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
-		return spec, err
-	}
-
-	if _, ok := args[1].(*nats.Conn); !ok {
-		err := errors.New("args[1] must be a valid NATS connection")
-		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
-		return spec, err
-	}
-
-	if _, ok := args[2].(models.NodeOptions); !ok {
-		err := errors.New("args[2] must be valid node options")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
@@ -64,22 +87,35 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		{
 			Name:    actorNameInternalNATSServer,
 			Factory: createInternalNatsServer,
-			Args:    []any{nodeOptions},
+			Args:    []any{nodeOptions}, // TODO-- merge internal NATS server branch and then add internalNatsServerParams here
 		},
 		{
 			Name:    actorNameHostServices,
 			Factory: createHostServices,
-			Args:    []any{nodeOptions.HostServiceOptions},
+			Args: []any{
+				hostServicesServerParams{
+					options: params.options.HostServiceOptions,
+				},
+			},
 		},
 		{
 			Name:    actorNameControlAPI,
 			Factory: createControlAPI,
-			Args:    []any{nc, nodeID},
+			Args: []any{
+				controlAPIParams{
+					nc:        nc,
+					publicKey: nodeID,
+				},
+			},
 		},
 		{
 			Name:    actorNameAgentManager,
 			Factory: createAgentManager,
-			Args:    []any{nodeOptions},
+			Args: []any{
+				agentManagerParams{
+					options: params.options,
+				},
+			},
 		},
 	}
 
