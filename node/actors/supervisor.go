@@ -27,7 +27,11 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		{
 			Name:    "internal_nats_server",
 			Factory: createInternalNatsServer,
-			Args:    []any{nodeOptions},
+			Args: []any{
+				internalNatsServerParams{
+					nodeOptions: params.options,
+				},
+			},
 		},
 		{
 			Name:    "host_services",
