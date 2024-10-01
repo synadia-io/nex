@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"os/signal"
 	"slices"
+	"syscall"
 
 	"ergo.services/application/observer"
 	"ergo.services/ergo"
@@ -176,8 +178,33 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	node.Log().Info("Nex node started")
-	node.Log().Info("Observer Application started and available at http://localhost:9911")
+	node.Log().Info("Observer Application started", slog.String("server", "http://localhost:9911"))
 
+	nn.installSignalHandlers(node)
 	node.Wait()
+
 	return nil
+}
+
+func (nn *nexNode) installSignalHandlers(node gen.Node) {
+	go func() {
+		nn.options.Logger.Info("Installing signal handlers")
+
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+
+		for {
+			sig := <-sigs
+			if sig == nil {
+				signal.Reset()
+				return
+			}
+
+			signal.Reset()
+
+			nn.options.Logger.Info("Stopping node")
+			node.Stop()
+			return
+		}
+	}()
 }
