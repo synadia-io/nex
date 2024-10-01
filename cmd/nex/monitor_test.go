@@ -99,7 +99,7 @@ func TestLogSubject(t *testing.T) {
 	os.Stdout = origStdout
 	cancel()
 
-	if stdout.String() != "$NEX.logs.a.b -> derp\n" {
+	if stdout.String() != "$NEX.logs.a.b [1.0s] -> derp\n" {
 		t.Errorf("unexpected output: '%s'", stdout.String())
 	}
 }

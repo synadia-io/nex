@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/models"
@@ -47,8 +48,9 @@ func (e *Events) Run(ctx context.Context, globals Globals) error {
 		return err
 	}
 
+	startTime := time.Now()
 	sub, err := nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		fmt.Printf("%s -> %s\n", msg.Subject, msg.Data)
+		fmt.Printf("%s [%.1fs] -> %s\n", msg.Subject, time.Since(startTime).Seconds(), msg.Data)
 	})
 	if err != nil {
 		return err
@@ -90,8 +92,9 @@ func (l *Logs) Run(ctx context.Context, globals Globals) error {
 		return err
 	}
 
+	startTime := time.Now()
 	sub, err := nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		fmt.Printf("%s -> %s\n", msg.Subject, msg.Data)
+		fmt.Printf("%s [%.1fs] -> %s\n", msg.Subject, time.Since(startTime).Seconds(), msg.Data)
 	})
 	if err != nil {
 		return err
