@@ -1,6 +1,8 @@
 package actors
 
 import (
+	"log/slog"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
 	"github.com/synadia-io/nex/models"
@@ -42,7 +44,7 @@ func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
 		if _, err := mgr.MonitorEvent(InternalNatsServerReady); err != nil {
 			return err
 		}
-		mgr.Log().Info("successfully subscribed to: %s", InternalNatsServerReady)
+		mgr.Log().Info("successfully subscribed to internal nats server", slog.Any("event_name", InternalNatsServerReady))
 	}
 	return nil
 }
