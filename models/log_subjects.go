@@ -3,10 +3,10 @@ package models
 import "fmt"
 
 const (
-	// $NEX.logs."AppID"."stdout|stderr"
+	// $NEX.logs."WorkloadID"."stdout|stderr"
 	LOGS_SUBJECT NexSubject = "$NEX.logs.%s.%s"
 
-	// $NEX.events."AppID"."EventType"
+	// $NEX.events."WorkloadID"."EventType"
 	EVENTS_SUBJECT NexSubject = "$NEX.events.%s.%s"
 )
 
