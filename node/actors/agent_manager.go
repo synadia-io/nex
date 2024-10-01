@@ -44,7 +44,7 @@ func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
 		if _, err := mgr.MonitorEvent(InternalNatsServerReady); err != nil {
 			return err
 		}
-		mgr.Log().Info("successfully subscribed to internal nats server", slog.Any("status", InternalNatsServerReady))
+		mgr.Log().Info("successfully subscribed to internal nats server", slog.Any("event_name", InternalNatsServerReady))
 	}
 	return nil
 }
