@@ -100,3 +100,17 @@ func (i Info) Table() []table.Row {
 		{"JSON Output", i.JSON, reflect.TypeOf(i.JSON).String()},
 	}
 }
+
+func (l Logs) Table() []table.Row {
+	return []table.Row{
+		{"Workload ID", l.WorkloadID, reflect.TypeOf(l.WorkloadID).String()},
+		{"Level", l.Level, reflect.TypeOf(l.Level).String()},
+	}
+}
+
+func (e Events) Table() []table.Row {
+	return []table.Row{
+		{"Workload ID", e.WorkloadID, reflect.TypeOf(e.WorkloadID).String()},
+		{"Event Type", e.EventType, reflect.TypeOf(e.EventType).String()},
+	}
+}
