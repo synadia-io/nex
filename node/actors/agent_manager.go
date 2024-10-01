@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"errors"
 	"log/slog"
 
 	"ergo.services/ergo/act"
@@ -21,9 +22,44 @@ type agentManager struct {
 	nodeOptions models.NodeOptions
 }
 
+type agentManagerParams struct {
+	options models.NodeOptions
+}
+
+func (p *agentManagerParams) Validate() error {
+	var err error
+
+	// insert validations
+	// validate options much?
+
+	return err
+}
+
 func (mgr *agentManager) Init(args ...any) error {
-	mgr.nodeOptions = args[0].(models.NodeOptions)
-	_ = mgr.Send(mgr.PID(), PostInit)
+	if len(args) != 1 {
+		err := errors.New("agent manager params are required")
+		mgr.Log().Error("Failed to start agent manager", slog.String("error", err.Error()))
+		return err
+	}
+
+	if _, ok := args[0].(agentManagerParams); !ok {
+		err := errors.New("args[0] must be valid agent manager params")
+		mgr.Log().Error("Failed to start agent manager", slog.String("error", err.Error()))
+		return err
+	}
+
+	params := args[0].(agentManagerParams)
+	err := params.Validate()
+	if err != nil {
+		mgr.Log().Error("Failed to start agent manager", slog.String("error", err.Error()))
+		return err
+	}
+
+	err = mgr.Send(mgr.PID(), PostInit)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
