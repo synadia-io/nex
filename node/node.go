@@ -199,7 +199,7 @@ func (nn *nexNode) installSignalHandlers(node gen.Node) {
 
 			nn.options.Logger.Info("Stopping node")
 			node.Stop()
-			return
+			break
 		}
 	}()
 }
