@@ -55,6 +55,8 @@ func (mgr *agentManager) Init(args ...any) error {
 		return err
 	}
 
+	mgr.nodeOptions = params.options
+
 	err = mgr.Send(mgr.PID(), PostInit)
 	if err != nil {
 		return err
