@@ -38,7 +38,13 @@ func (app *NodeApp) Load(node gen.Node, args ...any) (gen.ApplicationSpec, error
 			{
 				Name:    nexSupervisorName,
 				Factory: createNexSupervisor,
-				Args:    []any{app.nodeID, app.nc, app.opts},
+				Args: []any{
+					nexSupervisorParams{
+						nc:      app.nc,
+						nodeID:  app.nodeID,
+						options: app.opts,
+					},
+				},
 			},
 		},
 	}, nil
