@@ -19,7 +19,7 @@ import (
 	"github.com/synadia-io/nex/node/actors"
 )
 
-const defaultNodeName = "nex@localhost"
+const ergoNodeName = "nex@localhost"
 
 type Node interface {
 	Validate() error
@@ -27,7 +27,6 @@ type Node interface {
 }
 
 type nexNode struct {
-	name      string
 	nc        *nats.Conn
 	options   *models.NodeOptions
 	publicKey nkeys.KeyPair
@@ -39,8 +38,7 @@ func NewNexNode(publicKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		name: defaultNodeName,
-		nc:   nc,
+		nc: nc,
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
@@ -136,7 +134,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	nodeID, err := nn.publicKey.PublicKey()
 	if err != nil {
-		fmt.Printf("Unable to start node '%s': %s\n", nn.name, err)
+		fmt.Printf("Unable to start node; %s\n", err)
 		return err
 	}
 
@@ -153,9 +151,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	// https://docs.ergo.services/tools/observer#log-process-page
 
 	// starting node
-	node, err := ergo.StartNode(gen.Atom(nn.name), options)
+	node, err := ergo.StartNode(gen.Atom(ergoNodeName), options)
 	if err != nil {
-		fmt.Printf("Unable to start node '%s': %s\n", nn.name, err)
+		fmt.Printf("Unable to start node; %s\n", err)
 		return err
 	}
 
