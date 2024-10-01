@@ -86,7 +86,7 @@ func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
 }
 
 func (mgr *agentManager) HandleEvent(event gen.MessageEvent) error {
-	mgr.Log().Info("received event", slog.Any("event", event.Event))
+	mgr.Log().Info("received event", slog.String("event_name", string(event.Event.Name)))
 
 	switch event.Event.Name {
 	case InternalNatsServerReadyName:
