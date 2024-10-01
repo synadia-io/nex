@@ -38,6 +38,19 @@ type internalNatsServer struct {
 	nodeOptions models.NodeOptions
 }
 
+type internalNatsServerParams struct {
+	nodeOptions models.NodeOptions
+}
+
+func (p *internalNatsServerParams) Validate() error {
+	var err error
+
+	// insert validations
+	// validate options much?
+
+	return err
+}
+
 type agentCredential struct {
 	workloadType string
 	nkey         nkeys.KeyPair
@@ -60,18 +73,25 @@ func (ns *internalNatsServer) Init(args ...any) error {
 	ns.tokens = make(map[gen.Atom]gen.Ref)
 
 	if len(args) != 1 {
-		err := errors.New("node options are required")
+		err := errors.New("internal NATS server params are required")
 		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
 		return err
 	}
 
-	if _, ok := args[0].(models.NodeOptions); !ok {
-		err := errors.New("args[0] must be valid node options")
+	if _, ok := args[0].(internalNatsServerParams); !ok {
+		err := errors.New("args[0] must be valid internal NATS server params")
 		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
 		return err
 	}
 
-	ns.nodeOptions = args[0].(models.NodeOptions)
+	params := args[0].(internalNatsServerParams)
+	err := params.Validate()
+	if err != nil {
+		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
+		return err
+	}
+
+	ns.nodeOptions = params.nodeOptions
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {

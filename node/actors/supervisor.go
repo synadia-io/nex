@@ -77,7 +77,11 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		{
 			Name:    actorNameInternalNATSServer,
 			Factory: createInternalNatsServer,
-			Args:    []any{params.options}, // TODO-- merge internal NATS server branch and then add internalNatsServerParams here
+			Args: []any{
+				internalNatsServerParams{
+					nodeOptions: params.options,
+				},
+			},
 		},
 		{
 			Name:    actorNameHostServices,
