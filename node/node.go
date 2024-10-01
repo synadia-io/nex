@@ -188,18 +188,15 @@ func (nn *nexNode) installSignalHandlers(node gen.Node) {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
 
-		for {
-			sig := <-sigs
-			if sig == nil {
-				signal.Reset()
-				return
-			}
-
+		sig := <-sigs
+		if sig == nil {
 			signal.Reset()
-
-			nn.options.Logger.Info("Stopping node")
-			node.Stop()
-			break
+			return
 		}
+
+		signal.Reset()
+
+		nn.options.Logger.Info("Stopping node")
+		node.Stop()
 	}()
 }
