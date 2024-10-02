@@ -7,7 +7,7 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-func configureNatsConnection(cfg Globals) (*nats.Conn, error) {
+func configureNatsConnection(cfg *Globals) (*nats.Conn, error) {
 	if cfg.Check {
 		return nil, nil
 	}

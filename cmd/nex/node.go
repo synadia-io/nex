@@ -33,6 +33,10 @@ type Preflight struct {
 	GithubPAT      string `optional:"" help:"GitHub Personal Access Token. Can be provided if rate limits are hit pulling data from Github" placeholder:"ghp_abc123..."`
 }
 
+func (Preflight) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
 func (p Preflight) Validate() error {
 	var errs error
 	if p.InstallVersion != "" {
@@ -82,11 +86,10 @@ func (p Preflight) Validate() error {
 	return errs
 }
 
-func (p Preflight) Run(ctx context.Context, globals Globals) error {
+func (p Preflight) Run(ctx context.Context, globals *Globals) error {
 	if globals.Check {
 		return printTable("Node Preflight Configuration", append(globals.Table(), p.Table()...)...)
 	}
-	fmt.Println("run preflight")
 	return nil
 }
 
@@ -94,6 +97,10 @@ func (p Preflight) Run(ctx context.Context, globals Globals) error {
 type LameDuck struct {
 	NodeID string            `optional:"" help:"Node ID to command into lame duck mode" placeholder:"NBTAFHAKW..."`
 	Label  map[string]string `optional:"" help:"Put all nodes with label in lameduck.  Only 1 label allowed" placeholder:"nex.nexus=mynexus"`
+}
+
+func (LameDuck) AfterApply(globals *Globals) error {
+	return checkVer(globals)
 }
 
 func (l LameDuck) Validate() error {
@@ -119,7 +126,7 @@ func (l LameDuck) Validate() error {
 	return nil
 }
 
-func (l LameDuck) Run(ctx context.Context, globals Globals) error {
+func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 	if globals.Check {
 		return printTable("Node Lameduck Configuration", append(globals.Table(), l.Table()...)...)
 	}
@@ -133,11 +140,15 @@ type List struct {
 	JSON   bool              `optional:"" help:"Output in JSON format"`
 }
 
+func (List) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
 func (l List) Validate() error {
 	return nil
 }
 
-func (l List) Run(ctx context.Context, globals Globals) error {
+func (l List) Run(ctx context.Context, globals *Globals) error {
 	if globals.Check {
 		return printTable("Node List Configuration", append(globals.Table(), l.Table()...)...)
 	}
@@ -151,6 +162,10 @@ type Info struct {
 	JSON   bool   `optional:"" help:"Output in JSON format"`
 }
 
+func (Info) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
 func (i Info) Validate() error {
 	var errs error
 	if !nkeys.IsValidPublicServerKey(i.NodeID) {
@@ -159,7 +174,7 @@ func (i Info) Validate() error {
 	return errs
 }
 
-func (i Info) Run(ctx context.Context, globals Globals) error {
+func (i Info) Run(ctx context.Context, globals *Globals) error {
 	if globals.Check {
 		return printTable("Node Info Configuration", append(globals.Table(), i.Table()...)...)
 	}
@@ -180,6 +195,10 @@ type Up struct {
 	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
 }
 
+func (u *Up) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
 func (u Up) Validate() error {
 	var errs error
 	if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
@@ -188,7 +207,7 @@ func (u Up) Validate() error {
 	return errs
 }
 
-func (u Up) Run(ctx context.Context, globals Globals, n *Node) error {
+func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 	if globals.Check {
 		return printTable("Node Up Configuration", append(globals.Table(), u.Table()...)...)
 	}

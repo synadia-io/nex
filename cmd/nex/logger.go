@@ -12,7 +12,7 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-func configureLogger(cfg Globals, nc *nats.Conn, serverPublicKey string) *slog.Logger {
+func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string) *slog.Logger {
 	var handlerOpts []shandler.HandlerOption
 
 	switch cfg.LogLevel {

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,9 +10,12 @@ import (
 )
 
 func TestCLISimple(t *testing.T) {
-	nex := new(NexCLI)
+	nex := NexCLI{}
 
-	parser := kong.Must(nex, kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}))
+	parser := kong.Must(&nex,
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Bind(&nex.Globals),
+	)
 	kp, err := nkeys.CreatePair(nkeys.PrefixByteServer)
 	if err != nil {
 		t.Fatal(err)
@@ -63,17 +64,18 @@ func TestCLIWithConfig(t *testing.T) {
 	f.WriteString(config)
 	defer f.Close()
 
-	nex := new(NexCLI)
-	parser := kong.Must(nex, kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}), kong.Configuration(kong.JSON, f.Name()))
+	nex := NexCLI{}
+	parser := kong.Must(&nex,
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Configuration(kong.JSON, f.Name()),
+		kong.Bind(&nex.Globals),
+	)
 	parser.LoadConfig(f.Name())
 
 	_, err = parser.Parse([]string{"node", "up", "--config", f.Name()})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	jsonData, _ := json.MarshalIndent(nex, "", "  ")
-	fmt.Println(string(jsonData))
 
 	if string(nex.Globals.Config) != f.Name() {
 		t.Fatal("Expected config to be loaded")
