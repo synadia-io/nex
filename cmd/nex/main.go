@@ -45,10 +45,9 @@ func main() {
 			"versionOnly":         VERSION,
 			"defaultResourcePath": userResourcePath,
 		},
+		kong.BindTo(context.Background(), (*context.Context)(nil)),
+		kong.Bind(&nex.Globals),
 	)
-
-	ctx.BindTo(context.Background(), (*context.Context)(nil))
-	ctx.BindTo(nex.Globals, (*Globals)(nil))
 
 	err = ctx.Run()
 	ctx.FatalIfErrorf(err)
