@@ -7,19 +7,9 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-type Globals struct {
-	GlobalLogger `prefix:"logger." group:"Logger Configuration"`
-	GlobalNats   `prefix:"nats." group:"NATS Configuration"`
-
-	Config    kong.ConfigFlag  `help:"Configuration file to load" placeholder:"./nex.config.json"`
-	Version   kong.VersionFlag `help:"Print version information"`
-	Namespace string           `env:"NEX_NAMESPACE" placeholder:"default" help:"Specifies namespace when running nex commands"`
-	Check     bool             `help:"Print the current configuration"`
-}
-
 type GlobalLogger struct {
 	Target         []string `default:"std" help:"Logger output targets" enum:"std,file,nats"`
-	LogLevel       string   `name:"level" default:"error" short:"l" help:"Set log level" enum:"fatal,error,warn,info,debug,trace"`
+	LogLevel       string   `name:"level" default:"info" short:"l" help:"Set log level" enum:"fatal,error,warn,info,debug,trace"`
 	LogJSON        bool     `name:"json" default:"false" help:"Enable JSON formatted logs"`
 	LogColor       bool     `name:"color" default:"true" help:"Enable colorized logs"`
 	LogShortLevels bool     `name:"short" default:"false" help:"Use abbreviated log levels; DEBUG -> DBG"`
@@ -42,16 +32,6 @@ type GlobalNats struct {
 	NatsTLSKey          string        `name:"tlskey" help:"Path to the NATS TLS key" type:"existingfile" placeholder:"/etc/nex/tls.key"`
 	NatsTLSCA           string        `name:"tlsca" help:"Path to the NATS TLS root CA" type:"existingfile" placeholder:"/etc/nex/ca.crt"`
 	NatsTLSFirst        bool          `name:"tlsfirst" help:"Enable TLS first" default:"false"`
-}
-
-type NexCLI struct {
-	Globals Globals `embed:""`
-
-	Node     Node     `cmd:"" help:"Interact with execution engine nodes"`
-	Workload Workload `cmd:"" help:"Interact with workloads"`
-	Monitor  Monitor  `cmd:"" help:"Live monitor workload log emissions"`
-	RootFS   RootFS   `cmd:"" name:"rootfs" help:"Build custom rootfs" alias:"fs"`
-	Upgrade  Upgrade  `cmd:"" help:"Upgrade the NEX CLI to the latest version"`
 }
 
 func (g Globals) Run(ctx *kong.Context) error {
