@@ -8,10 +8,9 @@ type Globals struct {
 	GlobalLogger `prefix:"logger." group:"Logger Configuration"`
 	GlobalNats   `prefix:"nats." group:"NATS Configuration"`
 
-	Config    kong.ConfigFlag  `help:"Configuration file to load" placeholder:"./nex.config.json"`
-	Version   kong.VersionFlag `help:"Print version information"`
-	Namespace string           `env:"NEX_NAMESPACE" placeholder:"default" help:"Specifies namespace when running nex commands"`
-	Check     bool             `help:"Print the current values of all options without running a command"`
+	Config  kong.ConfigFlag  `help:"Configuration file to load" placeholder:"./nex.config.json"`
+	Version kong.VersionFlag `help:"Print version information"`
+	Check   bool             `help:"Print the current values of all options without running a command"`
 }
 
 type NexCLI struct {

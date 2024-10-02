@@ -13,9 +13,10 @@ func TestCLISimple(t *testing.T) {
 	nex := NexCLI{}
 
 	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultConfigPath": t.TempDir(), "defaultResourcePath": "."}),
 		kong.Bind(&nex.Globals),
 	)
+
 	kp, err := nkeys.CreatePair(nkeys.PrefixByteServer)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +67,7 @@ func TestCLIWithConfig(t *testing.T) {
 
 	nex := NexCLI{}
 	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultConfigPath": t.TempDir(), "defaultResourcePath": "."}),
 		kong.Configuration(kong.JSON, f.Name()),
 		kong.Bind(&nex.Globals),
 	)
@@ -79,10 +80,6 @@ func TestCLIWithConfig(t *testing.T) {
 
 	if string(nex.Globals.Config) != f.Name() {
 		t.Fatal("Expected config to be loaded")
-	}
-
-	if nex.Globals.Namespace != "derp" {
-		t.Fatalf("Expected nats servers to be %v, got %v", "derp", nex.Globals.Namespace)
 	}
 
 	if len(nex.Node.Up.WorkloadTypes) != 2 {
