@@ -13,7 +13,7 @@ func TestCLISimple(t *testing.T) {
 	nex := NexCLI{}
 
 	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing","defaultConfigPath": t.TempDir(), "defaultResourcePath": "."}),
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultConfigPath": t.TempDir(), "defaultResourcePath": "."}),
 		kong.Bind(&nex.Globals),
 	)
 
@@ -65,17 +65,12 @@ func TestCLIWithConfig(t *testing.T) {
 	f.WriteString(config)
 	defer f.Close()
 
-<<<<<<< HEAD
 	nex := NexCLI{}
 	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultConfigPath": t.TempDir(), "defaultResourcePath": "."}),
 		kong.Configuration(kong.JSON, f.Name()),
 		kong.Bind(&nex.Globals),
 	)
-=======
-	nex := new(NexCLI)
-	parser := kong.Must(nex, kong.Vars(map[string]string{"versionOnly": "testing", "defaultConfigPath": t.TempDir(), "defaultResourcePath": "."}), kong.Configuration(kong.JSON, f.Name()))
->>>>>>> 4ca7457 (missing vars)
 	parser.LoadConfig(f.Name())
 
 	_, err = parser.Parse([]string{"node", "up", "--config", f.Name()})

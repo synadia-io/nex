@@ -7,15 +7,6 @@ import (
 	"github.com/alecthomas/kong"
 )
 
-type Globals struct {
-	GlobalLogger `prefix:"logger." group:"Logger Configuration"`
-	GlobalNats   `prefix:"nats." group:"NATS Configuration"`
-
-	Config  kong.ConfigFlag  `help:"Configuration file to load" placeholder:"./nex.config.json"`
-	Version kong.VersionFlag `help:"Print version information"`
-	Check   bool             `help:"Print the current configuration"`
-}
-
 type GlobalLogger struct {
 	Target         []string `default:"std" help:"Logger output targets" enum:"std,file,nats"`
 	LogLevel       string   `name:"level" default:"info" short:"l" help:"Set log level" enum:"fatal,error,warn,info,debug,trace"`
