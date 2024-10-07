@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -168,8 +169,16 @@ func (c *ControlAPIClient) GetInfo(nodeId string) (*models.InfoResponse, error) 
 	return resp, nil
 }
 
-func (c *ControlAPIClient) SetLameDuck(nodeId string) (*models.LameduckResponse, error) {
-	req := models.LameduckRequest{}
+func (c *ControlAPIClient) SetLameDuck(nodeId string, tag map[string]string) (*models.LameduckResponse, error) {
+	if nodeId == "" && len(tag) != 1 {
+		return nil, errors.New("invalid inputs to lameduck request")
+	}
+
+	req := models.LameduckRequest{
+		NodeId: nodeId,
+		Tag:    tag,
+	}
+
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err

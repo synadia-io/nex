@@ -11,6 +11,7 @@ import (
 
 	"github.com/nats-io/nkeys"
 
+	control "github.com/synadia-io/nex/api"
 	options "github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node"
 )
@@ -113,16 +114,6 @@ func (l LameDuck) Validate() error {
 	if len(l.Label) > 1 {
 		return errors.New("only one label allowed")
 	}
-
-	switch {
-	case l.NodeID != "":
-		fmt.Println("Putting node in lameduck")
-	case len(l.Label) == 1:
-		fmt.Println("Putting all nodes with label in lameduck")
-	default:
-		return errors.New("used must provide valid Node ID or one label")
-	}
-
 	return nil
 }
 
@@ -130,7 +121,27 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 	if globals.Check {
 		return printTable("Node Lameduck Configuration", append(globals.Table(), l.Table()...)...)
 	}
-	fmt.Println("run lameduck")
+
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	controller, err := control.NewControlApiClient(nc)
+	if err != nil {
+		return err
+	}
+
+	resp, err := controller.SetLameDuck(l.NodeID, l.Label)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("failed to put node in lameduck mode: %s", resp.Msg)
+	}
+
+	fmt.Printf("Node %s is now in lameduck mode. Workloads will begin stopping gracefully.\n", l.NodeID)
 	return nil
 }
 
