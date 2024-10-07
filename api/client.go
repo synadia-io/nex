@@ -1,9 +1,11 @@
 package api
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
 )
 
@@ -21,79 +23,167 @@ func NewControlApiClient(nc *nats.Conn) (*ControlAPIClient, error) {
 	}, nil
 }
 
-func (c *ControlAPIClient) Auction(tags []string) (string, error) {
-	auctionPayload := []byte{}
-	msg, err := c.nc.Request(actors.AuctionSubject(), auctionPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) Auction(tags []string) (*models.AuctionResponse, error) {
+	req := models.AuctionRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(msg.Data), nil
+
+	msg, err := c.nc.Request(actors.AuctionSubject(), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := new(models.AuctionResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
-func (c *ControlAPIClient) Ping() error {
-	pingPayload := []byte{}
-	_, err := c.nc.Request(actors.PingSubject(), pingPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) Ping() (*models.PingResponse, error) {
+	req := models.PingRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+
+	msg, err := c.nc.Request(actors.PingSubject(), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+	resp := new(models.PingResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
-func (c *ControlAPIClient) FindWorkload() (string, error) {
-	workloadPingPayload := []byte{}
-	msg, err := c.nc.Request(actors.WorkloadPingSubject(), workloadPingPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) FindWorkload() (*models.FindWorkloadResponse, error) {
+	req := models.FindWorkloadRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(msg.Data), nil
+
+	msg, err := c.nc.Request(actors.WorkloadPingSubject(), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := new(models.FindWorkloadResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
-func (c *ControlAPIClient) DirectPing(nodeId string) error {
-	directPingPayload := []byte{}
-	_, err := c.nc.Request(actors.DirectPingSubject(nodeId), directPingPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) DirectPing(nodeId string) (*models.PingResponse, error) {
+	req := models.PingRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	msg, err := c.nc.Request(actors.DirectPingSubject(nodeId), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+	resp := new(models.PingResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
-func (c *ControlAPIClient) DeployWorkload(nodeId string) error {
-	deployPayload := []byte{}
-	_, err := c.nc.Request(actors.DeploySubject(nodeId), deployPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) DeployWorkload(nodeId string) (*models.DeployResponse, error) {
+	req := models.DeployRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	msg, err := c.nc.Request(actors.DeploySubject(nodeId), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := new(models.DeployResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
-func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string) error {
-	unDeployPayload := []byte(workloadId)
-	_, err := c.nc.Request(actors.UndeploySubject(nodeId), unDeployPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string) (*models.UndeployResponse, error) {
+	req := models.UndeployRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	msg, err := c.nc.Request(actors.UndeploySubject(nodeId), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := new(models.UndeployResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
-func (c *ControlAPIClient) GetInfo(nodeId string) (string, error) {
-	infoPayload := []byte{}
-	msg, err := c.nc.Request(actors.InfoSubject(nodeId), infoPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) GetInfo(nodeId string) (*models.InfoResponse, error) {
+	req := models.InfoRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return string(msg.Data), nil
+	msg, err := c.nc.Request(actors.InfoSubject(nodeId), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := new(models.InfoResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
-func (c *ControlAPIClient) SetLameDuck(nodeId string) error {
-	lameDuckPayload := []byte{}
-	_, err := c.nc.Request(actors.LameduckSubject(nodeId), lameDuckPayload, DefaultRequestTimeout)
+func (c *ControlAPIClient) SetLameDuck(nodeId string) (*models.LameduckResponse, error) {
+	req := models.LameduckRequest{}
+	req_b, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	msg, err := c.nc.Request(actors.LameduckSubject(nodeId), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	resp := new(models.LameduckResponse)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
