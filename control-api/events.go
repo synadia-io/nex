@@ -35,9 +35,10 @@ type AgentStoppedEvent struct {
 }
 
 type NodeStartedEvent struct {
-	Version string            `json:"version"`
-	ID      string            `json:"id"`
-	Tags    map[string]string `json:"tags,omitempty"`
+	Version    string            `json:"version"`
+	ID         string            `json:"id"`
+	Tags       map[string]string `json:"tags,omitempty"`
+	PublicXKey string            `json:"public_xkey,omitempty"`
 }
 
 type LameDuckEnteredEvent struct {
@@ -57,5 +58,6 @@ type HeartbeatEvent struct {
 	RunningMachines         int               `json:"running_machines"`
 	Tags                    map[string]string `json:"tags,omitempty"`
 	Uptime                  string            `json:"uptime"`
+	PublicXKey              string            `json:"public_xkey,omitempty"`
 	Version                 string            `json:"version"`
 }

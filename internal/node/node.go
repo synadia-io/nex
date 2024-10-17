@@ -592,6 +592,7 @@ func (n *Node) publishHeartbeat() error {
 		AllowDuplicateWorkloads: n.config.AllowDuplicateWorkloads,
 		Nexus:                   n.nexus,
 		NodeID:                  n.publicKey,
+		PublicXKey:              n.api.PublicXKey(),
 		RunningMachines:         len(machines),
 		Tags:                    n.config.Tags,
 		Uptime:                  myUptime(now.Sub(n.startedAt)),
@@ -611,9 +612,10 @@ func (n *Node) publishHeartbeat() error {
 
 func (n *Node) publishNodeStarted() error {
 	nodeStart := controlapi.NodeStartedEvent{
-		Version: VERSION,
-		ID:      n.publicKey,
-		Tags:    n.config.Tags,
+		Version:    VERSION,
+		ID:         n.publicKey,
+		Tags:       n.config.Tags,
+		PublicXKey: n.api.PublicXKey(),
 	}
 
 	cloudevent := cloudevents.NewEvent()
