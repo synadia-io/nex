@@ -1,6 +1,7 @@
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -23,7 +24,8 @@ type Node interface {
 }
 
 type nexNode struct {
-	nc *nats.Conn
+	nc  *nats.Conn
+	ctx context.Context
 
 	options *models.NodeOptions
 }
@@ -34,7 +36,8 @@ func NewNexNode(nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
 	}
 
 	nn := &nexNode{
-		nc: nc,
+		nc:  nc,
+		ctx: context.Background(),
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
@@ -149,7 +152,7 @@ func (nn *nexNode) initializeSupervisionTree() {
 		return
 	}
 
-	logger, err := node.Spawn(actors.CreateNodeLogger(nn.options.Logger), gen.ProcessOptions{})
+	logger, err := node.Spawn(actors.CreateNodeLogger(nn.ctx, nn.options.Logger), gen.ProcessOptions{})
 	if err != nil {
 		panic(err) // TODO: no panic
 	}
