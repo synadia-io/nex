@@ -2,30 +2,49 @@ package actors
 
 import (
 	"ergo.services/ergo/gen"
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/models"
+)
+
+const (
+	nexApplicationName        = "nex"
+	nexApplicationDescription = "Nex Node - A NATS Execution Engine"
+	nexSupervisorName         = "nexsup"
 )
 
 // NOTE: intentionally forcing a copy here so these options aren't mutable
 // by the node
-func CreateNodeApp(opts models.NodeOptions) gen.ApplicationBehavior {
-	return &NodeApp{opts}
+func CreateNodeApp(nodeID string, nc *nats.Conn, opts models.NodeOptions) gen.ApplicationBehavior {
+	return &NodeApp{
+		nc,
+		nodeID,
+		opts,
+	}
 }
 
 type NodeApp struct {
-	opts models.NodeOptions
+	nc     *nats.Conn
+	nodeID string
+	opts   models.NodeOptions
 }
 
 // Load invoked on loading application using method ApplicationLoad of gen.Node interface.
 func (app *NodeApp) Load(node gen.Node, args ...any) (gen.ApplicationSpec, error) {
 	return gen.ApplicationSpec{
-		Name:        "nex",
-		Description: "Nex Node - A NATS Execution Engine",
+		Name:        nexApplicationName,
+		Description: nexApplicationDescription,
 		Mode:        gen.ApplicationModeTransient,
 		Group: []gen.ApplicationMemberSpec{
 			{
-				Name:    "nexsup",
+				Name:    nexSupervisorName,
 				Factory: createNexSupervisor,
-				Args:    []any{app.opts},
+				Args: []any{
+					nexSupervisorParams{
+						nc:      app.nc,
+						nodeID:  app.nodeID,
+						options: app.opts,
+					},
+				},
 			},
 		},
 	}, nil

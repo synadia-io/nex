@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -228,7 +229,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 
 	logger := configureLogger(globals, nc, pubKey)
 
-	nexNode, err := node.NewNexNode(nc,
+	nexNode, err := node.NewNexNode(kp, nc,
 		options.WithLogger(logger),
 		options.WithAgentHandshakeTimeout(u.AgentHandshakeTimeoutMillisecond),
 		options.WithResourceDirectory(u.DefaultResourceDir),
@@ -282,8 +283,11 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	logger.Info("Starting Nex Node")
-	nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
+	logger.Info("Starting Nex Node", slog.String("public_key", pubKey))
+	err = nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
+	if err != nil {
+		logger.Error("Failed to start Nex Node", slog.String("error", err.Error()))
+	}
 	logger.Info("Shutting down Nex Node")
 
 	return nil
