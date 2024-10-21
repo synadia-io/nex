@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"os/signal"
 	"slices"
+	"syscall"
 
 	"ergo.services/application/observer"
 	"ergo.services/ergo"
@@ -18,26 +20,31 @@ import (
 	"github.com/synadia-io/nex/node/actors"
 )
 
+const ergoNodeName = "nex@localhost"
+
 type Node interface {
 	Validate() error
-	Start()
+	Start() error
 }
 
 type nexNode struct {
-	nc  *nats.Conn
 	ctx context.Context
+	nc  *nats.Conn
 
-	options *models.NodeOptions
+	options   *models.NodeOptions
+	publicKey nkeys.KeyPair
 }
 
-func NewNexNode(nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
+func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
 	if nc == nil {
 		return nil, fmt.Errorf("no nats connection provided")
 	}
 
 	nn := &nexNode{
-		nc:  nc,
-		ctx: context.Background(),
+		ctx:       context.Background(),
+		nc:        nc,
+		publicKey: serverKey,
+
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
@@ -59,8 +66,8 @@ func NewNexNode(nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
 		},
 	}
 
-	if len(opts) > 0 && opts[0] != nil {
-		for _, opt := range opts {
+	for _, opt := range opts {
+		if opt != nil {
 			opt(nn.options)
 		}
 	}
@@ -123,19 +130,24 @@ func (nn *nexNode) Validate() error {
 	return errs
 }
 
-func (nn *nexNode) Start() {
-	nn.initializeSupervisionTree()
+func (nn *nexNode) Start() error {
+	return nn.initializeSupervisionTree()
 }
 
-func (nn *nexNode) initializeSupervisionTree() {
+func (nn *nexNode) initializeSupervisionTree() error {
 	var options gen.NodeOptions
 
-	// create applications that must be started
-	apps := []gen.ApplicationBehavior{
-		observer.CreateApp(observer.Options{}), // TODO: opt out of this via config
-		actors.CreateNodeApp(*nn.options),      // copy options
+	nodeID, err := nn.publicKey.PublicKey()
+	if err != nil {
+		fmt.Printf("Unable to start node; %s\n", err)
+		return err
 	}
-	options.Applications = apps
+
+	// create applications that must be started
+	options.Applications = []gen.ApplicationBehavior{
+		observer.CreateApp(observer.Options{}),           // TODO: opt out of this via config
+		actors.CreateNodeApp(nodeID, nn.nc, *nn.options), // copy options
+	}
 
 	// disable default logger to get rid of multiple logging to the os.Stdout
 	options.Log.DefaultLogger.Disable = true
@@ -143,25 +155,51 @@ func (nn *nexNode) initializeSupervisionTree() {
 	// https://docs.ergo.services/basics/logging#process-logger
 	// https://docs.ergo.services/tools/observer#log-process-page
 
-	nodeName := "nex@localhost"
-
 	// starting node
-	node, err := ergo.StartNode(gen.Atom(nodeName), options)
+	node, err := ergo.StartNode(gen.Atom(ergoNodeName), options)
 	if err != nil {
-		fmt.Printf("Unable to start node '%s': %s\n", nodeName, err)
-		return
+		fmt.Printf("Unable to start node; %s\n", err)
+		return err
 	}
 
 	logger, err := node.Spawn(actors.CreateNodeLogger(nn.ctx, nn.options.Logger), gen.ProcessOptions{})
 	if err != nil {
-		panic(err) // TODO: no panic
+		return err
 	}
 
 	// NOTE: the supervised processes won't log their startup (Init) calls because the
 	// logger won't have been in place. However, they will log stuff afterward
-	_ = node.LoggerAddPID(logger, "nexlogger")
+	err = node.LoggerAddPID(logger, "nexlogger")
+	if err != nil {
+		node.Log().Error("Failed to add logger", slog.String("error", err.Error()))
+		return err
+	}
 
 	node.Log().Info("Nex node started")
-	node.Log().Info("Observer Application started and available at http://localhost:9911")
+	node.Log().Info("Observer Application started", slog.String("server", "http://localhost:9911"))
+
+	nn.installSignalHandlers(node)
 	node.Wait()
+
+	return nil
+}
+
+func (nn *nexNode) installSignalHandlers(node gen.Node) {
+	go func() {
+		nn.options.Logger.Info("Installing signal handlers")
+
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+
+		sig := <-sigs
+		if sig == nil {
+			signal.Reset()
+			return
+		}
+
+		signal.Reset()
+
+		nn.options.Logger.Info("Stopping node")
+		node.Stop()
+	}()
 }

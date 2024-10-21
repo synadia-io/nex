@@ -1,6 +1,9 @@
 package actors
 
 import (
+	"errors"
+	"log/slog"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
 	"github.com/synadia-io/nex/models"
@@ -19,9 +22,46 @@ type agentManager struct {
 	nodeOptions models.NodeOptions
 }
 
+type agentManagerParams struct {
+	options models.NodeOptions
+}
+
+func (p *agentManagerParams) Validate() error {
+	var err error
+
+	// insert validations
+	// validate options much?
+
+	return err
+}
+
 func (mgr *agentManager) Init(args ...any) error {
-	mgr.nodeOptions = args[0].(models.NodeOptions)
-	_ = mgr.Send(mgr.PID(), "post_init")
+	if len(args) != 1 {
+		err := errors.New("agent manager params are required")
+		mgr.Log().Error("Failed to start agent manager", slog.String("error", err.Error()))
+		return err
+	}
+
+	if _, ok := args[0].(agentManagerParams); !ok {
+		err := errors.New("args[0] must be valid agent manager params")
+		mgr.Log().Error("Failed to start agent manager", slog.String("error", err.Error()))
+		return err
+	}
+
+	params := args[0].(agentManagerParams)
+	err := params.Validate()
+	if err != nil {
+		mgr.Log().Error("Failed to start agent manager", slog.String("error", err.Error()))
+		return err
+	}
+
+	mgr.nodeOptions = params.options
+
+	err = mgr.Send(mgr.PID(), PostInit)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -37,18 +77,18 @@ func (mgr *agentManager) HandleInspect(from gen.PID, item ...string) map[string]
 
 func (mgr *agentManager) HandleMessage(from gen.PID, message any) error {
 	switch message {
-	case "post_init":
+	case PostInit:
 		// making subscription using MonitorEvent of the gen.Process interface
 		if _, err := mgr.MonitorEvent(InternalNatsServerReady); err != nil {
 			return err
 		}
-		mgr.Log().Info("successfully subscribed to: %s", InternalNatsServerReady)
+		mgr.Log().Info("successfully subscribed to internal nats server", slog.Any("event_name", InternalNatsServerReady))
 	}
 	return nil
 }
 
 func (mgr *agentManager) HandleEvent(event gen.MessageEvent) error {
-	mgr.Log().Info("received event %s", event.Event)
+	mgr.Log().Info("received event", slog.String("event_name", string(event.Event.Name)))
 
 	switch event.Event.Name {
 	case InternalNatsServerReadyName:

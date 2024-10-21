@@ -1,9 +1,20 @@
 package actors
 
 import (
+	"errors"
+	"log/slog"
+
 	"ergo.services/ergo/act"
 	"ergo.services/ergo/gen"
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/models"
+)
+
+const (
+	actorNameAgentManager       = "agent_manager"
+	actorNameControlAPI         = "control_api"
+	actorNameHostServices       = "host_services"
+	actorNameInternalNATSServer = "internal_nats_server"
 )
 
 func createNexSupervisor() gen.ProcessBehavior {
@@ -14,37 +25,87 @@ type NexSupervisor struct {
 	act.Supervisor
 }
 
+type nexSupervisorParams struct {
+	nc      *nats.Conn
+	nodeID  string
+	options models.NodeOptions
+}
+
+func (p *nexSupervisorParams) Validate() error {
+	var err error
+
+	if p.nc == nil {
+		err = errors.Join(err, errors.New("valid NATS connection is required"))
+	}
+
+	if p.nodeID == "" {
+		err = errors.Join(err, errors.New("node id is required"))
+	}
+
+	// validate options much?
+
+	return err
+}
+
 // Init invoked on a spawn Supervisor process. This is a mandatory callback for the implementation
 func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 	var spec act.SupervisorSpec
 
-	nodeOptions := args[0].(models.NodeOptions)
+	if len(args) != 1 {
+		err := errors.New("nex supervisor params are required")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	if _, ok := args[0].(nexSupervisorParams); !ok {
+		err := errors.New("args[0] must be valid nex supervisor params")
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
+
+	params := args[0].(nexSupervisorParams)
+	err := params.Validate()
+	if err != nil {
+		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
+		return spec, err
+	}
 
 	// set supervisor type
 	spec.Type = act.SupervisorTypeOneForOne
 
 	spec.Children = []act.SupervisorChildSpec{
 		{
-			Name:    "internal_nats_server",
+			Name:    actorNameInternalNATSServer,
 			Factory: createInternalNatsServer,
+			Args:    []any{params.options}, // TODO-- merge internal NATS server branch and then add internalNatsServerParams here
+		},
+		{
+			Name:    actorNameHostServices,
+			Factory: createHostServices,
 			Args: []any{
-				internalNatsServerParams{
-					nodeOptions: nodeOptions,
+				hostServicesServerParams{
+					options: params.options.HostServiceOptions,
 				},
 			},
 		},
 		{
-			Name:    "host_services",
-			Factory: createHostServices,
+			Name:    actorNameControlAPI,
+			Factory: createControlAPI,
+			Args: []any{
+				controlAPIParams{
+					nc:        params.nc,
+					publicKey: params.nodeID,
+				},
+			},
 		},
 		{
-			Name:    "control_api",
-			Factory: createControlAPIServer,
-		},
-		{
-			Name:    "agent_manager",
+			Name:    actorNameAgentManager,
 			Factory: createAgentManager,
-			Args:    []any{nodeOptions},
+			Args: []any{
+				agentManagerParams{
+					options: params.options,
+				},
+			},
 		},
 	}
 
