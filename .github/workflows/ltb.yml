@@ -4,7 +4,7 @@ name: Lint | Test | Build
 
 on:
   pull_request:
-    branches: [ "vnext" ]
+    branches: [ "v3" ]
 
 env:
   GO_VER: '1.23.0'
