@@ -96,7 +96,7 @@ func (api *controlAPI) HandleInspect(from gen.PID, item ...string) map[string]st
 func (api *controlAPI) initPublicXKey() error {
 	kp, err := nkeys.CreateCurveKeys()
 	if err != nil {
-		api.Log().Error("Failed to create X25519 keypair", slog.Any("error", err))
+		api.Log().Error("Failed to create XKey keypair", slog.Any("error", err))
 		return nil
 	}
 

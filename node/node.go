@@ -35,14 +35,15 @@ type nexNode struct {
 	publicKey nkeys.KeyPair
 }
 
-func NewNexNode(publicKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
+func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
 	if nc == nil {
 		return nil, fmt.Errorf("no nats connection provided")
 	}
 
 	nn := &nexNode{
-		ctx: context.Background(),
-		nc:  nc,
+		ctx:       context.Background(),
+		nc:        nc,
+		publicKey: serverKey,
 
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
@@ -63,11 +64,10 @@ func NewNexNode(publicKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 				Services: make(map[string]models.ServiceConfig),
 			},
 		},
-		publicKey: publicKey,
 	}
 
-	if len(opts) > 0 && opts[0] != nil {
-		for _, opt := range opts {
+	for _, opt := range opts {
+		if opt != nil {
 			opt(nn.options)
 		}
 	}
