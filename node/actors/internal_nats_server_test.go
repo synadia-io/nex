@@ -17,7 +17,7 @@ func TestGenerateConfig(t *testing.T) {
 	ns := &internalNatsServer{
 		hostUser: hostUser,
 		nodeOptions: models.NodeOptions{
-			WorkloadOptions: []models.WorkloadOptions{
+			AgentOptions: []models.AgentOptions{
 				{
 					Name: "native",
 				},

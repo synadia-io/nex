@@ -59,7 +59,8 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 				TracesExporter:   "file",
 				ExporterEndpoint: "127.0.0.1:14532",
 			},
-			WorkloadOptions: []models.WorkloadOptions{},
+			DisableDirectStart: false,
+			AgentOptions:       []models.AgentOptions{},
 			HostServiceOptions: models.HostServiceOptions{
 				Services: make(map[string]models.ServiceConfig),
 			},
@@ -80,7 +81,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	return nn, nil
 }
 
-func (nn *nexNode) Validate() error {
+func (nn nexNode) Validate() error {
 	var errs error
 
 	if nn.options.Logger == nil {
@@ -91,7 +92,7 @@ func (nn *nexNode) Validate() error {
 		errs = errors.Join(errs, errors.New("agent handshake timeout must be greater than 0"))
 	}
 
-	if len(nn.options.WorkloadOptions) <= 0 {
+	if len(nn.options.AgentOptions) < 1 && nn.options.DisableDirectStart {
 		errs = errors.Join(errs, errors.New("node required at least 1 workload type be configured in order to start"))
 	}
 
@@ -151,9 +152,13 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	// disable default logger to get rid of multiple logging to the os.Stdout
 	options.Log.DefaultLogger.Disable = true
+	options.Log.Level = gen.LogLevelTrace // can stay at trace because slog.Log level will handle the output
 
-	// https://docs.ergo.services/basics/logging#process-logger
-	// https://docs.ergo.services/tools/observer#log-process-page
+	// DO NOT REMOVE: the ergo.services library will transmit metrics by default and can only be seen if TRACE level logs are enabled.
+	// This disables that behavior
+	// ref: https://github.com/ergo-services/ergo/blob/364c7ef006ed6eef2775c23dad48ab3a12b7085f/app/system/metrics.go#L102
+	options.Env = make(map[gen.Env]any)
+	options.Env["disable_metrics"] = "true"
 
 	// starting node
 	node, err := ergo.StartNode(gen.Atom(ergoNodeName), options)
@@ -162,6 +167,8 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		return err
 	}
 
+	// https://docs.ergo.services/basics/logging#process-logger
+	// https://docs.ergo.services/tools/observer#log-process-page
 	logger, err := node.Spawn(actors.CreateNodeLogger(nn.ctx, nn.options.Logger), gen.ProcessOptions{})
 	if err != nil {
 		return err
@@ -169,7 +176,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	// NOTE: the supervised processes won't log their startup (Init) calls because the
 	// logger won't have been in place. However, they will log stuff afterward
-	err = node.LoggerAddPID(logger, "nexlogger")
+	err = node.LoggerAddPID(logger, "nexlogger", gen.DefaultLogLevels...)
 	if err != nil {
 		node.Log().Error("Failed to add logger", slog.String("error", err.Error()))
 		return err

@@ -59,7 +59,7 @@ func (u Up) Table() []table.Row {
 		{"Nexus Name", u.NexusName, reflect.TypeOf(u.NexusName)},
 		{"Tags", u.Tags, reflect.TypeOf(u.Tags).String()},
 		{"Valid Issuers", u.ValidIssuers, reflect.TypeOf(u.ValidIssuers).String()},
-		{"Workload Types", u.WorkloadTypes, reflect.TypeOf(u.WorkloadTypes).String()},
+		{"Agents", u.Agents, reflect.TypeOf(u.Agents).String()},
 		{"OpenTelemetry Metrics Enabled", u.OtelConfig.OtelMetrics, reflect.TypeOf(u.OtelConfig.OtelMetrics).String()},
 		{"OpenTelemetry Metrics Port", u.OtelConfig.OtelMetricsPort, reflect.TypeOf(u.OtelConfig.OtelMetricsPort).String()},
 		{"OpenTelemetry Metrics Exporter", u.OtelConfig.OtelMetricsExporter, reflect.TypeOf(u.OtelConfig.OtelMetricsExporter).String()},

@@ -12,7 +12,8 @@ type NodeOptions struct {
 	Tags                  map[string]string
 	ValidIssuers          []string
 	OtelOptions           OTelOptions
-	WorkloadOptions       []WorkloadOptions
+	DisableDirectStart    bool
+	AgentOptions          []AgentOptions
 	HostServiceOptions    HostServiceOptions
 }
 
@@ -56,9 +57,15 @@ func WithOTelOptions(o OTelOptions) NodeOption {
 	}
 }
 
-func WithWorkloadTypes(w []WorkloadOptions) NodeOption {
+func WithDisableDirectStart(b bool) NodeOption {
 	return func(n *NodeOptions) {
-		n.WorkloadOptions = w
+		n.DisableDirectStart = b
+	}
+}
+
+func WithExternalAgents(w []AgentOptions) NodeOption {
+	return func(n *NodeOptions) {
+		n.AgentOptions = w
 	}
 }
 
@@ -77,11 +84,10 @@ type OTelOptions struct {
 	ExporterEndpoint string
 }
 
-type WorkloadOptions struct {
-	Name     string
-	AgentUri string
-	Argv     []string
-	Env      map[string]string
+type AgentOptions struct {
+	Name          string
+	Uri           string
+	Configuration json.RawMessage
 }
 
 type HostServiceOptions struct {
