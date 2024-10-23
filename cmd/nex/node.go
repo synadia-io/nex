@@ -194,6 +194,7 @@ type Up struct {
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
 	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
+	ObserverConfig     ObserverConfig     `embed:"" prefix:"observer." group:"Observer Configuration"`
 }
 
 func (u *Up) AfterApply(globals *Globals) error {
@@ -273,6 +274,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 				}(),
 			}
 		}()),
+		options.WithObserver(u.ObserverConfig.Enabled, u.ObserverConfig.Host, u.ObserverConfig.Port),
 	)
 	if err != nil {
 		return err
@@ -321,3 +323,9 @@ type AgentConfig struct {
 	Configuration json.RawMessage `help:"Configuration JSON for agent" placeholder:"{}"`
 }
 type AgentConfigs []AgentConfig
+
+type ObserverConfig struct {
+	Enabled bool   `default:"false"`
+	Host    string `default:"127.0.0.1"`
+	Port    uint16 `default:"9911"`
+}

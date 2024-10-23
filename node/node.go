@@ -64,6 +64,11 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			HostServiceOptions: models.HostServiceOptions{
 				Services: make(map[string]models.ServiceConfig),
 			},
+			Observer: models.ObserverOptions{
+				Enabled: false,
+				Host:    "127.0.0.1",
+				Port:    9911,
+			},
 		},
 	}
 
@@ -146,8 +151,16 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	// create applications that must be started
 	options.Applications = []gen.ApplicationBehavior{
-		observer.CreateApp(observer.Options{}),           // TODO: opt out of this via config
 		actors.CreateNodeApp(nodeID, nn.nc, *nn.options), // copy options
+	}
+
+	if nn.options.Observer.Enabled {
+		options.Applications = append(options.Applications,
+			observer.CreateApp(observer.Options{
+				Host: nn.options.Observer.Host,
+				Port: nn.options.Observer.Port,
+			},
+			))
 	}
 
 	// disable default logger to get rid of multiple logging to the os.Stdout
@@ -183,7 +196,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	node.Log().Info("Nex node started")
-	node.Log().Info("Observer Application started", slog.String("server", "http://localhost:9911"))
+	if nn.options.Observer.Enabled {
+		node.Log().Info("Observer Application started", slog.String("server", fmt.Sprintf("http://%s:%d", nn.options.Observer.Host, nn.options.Observer.Port)))
+	}
 
 	nn.installSignalHandlers(node)
 	node.Wait()
