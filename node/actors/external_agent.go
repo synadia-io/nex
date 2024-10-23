@@ -40,7 +40,7 @@ func (a *externalAgent) HandleMessage(from gen.PID, message any) error {
 			return gen.TerminateReasonPanic
 		}
 
-		creds, err := a.Call(gen.Atom(actorNameInternalNATSServer), "imready")
+		creds, err := a.Call(gen.Atom(actorNameInternalNATSServer), AgentReady)
 		if err != nil {
 			a.Log().Error("failed to call internal nats server", slog.Any("err", err))
 			return gen.TerminateReasonPanic
