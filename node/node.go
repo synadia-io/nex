@@ -9,18 +9,16 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"syscall"
 
-	"ergo.services/application/observer"
-	"ergo.services/ergo"
-	"ergo.services/ergo/gen"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
+	goakt "github.com/tochemey/goakt/v2/actors"
+	"github.com/tochemey/goakt/v2/log"
 )
-
-const ergoNodeName = "nex@localhost"
 
 type Node interface {
 	Validate() error
@@ -133,6 +131,11 @@ func (nn nexNode) Validate() error {
 		}
 	}
 
+	_, err := nn.publicKey.PublicKey()
+	if err != nil {
+		errs = errors.Join(errs, errors.New("could not produce a public key for this node. This should never happen"))
+	}
+
 	return errs
 }
 
@@ -141,87 +144,74 @@ func (nn *nexNode) Start() error {
 }
 
 func (nn *nexNode) initializeSupervisionTree() error {
-	var options gen.NodeOptions
+	ctx := context.Background()
 
-	nodeID, err := nn.publicKey.PublicKey()
+	actorSystem, _ := goakt.NewActorSystem("nexnode",
+		goakt.WithLogger(log.DefaultLogger), // TODO: use "our" logger here. I think we just need a wrapper that conforms to this interface?
+		goakt.WithPassivationDisabled(),
+		// In the non-v2 version of goakt, these functions were supported.
+		// TODO: figure out why they're gone or how we can plug in our own impls
+		//goakt.WithTelemetry(telemetry),
+		//goakt.WithTracing(),
+		goakt.WithActorInitMaxRetries(3))
+
+	// start the actor system
+	_ = actorSystem.Start(ctx)
+
+	// start the root actors
+	agentSuper, err := actorSystem.Spawn(ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(actorSystem, *nn.options))
 	if err != nil {
-		fmt.Printf("Unable to start node; %s\n", err)
 		return err
 	}
+	inats := actors.CreateInternalNatsServer(*nn.options)
 
-	// create applications that must be started
-	options.Applications = []gen.ApplicationBehavior{
-		actors.CreateNodeApp(nodeID, nn.nc, *nn.options), // copy options
-	}
-
-	if nn.options.Observer.Enabled {
-		options.Applications = append(options.Applications,
-			observer.CreateApp(observer.Options{
-				Host: nn.options.Observer.Host,
-				Port: nn.options.Observer.Port,
-			},
-			))
-	}
-
-	// disable default logger to get rid of multiple logging to the os.Stdout
-	options.Log.DefaultLogger.Disable = true
-	options.Log.Level = gen.LogLevelTrace // can stay at trace because slog.Log level will handle the output
-
-	// DO NOT REMOVE: the ergo.services library will transmit metrics by default and can only be seen if TRACE level logs are enabled.
-	// This disables that behavior
-	// ref: https://github.com/ergo-services/ergo/blob/364c7ef006ed6eef2775c23dad48ab3a12b7085f/app/system/metrics.go#L102
-	options.Env = make(map[gen.Env]any)
-	options.Env["disable_metrics"] = "true"
-
-	// starting node
-	node, err := ergo.StartNode(gen.Atom(ergoNodeName), options)
+	_, err = actorSystem.Spawn(ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
-		fmt.Printf("Unable to start node; %s\n", err)
 		return err
 	}
+	allCreds := inats.CredentialsMap()
 
-	// https://docs.ergo.services/basics/logging#process-logger
-	// https://docs.ergo.services/tools/observer#log-process-page
-	logger, err := node.Spawn(actors.CreateNodeLogger(nn.ctx, nn.options.Logger), gen.ProcessOptions{})
+	_, err = actorSystem.Spawn(ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
 	if err != nil {
 		return err
 	}
 
-	// NOTE: the supervised processes won't log their startup (Init) calls because the
-	// logger won't have been in place. However, they will log stuff afterward
-	err = node.LoggerAddPID(logger, "nexlogger", gen.DefaultLogLevels...)
+	if !nn.options.DisableDirectStart {
+		_, err = agentSuper.SpawnChild(ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
+		if err != nil {
+			return err
+		}
+	}
+	for _, agent := range nn.options.AgentOptions {
+		// This map lookup works because the agent name is identical to the workload type
+		_, err := agentSuper.SpawnChild(ctx, agent.Name, actors.CreateExternalAgent(allCreds[agent.Name], agent))
+		if err != nil {
+			return err
+		}
+	}
+
+	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
-		node.Log().Error("Failed to add logger", slog.String("error", err.Error()))
+		return err
+	}
+	_, err = actorSystem.Spawn(ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, pk))
+	if err != nil {
 		return err
 	}
 
-	node.Log().Info("Nex node started")
-	if nn.options.Observer.Enabled {
-		node.Log().Info("Observer Application started", slog.String("server", fmt.Sprintf("http://%s:%d", nn.options.Observer.Host, nn.options.Observer.Port)))
+	running := make([]string, 0)
+	for _, actor := range actorSystem.Actors() {
+		running = append(running, actor.Name())
 	}
+	actorSystem.Logger().Infof("Actors started: %s", strings.Join(running, ","))
 
-	nn.installSignalHandlers(node)
-	node.Wait()
+	interruptSignal := make(chan os.Signal, 1)
+	signal.Notify(interruptSignal, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	<-interruptSignal
+
+	// stop the actor system
+	_ = actorSystem.Stop(ctx)
+	os.Exit(0)
 
 	return nil
-}
-
-func (nn *nexNode) installSignalHandlers(node gen.Node) {
-	go func() {
-		nn.options.Logger.Info("Installing signal handlers")
-
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
-
-		sig := <-sigs
-		if sig == nil {
-			signal.Reset()
-			return
-		}
-
-		signal.Reset()
-
-		nn.options.Logger.Info("Stopping node")
-		node.Stop()
-	}()
 }

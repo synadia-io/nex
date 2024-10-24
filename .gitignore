@@ -31,3 +31,6 @@ go.work.sum
 
 cmd/nex/nex
 dist/
+
+config.json
+.resources/

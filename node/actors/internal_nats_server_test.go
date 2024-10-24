@@ -14,7 +14,7 @@ func TestGenerateConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ns := &internalNatsServer{
+	ns := &InternalNatsServer{
 		hostUser: hostUser,
 		nodeOptions: models.NodeOptions{
 			AgentOptions: []models.AgentOptions{
