@@ -14,10 +14,10 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/synadia-io/nex/internal/logger"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
 	goakt "github.com/tochemey/goakt/v2/actors"
-	"github.com/tochemey/goakt/v2/log"
 )
 
 type Node interface {
@@ -147,7 +147,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	ctx := context.Background()
 
 	actorSystem, _ := goakt.NewActorSystem("nexnode",
-		goakt.WithLogger(log.DefaultLogger), // TODO: use "our" logger here. I think we just need a wrapper that conforms to this interface?
+		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler())),
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
 		// TODO: figure out why they're gone or how we can plug in our own impls
