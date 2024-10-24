@@ -1,71 +1,38 @@
 package actors
 
 import (
-	"fmt"
-	"log/slog"
+	"context"
 
-	"ergo.services/ergo/act"
-	"ergo.services/ergo/gen"
 	"github.com/synadia-io/nex/models"
+	goakt "github.com/tochemey/goakt/v2/actors"
+	"github.com/tochemey/goakt/v2/goaktpb"
+	"github.com/tochemey/goakt/v2/log"
 )
 
-type externalAgent struct {
-	act.Actor
-
-	internalNatsCreds agentCredential
+type ExternalAgent struct {
+	agentOptions      models.AgentOptions
+	internalNatsCreds AgentCredential
+	logger            log.Logger
 }
 
-func createExternalAgent() gen.ProcessBehavior {
-	return &externalAgent{}
+func CreateExternalAgent(creds AgentCredential, agentOptions models.AgentOptions) *ExternalAgent {
+	return &ExternalAgent{agentOptions: agentOptions, internalNatsCreds: creds}
 }
 
-type externalAgentParams struct {
-	agentOptions models.AgentOptions
+func (a *ExternalAgent) PreStart(ctx context.Context) error {
+	return nil
 }
 
-func (a *externalAgent) Init(args ...any) error {
-	err := a.Send(a.PID(), PostInit)
-	if err != nil {
-		return err
+func (a *ExternalAgent) PostStop(ctx context.Context) error {
+	return nil
+}
+
+func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
+	switch ctx.Message().(type) {
+	case *goaktpb.PostStart:
+		a.logger = ctx.Self().Logger()
+		a.logger.Infof("External agent for workload type '%s' is running", ctx.Self().Name())
+	default:
+		ctx.Unhandled()
 	}
-	return nil
-}
-
-func (a *externalAgent) HandleMessage(from gen.PID, message any) error {
-	switch message {
-	case PostInit:
-		if _, err := a.MonitorEvent(InternalNatsServerReady); err != nil {
-			fmt.Println("failed to monitor InternalNatsServerReady")
-			a.Log().Error("failed to monitor InternalNatsServerReady event")
-			return gen.TerminateReasonPanic
-		}
-
-		creds, err := a.Call(gen.Atom(actorNameInternalNATSServer), AgentReady)
-		if err != nil {
-			a.Log().Error("failed to call internal nats server", slog.Any("err", err))
-			return gen.TerminateReasonPanic
-		}
-
-		var ok bool
-		a.internalNatsCreds, ok = creds.(agentCredential)
-		if !ok {
-			a.Log().Error("failed to cast creds to agentCredential")
-			return gen.TerminateReasonPanic
-		}
-
-		a.Log().Trace("internal nats server credentials", slog.Any("creds", creds))
-	}
-	return nil
-}
-
-func (a *externalAgent) HandleEvent(event gen.MessageEvent) error {
-	switch event.Event.Name {
-	case InternalNatsServerReadyName:
-		return a.StartAgent()
-	}
-	return nil
-}
-
-func (a *externalAgent) StartAgent() error {
-	return nil
 }
