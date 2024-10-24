@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	actorNameAgentManager       = "agent_manager"
+	actorNameAgentSupervisor    = "agent_supervisor"
 	actorNameControlAPI         = "control_api"
 	actorNameHostServices       = "host_services"
 	actorNameInternalNATSServer = "internal_nats_server"
@@ -57,13 +57,13 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		return spec, err
 	}
 
-	if _, ok := args[0].(nexSupervisorParams); !ok {
+	params, ok := args[0].(nexSupervisorParams)
+	if !ok {
 		err := errors.New("args[0] must be valid nex supervisor params")
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
 		return spec, err
 	}
 
-	params := args[0].(nexSupervisorParams)
 	err := params.Validate()
 	if err != nil {
 		sup.Log().Error("Failed to start nex supervisor", slog.String("error", err.Error()))
@@ -77,7 +77,11 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 		{
 			Name:    actorNameInternalNATSServer,
 			Factory: createInternalNatsServer,
-			Args:    []any{params.options}, // TODO-- merge internal NATS server branch and then add internalNatsServerParams here
+			Args: []any{
+				internalNatsServerParams{
+					nodeOptions: params.options,
+				},
+			},
 		},
 		{
 			Name:    actorNameHostServices,
@@ -99,10 +103,10 @@ func (sup *NexSupervisor) Init(args ...any) (act.SupervisorSpec, error) {
 			},
 		},
 		{
-			Name:    actorNameAgentManager,
-			Factory: createAgentManager,
+			Name:    actorNameAgentSupervisor,
+			Factory: createAgentSupervisor,
 			Args: []any{
-				agentManagerParams{
+				agentSupervisorParams{
 					options: params.options,
 				},
 			},
@@ -139,6 +143,7 @@ func (sup *NexSupervisor) HandleChildTerminate(name gen.Atom, pid gen.PID, reaso
 // gen.TerminateReasonShutdown. Any other - for abnormal termination.
 func (sup *NexSupervisor) HandleMessage(from gen.PID, message any) error {
 	sup.Log().Info("supervisor got message from %s", from)
+
 	return nil
 }
 

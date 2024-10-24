@@ -13,7 +13,7 @@ type GlobalLogger struct {
 	LogJSON        bool     `name:"json" default:"false" help:"Enable JSON formatted logs"`
 	LogColor       bool     `name:"color" default:"true" help:"Enable colorized logs"`
 	LogShortLevels bool     `name:"short" default:"false" help:"Use abbreviated log levels; DEBUG -> DBG"`
-	LogTimeFormat  string   `name:"timefmt" default:"DateTime" help:"Time format for log messages" enum:"DateTime"`
+	LogTimeFormat  string   `name:"timefmt" default:"DateTime" help:"Time format for log messages" enum:"DateTime,TimeOnly,DateOnly,Stamp,RFC822,RFC3339"`
 }
 
 type GlobalNats struct {

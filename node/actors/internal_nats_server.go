@@ -31,7 +31,7 @@ func createInternalNatsServer() gen.ProcessBehavior {
 type internalNatsServer struct {
 	act.Actor
 	tokens        map[gen.Atom]gen.Ref
-	haveConsumers bool
+	consumerCount int
 
 	creds       []agentCredential
 	hostUser    nkeys.KeyPair
@@ -71,54 +71,53 @@ type credentials struct {
 
 func (ns *internalNatsServer) Init(args ...any) error {
 	ns.tokens = make(map[gen.Atom]gen.Ref)
-
 	if len(args) != 1 {
 		err := errors.New("internal NATS server params are required")
 		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
-		return err
+		return gen.TerminateReasonPanic
 	}
 
 	if _, ok := args[0].(internalNatsServerParams); !ok {
 		err := errors.New("args[0] must be valid internal NATS server params")
 		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
-		return err
+		return gen.TerminateReasonPanic
 	}
 
 	params := args[0].(internalNatsServerParams)
 	err := params.Validate()
 	if err != nil {
 		ns.Log().Error("Failed to start internal NATS server", slog.String("error", err.Error()))
-		return err
+		return gen.TerminateReasonPanic
 	}
 
 	ns.nodeOptions = params.nodeOptions
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {
-		return err
+		return gen.TerminateReasonPanic
 	}
 	ns.hostUser = hostUser
 
 	creds, err := ns.buildAgentCredentials()
 	if err != nil {
-		return err
+		return gen.TerminateReasonPanic
 	}
 
 	ns.creds = creds
 
 	opts, err := ns.generateConfig()
 	if err != nil {
-		return err
+		return gen.TerminateReasonPanic
 	}
 
 	err = ns.startNatsServer(opts)
 	if err != nil {
-		return err
+		return gen.TerminateReasonPanic
 	}
 
 	err = ns.Send(ns.PID(), PostInit)
 	if err != nil {
-		return err
+		return gen.TerminateReasonPanic
 	}
 
 	ns.Log().Info("Internal NATS server started")
@@ -142,17 +141,16 @@ func (ns *internalNatsServer) HandleMessage(from gen.PID, message any) error {
 			return err
 		}
 		ns.tokens[InternalNatsServerReadyName] = token
-		ns.Log().Info("registered publishable event, waiting for consumers...", slog.Any("event_name", InternalNatsServerReadyName))
-	case eventStart:
-		ns.Log().Info("publisher got first consumer. start producing events...", slog.Any("event_name", InternalNatsServerReadyName))
-		ns.haveConsumers = true
+		ns.Log().Info("registered publishable event, waiting for consumers", slog.Any("event_name", InternalNatsServerReadyName))
+	case AgentsReady:
 		err := ns.SendEvent(InternalNatsServerReadyName, ns.tokens[InternalNatsServerReadyName], InternalNatsServerReadyEvent{AgentCredentials: ns.creds})
 		if err != nil {
 			return err
 		}
-	case eventStop: // handle gen.MessageEventStop message
-		ns.Log().Info("no consumers for %s", InternalNatsServerReadyName)
-		ns.haveConsumers = false
+	case eventStart:
+		ns.Log().Debug("initial consumer checked in", slog.Any("event_name", InternalNatsServerReadyName))
+	case eventStop:
+		ns.Log().Debug("no consumers remaining", slog.Any("event_name", InternalNatsServerReadyName))
 	}
 	return nil
 }
@@ -163,9 +161,24 @@ func (ns *internalNatsServer) HandleInspect(from gen.PID, item ...string) map[st
 	return nil
 }
 
+func (ns *internalNatsServer) HandleCall(from gen.PID, ref gen.Ref, request any) (any, error) {
+	switch request {
+	case AgentReady:
+		ns.consumerCount++
+		if ns.consumerCount == len(ns.nodeOptions.AgentOptions) {
+			err := ns.Send(ns.PID(), AgentsReady)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return ns.creds[0], nil // TODO: send back correct creds
+	}
+	return nil, nil
+}
+
 func (ns *internalNatsServer) buildAgentCredentials() ([]agentCredential, error) {
-	creds := make([]agentCredential, len(ns.nodeOptions.WorkloadOptions))
-	for i, w := range ns.nodeOptions.WorkloadOptions {
+	creds := make([]agentCredential, len(ns.nodeOptions.AgentOptions))
+	for i, w := range ns.nodeOptions.AgentOptions {
 		kp, _ := nkeys.CreateUser()
 		creds[i] = agentCredential{
 			workloadType: w.Name,
