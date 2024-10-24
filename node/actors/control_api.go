@@ -41,6 +41,10 @@ func (a *ControlAPI) PreStart(ctx context.Context) error {
 }
 
 func (a *ControlAPI) PostStop(ctx context.Context) error {
+	for _, sub := range a.subsz {
+		_ = sub.Unsubscribe()
+	}
+
 	return nil
 }
 
