@@ -7,6 +7,7 @@ import (
 	golog "log"
 	"log/slog"
 	"os"
+	"strings"
 
 	"disorder.dev/shandler"
 	"github.com/tochemey/goakt/v2/log"
@@ -49,7 +50,11 @@ func NewSlog(handler slog.Handler) *SlogLog {
 
 // Debug starts a message with debug level
 func (l *SlogLog) Debug(v ...any) {
-	l.logger.Debug(fmt.Sprint(v...))
+	s := strings.Builder{}
+	for _, a := range v {
+		s.WriteString(fmt.Sprint(a) + " ")
+	}
+	l.logger.Info(s.String())
 }
 
 // Debugf starts a message with debug level
@@ -60,7 +65,11 @@ func (l *SlogLog) Debugf(format string, v ...any) {
 // Panic starts a new message with panic level. The panic() function
 // is called which stops the ordinary flow of a goroutine.
 func (l *SlogLog) Panic(v ...any) {
-	l.logger.Log(context.TODO(), shandler.LevelFatal+2, fmt.Sprint(v...))
+	s := strings.Builder{}
+	for _, a := range v {
+		s.WriteString(fmt.Sprint(a) + " ")
+	}
+	l.logger.Info(s.String())
 	panic(v)
 }
 
@@ -74,7 +83,11 @@ func (l *SlogLog) Panicf(format string, v ...any) {
 // Fatal starts a new message with fatal level. The os.Exit(1) function
 // is called which terminates the program immediately.
 func (l *SlogLog) Fatal(v ...any) {
-	l.logger.Log(context.TODO(), shandler.LevelFatal, fmt.Sprint(v...))
+	s := strings.Builder{}
+	for _, a := range v {
+		s.WriteString(fmt.Sprint(a) + " ")
+	}
+	l.logger.Info(s.String())
 	os.Exit(1)
 }
 
@@ -87,7 +100,11 @@ func (l *SlogLog) Fatalf(format string, v ...any) {
 
 // Error starts a new message with error level.
 func (l *SlogLog) Error(v ...any) {
-	l.logger.Error(fmt.Sprint(v...))
+	s := strings.Builder{}
+	for _, a := range v {
+		s.WriteString(fmt.Sprint(a) + " ")
+	}
+	l.logger.Info(s.String())
 }
 
 // Errorf starts a new message with error level.
@@ -98,6 +115,11 @@ func (l *SlogLog) Errorf(format string, v ...any) {
 // Warn starts a new message with warn level
 func (l *SlogLog) Warn(v ...any) {
 	l.logger.Warn(fmt.Sprint(v...))
+	s := strings.Builder{}
+	for _, a := range v {
+		s.WriteString(fmt.Sprint(a) + " ")
+	}
+	l.logger.Info(s.String())
 }
 
 // Warnf starts a new message with warn level
@@ -107,7 +129,11 @@ func (l *SlogLog) Warnf(format string, v ...any) {
 
 // Info starts a message with info level
 func (l *SlogLog) Info(v ...any) {
-	l.logger.Info(fmt.Sprint(v...))
+	s := strings.Builder{}
+	for _, a := range v {
+		s.WriteString(fmt.Sprint(a) + " ")
+	}
+	l.logger.Info(s.String())
 }
 
 // Infof starts a message with info level
