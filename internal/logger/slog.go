@@ -164,8 +164,22 @@ func (l *SlogLog) Infof(format string, v ...any) {
 	l.logger.Info(fmt.Sprintf(format, v...))
 }
 
+// Info starts a message with info level
+func (l *SlogLog) Trace(v ...any) {
+	s := strings.Builder{}
+	for i, a := range v {
+		if i != len(v)-1 {
+			s.WriteString(fmt.Sprint(a) + " ")
+		} else {
+			s.WriteString(fmt.Sprint(a))
+		}
+	}
+	l.logger.Log(context.TODO(), shandler.LevelTrace, s.String())
+}
+
 // LogLevel returns the log level that is used
 func (l *SlogLog) LogLevel() log.Level {
+	var traceLevel log.Level = log.DebugLevel + 2
 	switch l.level {
 	case shandler.LevelFatal:
 		return log.FatalLevel
@@ -177,6 +191,8 @@ func (l *SlogLog) LogLevel() log.Level {
 		return log.DebugLevel
 	case slog.LevelWarn:
 		return log.WarningLevel
+	case shandler.LevelTrace:
+		return traceLevel
 	default:
 		return log.InvalidLevel
 	}

@@ -3,59 +3,69 @@ package actors
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"os"
-	"path/filepath"
 	"text/template"
 	"time"
 
+	"disorder.dev/shandler"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
-	"github.com/tochemey/goakt/v2/log"
 )
 
 const (
 	defaultInternalNatsConfigFile             = "internalconf*"
 	defaultInternalNatsConnectionDrainTimeout = time.Millisecond * 5000
-	defaultInternalNatsStoreDir               = "pnats"
 	workloadCacheBucketName                   = "NEXCACHE"
 	InternalNatsServerActorName               = "internal_nats"
 )
 
 type InternalNatsServer struct {
+	server        *server.Server
 	nodeOptions   models.NodeOptions
 	hostUser      nkeys.KeyPair
 	creds         []AgentCredential
 	serverOptions *server.Options
-	logger        log.Logger
+	logger        *slog.Logger
+
+	storeDir string
 }
 
 func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
-	ns := &InternalNatsServer{nodeOptions: options}
+	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger}
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {
+		options.Logger.Error("Failed to create host user", slog.Any("error", err))
 		return nil
 	}
 	ns.hostUser = hostUser
 
 	creds, err := ns.buildAgentCredentials()
 	if err != nil {
+		options.Logger.Error("Failed to build agent credentials", slog.Any("error", err))
 		return nil
 	}
 	ns.creds = creds
 
 	opts, err := ns.generateConfig()
 	if err != nil {
+		options.Logger.Error("Failed to generate NATS server config", slog.Any("error", err))
 		return nil
 	}
 	ns.serverOptions = opts
 
-	return ns
+	ns.storeDir, err = os.MkdirTemp(os.TempDir(), "pnats_*")
+	if err != nil {
+		options.Logger.Error("Failed to create store temp directory", slog.Any("error", err))
+		return nil
+	}
 
+	return ns
 }
 
 func (ns *InternalNatsServer) CredentialsMap() map[string]AgentCredential {
@@ -84,8 +94,7 @@ func (s *InternalNatsServer) PostStop(ctx context.Context) error {
 func (s *InternalNatsServer) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		s.logger = ctx.Self().Logger()
-		s.logger.Infof("Internal NATS server actor '%s' is running", ctx.Self().Name())
+		s.logger.Info("Internal NATS server actor is running", slog.String("name", ctx.Self().Name()))
 	default:
 		ctx.Unhandled()
 	}
@@ -122,9 +131,9 @@ type credentials struct {
 }
 
 func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
-	//ns.Log().Debug("Starting internal NATS server")
-
-	s, err := server.NewServer(opts)
+	ns.logger.Debug("Starting internal NATS server")
+	var err error
+	ns.server, err = server.NewServer(opts)
 	if err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
 		return err
@@ -135,7 +144,7 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 	// 	s.ConfigureLogger()
 	// }
 
-	if err := server.Run(s); err != nil {
+	if err := server.Run(ns.server); err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
 		return err
 	}
@@ -181,13 +190,13 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 
 	bytes, err := ns.generateTemplate(data)
 	if err != nil {
-		//ns.Log().Error("Failed to generate internal nats server config file", slog.Any("error", err))
+		ns.logger.Error("Failed to generate internal nats server config file", slog.Any("error", err))
 		return nil, err
 	}
 
 	opts := &server.Options{
 		JetStream: true,
-		StoreDir:  filepath.Join(os.TempDir(), defaultInternalNatsStoreDir), // FIXME-- use unique temp location
+		StoreDir:  ns.storeDir,
 		Port:      -1,
 		// Debug:     debug, FIXME-- make configurable
 		// Trace:     trace,
@@ -200,13 +209,13 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 	defer os.Remove(f.Name()) // clean up
 
 	if _, err := f.Write(bytes); err != nil {
-		//ns.Log().Error("Failed to write internal nats server config file", slog.Any("error", err))
+		ns.logger.Error("Failed to write internal nats server config file", slog.Any("error", err))
 		return nil, err
 	}
 
 	err = opts.ProcessConfigFile(f.Name())
 	if err != nil {
-		//ns.Log().Error("Failed to process configuration file", slog.Any("error", err))
+		ns.logger.Error("Failed to process configuration file", slog.Any("error", err))
 		return nil, err
 	}
 
@@ -222,9 +231,7 @@ func (ns *InternalNatsServer) generateTemplate(config *configTemplateData) ([]by
 		return nil, err
 	}
 
-	// -8 is equivalent to TRACE-ish level
-	// FIXME... .Log() does not exist
-	// ns.Log().Log(context.Background(), -8, "generated NATS config", ns.Log().String("config", wr.String()))
+	ns.logger.Log(context.TODO(), shandler.LevelTrace, "generated NATS config", slog.String("config", wr.String()))
 	return wr.Bytes(), nil
 }
 

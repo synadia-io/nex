@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"slices"
-	"strings"
 	"syscall"
 
 	"github.com/nats-io/nats.go"
@@ -139,14 +138,33 @@ func (nn nexNode) Validate() error {
 	return errs
 }
 
+// Start is blocking and will not return until the node is stopped
+// Can be stopped by canceling the provided context
 func (nn *nexNode) Start() error {
-	return nn.initializeSupervisionTree()
+	var cancel context.CancelFunc
+	nn.ctx, cancel = context.WithCancel(nn.ctx)
+	defer cancel()
+
+	interruptSignal := make(chan os.Signal, 1)
+	signal.Notify(interruptSignal, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-interruptSignal
+		cancel()
+	}()
+
+	as, err := nn.initializeSupervisionTree()
+	if err != nil {
+		return err
+	}
+
+	<-nn.ctx.Done()
+	return as.Stop(nn.ctx)
 }
 
-func (nn *nexNode) initializeSupervisionTree() error {
-	ctx := context.Background()
+func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 
-	actorSystem, _ := goakt.NewActorSystem("nexnode",
+	actorSystem, err := goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler())),
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
@@ -154,64 +172,62 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		//goakt.WithTelemetry(telemetry),
 		//goakt.WithTracing(),
 		goakt.WithActorInitMaxRetries(3))
+	if err != nil {
+		return nil, err
+	}
 
 	// start the actor system
-	_ = actorSystem.Start(ctx)
+	err = actorSystem.Start(nn.ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// start the root actors
-	agentSuper, err := actorSystem.Spawn(ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(actorSystem, *nn.options))
+	agentSuper, err := actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(actorSystem, *nn.options))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	inats := actors.CreateInternalNatsServer(*nn.options)
 
-	_, err = actorSystem.Spawn(ctx, actors.InternalNatsServerActorName, inats)
+	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	allCreds := inats.CredentialsMap()
 
-	_, err = actorSystem.Spawn(ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	_, err = actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	for _, agent := range nn.options.AgentOptions {
 		// This map lookup works because the agent name is identical to the workload type
-		_, err := agentSuper.SpawnChild(ctx, agent.Name, actors.CreateExternalAgent(allCreds[agent.Name], agent))
+		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(allCreds[agent.Name], agent))
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = actorSystem.Spawn(ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, pk))
+	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, pk))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	running := make([]string, 0)
-	for _, actor := range actorSystem.Actors() {
-		running = append(running, actor.Name())
+	running := make([]string, len(actorSystem.Actors()))
+	for i, actor := range actorSystem.Actors() {
+		running[i] = actor.Name()
 	}
-	actorSystem.Logger().Infof("Actors started: %s", strings.Join(running, ","))
+	actorSystem.Logger().Info("Actors started", slog.Any("running", running))
 
-	interruptSignal := make(chan os.Signal, 1)
-	signal.Notify(interruptSignal, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-interruptSignal
-
-	// stop the actor system
-	_ = actorSystem.Stop(ctx)
-	os.Exit(0)
-
-	return nil
+	return actorSystem, nil
 }
