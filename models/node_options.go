@@ -12,8 +12,12 @@ type NodeOptions struct {
 	Tags                  map[string]string
 	ValidIssuers          []string
 	OtelOptions           OTelOptions
-	WorkloadOptions       []WorkloadOptions
+	DisableDirectStart    bool
+	AgentOptions          []AgentOptions
 	HostServiceOptions    HostServiceOptions
+
+	// Ergos Observer
+	Observer ObserverOptions
 }
 
 type NodeOption func(*NodeOptions)
@@ -56,15 +60,31 @@ func WithOTelOptions(o OTelOptions) NodeOption {
 	}
 }
 
-func WithWorkloadTypes(w []WorkloadOptions) NodeOption {
+func WithDisableDirectStart(b bool) NodeOption {
 	return func(n *NodeOptions) {
-		n.WorkloadOptions = w
+		n.DisableDirectStart = b
+	}
+}
+
+func WithExternalAgents(w []AgentOptions) NodeOption {
+	return func(n *NodeOptions) {
+		n.AgentOptions = w
 	}
 }
 
 func WithHostServiceOptions(h HostServiceOptions) NodeOption {
 	return func(n *NodeOptions) {
 		n.HostServiceOptions = h
+	}
+}
+
+func WithObserver(b bool, host string, port uint16) NodeOption {
+	return func(n *NodeOptions) {
+		n.Observer = ObserverOptions{
+			Enabled: b,
+			Host:    host,
+			Port:    port,
+		}
 	}
 }
 
@@ -77,11 +97,10 @@ type OTelOptions struct {
 	ExporterEndpoint string
 }
 
-type WorkloadOptions struct {
-	Name     string
-	AgentUri string
-	Argv     []string
-	Env      map[string]string
+type AgentOptions struct {
+	Name          string
+	Uri           string
+	Configuration json.RawMessage
 }
 
 type HostServiceOptions struct {
@@ -94,4 +113,10 @@ type HostServiceOptions struct {
 type ServiceConfig struct {
 	Enabled       bool
 	Configuration json.RawMessage
+}
+
+type ObserverOptions struct {
+	Enabled bool
+	Host    string
+	Port    uint16
 }

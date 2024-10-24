@@ -189,10 +189,12 @@ type Up struct {
 	NexusName                        string            `default:"nexus" help:"Nexus name"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
-	WorkloadTypes                    WorkloadConfigs   `help:"Workload types configurations for nex node to initialize"`
+	Agents                           AgentConfigs      `help:"Workload types configurations for nex node to initialize"`
+	DisableDirectStart               bool              `help:"Disable direct start (no sandbox) workloads" default:"false"`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
 	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
+	ObserverConfig     ObserverConfig     `embed:"" prefix:"observer." group:"Observer Configuration"`
 }
 
 func (u *Up) AfterApply(globals *Globals) error {
@@ -201,8 +203,8 @@ func (u *Up) AfterApply(globals *Globals) error {
 
 func (u Up) Validate() error {
 	var errs error
-	if u.WorkloadTypes == nil || len(u.WorkloadTypes) < 1 {
-		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration"))
+	if len(u.Agents) < 1 && u.DisableDirectStart {
+		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration or enable direct start"))
 	}
 	return errs
 }
@@ -243,14 +245,14 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 			TracesExporter:   u.OtelConfig.OtelTracesExporter,
 			ExporterEndpoint: u.OtelConfig.OtlpExporterUrl,
 		}),
-		options.WithWorkloadTypes(func() []options.WorkloadOptions {
-			ret := make([]options.WorkloadOptions, len(u.WorkloadTypes))
-			for i, e := range u.WorkloadTypes {
-				ret[i] = options.WorkloadOptions{
-					Name:     e.Name,
-					AgentUri: e.AgentUri,
-					Argv:     e.Argv,
-					Env:      e.Env,
+		options.WithDisableDirectStart(false),
+		options.WithExternalAgents(func() []options.AgentOptions {
+			ret := make([]options.AgentOptions, len(u.Agents))
+			for i, e := range u.Agents {
+				ret[i] = options.AgentOptions{
+					Name:          e.Name,
+					Uri:           e.AgentUri,
+					Configuration: e.Configuration,
 				}
 			}
 			return ret
@@ -272,6 +274,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 				}(),
 			}
 		}()),
+		options.WithObserver(u.ObserverConfig.Enabled, u.ObserverConfig.Host, u.ObserverConfig.Port),
 	)
 	if err != nil {
 		return err
@@ -310,14 +313,19 @@ type HostServicesConfig struct {
 }
 
 type ServiceConfig struct {
-	Enabled       bool            `group:"Services Configuration"`
-	Configuration json.RawMessage `group:"Services Configuration"`
+	Enabled       bool            `default:"false"`
+	Configuration json.RawMessage `placeholder:"{}"`
 }
 
-type WorkloadConfig struct {
-	Name     string            `help:"Name of the workload type" placeholder:"javascript"`
-	AgentUri string            `name:"agenturi" help:"URI to the agent binary to download and install in resource directory" placeholder:"nats://bucket/key"`
-	Argv     []string          `help:"Arguments to pass to the agent. Comma seperated" placeholder:"--foo=bar,--true"`
-	Env      map[string]string `help:"Environment variables to pass to the agent" placeholder:"NAME=derp"`
+type AgentConfig struct {
+	Name          string          `help:"Name of the workload type" placeholder:"javascript"`
+	AgentUri      string          `name:"agenturi" help:"URI to the agent binary to download and install in resource directory" placeholder:"nats://bucket/key"`
+	Configuration json.RawMessage `help:"Configuration JSON for agent" placeholder:"{}"`
 }
-type WorkloadConfigs []WorkloadConfig
+type AgentConfigs []AgentConfig
+
+type ObserverConfig struct {
+	Enabled bool   `default:"false"`
+	Host    string `default:"127.0.0.1"`
+	Port    uint16 `default:"9911"`
+}

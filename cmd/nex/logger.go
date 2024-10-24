@@ -15,6 +15,10 @@ import (
 func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string) *slog.Logger {
 	var handlerOpts []shandler.HandlerOption
 
+	if cfg.LogShortLevels {
+		handlerOpts = append(handlerOpts, shandler.WithShortLevels())
+	}
+
 	switch cfg.LogLevel {
 	case "debug":
 		handlerOpts = append(handlerOpts, shandler.WithLogLevel(slog.LevelDebug))
@@ -31,6 +35,8 @@ func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string) *slog.
 	}
 
 	switch cfg.LogTimeFormat {
+	case "TimeOnly":
+		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.TimeOnly))
 	case "DateOnly":
 		handlerOpts = append(handlerOpts, shandler.WithTimeFormat(time.DateOnly))
 	case "Stamp":

@@ -9,6 +9,8 @@ const (
 
 	InternalNatsServerReadyName = gen.Atom("internal_nats_server_ready")
 	PostInit                    = "post_init"
+	AgentsReady                 = "agents_ready" // sent by internal nats server when ALL agents are ready to start
+	AgentReady                  = "agent_ready"  // sent by individual agent to nats server when it is ready to start
 )
 
 var (

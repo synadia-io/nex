@@ -38,7 +38,7 @@ func TestCLISimple(t *testing.T) {
 func TestCLIWithConfig(t *testing.T) {
 	config := `{
     "namespace": "derp",
-    "workload_types": [
+    "agents": [
       {
         "name": "CONFIGWORKLOAD",
         "agenturi": "nats://uri/config",
@@ -85,7 +85,7 @@ func TestCLIWithConfig(t *testing.T) {
 		t.Fatalf("Expected nats servers to be %v, got %v", "derp", nex.Globals.Namespace)
 	}
 
-	if len(nex.Node.Up.WorkloadTypes) != 2 {
-		t.Fatalf("Expected 2 workload types, got %d", len(nex.Node.Up.WorkloadTypes))
+	if len(nex.Node.Up.Agents) != 2 {
+		t.Fatalf("Expected 2 workload types, got %d", len(nex.Node.Up.Agents))
 	}
 }

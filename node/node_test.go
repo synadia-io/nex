@@ -1,6 +1,7 @@
 package node_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -46,8 +47,8 @@ func TestDefaultConfigNodeValidation(t *testing.T) {
 
 	tDir := t.TempDir()
 
-	node, err := node.NewNexNode(kp, nc, models.WithResourceDirectory(tDir),
-		models.WithWorkloadTypes([]models.WorkloadOptions{{Name: "test", AgentUri: "https://derp.com", Argv: []string{}, Env: map[string]string{}}}))
+	node, err := node.NewNexNode(kp, nc, models.WithResourceDirectory(tDir), models.WithDisableDirectStart(true),
+		models.WithExternalAgents([]models.AgentOptions{{Name: "test", Uri: "https://derp.com", Configuration: json.RawMessage{}}}))
 	if err != nil {
 		t.Fatal("failed to create new nex node", err)
 	}
@@ -65,7 +66,7 @@ func TestNilOptions(t *testing.T) {
 		t.Fatal("failed to create keypair")
 	}
 
-	_, err = node.NewNexNode(kp, nc, nil)
+	_, err = node.NewNexNode(kp, nc, nil, models.WithDisableDirectStart(true))
 	if err.Error() != `node required at least 1 workload type be configured in order to start
 resource directory does not exist` {
 		fmt.Printf("'%s'", err.Error())
@@ -82,7 +83,7 @@ func TestNoOptions(t *testing.T) {
 		t.Fatal("failed to create keypair")
 	}
 
-	_, err = node.NewNexNode(kp, nc)
+	_, err = node.NewNexNode(kp, nc, models.WithDisableDirectStart(true))
 	if err.Error() != `node required at least 1 workload type be configured in order to start
 resource directory does not exist` {
 		fmt.Printf("'%s'", err.Error())
