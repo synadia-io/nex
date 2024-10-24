@@ -165,7 +165,7 @@ func (nn *nexNode) Start() error {
 func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 
 	actorSystem, err := goakt.NewActorSystem("nexnode",
-		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler())),
+		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
 		// TODO: figure out why they're gone or how we can plug in our own impls
@@ -227,7 +227,7 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	for i, actor := range actorSystem.Actors() {
 		running[i] = actor.Name()
 	}
-	actorSystem.Logger().Info("Actors started", slog.Any("running", running))
+	nn.options.Logger.Info("Actors started", slog.Any("running", running))
 
 	return actorSystem, nil
 }

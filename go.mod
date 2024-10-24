@@ -3,7 +3,7 @@ module github.com/synadia-io/nex
 go 1.23.0
 
 require (
-	disorder.dev/shandler v0.0.0-20240826142832-c3d20720c9db
+	disorder.dev/shandler v0.0.0-20241024213922-2d4ad5b6e00c
 	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
@@ -20,8 +20,8 @@ require (
 	github.com/buraksezer/consistent v0.10.0 // indirect
 	github.com/buraksezer/olric v0.5.6-0.20240925183822-6ca0e20256e0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charmbracelet/lipgloss v0.13.0 // indirect
-	github.com/charmbracelet/x/ansi v0.2.3 // indirect
+	github.com/charmbracelet/lipgloss v0.13.1 // indirect
+	github.com/charmbracelet/x/ansi v0.4.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/flowchartsman/retry v1.2.0 // indirect

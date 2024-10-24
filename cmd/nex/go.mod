@@ -5,7 +5,7 @@ go 1.23.0
 replace github.com/synadia-io/nex => ../..
 
 require (
-	disorder.dev/shandler v0.0.0-20240826142832-c3d20720c9db
+	disorder.dev/shandler v0.0.0-20241024213922-2d4ad5b6e00c
 	github.com/alecthomas/kong v1.2.1
 	github.com/jedib0t/go-pretty/v6 v6.6.1
 	github.com/nats-io/jsm.go v0.1.2
@@ -25,8 +25,8 @@ require (
 	github.com/buraksezer/consistent v0.10.0 // indirect
 	github.com/buraksezer/olric v0.5.6-0.20240925183822-6ca0e20256e0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charmbracelet/lipgloss v0.13.0 // indirect
-	github.com/charmbracelet/x/ansi v0.3.2 // indirect
+	github.com/charmbracelet/lipgloss v0.13.1 // indirect
+	github.com/charmbracelet/x/ansi v0.4.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/flowchartsman/retry v1.2.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
