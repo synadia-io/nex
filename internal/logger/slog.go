@@ -75,12 +75,14 @@ func (l *SlogLog) Panicf(format string, v ...any) {
 // is called which terminates the program immediately.
 func (l *SlogLog) Fatal(v ...any) {
 	l.logger.Log(context.TODO(), shandler.LevelFatal, fmt.Sprint(v...))
+	os.Exit(1)
 }
 
 // Fatalf starts a new message with fatal level. The os.Exit(1) function
 // is called which terminates the program immediately.
 func (l *SlogLog) Fatalf(format string, v ...any) {
 	l.logger.Log(context.TODO(), shandler.LevelFatal, fmt.Sprintf(format, v...))
+	os.Exit(1)
 }
 
 // Error starts a new message with error level.
