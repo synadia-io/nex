@@ -1,6 +1,9 @@
 version: '3'
 
 tasks:
+  # requires the protoc binary in the path, and the `protoc-gen-go` plugin
+  # 'go install google.golang.org/protobuf/cmd/protoc-gen-go@latest'
+
   proto:
     dir: node/actors/pb
     sources:
