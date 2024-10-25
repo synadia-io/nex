@@ -7,12 +7,11 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"os/signal"
 	"slices"
-	"syscall"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+
 	"github.com/synadia-io/nex/internal/logger"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
@@ -28,6 +27,7 @@ type nexNode struct {
 	ctx context.Context
 	nc  *nats.Conn
 
+	interrupt chan os.Signal
 	options   *models.NodeOptions
 	publicKey nkeys.KeyPair
 }
@@ -140,11 +140,9 @@ func (nn *nexNode) Start() error {
 	nn.ctx, cancel = context.WithCancel(nn.ctx)
 	defer cancel()
 
-	interruptSignal := make(chan os.Signal, 1)
-	signal.Notify(interruptSignal, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
+	nn.interrupt = make(chan os.Signal, 1)
 	go func() {
-		<-interruptSignal
+		<-nn.interrupt
 		cancel()
 	}()
 
@@ -154,6 +152,7 @@ func (nn *nexNode) Start() error {
 	}
 
 	<-nn.ctx.Done()
+	nn.options.Logger.Info("Shutting down nexnode")
 	return as.Stop(nn.ctx)
 }
 
@@ -182,7 +181,7 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-	inats := actors.CreateInternalNatsServer(*nn.options)
+	inats := actors.CreateInternalNatsServer(*nn.options, nn.interrupt)
 
 	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
