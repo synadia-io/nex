@@ -12,8 +12,12 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string) *slog.Logger {
+func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string, showSystemLogs bool) *slog.Logger {
 	var handlerOpts []shandler.HandlerOption
+
+	if !showSystemLogs {
+		handlerOpts = append(handlerOpts, shandler.WithGroupFilter([]string{"system"}))
+	}
 
 	if cfg.LogShortLevels {
 		handlerOpts = append(handlerOpts, shandler.WithShortLevels())

@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"log/slog"
 	"slices"
 	"testing"
 
@@ -14,8 +15,9 @@ func TestGenerateConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ns := &internalNatsServer{
+	ns := &InternalNatsServer{
 		hostUser: hostUser,
+		logger:   slog.Default(),
 		nodeOptions: models.NodeOptions{
 			AgentOptions: []models.AgentOptions{
 				{
