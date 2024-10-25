@@ -185,17 +185,16 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 // ----- Up Command -----
 type Up struct {
 	AgentHandshakeTimeoutMillisecond int               `help:"Timeout in milliseconds" name:"agent-timeout" default:"5000"`
-	DefaultResourceDir               string            `default:"${defaultResourcePath}"`
+	DefaultResourceDir               string            `name:"resource-directory" default:"${defaultResourcePath}"`
 	NexusName                        string            `default:"nexus" help:"Nexus name"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
 	Agents                           AgentConfigs      `help:"Workload types configurations for nex node to initialize"`
 	DisableDirectStart               bool              `help:"Disable direct start (no sandbox) workloads" default:"false"`
-	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false"`
+	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false" hidden:""`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
 	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
-	ObserverConfig     ObserverConfig     `embed:"" prefix:"observer." group:"Observer Configuration"`
 }
 
 func (u *Up) AfterApply(globals *Globals) error {
@@ -275,7 +274,6 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 				}(),
 			}
 		}()),
-		options.WithObserver(u.ObserverConfig.Enabled, u.ObserverConfig.Host, u.ObserverConfig.Port),
 	)
 	if err != nil {
 		return err
@@ -287,7 +285,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	logger.Info("Starting Nex Node", slog.String("public_key", pubKey))
+	logger.Info("Starting Nex Node", slog.String("public_key", pubKey), slog.String("config", string(globals.Config)))
 	err = nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
 	if err != nil {
 		logger.Error("Failed to start Nex Node", slog.String("error", err.Error()))
@@ -324,9 +322,3 @@ type AgentConfig struct {
 	Configuration json.RawMessage `help:"Configuration JSON for agent" placeholder:"{}"`
 }
 type AgentConfigs []AgentConfig
-
-type ObserverConfig struct {
-	Enabled bool   `default:"false"`
-	Host    string `default:"127.0.0.1"`
-	Port    uint16 `default:"9911"`
-}
