@@ -7,6 +7,9 @@ import "fmt"
 import "reflect"
 
 type AuctionRequestJson struct {
+	// The type of agent to auction for
+	AgentType []string `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
+
 	// The architecture auction for
 	Arch *AuctionRequestJsonArch `json:"arch,omitempty" yaml:"arch,omitempty" mapstructure:"arch,omitempty"`
 
@@ -15,9 +18,6 @@ type AuctionRequestJson struct {
 
 	// A list of tags to associate with the node during auction
 	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
-
-	// The type of workload to auction for
-	WorkloadType []string `json:"workload_type,omitempty" yaml:"workload_type,omitempty" mapstructure:"workload_type,omitempty"`
 }
 
 type AuctionRequestJsonArch string

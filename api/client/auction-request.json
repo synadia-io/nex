@@ -28,9 +28,9 @@
         "type": "string"
       }
     },
-    "workload_type": {
+    "agent_type": {
       "type": "array",
-      "description": "The type of workload to auction for",
+      "description": "The type of agent to auction for",
       "items": {
         "type": "string"
       }

@@ -12,8 +12,8 @@ type AuctionResponseJson struct {
 	// The unique identifier of the node
 	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
 
-	// The number of running workloads on the node
-	RunningWorkloads int `json:"running_workloads" yaml:"running_workloads" mapstructure:"running_workloads"`
+	// The number of agents running with workload count
+	Status AuctionResponseJsonStatus `json:"status" yaml:"status" mapstructure:"status"`
 
 	// Tags corresponds to the JSON schema field "tags".
 	Tags *AuctionResponseJsonTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
@@ -27,6 +27,14 @@ type AuctionResponseJson struct {
 	// The version of the node
 	Version string `json:"version" yaml:"version" mapstructure:"version"`
 }
+
+// The number of agents running with workload count
+type AuctionResponseJsonStatus struct {
+	// Status corresponds to the JSON schema field "status".
+	Status AuctionResponseJsonStatusStatus `json:"status,omitempty" yaml:"status,omitempty" mapstructure:"status,omitempty"`
+}
+
+type AuctionResponseJsonStatusStatus map[string]int
 
 type AuctionResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
@@ -44,8 +52,8 @@ func (j *AuctionResponseJson) UnmarshalJSON(b []byte) error {
 	if _, ok := raw["node_id"]; raw != nil && !ok {
 		return fmt.Errorf("field node_id in AuctionResponseJson: required")
 	}
-	if _, ok := raw["running_workloads"]; raw != nil && !ok {
-		return fmt.Errorf("field running_workloads in AuctionResponseJson: required")
+	if _, ok := raw["status"]; raw != nil && !ok {
+		return fmt.Errorf("field status in AuctionResponseJson: required")
 	}
 	if _, ok := raw["target_xkey"]; raw != nil && !ok {
 		return fmt.Errorf("field target_xkey in AuctionResponseJson: required")

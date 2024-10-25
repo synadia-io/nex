@@ -35,11 +35,25 @@
         }
       }
     },
-    "running_workloads": {
-      "type": "integer",
-      "description": "The number of running workloads on the node"
+    "status": {
+      "type": "object",
+      "description": "The number of agents running with workload count",
+      "properties": {
+        "status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
+      }
     }
   },
-  "required": ["node_id", "version", "uptime", "target_xkey", "running_workloads"],
+  "required": [
+    "node_id",
+    "version",
+    "uptime",
+    "target_xkey",
+    "status"
+  ],
   "additionalProperties": false
 }
