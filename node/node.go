@@ -61,11 +61,6 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			HostServiceOptions: models.HostServiceOptions{
 				Services: make(map[string]models.ServiceConfig),
 			},
-			Observer: models.ObserverOptions{
-				Enabled: false,
-				Host:    "127.0.0.1",
-				Port:    9911,
-			},
 		},
 	}
 
@@ -226,7 +221,7 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	for i, actor := range actorSystem.Actors() {
 		running[i] = actor.Name()
 	}
-	nn.options.Logger.Info("Actors started", slog.Any("running", running))
+	nn.options.Logger.Debug("Actors started", slog.Any("running", running))
 
 	return actorSystem, nil
 }
