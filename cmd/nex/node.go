@@ -286,13 +286,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 	}
 
 	logger.Info("Starting Nex Node", slog.String("public_key", pubKey), slog.String("config", string(globals.Config)))
-	err = nexNode.Start() // As this is a blocking call, it should return when the node is shutting down
-	if err != nil {
-		logger.Error("Failed to start Nex Node", slog.String("error", err.Error()))
-	}
-	logger.Info("Shutting down Nex Node")
-
-	return nil
+	return nexNode.Start() // As this is a blocking call, it should return only when the node is shutting down
 }
 
 type OtelConfig struct {
