@@ -5,8 +5,6 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
 	"text/template"
 	"time"
 
@@ -145,8 +143,7 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 		return err
 	}
 
-	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
-	signal.Notify(ns.interrupt, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	signalReset(ns.interrupt)
 
 	return nil
 }
