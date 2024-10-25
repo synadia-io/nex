@@ -5,6 +5,8 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"text/template"
 	"time"
 
@@ -32,11 +34,12 @@ type InternalNatsServer struct {
 	serverOptions *server.Options
 	logger        *slog.Logger
 
-	storeDir string
+	storeDir  string
+	interrupt chan os.Signal
 }
 
-func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
-	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger}
+func CreateInternalNatsServer(options models.NodeOptions, interrupt chan os.Signal) *InternalNatsServer {
+	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger, interrupt: interrupt}
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {
@@ -78,12 +81,6 @@ func (ns *InternalNatsServer) CredentialsMap() map[string]AgentCredential {
 }
 
 func (ns *InternalNatsServer) PreStart(ctx context.Context) error {
-
-	err := ns.startNatsServer(ns.serverOptions)
-	if err != nil {
-		return nil
-	}
-
 	return nil
 }
 
@@ -94,7 +91,11 @@ func (s *InternalNatsServer) PostStop(ctx context.Context) error {
 func (s *InternalNatsServer) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		s.logger.Info("Internal NATS server actor is running", slog.String("name", ctx.Self().Name()))
+		s.logger.Debug("Internal NATS server actor is running", slog.String("name", ctx.Self().Name()))
+		err := s.startNatsServer(s.serverOptions)
+		if err != nil {
+			ctx.Err(err)
+		}
 	default:
 		ctx.Unhandled()
 	}
@@ -139,15 +140,13 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 		return err
 	}
 
-	// FIXME-- read from config
-	// if debug || trace {
-	// 	s.ConfigureLogger()
-	// }
-
 	if err := server.Run(ns.server); err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
 		return err
 	}
+
+	signal.Reset(syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1, syscall.SIGUSR2, syscall.SIGHUP)
+	signal.Notify(ns.interrupt, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }
