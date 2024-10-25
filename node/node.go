@@ -11,16 +11,13 @@ import (
 	"slices"
 	"syscall"
 
-	"ergo.services/application/observer"
-	"ergo.services/ergo"
-	"ergo.services/ergo/gen"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/synadia-io/nex/internal/logger"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
+	goakt "github.com/tochemey/goakt/v2/actors"
 )
-
-const ergoNodeName = "nex@localhost"
 
 type Node interface {
 	Validate() error
@@ -133,95 +130,104 @@ func (nn nexNode) Validate() error {
 		}
 	}
 
+	_, err := nn.publicKey.PublicKey()
+	if err != nil {
+		errs = errors.Join(errs, errors.New("could not produce a public key for this node. This should never happen"))
+	}
+
 	return errs
 }
 
+// Start is blocking and will not return until the node is stopped
+// Can be stopped by canceling the provided context
 func (nn *nexNode) Start() error {
-	return nn.initializeSupervisionTree()
-}
+	var cancel context.CancelFunc
+	nn.ctx, cancel = context.WithCancel(nn.ctx)
+	defer cancel()
 
-func (nn *nexNode) initializeSupervisionTree() error {
-	var options gen.NodeOptions
+	interruptSignal := make(chan os.Signal, 1)
+	signal.Notify(interruptSignal, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	nodeID, err := nn.publicKey.PublicKey()
-	if err != nil {
-		fmt.Printf("Unable to start node; %s\n", err)
-		return err
-	}
-
-	// create applications that must be started
-	options.Applications = []gen.ApplicationBehavior{
-		actors.CreateNodeApp(nodeID, nn.nc, *nn.options), // copy options
-	}
-
-	if nn.options.Observer.Enabled {
-		options.Applications = append(options.Applications,
-			observer.CreateApp(observer.Options{
-				Host: nn.options.Observer.Host,
-				Port: nn.options.Observer.Port,
-			},
-			))
-	}
-
-	// disable default logger to get rid of multiple logging to the os.Stdout
-	options.Log.DefaultLogger.Disable = true
-	options.Log.Level = gen.LogLevelTrace // can stay at trace because slog.Log level will handle the output
-
-	// DO NOT REMOVE: the ergo.services library will transmit metrics by default and can only be seen if TRACE level logs are enabled.
-	// This disables that behavior
-	// ref: https://github.com/ergo-services/ergo/blob/364c7ef006ed6eef2775c23dad48ab3a12b7085f/app/system/metrics.go#L102
-	options.Env = make(map[gen.Env]any)
-	options.Env["disable_metrics"] = "true"
-
-	// starting node
-	node, err := ergo.StartNode(gen.Atom(ergoNodeName), options)
-	if err != nil {
-		fmt.Printf("Unable to start node; %s\n", err)
-		return err
-	}
-
-	// https://docs.ergo.services/basics/logging#process-logger
-	// https://docs.ergo.services/tools/observer#log-process-page
-	logger, err := node.Spawn(actors.CreateNodeLogger(nn.ctx, nn.options.Logger), gen.ProcessOptions{})
-	if err != nil {
-		return err
-	}
-
-	// NOTE: the supervised processes won't log their startup (Init) calls because the
-	// logger won't have been in place. However, they will log stuff afterward
-	err = node.LoggerAddPID(logger, "nexlogger", gen.DefaultLogLevels...)
-	if err != nil {
-		node.Log().Error("Failed to add logger", slog.String("error", err.Error()))
-		return err
-	}
-
-	node.Log().Info("Nex node started")
-	if nn.options.Observer.Enabled {
-		node.Log().Info("Observer Application started", slog.String("server", fmt.Sprintf("http://%s:%d", nn.options.Observer.Host, nn.options.Observer.Port)))
-	}
-
-	nn.installSignalHandlers(node)
-	node.Wait()
-
-	return nil
-}
-
-func (nn *nexNode) installSignalHandlers(node gen.Node) {
 	go func() {
-		nn.options.Logger.Info("Installing signal handlers")
-
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
-
-		sig := <-sigs
-		if sig == nil {
-			signal.Reset()
-			return
-		}
-
-		signal.Reset()
-
-		nn.options.Logger.Info("Stopping node")
-		node.Stop()
+		<-interruptSignal
+		cancel()
 	}()
+
+	as, err := nn.initializeSupervisionTree()
+	if err != nil {
+		return err
+	}
+
+	<-nn.ctx.Done()
+	return as.Stop(nn.ctx)
+}
+
+func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
+
+	actorSystem, err := goakt.NewActorSystem("nexnode",
+		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
+		goakt.WithPassivationDisabled(),
+		// In the non-v2 version of goakt, these functions were supported.
+		// TODO: figure out why they're gone or how we can plug in our own impls
+		//goakt.WithTelemetry(telemetry),
+		//goakt.WithTracing(),
+		goakt.WithActorInitMaxRetries(3))
+	if err != nil {
+		return nil, err
+	}
+
+	// start the actor system
+	err = actorSystem.Start(nn.ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// start the root actors
+	agentSuper, err := actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(actorSystem, *nn.options))
+	if err != nil {
+		return nil, err
+	}
+	inats := actors.CreateInternalNatsServer(*nn.options)
+
+	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
+	if err != nil {
+		return nil, err
+	}
+	allCreds := inats.CredentialsMap()
+
+	_, err = actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	if err != nil {
+		return nil, err
+	}
+
+	if !nn.options.DisableDirectStart {
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
+		if err != nil {
+			return nil, err
+		}
+	}
+	for _, agent := range nn.options.AgentOptions {
+		// This map lookup works because the agent name is identical to the workload type
+		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(allCreds[agent.Name], agent))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, pk))
+	if err != nil {
+		return nil, err
+	}
+
+	running := make([]string, len(actorSystem.Actors()))
+	for i, actor := range actorSystem.Actors() {
+		running[i] = actor.Name()
+	}
+	nn.options.Logger.Info("Actors started", slog.Any("running", running))
+
+	return actorSystem, nil
 }

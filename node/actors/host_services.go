@@ -1,62 +1,39 @@
 package actors
 
 import (
-	"errors"
-	"log/slog"
+	"context"
 
-	"ergo.services/ergo/act"
-	"ergo.services/ergo/gen"
 	"github.com/synadia-io/nex/models"
+	goakt "github.com/tochemey/goakt/v2/actors"
+	"github.com/tochemey/goakt/v2/goaktpb"
+	"github.com/tochemey/goakt/v2/log"
 )
 
-func createHostServices() gen.ProcessBehavior {
-	return &hostServicesServer{}
+const HostServicesActorName = "host_services"
+
+func CreateHostServices(options models.HostServiceOptions) *HostServicesServer {
+	return &HostServicesServer{options: options}
 }
 
-type hostServicesServer struct {
-	act.Actor
-}
-
-type hostServicesServerParams struct {
+type HostServicesServer struct {
 	options models.HostServiceOptions
+	logger  log.Logger
 }
 
-func (p *hostServicesServerParams) Validate() error {
-	var err error
-
-	// insert validations
-	// validate options much?
-
-	return err
-}
-
-func (hs *hostServicesServer) Init(args ...any) error {
-	if len(args) != 1 {
-		err := errors.New("host service params are required")
-		hs.Log().Error("Failed to start host services", slog.String("error", err.Error()))
-		return err
-	}
-
-	if _, ok := args[0].(hostServicesServerParams); !ok {
-		err := errors.New("args[0] must be valid host service params")
-		hs.Log().Error("Failed to start host services", slog.String("error", err.Error()))
-		return err
-	}
-
-	params := args[0].(hostServicesServerParams)
-	err := params.Validate()
-	if err != nil {
-		hs.Log().Error("Failed to start host services", slog.String("error", err.Error()))
-		return err
-	}
-
-	hs.Log().Info("Host services started", slog.String("nats_url", params.options.NatsUrl))
-
+func (s *HostServicesServer) PreStart(ctx context.Context) error {
 	return nil
 }
 
-// HandleInspect invoked on the request made with gen.Process.Inspect(...)
-func (hs *hostServicesServer) HandleInspect(from gen.PID, item ...string) map[string]string {
-	hs.Log().Info("host services server got inspect request from %s", from)
+func (s *HostServicesServer) PostStop(ctx context.Context) error {
 	return nil
+}
+
+func (s *HostServicesServer) Receive(ctx *goakt.ReceiveContext) {
+	switch ctx.Message().(type) {
+	case *goaktpb.PostStart:
+		s.logger = ctx.Self().Logger()
+		s.logger.Infof("Host services server '%s' is running", ctx.Self().Name())
+	default:
+		ctx.Unhandled()
+	}
 }
