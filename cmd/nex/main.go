@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		userConfigPath = "."
 	}
-	userResourcePath := filepath.Join(userConfigPath, ".nex", "bin")
+	userResourcePath := filepath.Join(userConfigPath, "nex")
 
 	nex := new(NexCLI)
 	ctx := kong.Parse(nex,
@@ -39,7 +39,7 @@ func main() {
 		kong.Description("The NATS execution engine\n"+Banner),
 		kong.UsageOnError(),
 		kong.ConfigureHelp(kong.HelpOptions{Compact: true, NoExpandSubcommands: true, FlagsLast: true}),
-		kong.Configuration(kong.JSON),
+		kong.Configuration(kong.JSON, filepath.Join(userConfigPath, "config.json")),
 		kong.Vars{
 			"version":             fmt.Sprintf("%s [%s] | Built: %s", VERSION, COMMIT, BUILDDATE),
 			"versionOnly":         VERSION,
