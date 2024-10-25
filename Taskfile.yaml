@@ -1,0 +1,17 @@
+version: '3'
+
+tasks:
+  proto:
+    dir: node/actors/pb
+    sources:
+      - "*.proto"
+    generates:
+      - "*.go"
+    cmds:
+      - protoc --proto_path=. --go_out=. --go_opt=paths=source_relative *.proto
+  
+  nex:
+    deps: [proto]
+    dir: cmd/nex
+    cmds:
+      - go build .

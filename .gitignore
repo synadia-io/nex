@@ -34,3 +34,5 @@ dist/
 
 config.json
 .resources/
+
+.task
