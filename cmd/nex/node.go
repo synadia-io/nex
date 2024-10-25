@@ -285,7 +285,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	logger.Info("Starting Nex Node", slog.String("public_key", pubKey))
+	logger.Info("Starting Nex Node", slog.String("public_key", pubKey), slog.String("config", string(globals.Config)))
 	return nexNode.Start() // As this is a blocking call, it should return only when the node is shutting down
 }
 
