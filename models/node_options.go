@@ -15,9 +15,6 @@ type NodeOptions struct {
 	DisableDirectStart    bool
 	AgentOptions          []AgentOptions
 	HostServiceOptions    HostServiceOptions
-
-	// Ergos Observer
-	Observer ObserverOptions
 }
 
 type NodeOption func(*NodeOptions)
@@ -78,16 +75,6 @@ func WithHostServiceOptions(h HostServiceOptions) NodeOption {
 	}
 }
 
-func WithObserver(b bool, host string, port uint16) NodeOption {
-	return func(n *NodeOptions) {
-		n.Observer = ObserverOptions{
-			Enabled: b,
-			Host:    host,
-			Port:    port,
-		}
-	}
-}
-
 type OTelOptions struct {
 	MetricsEnabled   bool
 	MetricsExporter  string
@@ -113,10 +100,4 @@ type HostServiceOptions struct {
 type ServiceConfig struct {
 	Enabled       bool
 	Configuration json.RawMessage
-}
-
-type ObserverOptions struct {
-	Enabled bool
-	Host    string
-	Port    uint16
 }
