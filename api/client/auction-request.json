@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/synadia-io/nex/api/client/auction-request",
+  "title": "AuctionRequest",
+  "type": "object",
+  "properties": {
+    "arch": {
+      "type": "string",
+      "description": "The architecture auction for",
+      "enum": [
+        "amd64",
+        "arm64"
+      ]
+    },
+    "os": {
+      "type": "string",
+      "description": "The operating system to auction for",
+      "enum": [
+        "linux",
+        "darwin",
+        "windows"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "description": "A list of tags to associate with the node during auction",
+      "items": {
+        "type": "string"
+      }
+    },
+    "workload_type": {
+      "type": "array",
+      "description": "The type of workload to auction for",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}
