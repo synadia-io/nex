@@ -1,0 +1,55 @@
+// Message definitions for communciation with and between agent actors
+// This is NOT the API definition for host services or the internal NATS server agent comms
+// protocol.
+
+syntax = "proto3";
+import "google/protobuf/timestamp.proto";
+
+package agents;
+
+option go_package = "github.com/synadia-io/nex/node/actors/pb;actorproto";
+
+// Probably not going to be used. Placeholder to get at least one field until we
+// fill out the other structs
+message Ping {
+  string id = 1;
+}
+
+// Sent by the control API actor to an agent actor to request a workload be started
+message StartWorkload {
+
+}
+
+// Reply from the agent actor containing the results of the attempt to start a workload
+message WorkloadStarted {
+
+}
+
+// Request sent by the control API actor to an agent actor asking to stop a workload
+message StopWorkload {
+
+}
+
+// Response from the agent actor indicating the results of the workload stop attempt
+message WorkloadStopped {
+
+}
+
+// Asks the target agent for a list of all if its known, running workloads
+message QueryWorkloads {}
+
+message WorkloadListing {
+    repeated WorkloadSummary workloads = 1;
+}
+
+message WorkloadSummary {
+    string name = 1;
+    google.protobuf.Timestamp started_at = 2;
+    
+}
+
+// Request made by the actor system and/or control API asking the agent to stop. Note
+// that the direct start agent will ignore this
+message Halt {
+
+}
