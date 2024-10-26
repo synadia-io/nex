@@ -140,9 +140,10 @@ func (nn *nexNode) Start() error {
 	nn.ctx, cancel = context.WithCancel(nn.ctx)
 	defer cancel()
 
-	nn.interrupt = make(chan os.Signal, 1)
+	interrupt := make(chan os.Signal, 1)
+	signalReset(interrupt)
 	go func() {
-		<-nn.interrupt
+		<-interrupt
 		cancel()
 	}()
 
@@ -181,7 +182,7 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-	inats := actors.CreateInternalNatsServer(*nn.options, nn.interrupt)
+	inats := actors.CreateInternalNatsServer(*nn.options)
 
 	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {

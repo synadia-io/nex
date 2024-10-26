@@ -32,12 +32,11 @@ type InternalNatsServer struct {
 	serverOptions *server.Options
 	logger        *slog.Logger
 
-	storeDir  string
-	interrupt chan os.Signal
+	storeDir string
 }
 
-func CreateInternalNatsServer(options models.NodeOptions, interrupt chan os.Signal) *InternalNatsServer {
-	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger, interrupt: interrupt}
+func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
+	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger}
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {
@@ -143,8 +142,6 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 		return err
 	}
 
-	signalReset(ns.interrupt)
-
 	return nil
 }
 
@@ -194,6 +191,7 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 		JetStream: true,
 		StoreDir:  ns.storeDir,
 		Port:      -1,
+		NoSigs:    true,
 		// Debug:     debug, FIXME-- make configurable
 		// Trace:     trace,
 	}
