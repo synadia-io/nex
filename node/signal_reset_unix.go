@@ -1,6 +1,6 @@
 //go:build !windows
 
-package actors
+package node
 
 import (
 	"os"

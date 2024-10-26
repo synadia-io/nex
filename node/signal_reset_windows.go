@@ -1,4 +1,4 @@
-package actors
+package node
 
 import (
 	"os"
