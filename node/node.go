@@ -27,7 +27,6 @@ type nexNode struct {
 	ctx context.Context
 	nc  *nats.Conn
 
-	interrupt chan os.Signal
 	options   *models.NodeOptions
 	publicKey nkeys.KeyPair
 }
