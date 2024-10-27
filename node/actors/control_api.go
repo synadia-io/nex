@@ -2,15 +2,17 @@ package actors
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
-
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"github.com/tochemey/goakt/v2/log"
+	"log/slog"
+
+	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
 const APIPrefix = "$NEX"
@@ -33,6 +35,8 @@ type ControlAPI struct {
 	publicKey  string
 	publicXKey string
 	subsz      []*nats.Subscription
+
+	self *goakt.PID
 }
 
 func (a *ControlAPI) PreStart(ctx context.Context) error {
@@ -52,6 +56,7 @@ func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		a.logger = ctx.Self().Logger()
+		a.self = ctx.Self()
 		err := a.subscribe()
 		if err != nil {
 			_ = a.shutdown()
@@ -171,7 +176,38 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-	// TODO
+
+	req := &actorproto.QueryWorkloads{}
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		// TODO: do something
+	}
+	// Ask the agent supervisor for a list of all the workloads from all of its children
+	response, err := api.self.Ask(ctx, agentSuper, req)
+	if err != nil {
+		// TODO: TODO
+	}
+	workloadResponse, ok := response.(*actorproto.WorkloadListing)
+	if !ok {
+		// TODO: TODO
+	}
+
+	// TODO: This struct will be replaced by a generated struct from a JSON schema in api/nodecontrol
+	info := struct {
+		NodeID    string                        `json:"node_id"`
+		Workloads []*actorproto.WorkloadSummary `json:"workloads"`
+	}{
+		NodeID:    "Nxxx",
+		Workloads: workloadResponse.Workloads,
+	}
+
+	bytes, err := json.Marshal(&info)
+	if err != nil {
+		// TODO: TODO
+	}
+
+	_ = m.Respond(bytes)
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
