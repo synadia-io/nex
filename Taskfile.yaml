@@ -33,31 +33,31 @@ tasks:
        ../stop-workload-request.json"
   
   gen-schema-client:
-    dir: api/client
+    dir: api/nodecontrol
     cmds:
       - "go-jsonschema \
       --package=gen -o=./gen/auction_request.go \
-      --schema-package=io.nats.nex.v2.auction-request=github.com/synadia-io/nex/api/client/gen \
+      --schema-package=io.nats.nex.v2.auction-request=github.com/synadia-io/nex/api/nodecontrol/gen \
       auction-request.json"
       - "go-jsonschema \
       --package=gen -o=./gen/auction_response.go \
-      --schema-package=io.nats.nex.v2.auction-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-package=io.nats.nex.v2.auction-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       auction-response.json"
       - "go-jsonschema \
       --package=gen -o=./gen/node_ping_response.go \
-      --schema-package=io.nats.nex.v2.node-ping-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-package=io.nats.nex.v2.node-ping-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       node-ping-response.json"
       - "go-jsonschema \
       --package=gen -o=./gen/agent_ping_response.go \
-      --schema-package=io.nats.nex.v2.agent-ping-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-package=io.nats.nex.v2.agent-ping-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       agent-ping-response.json"
       - "go-jsonschema \
       --package=gen -o=./gen/lameduck_response.go \
-      --schema-package=io.nats.nex.v2.lame-duck-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-package=io.nats.nex.v2.lame-duck-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       lameduck-response.json"
       - "go-jsonschema \
       --package=gen -o=./gen/node_info_response.go \
-      --schema-package=io.nats.nex.v2.node-info-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-package=io.nats.nex.v2.node-info-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       node-info-response.json"
   
   nex:
