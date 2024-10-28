@@ -181,16 +181,19 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 	ctx := context.Background()
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
-		// TODO: do something
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		return
 	}
 	// Ask the agent supervisor for a list of all the workloads from all of its children
 	response, err := api.self.Ask(ctx, agentSuper, req)
 	if err != nil {
-		// TODO: TODO
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		return
 	}
 	workloadResponse, ok := response.(*actorproto.WorkloadListing)
 	if !ok {
-		// TODO: TODO
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		return
 	}
 
 	// TODO: This struct will be replaced by a generated struct from a JSON schema in api/nodecontrol
@@ -204,7 +207,8 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 
 	bytes, err := json.Marshal(&info)
 	if err != nil {
-		// TODO: TODO
+		api.logger.Error("Failed to marshal node info to JSON", slog.Any("error", err))
+		return
 	}
 
 	_ = m.Respond(bytes)
