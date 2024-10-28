@@ -16,7 +16,22 @@ import (
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
-const APIPrefix = "$NEX"
+const (
+	APIPrefix = "$NEX"
+)
+
+var (
+	AuctionSubject      NexSubject = func(_ ...string) string { return APIPrefix + ".AUCTION" }
+	PingSubject         NexSubject = func(_ ...string) string { return APIPrefix + ".PING" }
+	WorkloadPingSubject NexSubject = func(_ ...string) string { return APIPrefix + ".WPING.>" }
+	DirectPingSubject   NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".PING.%s", in[0]) }
+	UndeploySubject     NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".UNDEPLOY.*.%s", in[0]) }
+	DeploySubject       NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".DEPLOY.*.%s", in[0]) }
+	InfoSubject         NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".INFO.*.%s", in[0]) }
+	LameduckSubject     NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".LAMEDUCK.%s", in[0]) }
+)
+
+type NexSubject func(...string) string
 
 const ControlAPIActorName = "control_api"
 
@@ -121,7 +136,7 @@ func (api *ControlAPI) subscribe() error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = api.nc.Subscribe(APIPrefix+".AUCTION", api.handleAuction)
+	sub, err = api.nc.Subscribe(AuctionSubject(), api.handleAuction)
 	if err != nil {
 		// TODO: change this to conform to whatever our "real" logging strat is
 		api.logger.Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
@@ -129,49 +144,49 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".DEPLOY.*."+api.publicKey, api.handleDeploy)
+	sub, err = api.nc.Subscribe(DeploySubject(api.publicKey), api.handleDeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".INFO.*."+api.publicKey, api.handleInfo)
+	sub, err = api.nc.Subscribe(InfoSubject(api.publicKey), api.handleInfo)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".LAMEDUCK."+api.publicKey, api.handleLameDuck)
+	sub, err = api.nc.Subscribe(LameduckSubject(api.publicKey), api.handleLameDuck)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".PING", api.handlePing)
+	sub, err = api.nc.Subscribe(PingSubject(), api.handlePing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".PING."+api.publicKey, api.handlePing)
+	sub, err = api.nc.Subscribe(DirectPingSubject(api.publicKey), api.handlePing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to node-specific ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".UNDEPLOY.*."+api.publicKey, api.handleUndeploy)
+	sub, err = api.nc.Subscribe(UndeploySubject(api.publicKey), api.handleUndeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to undeploy subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".WPING.>", api.handleWorkloadPing)
+	sub, err = api.nc.Subscribe(WorkloadPingSubject(), api.handleWorkloadPing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to workload ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
