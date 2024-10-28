@@ -37,7 +37,9 @@
     },
     "workload_summaries": {
       "type": "array",
-      "$ref": "WorkloadSummary"
+      "items": {
+        "$ref": "#/definitions/WorkloadSummary"
+      }
     }
   },
   "required": [

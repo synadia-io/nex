@@ -54,7 +54,11 @@ tasks:
       - "go-jsonschema \
       --package=gen -o=./gen/lameduck_response.go \
       --schema-package=io.nats.nex.v2.lame-duck-response=github.com/synadia-io/nex/api/client/gen \
-      lame-duck-response.json"
+      lameduck-response.json"
+      - "go-jsonschema \
+      --package=gen -o=./gen/node_info_response.go \
+      --schema-package=io.nats.nex.v2.node-info-response=github.com/synadia-io/nex/api/client/gen \
+      node-info-response.json"
   
   nex:
     deps: [proto]
