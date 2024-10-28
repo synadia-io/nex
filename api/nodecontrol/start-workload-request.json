@@ -75,7 +75,24 @@
       "description": "The type of the workload"
     }
   },
-  "required": [],
+  "required": [
+    "argv",
+    "description",
+    "hash",
+    "uri",
+    "essential",
+    "environment",
+    "jsdomain",
+    "retry_count",
+    "retried_at",
+    "sender_public_key",
+    "target_node",
+    "trigger_subjects",
+    "host_service_config",
+    "workload_name",
+    "workload_jwt",
+    "workload_type"
+  ],
   "definitions": {
     "HostServicesConfig": {
       "type": "object",

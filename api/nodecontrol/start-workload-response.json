@@ -17,7 +17,12 @@
       "type": "boolean"
     }
   },
-  "required": [],
+  "required": [
+    "id",
+    "issuer",
+    "name",
+    "started"
+  ],
   "definitions": {},
   "additionalProperties": false
 }

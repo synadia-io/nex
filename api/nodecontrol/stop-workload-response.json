@@ -14,7 +14,11 @@
       "type": "boolean"
     }
   },
-  "required": [],
+  "required": [
+    "id",
+    "issuer",
+    "stopped"
+  ],
   "definitions": {},
   "additionalProperties": false
 }

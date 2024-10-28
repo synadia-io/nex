@@ -14,7 +14,11 @@
       "type": "string"
     }
   },
-  "required": [],
+  "required": [
+    "node_id",
+    "workload_id",
+    "workload_jwt"
+  ],
   "definitions": {},
   "additionalProperties": false
 }

@@ -2,6 +2,9 @@
 
 package gen
 
+import "encoding/json"
+import "fmt"
+
 type HostServicesConfig struct {
 	// NatsUrl corresponds to the JSON schema field "nats_url".
 	NatsUrl *string `json:"nats_url,omitempty" yaml:"nats_url,omitempty" mapstructure:"nats_url,omitempty"`
@@ -12,52 +15,115 @@ type HostServicesConfig struct {
 
 type StartWorkloadRequestJson struct {
 	// Arguments to be passed to the binary
-	Argv []string `json:"argv,omitempty" yaml:"argv,omitempty" mapstructure:"argv,omitempty"`
+	Argv []string `json:"argv" yaml:"argv" mapstructure:"argv"`
 
 	// A description of the workload
-	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description string `json:"description" yaml:"description" mapstructure:"description"`
 
 	// The base64-encoded byte array of the environment in which the workload is
 	// provided at runtime
-	Environment *string `json:"environment,omitempty" yaml:"environment,omitempty" mapstructure:"environment,omitempty"`
+	Environment string `json:"environment" yaml:"environment" mapstructure:"environment"`
 
 	// Whether the workload is essential; essential workloads will be restarted if
 	// they fail
-	Essential *bool `json:"essential,omitempty" yaml:"essential,omitempty" mapstructure:"essential,omitempty"`
+	Essential bool `json:"essential" yaml:"essential" mapstructure:"essential"`
 
 	// The hash of the workload
-	Hash *string `json:"hash,omitempty" yaml:"hash,omitempty" mapstructure:"hash,omitempty"`
+	Hash string `json:"hash" yaml:"hash" mapstructure:"hash"`
 
 	// The NATS configuration for the host services
-	HostServiceConfig *HostServicesConfig `json:"host_service_config,omitempty" yaml:"host_service_config,omitempty" mapstructure:"host_service_config,omitempty"`
+	HostServiceConfig HostServicesConfig `json:"host_service_config" yaml:"host_service_config" mapstructure:"host_service_config"`
 
 	// The NATS JSDomain for the workload
-	Jsdomain *string `json:"jsdomain,omitempty" yaml:"jsdomain,omitempty" mapstructure:"jsdomain,omitempty"`
+	Jsdomain string `json:"jsdomain" yaml:"jsdomain" mapstructure:"jsdomain"`
 
 	// The time at which the workload was last retried
-	RetriedAt *string `json:"retried_at,omitempty" yaml:"retried_at,omitempty" mapstructure:"retried_at,omitempty"`
+	RetriedAt string `json:"retried_at" yaml:"retried_at" mapstructure:"retried_at"`
 
 	// The number of times the workload has been retried
-	RetryCount *int `json:"retry_count,omitempty" yaml:"retry_count,omitempty" mapstructure:"retry_count,omitempty"`
+	RetryCount int `json:"retry_count" yaml:"retry_count" mapstructure:"retry_count"`
 
 	// The public key of the sender
-	SenderPublicKey *string `json:"sender_public_key,omitempty" yaml:"sender_public_key,omitempty" mapstructure:"sender_public_key,omitempty"`
+	SenderPublicKey string `json:"sender_public_key" yaml:"sender_public_key" mapstructure:"sender_public_key"`
 
 	// The target node for the workload
-	TargetNode *string `json:"target_node,omitempty" yaml:"target_node,omitempty" mapstructure:"target_node,omitempty"`
+	TargetNode string `json:"target_node" yaml:"target_node" mapstructure:"target_node"`
 
 	// The subjects that trigger the workload
-	TriggerSubjects []string `json:"trigger_subjects,omitempty" yaml:"trigger_subjects,omitempty" mapstructure:"trigger_subjects,omitempty"`
+	TriggerSubjects []string `json:"trigger_subjects" yaml:"trigger_subjects" mapstructure:"trigger_subjects"`
 
 	// The URI of the workload
-	Uri *string `json:"uri,omitempty" yaml:"uri,omitempty" mapstructure:"uri,omitempty"`
+	Uri string `json:"uri" yaml:"uri" mapstructure:"uri"`
 
 	// The JWT for the workload
-	WorkloadJwt *string `json:"workload_jwt,omitempty" yaml:"workload_jwt,omitempty" mapstructure:"workload_jwt,omitempty"`
+	WorkloadJwt string `json:"workload_jwt" yaml:"workload_jwt" mapstructure:"workload_jwt"`
 
 	// The name of the workload
-	WorkloadName *string `json:"workload_name,omitempty" yaml:"workload_name,omitempty" mapstructure:"workload_name,omitempty"`
+	WorkloadName string `json:"workload_name" yaml:"workload_name" mapstructure:"workload_name"`
 
 	// The type of the workload
-	WorkloadType *string `json:"workload_type,omitempty" yaml:"workload_type,omitempty" mapstructure:"workload_type,omitempty"`
+	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["argv"]; raw != nil && !ok {
+		return fmt.Errorf("field argv in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["environment"]; raw != nil && !ok {
+		return fmt.Errorf("field environment in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["essential"]; raw != nil && !ok {
+		return fmt.Errorf("field essential in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["hash"]; raw != nil && !ok {
+		return fmt.Errorf("field hash in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["host_service_config"]; raw != nil && !ok {
+		return fmt.Errorf("field host_service_config in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["jsdomain"]; raw != nil && !ok {
+		return fmt.Errorf("field jsdomain in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["retried_at"]; raw != nil && !ok {
+		return fmt.Errorf("field retried_at in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["retry_count"]; raw != nil && !ok {
+		return fmt.Errorf("field retry_count in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["sender_public_key"]; raw != nil && !ok {
+		return fmt.Errorf("field sender_public_key in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["target_node"]; raw != nil && !ok {
+		return fmt.Errorf("field target_node in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["trigger_subjects"]; raw != nil && !ok {
+		return fmt.Errorf("field trigger_subjects in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["uri"]; raw != nil && !ok {
+		return fmt.Errorf("field uri in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["workload_jwt"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_jwt in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["workload_name"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_name in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["workload_type"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_type in StartWorkloadRequestJson: required")
+	}
+	type Plain StartWorkloadRequestJson
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = StartWorkloadRequestJson(plain)
+	return nil
 }
