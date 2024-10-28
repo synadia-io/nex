@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.stop_workload_request",
+  "title": "StopWorkloadRequest",
+  "type": "object",
+  "properties": {
+    "node_id": {
+      "type": "string"
+    },
+    "workload_id": {
+      "type": "string"
+    },
+    "workload_jwt": {
+      "type": "string"
+    }
+  },
+  "required": [],
+  "definitions": {},
+  "additionalProperties": false
+}

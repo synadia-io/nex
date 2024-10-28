@@ -21,14 +21,14 @@ const (
 )
 
 var (
-	AuctionSubject      NexSubject = func(_ ...string) string { return APIPrefix + ".AUCTION" }
-	PingSubject         NexSubject = func(_ ...string) string { return APIPrefix + ".PING" }
-	WorkloadPingSubject NexSubject = func(_ ...string) string { return APIPrefix + ".WPING.>" }
-	DirectPingSubject   NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".PING.%s", in[0]) }
-	UndeploySubject     NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".UNDEPLOY.*.%s", in[0]) }
-	DeploySubject       NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".DEPLOY.*.%s", in[0]) }
-	InfoSubject         NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".INFO.*.%s", in[0]) }
-	LameduckSubject     NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".LAMEDUCK.%s", in[0]) }
+	AuctionSubject    NexSubject = func(_ ...string) string { return APIPrefix + ".AUCTION" }
+	PingSubject       NexSubject = func(_ ...string) string { return APIPrefix + ".PING" }
+	AgentPingSubject  NexSubject = func(_ ...string) string { return APIPrefix + ".APING.>" }
+	DirectPingSubject NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".PING.%s", in[0]) }
+	UndeploySubject   NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".UNDEPLOY.*.%s", in[0]) }
+	DeploySubject     NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".DEPLOY.*.%s", in[0]) }
+	InfoSubject       NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".INFO.*.%s", in[0]) }
+	LameduckSubject   NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".LAMEDUCK.%s", in[0]) }
 )
 
 type NexSubject func(...string) string
@@ -186,9 +186,9 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(WorkloadPingSubject(), api.handleWorkloadPing)
+	sub, err = api.nc.Subscribe(AgentPingSubject(), api.handleWorkloadPing)
 	if err != nil {
-		api.logger.Error("Failed to subscribe to workload ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
