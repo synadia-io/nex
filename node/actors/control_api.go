@@ -11,6 +11,7 @@ import (
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"github.com/tochemey/goakt/v2/log"
 	"log/slog"
+	"strings"
 
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
@@ -196,20 +197,20 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondFail(m, InfoResponseType, 500, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 	// Ask the agent supervisor for a list of all the workloads from all of its children
 	response, err := api.self.Ask(ctx, agentSuper, req)
 	if err != nil {
 		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondFail(m, InfoResponseType, 500, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
 		return
 	}
 	workloadResponse, ok := response.(*actorproto.WorkloadListing)
 	if !ok {
 		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondFail(m, InfoResponseType, 500, "Agent supervisor returned the wrong data type")
+		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")
 		return
 	}
 
@@ -221,7 +222,7 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 		NodeID:    "Nxxx",
 		Workloads: workloadResponse.Workloads,
 	}
-	respondPass(m, InfoResponseType, 200, info)
+	respondEnvelope(m, InfoResponseType, 200, info, "")
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
@@ -263,12 +264,11 @@ func failEnvelope(dataType string, code int, err string) Envelope {
 	}
 }
 
-func respondFail(m *nats.Msg, dataType string, code int, err string) {
-	bytes, _ := json.Marshal(failEnvelope(dataType, code, err))
-	_ = m.Respond(bytes)
-}
-
-func respondPass(m *nats.Msg, dataType string, code int, data interface{}) {
-	bytes, _ := json.Marshal(newEnvelope(dataType, data, code, nil))
+func respondEnvelope(m *nats.Msg, dataType string, code int, data interface{}, err string) {
+	e := &err
+	if len(strings.TrimSpace(err)) == 0 {
+		e = nil
+	}
+	bytes, _ := json.Marshal(newEnvelope(dataType, data, code, &err))
 	_ = m.Respond(bytes)
 }
