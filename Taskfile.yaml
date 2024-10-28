@@ -51,7 +51,10 @@ tasks:
       --schema-package=https://github.com/synadia-io/nex/api/client/agent-ping-response=github.com/synadia-io/nex/api/client/gen \
       --schema-output=https://github.com/synadia-io/nex/api/client/agent-ping-response=gen/agent_ping_response.go \
        agent-ping-response.json"
-      
+      - "go-jsonschema \
+      --schema-package=https://github.com/synadia-io/nex/api/client/lame-duck-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-output=https://github.com/synadia-io/nex/api/client/lame-duck-response=gen/lame_duck_response.go \
+       lame-duck-response.json"
   
   nex:
     deps: [proto]
