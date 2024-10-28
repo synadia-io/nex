@@ -19,6 +19,20 @@ const APIPrefix = "$NEX"
 
 const ControlAPIActorName = "control_api"
 
+const (
+	AuctionResponseType  = "io.nats.nex.v2.auction_response"
+	InfoResponseType     = "io.nats.nex.v2.info_response"
+	PingResponseType     = "io.nats.nex.v2.ping_response"
+	RunResponseType      = "io.nats.nex.v2.run_response"
+	StopResponseType     = "io.nats.nex.v2.stop_response"
+	LameDuckResponseType = "io.nats.nex.v2.lameduck_response"
+
+	TagOS       = "nex.os"
+	TagArch     = "nex.arch"
+	TagCPUs     = "nex.cpucount"
+	TagLameDuck = "nex.lameduck"
+)
+
 func CreateControlAPI(nc *nats.Conn, publicKey string) *ControlAPI {
 	api := &ControlAPI{nc: nc, publicKey: publicKey, subsz: make([]*nats.Subscription, 0)}
 	err := api.initPublicXKey()
@@ -182,36 +196,32 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondFail(m, InfoResponseType, 500, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 	// Ask the agent supervisor for a list of all the workloads from all of its children
 	response, err := api.self.Ask(ctx, agentSuper, req)
 	if err != nil {
 		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondFail(m, InfoResponseType, 500, fmt.Sprintf("failed to get list of running workloads: %s", err))
 		return
 	}
 	workloadResponse, ok := response.(*actorproto.WorkloadListing)
 	if !ok {
 		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondFail(m, InfoResponseType, 500, "Agent supervisor returned the wrong data type")
 		return
 	}
 
 	// TODO: This struct will be replaced by a generated struct from a JSON schema in api/nodecontrol
 	info := struct {
 		NodeID    string                        `json:"node_id"`
-		Workloads []*actorproto.WorkloadSummary `json:"workloads"`
+		Workloads []*actorproto.WorkloadSummary `json:"workloads"` // NOTE: the json schema gernerated version of this won't use actorproto
 	}{
 		NodeID:    "Nxxx",
 		Workloads: workloadResponse.Workloads,
 	}
-
-	bytes, err := json.Marshal(&info)
-	if err != nil {
-		api.logger.Error("Failed to marshal node info to JSON", slog.Any("error", err))
-		return
-	}
-
-	_ = m.Respond(bytes)
+	respondPass(m, InfoResponseType, 200, info)
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
@@ -228,4 +238,37 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 
 func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 	// TODO
+}
+
+type Envelope struct {
+	PayloadType string      `json:"type"`
+	Data        interface{} `json:"data,omitempty"`
+	Error       *string     `json:"error,omitempty"`
+	Code        int         `json:"code"`
+}
+
+func newEnvelope(dataType string, data interface{}, code int, err *string) Envelope {
+	return Envelope{
+		PayloadType: dataType,
+		Data:        data,
+		Error:       err,
+	}
+}
+
+func failEnvelope(dataType string, code int, err string) Envelope {
+	return Envelope{
+		PayloadType: dataType,
+		Code:        code,
+		Error:       &err,
+	}
+}
+
+func respondFail(m *nats.Msg, dataType string, code int, err string) {
+	bytes, _ := json.Marshal(failEnvelope(dataType, code, err))
+	_ = m.Respond(bytes)
+}
+
+func respondPass(m *nats.Msg, dataType string, code int, data interface{}) {
+	bytes, _ := json.Marshal(newEnvelope(dataType, data, code, nil))
+	_ = m.Respond(bytes)
 }
