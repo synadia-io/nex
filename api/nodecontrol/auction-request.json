@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.auction_request",
+  "title": "AuctionRequest",
+  "type": "object",
+  "properties": {
+    "arch": {
+      "type": "string",
+      "description": "Specify a required architecture for the auction",
+      "enum": [
+        "amd64",
+        "arm64"
+      ]
+    },
+    "os": {
+      "type": "string",
+      "description": "Specify a required operating system for the auction",
+      "enum": [
+        "linux",
+        "darwin",
+        "windows"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "description": "A list of tags to associate with the node during auction. To be returned, node must satisfy ALL tags",
+      "items": {
+        "type": "string"
+      }
+    },
+    "agent_type": {
+      "type": "array",
+      "description": "The type of agent to auction for",
+      "items": {
+        "$ref": "#/definitions/NexWorkload"
+      }
+    }
+  },
+  "required": [],
+  "definitions": {
+    "NexWorkload": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}
