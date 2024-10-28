@@ -2,20 +2,37 @@ package actors
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
-
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"github.com/tochemey/goakt/v2/log"
+	"log/slog"
+	"strings"
+
+	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
 const APIPrefix = "$NEX"
 
 const ControlAPIActorName = "control_api"
+
+const (
+	AuctionResponseType  = "io.nats.nex.v2.auction_response"
+	InfoResponseType     = "io.nats.nex.v2.info_response"
+	PingResponseType     = "io.nats.nex.v2.ping_response"
+	RunResponseType      = "io.nats.nex.v2.run_response"
+	StopResponseType     = "io.nats.nex.v2.stop_response"
+	LameDuckResponseType = "io.nats.nex.v2.lameduck_response"
+
+	TagOS       = "nex.os"
+	TagArch     = "nex.arch"
+	TagCPUs     = "nex.cpucount"
+	TagLameDuck = "nex.lameduck"
+)
 
 func CreateControlAPI(nc *nats.Conn, publicKey string) *ControlAPI {
 	api := &ControlAPI{nc: nc, publicKey: publicKey, subsz: make([]*nats.Subscription, 0)}
@@ -33,6 +50,8 @@ type ControlAPI struct {
 	publicKey  string
 	publicXKey string
 	subsz      []*nats.Subscription
+
+	self *goakt.PID
 }
 
 func (a *ControlAPI) PreStart(ctx context.Context) error {
@@ -52,6 +71,7 @@ func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		a.logger = ctx.Self().Logger()
+		a.self = ctx.Self()
 		err := a.subscribe()
 		if err != nil {
 			_ = a.shutdown()
@@ -171,7 +191,38 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-	// TODO
+
+	req := &actorproto.QueryWorkloads{}
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+	// Ask the agent supervisor for a list of all the workloads from all of its children
+	response, err := api.self.Ask(ctx, agentSuper, req)
+	if err != nil {
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		return
+	}
+	workloadResponse, ok := response.(*actorproto.WorkloadListing)
+	if !ok {
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		return
+	}
+
+	// TODO: This struct will be replaced by a generated struct from a JSON schema in api/nodecontrol
+	info := struct {
+		NodeID    string                        `json:"node_id"`
+		Workloads []*actorproto.WorkloadSummary `json:"workloads"` // NOTE: the json schema gernerated version of this won't use actorproto
+	}{
+		NodeID:    "Nxxx",
+		Workloads: workloadResponse.Workloads,
+	}
+	respondEnvelope(m, InfoResponseType, 200, info, "")
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
@@ -188,4 +239,28 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 
 func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 	// TODO
+}
+
+type Envelope struct {
+	PayloadType string      `json:"type"`
+	Data        interface{} `json:"data,omitempty"`
+	Error       *string     `json:"error,omitempty"`
+	Code        int         `json:"code"`
+}
+
+func newEnvelope(dataType string, data interface{}, code int, err *string) Envelope {
+	return Envelope{
+		PayloadType: dataType,
+		Data:        data,
+		Error:       err,
+	}
+}
+
+func respondEnvelope(m *nats.Msg, dataType string, code int, data interface{}, err string) {
+	e := &err
+	if len(strings.TrimSpace(err)) == 0 {
+		e = nil
+	}
+	bytes, _ := json.Marshal(newEnvelope(dataType, data, code, e))
+	_ = m.Respond(bytes)
 }
