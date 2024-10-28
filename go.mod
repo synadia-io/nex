@@ -9,6 +9,7 @@ require (
 	github.com/nats-io/nkeys v0.4.7
 	github.com/stretchr/testify v1.9.0
 	github.com/tochemey/goakt/v2 v2.7.1
+	google.golang.org/protobuf v1.35.1
 )
 
 require (
@@ -69,7 +70,6 @@ require (
 	golang.org/x/text v0.19.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
-	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
