@@ -8,7 +8,7 @@ import "reflect"
 
 type AuctionRequestJson struct {
 	// The type of agent to auction for
-	AgentType []string `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
+	AgentType []NexWorkload `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
 
 	// The architecture auction for
 	Arch *AuctionRequestJsonArch `json:"arch,omitempty" yaml:"arch,omitempty" mapstructure:"arch,omitempty"`
@@ -81,3 +81,5 @@ func (j *AuctionRequestJsonOs) UnmarshalJSON(b []byte) error {
 	*j = AuctionRequestJsonOs(v)
 	return nil
 }
+
+type NexWorkload string

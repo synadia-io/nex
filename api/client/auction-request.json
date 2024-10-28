@@ -32,10 +32,15 @@
       "type": "array",
       "description": "The type of agent to auction for",
       "items": {
-        "type": "string"
+        "$ref": "#/definitions/NexWorkload"
       }
     }
   },
   "required": [],
+  "definitions": {
+    "NexWorkload": {
+      "type": "string"
+    }
+  },
   "additionalProperties": false
 }

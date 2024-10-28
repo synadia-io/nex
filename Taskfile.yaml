@@ -43,6 +43,14 @@ tasks:
       --schema-package=https://github.com/synadia-io/nex/api/client/auction-response=github.com/synadia-io/nex/api/client/gen \
       --schema-output=https://github.com/synadia-io/nex/api/client/auction-response=gen/auction_response.go \
        auction-response.json"
+      - "go-jsonschema \
+      --schema-package=https://github.com/synadia-io/nex/api/client/node-ping-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-output=https://github.com/synadia-io/nex/api/client/node-ping-response=gen/node_ping_response.go \
+       node-ping-response.json"
+      - "go-jsonschema \
+      --schema-package=https://github.com/synadia-io/nex/api/client/agent-ping-response=github.com/synadia-io/nex/api/client/gen \
+      --schema-output=https://github.com/synadia-io/nex/api/client/agent-ping-response=gen/agent_ping_response.go \
+       agent-ping-response.json"
       
   
   nex:
