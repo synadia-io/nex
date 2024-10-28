@@ -2,7 +2,7 @@ name: Verify Schema Generation
 
 on:
   pull_request:
-    branches: main
+    branches: v3
 
 jobs:
   verify-schema-generation:
