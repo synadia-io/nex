@@ -256,14 +256,6 @@ func newEnvelope(dataType string, data interface{}, code int, err *string) Envel
 	}
 }
 
-func failEnvelope(dataType string, code int, err string) Envelope {
-	return Envelope{
-		PayloadType: dataType,
-		Code:        code,
-		Error:       &err,
-	}
-}
-
 func respondEnvelope(m *nats.Msg, dataType string, code int, data interface{}, err string) {
 	e := &err
 	if len(strings.TrimSpace(err)) == 0 {
