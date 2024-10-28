@@ -8,6 +8,8 @@ import (
 
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
+
+	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
 const AgentSupervisorActorName = "agent_supervisor"
@@ -22,7 +24,6 @@ func CreateAgentSupervisor(system goakt.ActorSystem, options models.NodeOptions)
 // the right parameters, and keeping track of the information received from its initial
 // registration
 type AgentSupervisor struct {
-	// TODO: figure out what to do about logging
 	logger log.Logger
 
 	nodeOptions models.NodeOptions
@@ -43,8 +44,26 @@ func (s *AgentSupervisor) Receive(ctx *goakt.ReceiveContext) {
 	case *goaktpb.PostStart:
 		s.logger = ctx.Self().Logger()
 		s.logger.Infof("Agent supervisor '%v' is running", ctx.Self().Name())
+	case *actorproto.QueryWorkloads:
+		s.queryWorkloads(ctx)
 	default:
 		ctx.Unhandled()
 	}
+}
 
+// Ask each child of the supervisor for its list of running workloads and then return
+// the aggregate result
+func (s *AgentSupervisor) queryWorkloads(ctx *goakt.ReceiveContext) {
+	ctxx := context.Background()
+	workloads := make([]*actorproto.WorkloadSummary, 0)
+
+	for _, pid := range ctx.Self().Children() {
+		res, err := ctx.Self().Ask(ctxx, pid, &actorproto.QueryWorkloads{})
+		if err != nil {
+			// TODO: todo
+			continue
+		}
+		workloads = append(workloads, res.(*actorproto.WorkloadListing).Workloads...)
+	}
+	ctx.Response(&actorproto.WorkloadListing{Workloads: workloads})
 }

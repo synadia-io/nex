@@ -7,6 +7,8 @@ import (
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"github.com/tochemey/goakt/v2/log"
+
+	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
 const DirectStartActorName = "direct_start"
@@ -34,7 +36,17 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 	case *goaktpb.PostStart:
 		a.logger = ctx.Self().Logger()
 		a.logger.Infof("Direct start agent '%v' is running", ctx.Self().Name())
+	case *actorproto.QueryWorkloads:
+		a.queryWorkloads(ctx)
 	default:
 		ctx.Unhandled()
 	}
+}
+
+func (a *DirectStartAgent) queryWorkloads(ctx *goakt.ReceiveContext) {
+	// TODO: make this real
+
+	results := make([]*actorproto.WorkloadSummary, 0)
+	listing := &actorproto.WorkloadListing{Workloads: results}
+	ctx.Response(listing)
 }
