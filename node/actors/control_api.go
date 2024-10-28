@@ -269,6 +269,6 @@ func respondEnvelope(m *nats.Msg, dataType string, code int, data interface{}, e
 	if len(strings.TrimSpace(err)) == 0 {
 		e = nil
 	}
-	bytes, _ := json.Marshal(newEnvelope(dataType, data, code, &err))
+	bytes, _ := json.Marshal(newEnvelope(dataType, data, code, e))
 	_ = m.Respond(bytes)
 }
