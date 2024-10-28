@@ -6,13 +6,13 @@ import "encoding/json"
 import "fmt"
 
 type AuctionResponseJson struct {
-	// The name of the nexus - if assigned
+	// The name of the nexus
 	Nexus *string `json:"nexus,omitempty" yaml:"nexus,omitempty" mapstructure:"nexus,omitempty"`
 
 	// The unique identifier of the node
 	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
 
-	// The number of agents running with workload count
+	// The number of agents running and their workload counts
 	Status AuctionResponseJsonStatus `json:"status" yaml:"status" mapstructure:"status"`
 
 	// Tags corresponds to the JSON schema field "tags".
@@ -28,7 +28,7 @@ type AuctionResponseJson struct {
 	Version string `json:"version" yaml:"version" mapstructure:"version"`
 }
 
-// The number of agents running with workload count
+// The number of agents running and their workload counts
 type AuctionResponseJsonStatus struct {
 	// Status corresponds to the JSON schema field "status".
 	Status AuctionResponseJsonStatusStatus `json:"status,omitempty" yaml:"status,omitempty" mapstructure:"status,omitempty"`

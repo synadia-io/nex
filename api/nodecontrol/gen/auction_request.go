@@ -10,13 +10,14 @@ type AuctionRequestJson struct {
 	// The type of agent to auction for
 	AgentType []NexWorkload `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
 
-	// The architecture auction for
+	// Specify a required architecture for the auction
 	Arch *AuctionRequestJsonArch `json:"arch,omitempty" yaml:"arch,omitempty" mapstructure:"arch,omitempty"`
 
-	// The operating system to auction for
+	// Specify a required operating system for the auction
 	Os *AuctionRequestJsonOs `json:"os,omitempty" yaml:"os,omitempty" mapstructure:"os,omitempty"`
 
-	// A list of tags to associate with the node during auction
+	// A list of tags to associate with the node during auction. To be returned, node
+	// must satisfy ALL tags
 	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 }
 

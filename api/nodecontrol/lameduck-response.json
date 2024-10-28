@@ -10,7 +10,7 @@
     },
     "success": {
       "type": "boolean",
-      "description": "Indicates if the node was successfully places into lameduck mode"
+      "description": "Indicates if the node was successfully placed into lameduck mode"
     }
   },
   "required": [],

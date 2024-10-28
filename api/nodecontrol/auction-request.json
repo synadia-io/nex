@@ -6,7 +6,7 @@
   "properties": {
     "arch": {
       "type": "string",
-      "description": "The architecture auction for",
+      "description": "Specify a required architecture for the auction",
       "enum": [
         "amd64",
         "arm64"
@@ -14,7 +14,7 @@
     },
     "os": {
       "type": "string",
-      "description": "The operating system to auction for",
+      "description": "Specify a required operating system for the auction",
       "enum": [
         "linux",
         "darwin",
@@ -23,7 +23,7 @@
     },
     "tags": {
       "type": "array",
-      "description": "A list of tags to associate with the node during auction",
+      "description": "A list of tags to associate with the node during auction. To be returned, node must satisfy ALL tags",
       "items": {
         "type": "string"
       }

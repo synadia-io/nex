@@ -10,7 +10,7 @@
     },
     "nexus": {
       "type": "string",
-      "description": "The name of the nexus - if assigned"
+      "description": "The name of the nexus"
     },
     "version": {
       "type": "string",
@@ -37,7 +37,7 @@
     },
     "status": {
       "type": "object",
-      "description": "The number of agents running with workload count",
+      "description": "The number of agents running and their workload counts",
       "properties": {
         "status": {
           "type": "object",
