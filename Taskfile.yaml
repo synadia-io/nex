@@ -36,25 +36,25 @@ tasks:
     dir: api/client
     cmds:
       - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/client/auction-request=github.com/synadia-io/nex/api/client/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/client/auction-request=gen/auction_request.go \
-       auction-request.json"
+      --package=gen -o=./gen/auction_request.go \
+      --schema-package=io.nats.nex.v2.auction-request=github.com/synadia-io/nex/api/client/gen \
+      auction-request.json"
       - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/client/auction-response=github.com/synadia-io/nex/api/client/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/client/auction-response=gen/auction_response.go \
-       auction-response.json"
+      --package=gen -o=./gen/auction_response.go \
+      --schema-package=io.nats.nex.v2.auction-response=github.com/synadia-io/nex/api/client/gen \
+      auction-response.json"
       - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/client/node-ping-response=github.com/synadia-io/nex/api/client/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/client/node-ping-response=gen/node_ping_response.go \
-       node-ping-response.json"
+      --package=gen -o=./gen/node_ping_response.go \
+      --schema-package=io.nats.nex.v2.node-ping-response=github.com/synadia-io/nex/api/client/gen \
+      node-ping-response.json"
       - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/client/agent-ping-response=github.com/synadia-io/nex/api/client/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/client/agent-ping-response=gen/agent_ping_response.go \
-       agent-ping-response.json"
+      --package=gen -o=./gen/agent_ping_response.go \
+      --schema-package=io.nats.nex.v2.agent-ping-response=github.com/synadia-io/nex/api/client/gen \
+      agent-ping-response.json"
       - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/client/lame-duck-response=github.com/synadia-io/nex/api/client/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/client/lame-duck-response=gen/lame_duck_response.go \
-       lame-duck-response.json"
+      --package=gen -o=./gen/lameduck_response.go \
+      --schema-package=io.nats.nex.v2.lame-duck-response=github.com/synadia-io/nex/api/client/gen \
+      lame-duck-response.json"
   
   nex:
     deps: [proto]

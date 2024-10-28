@@ -12,8 +12,8 @@ type NodePingResponseJson struct {
 	// The unique identifier of the node
 	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
 
-	// List of running agent types
-	RunningAgents []string `json:"running_agents" yaml:"running_agents" mapstructure:"running_agents"`
+	// The number of agents running with workload count
+	RunningAgents NodePingResponseJsonRunningAgents `json:"running_agents" yaml:"running_agents" mapstructure:"running_agents"`
 
 	// Tags corresponds to the JSON schema field "tags".
 	Tags *NodePingResponseJsonTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
@@ -27,6 +27,14 @@ type NodePingResponseJson struct {
 	// The version of the node
 	Version string `json:"version" yaml:"version" mapstructure:"version"`
 }
+
+// The number of agents running with workload count
+type NodePingResponseJsonRunningAgents struct {
+	// Status corresponds to the JSON schema field "status".
+	Status NodePingResponseJsonRunningAgentsStatus `json:"status,omitempty" yaml:"status,omitempty" mapstructure:"status,omitempty"`
+}
+
+type NodePingResponseJsonRunningAgentsStatus map[string]int
 
 type NodePingResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".

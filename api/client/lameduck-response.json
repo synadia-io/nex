@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/synadia-io/nex/api/client/lame-duck-response",
+  "$id": "io.nats.nex.v2.lameduck_response",
   "title": "LameduckResponse",
   "type": "object",
   "properties": {

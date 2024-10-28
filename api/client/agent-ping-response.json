@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/synadia-io/nex/api/client/agent-ping-response",
+  "$id": "io.nats.nex.v2.agent_ping_response",
   "title": "AgentPingResponse",
   "type": "object",
   "properties": {

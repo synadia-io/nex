@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/synadia-io/nex/api/client/node-ping-response",
+  "$id": "io.nats.nex.v2.node_ping_response",
   "title": "NodePingResponse",
   "type": "object",
   "properties": {
@@ -36,13 +36,25 @@
       }
     },
     "running_agents": {
-      "type": "array",
-      "description": "List of running agent types",
-      "items": {
-        "type": "string"
+      "type": "object",
+      "description": "The number of agents running with workload count",
+      "properties": {
+        "status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        }
       }
     }
   },
-  "required": ["node_id", "version", "uptime", "target_xkey", "running_agents"],
+  "required": [
+    "node_id",
+    "version",
+    "uptime",
+    "target_xkey",
+    "running_agents"
+  ],
+  "definations": {},
   "additionalProperties": false
 }
