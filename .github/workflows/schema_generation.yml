@@ -19,10 +19,10 @@ jobs:
         with:
           go-version: '1.23'  # Specify your Go version
 
-      - name: Install Taskfile.dev
+      - name: Install dependencies
         run: |
-          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b $(go env GOPATH)/bin
-          echo "$HOME/go/bin" >> $GITHUB_PATH
+          go install github.com/go-task/task/v3/cmd/task@latest
+          go install github.com/atombender/go-jsonschema@latest
 
       - name: Run 'task gen-schema'
         run: |
