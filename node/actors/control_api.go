@@ -5,14 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
+
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"github.com/tochemey/goakt/v2/log"
-	"log/slog"
-	"strings"
 
+	nodecontrol "github.com/synadia-io/nex/api/nodecontrol/gen"
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
@@ -185,11 +187,73 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {
-	// TODO
+	req := new(nodecontrol.StartWorkloadRequestJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
+		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to unmarshal deploy request: %s", err))
+		return
+	}
+
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+	askResp, err := api.self.Ask(ctx, agentSuper, startRequestToProto(req))
+	if err != nil {
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		return
+	}
+
+	protoResp, ok := askResp.(*actorproto.WorkloadStarted)
+	if !ok {
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		return
+	}
+
+	respondEnvelope(m, InfoResponseType, 200, startResponseFromProto(protoResp), "")
+}
+
+func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
+	req := new(nodecontrol.StopWorkloadRequestJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal undeploy request", slog.Any("error", err))
+		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to unmarshal undeploy request: %s", err))
+		return
+	}
+
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+
+	askResp, err := api.self.Ask(ctx, agentSuper, stopRequestToProto(req))
+	if err != nil {
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		return
+	}
+
+	protoResp, ok := askResp.(*actorproto.WorkloadStopped)
+	if !ok {
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		return
+	}
+
+	respondEnvelope(m, InfoResponseType, 200, stopResponseFromProto(protoResp), "")
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-
 	req := &actorproto.QueryWorkloads{}
 	ctx := context.Background()
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
@@ -228,10 +292,6 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {
-	// TODO
-}
-
-func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 	// TODO
 }
 
