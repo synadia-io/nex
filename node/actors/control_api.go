@@ -199,24 +199,25 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
+
 	askResp, err := api.self.Ask(ctx, agentSuper, startRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
 		return
 	}
 
 	protoResp, ok := askResp.(*actorproto.WorkloadStarted)
 	if !ok {
 		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		respondEnvelope(m, RunResponseType, 500, nil, "Agent supervisor returned the wrong data type")
 		return
 	}
 
-	respondEnvelope(m, InfoResponseType, 200, startResponseFromProto(protoResp), "")
+	respondEnvelope(m, RunResponseType, 200, startResponseFromProto(protoResp), "")
 }
 
 func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
@@ -232,25 +233,25 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 
 	askResp, err := api.self.Ask(ctx, agentSuper, stopRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
 		return
 	}
 
 	protoResp, ok := askResp.(*actorproto.WorkloadStopped)
 	if !ok {
 		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		respondEnvelope(m, StopResponseType, 500, nil, "Agent supervisor returned the wrong data type")
 		return
 	}
 
-	respondEnvelope(m, InfoResponseType, 200, stopResponseFromProto(protoResp), "")
+	respondEnvelope(m, StopResponseType, 200, stopResponseFromProto(protoResp), "")
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
