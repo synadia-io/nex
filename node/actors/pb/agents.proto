@@ -104,6 +104,12 @@ message WorkloadSummary {
     string workload_type = 5;
 }
 
+message SetLameDuck {}
+message LameDuckResponse {
+  string node_id = 1;
+  bool success = 2;
+}
+
 // Request made by the actor system and/or control API asking the agent to stop. Note
 // that the direct start agent will ignore this
 message Halt {

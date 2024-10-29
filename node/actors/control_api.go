@@ -121,7 +121,6 @@ func (api *ControlAPI) subscribe() error {
 
 	sub, err = api.nc.Subscribe(AuctionSubject(), api.handleAuction)
 	if err != nil {
-		// TODO: change this to conform to whatever our "real" logging strat is
 		api.logger.Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
@@ -193,25 +192,25 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 
 	askResp, err := api.self.Ask(ctx, agentSuper, auctionRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
 		return
 	}
 
 	protoResp, ok := askResp.(*actorproto.AuctionResponse)
 	if !ok {
 		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, RunResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		respondEnvelope(m, AuctionResponseType, 500, nil, "Agent supervisor returned the wrong data type")
 		return
 	}
 
-	respondEnvelope(m, RunResponseType, 200, auctionResponseFromProto(protoResp), "")
+	respondEnvelope(m, AuctionResponseType, 200, auctionResponseFromProto(protoResp), "")
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {
@@ -309,7 +308,29 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
-	// TODO
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+	// Ask the agent supervisor for a list of all the workloads from all of its children
+	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.SetLameDuck))
+	if err != nil {
+		api.logger.Error("Failed to put node in lame duck mode", slog.Any("error", err))
+		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to put node in lame duck mode: %s", err))
+		return
+	}
+
+	workloadResponse, ok := response.(*actorproto.LameDuckResponse)
+	if !ok {
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondEnvelope(m, LameDuckResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		return
+	}
+
+	respondEnvelope(m, LameDuckResponseType, 200, lameDuckResponseFromProto(workloadResponse), "")
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {

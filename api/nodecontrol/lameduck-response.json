@@ -13,6 +13,6 @@
       "description": "Indicates if the node was successfully placed into lameduck mode"
     }
   },
-  "required": [],
+  "required": ["node_id", "success"],
   "additionalProperties": false
 }
