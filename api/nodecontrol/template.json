@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.",
+  "title": "",
+  "type": "object",
+  "properties": {},
+  "required": [],
+  "definitions": {},
+  "additionalProperties": false
+}

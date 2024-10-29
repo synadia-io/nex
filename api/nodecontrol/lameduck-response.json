@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.lameduck_response",
+  "title": "LameduckResponse",
+  "type": "object",
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "description": "The unique identifier of the node"
+    },
+    "success": {
+      "type": "boolean",
+      "description": "Indicates if the node was successfully placed into lameduck mode"
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

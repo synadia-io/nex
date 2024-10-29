@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_ping_response",
+  "title": "AgentPingResponse",
+  "type": "object",
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "description": "The unique identifier of the node on which the agent is running"
+    },
+    "target_xkey": {
+      "type": "string",
+      "description": "The target agents xkey"
+    },
+    "version": {
+      "type": "string",
+      "description": "The target agents version"
+    },
+    "tags": {
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uptime": {
+      "type": "string",
+      "description": "The uptime of the node"
+    },
+    "running_workloads": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/WorkloadPingMachineSummary"
+      }
+    }
+  },
+  "required": [
+    "node_id",
+    "target_xkey",
+    "version",
+    "tags",
+    "uptime",
+    "running_workloads"
+  ],
+  "definitions": {
+    "WorkloadPingMachineSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "namespace",
+        "name",
+        "type"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

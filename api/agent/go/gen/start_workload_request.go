@@ -67,6 +67,9 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
+	if 1 > plain.TotalBytes {
+		return fmt.Errorf("field %s: must be >= %v", "totalBytes", 1)
+	}
 	*j = StartWorkloadRequestJson(plain)
 	return nil
 }
