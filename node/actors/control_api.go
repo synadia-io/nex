@@ -255,7 +255,6 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-	req := &actorproto.QueryWorkloads{}
 	ctx := context.Background()
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
@@ -264,28 +263,21 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 		return
 	}
 	// Ask the agent supervisor for a list of all the workloads from all of its children
-	response, err := api.self.Ask(ctx, agentSuper, req)
+	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.GetNodeInfo))
 	if err != nil {
 		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
 		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
 		return
 	}
-	workloadResponse, ok := response.(*actorproto.WorkloadList)
+
+	workloadResponse, ok := response.(*actorproto.NodeInfo)
 	if !ok {
 		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
 		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")
 		return
 	}
 
-	// TODO: This struct will be replaced by a generated struct from a JSON schema in api/nodecontrol
-	info := struct {
-		NodeID    string                        `json:"node_id"`
-		Workloads []*actorproto.WorkloadSummary `json:"workloads"` // NOTE: the json schema gernerated version of this won't use actorproto
-	}{
-		NodeID:    "Nxxx",
-		Workloads: workloadResponse.Workloads,
-	}
-	respondEnvelope(m, InfoResponseType, 200, info, "")
+	respondEnvelope(m, InfoResponseType, 200, infoResponseFromProto(workloadResponse), "")
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {

@@ -70,6 +70,7 @@ message WorkloadList {
   repeated WorkloadSummary workloads = 1;
 }
 
+message GetNodeInfo {}
 message NodeInfo {
   string nexus = 1;
   string id = 2;

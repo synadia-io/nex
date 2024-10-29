@@ -13,6 +13,9 @@ tasks:
     cmds:
       - protoc --proto_path=. --go_out=. --go_opt=paths=source_relative *.proto
 
+  all-code-gen:
+    deps: [gen-schema, proto]
+
   gen-schema:
     deps: [gen-schema-nodecontrol, gen-schema-agent]
 
