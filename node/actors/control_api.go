@@ -16,23 +16,6 @@ import (
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
-const (
-	APIPrefix = "$NEX"
-)
-
-var (
-	AuctionSubject    NexSubject = func(_ ...string) string { return APIPrefix + ".AUCTION" }
-	PingSubject       NexSubject = func(_ ...string) string { return APIPrefix + ".PING" }
-	AgentPingSubject  NexSubject = func(_ ...string) string { return APIPrefix + ".APING.>" }
-	DirectPingSubject NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".PING.%s", in[0]) }
-	UndeploySubject   NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".UNDEPLOY.*.%s", in[0]) }
-	DeploySubject     NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".DEPLOY.*.%s", in[0]) }
-	InfoSubject       NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".INFO.*.%s", in[0]) }
-	LameduckSubject   NexSubject = func(in ...string) string { return fmt.Sprintf(APIPrefix+".LAMEDUCK.%s", in[0]) }
-)
-
-type NexSubject func(...string) string
-
 const ControlAPIActorName = "control_api"
 
 const (
@@ -144,14 +127,14 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(DeploySubject(api.publicKey), api.handleDeploy)
+	sub, err = api.nc.Subscribe(DeploySubscribeSubject(api.publicKey), api.handleDeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(InfoSubject(api.publicKey), api.handleInfo)
+	sub, err = api.nc.Subscribe(InfoSubscribeSubject(api.publicKey), api.handleInfo)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -179,14 +162,14 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(UndeploySubject(api.publicKey), api.handleUndeploy)
+	sub, err = api.nc.Subscribe(UndeploySubscribeSubject(api.publicKey), api.handleUndeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to undeploy subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(AgentPingSubject(), api.handleWorkloadPing)
+	sub, err = api.nc.Subscribe(AgentPingSubscribeSubject(), api.handleWorkloadPing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err

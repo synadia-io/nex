@@ -58,8 +58,8 @@ func (c *ControlAPIClient) Ping() (*nodegen.NodePingResponseJson, error) {
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindAgent() (*nodegen.AgentPingResponseJson, error) {
-	msg, err := c.nc.Request(actors.AgentPingSubject(), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) FindAgent(namespace string) (*nodegen.AgentPingResponseJson, error) {
+	msg, err := c.nc.Request(actors.AgentPingNamespaceRequestSubject(namespace), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -87,14 +87,29 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	return resp, nil
 }
 
-func (c *ControlAPIClient) DeployWorkload(nodeId string) (*nodegen.StartWorkloadResponseJson, error) {
+func (c *ControlAPIClient) FindWorkload(namespace, workloadId string) (*nodegen.AgentPingResponseJson, error) {
+	msg, err := c.nc.Request(actors.AgentPingWorkloadRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := new(nodegen.AgentPingResponseJson)
+	err = json.Unmarshal(msg.Data, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string) (*nodegen.StartWorkloadResponseJson, error) {
 	req := nodegen.StartWorkloadRequestJson{}
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(actors.DeploySubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(actors.DeployRequestSubject(namespace, nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +130,7 @@ func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string) (*nodegen
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(actors.UndeploySubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(actors.UndeployRequestSubject(nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +144,8 @@ func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string) (*nodegen
 	return resp, nil
 }
 
-func (c *ControlAPIClient) GetInfo(nodeId string) (*nodegen.NodeInfoResponseJson, error) {
-	msg, err := c.nc.Request(actors.InfoSubject(nodeId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoResponseJson, error) {
+	msg, err := c.nc.Request(actors.InfoRequestSubject(nodeId, namespace), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
