@@ -183,7 +183,37 @@ func (api *ControlAPI) subscribe() error {
 }
 
 func (api *ControlAPI) handleAuction(m *nats.Msg) {
-	// TODO
+	req := new(nodecontrol.AuctionRequestJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal auction request", slog.Any("error", err))
+		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to unmarshal auction request: %s", err))
+		return
+	}
+
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+
+	askResp, err := api.self.Ask(ctx, agentSuper, auctionRequestToProto(req))
+	if err != nil {
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		return
+	}
+
+	protoResp, ok := askResp.(*actorproto.AuctionResponse)
+	if !ok {
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondEnvelope(m, RunResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		return
+	}
+
+	respondEnvelope(m, RunResponseType, 200, auctionResponseFromProto(protoResp), "")
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {

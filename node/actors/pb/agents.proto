@@ -15,6 +15,23 @@ message Ping {
   string id = 1;
 }
 
+message AuctionRequest {
+  string architecture = 1;
+  string operating_system = 2;
+  repeated string tags = 3;
+  repeated string agent_type = 4;
+}
+
+message AuctionResponse {
+  string node_id = 1;
+  string nexus = 2;
+  string version = 3;
+  string target_xkey = 4;
+  google.protobuf.Timestamp started_at = 5;
+  map<string, string> tags = 6;
+  map<string, int32> status = 7;
+}
+
 // Sent by the control API actor to an agent actor to request a workload be started
 message StartWorkload {
   repeated string argv = 1;

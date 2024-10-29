@@ -1,6 +1,8 @@
 package actors
 
 import (
+	"time"
+
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	api "github.com/synadia-io/nex/api/nodecontrol/gen"
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
@@ -87,4 +89,42 @@ func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJ
 		})
 	}
 	return ret
+}
+
+func auctionRequestToProto(request *api.AuctionRequestJson) *actorproto.AuctionRequest {
+	ret := new(actorproto.AuctionRequest)
+	if request.Arch != nil {
+		ret.Architecture = string(*request.Arch)
+	}
+	if request.Os != nil {
+		ret.OperatingSystem = string(*request.Os)
+	}
+	if request.Tags != nil {
+		ret.Tags = request.Tags
+	}
+	if request.AgentType != nil {
+		for _, agentType := range request.AgentType {
+			ret.AgentType = append(ret.AgentType, string(agentType))
+		}
+	}
+	return ret
+}
+
+func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.AuctionResponseJson {
+	convertedStatus := make(map[string]int)
+	if response.Status != nil {
+		for k, v := range response.Status {
+			convertedStatus[k] = int(v)
+		}
+	}
+
+	return &api.AuctionResponseJson{
+		Nexus:      response.Nexus,
+		NodeId:     response.NodeId,
+		Status:     gen.AuctionResponseJsonStatus{Status: convertedStatus},
+		Tags:       api.AuctionResponseJsonTags{Tags: response.Tags},
+		TargetXkey: response.TargetXkey,
+		Uptime:     time.Since(response.StartedAt.AsTime()).String(),
+		Version:    response.Version,
+	}
 }

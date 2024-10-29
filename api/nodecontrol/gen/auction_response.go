@@ -7,7 +7,7 @@ import "fmt"
 
 type AuctionResponseJson struct {
 	// The name of the nexus
-	Nexus *string `json:"nexus,omitempty" yaml:"nexus,omitempty" mapstructure:"nexus,omitempty"`
+	Nexus string `json:"nexus" yaml:"nexus" mapstructure:"nexus"`
 
 	// The unique identifier of the node
 	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
@@ -16,7 +16,7 @@ type AuctionResponseJson struct {
 	Status AuctionResponseJsonStatus `json:"status" yaml:"status" mapstructure:"status"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags *AuctionResponseJsonTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags AuctionResponseJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
 
 	// The target nodes xkey
 	TargetXkey string `json:"target_xkey" yaml:"target_xkey" mapstructure:"target_xkey"`
@@ -49,11 +49,17 @@ func (j *AuctionResponseJson) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
+	if _, ok := raw["nexus"]; raw != nil && !ok {
+		return fmt.Errorf("field nexus in AuctionResponseJson: required")
+	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
 		return fmt.Errorf("field node_id in AuctionResponseJson: required")
 	}
 	if _, ok := raw["status"]; raw != nil && !ok {
 		return fmt.Errorf("field status in AuctionResponseJson: required")
+	}
+	if _, ok := raw["tags"]; raw != nil && !ok {
+		return fmt.Errorf("field tags in AuctionResponseJson: required")
 	}
 	if _, ok := raw["target_xkey"]; raw != nil && !ok {
 		return fmt.Errorf("field target_xkey in AuctionResponseJson: required")

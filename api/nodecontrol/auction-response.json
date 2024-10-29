@@ -50,10 +50,12 @@
   },
   "required": [
     "node_id",
+    "nexus",
     "version",
     "uptime",
     "target_xkey",
-    "status"
+    "status",
+    "tags"
   ],
   "definations": {},
   "additionalProperties": false
