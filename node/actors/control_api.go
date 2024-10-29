@@ -77,7 +77,13 @@ func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 			ctx.Err(err)
 		}
 		a.logger.Info("Control API NATS server is running", slog.String("name", ctx.Self().Name()))
-
+	case *actorproto.AuctionRequest:
+	case *actorproto.StartWorkload:
+	case *actorproto.StopWorkload:
+	case *actorproto.GetNodeInfo:
+	case *actorproto.SetLameDuck:
+	case *actorproto.PingNode:
+	case *actorproto.PingAgent:
 	default:
 		ctx.Unhandled()
 	}
