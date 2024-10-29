@@ -212,7 +212,7 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, pk))
+	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, nn.options.Logger, pk))
 	if err != nil {
 		return nil, err
 	}

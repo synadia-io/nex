@@ -12,7 +12,6 @@ import (
 	"github.com/nats-io/nkeys"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
-	"github.com/tochemey/goakt/v2/log"
 
 	nodecontrol "github.com/synadia-io/nex/api/nodecontrol/gen"
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
@@ -34,7 +33,7 @@ const (
 	TagLameDuck = "nex.lameduck"
 )
 
-func CreateControlAPI(nc *nats.Conn, publicKey string) *ControlAPI {
+func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string) *ControlAPI {
 	api := &ControlAPI{nc: nc, publicKey: publicKey, subsz: make([]*nats.Subscription, 0)}
 	err := api.initPublicXKey()
 	if err != nil {
@@ -45,7 +44,7 @@ func CreateControlAPI(nc *nats.Conn, publicKey string) *ControlAPI {
 }
 
 type ControlAPI struct {
-	logger     log.Logger
+	logger     *slog.Logger
 	nc         *nats.Conn
 	publicKey  string
 	publicXKey string
@@ -70,14 +69,13 @@ func (a *ControlAPI) PostStop(ctx context.Context) error {
 func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		a.logger = ctx.Self().Logger()
 		a.self = ctx.Self()
 		err := a.subscribe()
 		if err != nil {
 			_ = a.shutdown()
 			ctx.Err(err)
 		}
-		a.logger.Infof("Control API NATS server '%s' is running", ctx.Self().Name())
+		a.logger.Info("Control API NATS server is running", slog.String("name", ctx.Self().Name()))
 
 	default:
 		ctx.Unhandled()
@@ -109,7 +107,7 @@ func (api *ControlAPI) shutdown() error {
 
 		_err := sub.Drain()
 		if _err != nil {
-			api.logger.Warnf("Failed to drain API subscription: %s", sub.Subject)
+			api.logger.Warn("Failed to drain API subscription", slog.String("subscription", sub.Subject))
 			err = errors.Join(_err, fmt.Errorf("failed to drain API subscription: %s", sub.Subject))
 		}
 	}
