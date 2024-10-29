@@ -59,6 +59,22 @@ tasks:
       --package=gen -o=./gen/node_info_response.go \
       --schema-package=io.nats.nex.v2.node-info-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       node-info-response.json"
+      - "go-jsonschema \
+      --package=gen -o=./gen/stop_workload_request.go \
+      --schema-package=io.nats.nex.v2.stop-workload-request=github.com/synadia-io/nex/api/nodecontrol/gen \
+      stop-workload-request.json"
+      - "go-jsonschema \
+      --package=gen -o=./gen/stop_workload_response.go \
+      --schema-package=io.nats.nex.v2.stop-workload-response=github.com/synadia-io/nex/api/nodecontrol/gen \
+      stop-workload-response.json"
+      - "go-jsonschema \
+      --package=gen -o=./gen/start_workload_request.go \
+      --schema-package=io.nats.nex.v2.start-workload-request=github.com/synadia-io/nex/api/nodecontrol/gen \
+      start-workload-request.json"
+      - "go-jsonschema \
+      --package=gen -o=./gen/start_workload_response.go \
+      --schema-package=io.nats.nex.v2.start-workload-response=github.com/synadia-io/nex/api/nodecontrol/gen \
+      start-workload-response.json"
   
   nex:
     deps: [proto]

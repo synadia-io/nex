@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.start_workload_request",
+  "title": "StartWorkloadRequest",
+  "type": "object",
+  "properties": {
+    "argv": {
+      "type": "array",
+      "description": "Arguments to be passed to the binary",
+      "items": {
+        "type": "string"
+      }
+    },
+    "description": {
+      "type": "string",
+      "description": "A description of the workload"
+    },
+    "hash": {
+      "type": "string",
+      "description": "The hash of the workload"
+    },
+    "uri": {
+      "type": "string",
+      "description": "The URI of the workload"
+    },
+    "essential": {
+      "type": "boolean",
+      "description": "Whether the workload is essential; essential workloads will be restarted if they fail"
+    },
+    "environment": {
+      "type": "string",
+      "description": "The base64-encoded byte array of the environment in which the workload is provided at runtime"
+    },
+    "jsdomain": {
+      "type": "string",
+      "description": "The NATS JSDomain for the workload"
+    },
+    "retry_count": {
+      "type": "integer",
+      "description": "The number of times the workload has been retried"
+    },
+    "retried_at": {
+      "type": "string",
+      "description": "The time at which the workload was last retried"
+    },
+    "sender_public_key": {
+      "type": "string",
+      "description": "The public key of the sender"
+    },
+    "target_node": {
+      "type": "string",
+      "description": "The target node for the workload"
+    },
+    "trigger_subjects": {
+      "type": "array",
+      "description": "The subjects that trigger the workload",
+      "items": {
+        "type": "string"
+      }
+    },
+    "host_service_config": {
+      "$ref": "#/definitions/HostServicesConfig",
+      "description": "The NATS configuration for the host services"
+    },
+    "workload_name": {
+      "type": "string",
+      "description": "The name of the workload"
+    },
+    "workload_jwt": {
+      "type": "string",
+      "description": "The JWT for the workload"
+    },
+    "workload_type": {
+      "type": "string",
+      "description": "The type of the workload"
+    }
+  },
+  "required": [
+    "argv",
+    "description",
+    "hash",
+    "uri",
+    "essential",
+    "environment",
+    "jsdomain",
+    "retry_count",
+    "retried_at",
+    "sender_public_key",
+    "target_node",
+    "trigger_subjects",
+    "host_service_config",
+    "workload_name",
+    "workload_jwt",
+    "workload_type"
+  ],
+  "definitions": {
+    "HostServicesConfig": {
+      "type": "object",
+      "properties": {
+        "nats_url": {
+          "type": "string"
+        },
+        "nats_user_jwt": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}
