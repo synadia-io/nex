@@ -234,7 +234,7 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 	askResp, err := api.self.Ask(ctx, agentSuper, startRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to deploy workload", slog.Any("error", err))
-		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to deploy workload", err))
+		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to deploy workload: %s", err))
 		return
 	}
 
@@ -268,7 +268,7 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 	askResp, err := api.self.Ask(ctx, agentSuper, stopRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to undeploy workload", slog.Any("error", err))
-		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to undeploy workload", err))
+		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to undeploy workload: %s", err))
 		return
 	}
 
@@ -294,7 +294,7 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.GetNodeInfo))
 	if err != nil {
 		api.logger.Error("Failed to get node info", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get node info", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get node info: %s", err))
 		return
 	}
 
