@@ -199,8 +199,8 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 
 	askResp, err := api.self.Ask(ctx, agentSuper, auctionRequestToProto(req))
 	if err != nil {
-		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		api.logger.Error("Failed to getdo auction", slog.Any("error", err))
+		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to do auction: %s", err))
 		return
 	}
 
@@ -233,8 +233,8 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 
 	askResp, err := api.self.Ask(ctx, agentSuper, startRequestToProto(req))
 	if err != nil {
-		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		api.logger.Error("Failed to deploy workload", slog.Any("error", err))
+		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to deploy workload", err))
 		return
 	}
 
@@ -267,8 +267,8 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 
 	askResp, err := api.self.Ask(ctx, agentSuper, stopRequestToProto(req))
 	if err != nil {
-		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		api.logger.Error("Failed to undeploy workload", slog.Any("error", err))
+		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to undeploy workload", err))
 		return
 	}
 
@@ -293,8 +293,8 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 	// Ask the agent supervisor for a list of all the workloads from all of its children
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.GetNodeInfo))
 	if err != nil {
-		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
+		api.logger.Error("Failed to get node info", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get node info", err))
 		return
 	}
 
