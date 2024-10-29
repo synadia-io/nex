@@ -102,8 +102,7 @@ func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*n
 	return resp, nil
 }
 
-func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string) (*nodegen.StartWorkloadResponseJson, error) {
-	req := nodegen.StartWorkloadRequestJson{}
+func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -123,8 +122,7 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string) (*nodegen.St
 	return resp, nil
 }
 
-func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string) (*nodegen.StopWorkloadResponseJson, error) {
-	req := nodegen.StopWorkloadRequestJson{}
+func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodegen.StopWorkloadRequestJson) (*nodegen.StopWorkloadResponseJson, error) {
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
