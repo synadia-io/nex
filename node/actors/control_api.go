@@ -16,8 +16,6 @@ import (
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
 
-const APIPrefix = "$NEX"
-
 const ControlAPIActorName = "control_api"
 
 const (
@@ -121,7 +119,7 @@ func (api *ControlAPI) subscribe() error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = api.nc.Subscribe(APIPrefix+".AUCTION", api.handleAuction)
+	sub, err = api.nc.Subscribe(AuctionSubject(), api.handleAuction)
 	if err != nil {
 		// TODO: change this to conform to whatever our "real" logging strat is
 		api.logger.Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
@@ -129,51 +127,51 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".DEPLOY.*."+api.publicKey, api.handleDeploy)
+	sub, err = api.nc.Subscribe(DeploySubscribeSubject(api.publicKey), api.handleDeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".INFO.*."+api.publicKey, api.handleInfo)
+	sub, err = api.nc.Subscribe(InfoSubscribeSubject(api.publicKey), api.handleInfo)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".LAMEDUCK."+api.publicKey, api.handleLameDuck)
+	sub, err = api.nc.Subscribe(LameduckSubject(api.publicKey), api.handleLameDuck)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".PING", api.handlePing)
+	sub, err = api.nc.Subscribe(PingSubject(), api.handlePing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".PING."+api.publicKey, api.handlePing)
+	sub, err = api.nc.Subscribe(DirectPingSubject(api.publicKey), api.handlePing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to node-specific ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".UNDEPLOY.*."+api.publicKey, api.handleUndeploy)
+	sub, err = api.nc.Subscribe(UndeploySubscribeSubject(api.publicKey), api.handleUndeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to undeploy subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(APIPrefix+".WPING.>", api.handleWorkloadPing)
+	sub, err = api.nc.Subscribe(AgentPingSubscribeSubject(), api.handleWorkloadPing)
 	if err != nil {
-		api.logger.Error("Failed to subscribe to workload ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
