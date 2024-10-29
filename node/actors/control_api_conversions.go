@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	api "github.com/synadia-io/nex/api/nodecontrol/gen"
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
@@ -67,4 +68,25 @@ func stopResponseFromProto(response *actorproto.WorkloadStopped) *api.StopWorklo
 		Issuer:  response.Issuer,
 		Stopped: response.Stopped,
 	}
+}
+
+func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJson {
+	ret := new(api.NodeInfoResponseJson)
+	ret.Nexus = response.Nexus
+	ret.NodeId = response.Id
+	ret.Tags = gen.NodeInfoResponseJsonTags{Tags: response.Tags}
+	ret.TargetXkey = response.TargetXkey
+	ret.Uptime = response.Uptime
+	ret.Version = response.Version
+
+	for _, workload := range response.Workloads {
+		ret.WorkloadSummaries = append(ret.WorkloadSummaries, api.WorkloadSummary{
+			Id:           workload.Id,
+			Name:         workload.Name,
+			Runtime:      workload.Runtime,
+			StartTime:    workload.StartedAt.String(),
+			WorkloadType: workload.WorkloadType,
+		})
+	}
+	return ret
 }

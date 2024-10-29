@@ -270,7 +270,7 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get list of running workloads: %s", err))
 		return
 	}
-	workloadResponse, ok := response.(*actorproto.WorkloadListing)
+	workloadResponse, ok := response.(*actorproto.WorkloadList)
 	if !ok {
 		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
 		respondEnvelope(m, InfoResponseType, 500, nil, "Agent supervisor returned the wrong data type")

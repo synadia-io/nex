@@ -66,14 +66,26 @@ message WorkloadStopped {
 // Asks the target agent for a list of all if its known, running workloads
 message QueryWorkloads {}
 
-message WorkloadListing {
-    repeated WorkloadSummary workloads = 1;
+message WorkloadList {
+  repeated WorkloadSummary workloads = 1;
+}
+
+message NodeInfo {
+  string nexus = 1;
+  string id = 2;
+  map<string, string> tags = 3;
+  string target_xkey = 4;
+  string uptime = 5;
+  string version = 6;
+  repeated WorkloadSummary workloads = 7;
 }
 
 message WorkloadSummary {
-    string name = 1;
-    google.protobuf.Timestamp started_at = 2;
-    
+    string id = 1;
+    string name = 2;
+    string runtime = 3;
+    google.protobuf.Timestamp started_at = 4;
+    string workload_type = 5;
 }
 
 // Request made by the actor system and/or control API asking the agent to stop. Note

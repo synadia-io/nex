@@ -43,8 +43,4 @@ func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 
 func (a *ExternalAgent) queryWorkloads(ctx *goakt.ReceiveContext) {
 	// TODO: make this real
-
-	results := make([]*actorproto.WorkloadSummary, 0)
-	listing := &actorproto.WorkloadListing{Workloads: results}
-	ctx.Response(listing)
 }
