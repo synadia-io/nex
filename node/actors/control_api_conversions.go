@@ -39,8 +39,6 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 		Jsdomain:        request.Jsdomain,
 		RetriedAt:       request.RetriedAt,
 		RetryCount:      int32(request.RetryCount),
-		SenderPublicKey: request.SenderPublicKey,
-		TargetNode:      request.TargetNode,
 		TriggerSubjects: request.TriggerSubjects,
 		Uri:             request.Uri,
 		WorkloadJwt:     request.WorkloadJwt,

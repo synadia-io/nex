@@ -26,13 +26,11 @@ message StartWorkload {
   string jsdomain = 7;
   string retried_at = 8;
   int32 retry_count = 9;
-  string sender_public_key = 10;
-  string target_node = 11;
-  repeated string trigger_subjects = 12;
-  string uri = 13;
-  string workload_jwt = 14;
-  string workload_name = 15;
-  string workload_type = 16;
+  repeated string trigger_subjects = 10;
+  string uri = 11;
+  string workload_jwt = 12;
+  string workload_name = 13;
+  string workload_type = 14;
 }
 
 message HostServicesConfig {
