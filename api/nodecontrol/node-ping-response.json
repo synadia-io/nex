@@ -50,8 +50,10 @@
   },
   "required": [
     "node_id",
+    "nexus",
     "version",
     "uptime",
+    "tags",
     "target_xkey",
     "running_agents"
   ],

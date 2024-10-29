@@ -135,3 +135,40 @@ func lameDuckResponseFromProto(response *actorproto.LameDuckResponse) *api.Lamed
 		Success: response.Success,
 	}
 }
+
+func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingResponseJson {
+	convertedStatus := make(map[string]int)
+	if response.RunningAgents != nil {
+		for k, v := range response.RunningAgents {
+			convertedStatus[k] = int(v)
+		}
+	}
+	return &api.NodePingResponseJson{
+		Nexus:         response.Nexus,
+		NodeId:        response.NodeId,
+		RunningAgents: api.NodePingResponseJsonRunningAgents{Status: convertedStatus},
+		Tags:          api.NodePingResponseJsonTags{Tags: response.Tags},
+		TargetXkey:    response.TargetXkey,
+		Uptime:        time.Since(response.StartedAt.AsTime()).String(),
+		Version:       response.Version,
+	}
+}
+
+func agentPingResponseFromProto(response *actorproto.PingAgentResponse) *api.AgentPingResponseJson {
+	ret := new(api.AgentPingResponseJson)
+
+	for _, w := range response.RunningWorkloads {
+		ret.RunningWorkloads = append(ret.RunningWorkloads, api.WorkloadPingMachineSummary{
+			Id:        w.Id,
+			Name:      w.Name,
+			Namespace: w.Namespace,
+		})
+	}
+
+	ret.NodeId = response.NodeId
+	ret.Tags = api.AgentPingResponseJsonTags{Tags: response.Tags}
+	ret.TargetXkey = response.TargetXkey
+	ret.Uptime = time.Since(response.StartedAt.AsTime()).String()
+	ret.Version = response.Version
+	return ret
+}

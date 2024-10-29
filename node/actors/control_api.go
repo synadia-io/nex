@@ -20,12 +20,13 @@ import (
 const ControlAPIActorName = "control_api"
 
 const (
-	AuctionResponseType  = "io.nats.nex.v2.auction_response"
-	InfoResponseType     = "io.nats.nex.v2.info_response"
-	PingResponseType     = "io.nats.nex.v2.ping_response"
-	RunResponseType      = "io.nats.nex.v2.run_response"
-	StopResponseType     = "io.nats.nex.v2.stop_response"
-	LameDuckResponseType = "io.nats.nex.v2.lameduck_response"
+	AuctionResponseType   = "io.nats.nex.v2.auction_response"
+	InfoResponseType      = "io.nats.nex.v2.info_response"
+	PingResponseType      = "io.nats.nex.v2.ping_response"
+	AgentPingResponseType = "io.nats.nex.v2.agent_ping_response"
+	RunResponseType       = "io.nats.nex.v2.run_response"
+	StopResponseType      = "io.nats.nex.v2.stop_response"
+	LameDuckResponseType  = "io.nats.nex.v2.lameduck_response"
 
 	TagOS       = "nex.os"
 	TagArch     = "nex.arch"
@@ -168,7 +169,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(AgentPingSubscribeSubject(), api.handleWorkloadPing)
+	sub, err = api.nc.Subscribe(AgentPingSubscribeSubject(), api.handleAgentPing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -334,11 +335,63 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {
-	// TODO
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+
+	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.PingNode))
+	if err != nil {
+		api.logger.Error("Failed to ping node", slog.Any("error", err))
+		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to ping node: %s", err))
+		return
+	}
+
+	workloadResponse, ok := response.(*actorproto.PingNodeResponse)
+	if !ok {
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondEnvelope(m, LameDuckResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		return
+	}
+
+	respondEnvelope(m, PingResponseType, 200, pingResponseFromProto(workloadResponse), "")
 }
 
-func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
-	// TODO
+func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
+	req := new(nodecontrol.AgentPingResponseJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal agent ping request", slog.Any("error", err))
+		respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to unmarshal agent ping request: %s", err))
+		return
+	}
+
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+
+	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.PingAgent))
+	if err != nil {
+		api.logger.Error("Failed to ping agent", slog.Any("error", err))
+		respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to ping agent: %s", err))
+		return
+	}
+
+	workloadResponse, ok := response.(*actorproto.PingAgentResponse)
+	if !ok {
+		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
+		respondEnvelope(m, AgentPingResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		return
+	}
+
+	respondEnvelope(m, AgentPingResponseType, 200, agentPingResponseFromProto(workloadResponse), "")
 }
 
 type Envelope struct {

@@ -9,10 +9,33 @@ package agents;
 
 option go_package = "github.com/synadia-io/nex/node/actors/pb;actorproto";
 
-// Probably not going to be used. Placeholder to get at least one field until we
-// fill out the other structs
-message Ping {
+message PingNode {}
+
+message PingNodeResponse {
+  string node_id = 1;
+  string nexus = 2;
+  string version = 3;
+  string target_xkey = 4;
+  google.protobuf.Timestamp started_at = 5;
+  map<string, string> tags = 6;
+  map<string, int32> running_agents = 7;
+}
+
+message PingAgent {}
+
+message PingAgentResponse {
+  string node_id = 1;
+  string target_xkey = 2;
+  string version = 3;
+  map<string, string> tags = 4;
+  google.protobuf.Timestamp started_at = 5;
+  repeated RunningWorkload running_workloads = 6;
+}
+
+message RunningWorkload {
   string id = 1;
+  string namespace = 2;
+  string name = 3;
 }
 
 message AuctionRequest {
