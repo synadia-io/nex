@@ -36,3 +36,6 @@ config.json
 .resources/
 
 .task
+
+agents/javascript/cmd/javascript/javascript
+
