@@ -17,7 +17,7 @@
             "description": "Version of the agent"
         },
         "max_workloads": {
-            "type": "number",
+            "type": "integer",
             "description": "The maximum number of workloads this agent can hold. 0 indicates unlimited"
         }
     },
