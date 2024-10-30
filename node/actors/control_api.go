@@ -223,8 +223,8 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 
 	askResp, err := api.self.Ask(ctx, agentSuper, startRequestToProto(req))
 	if err != nil {
-		api.logger.Error("Failed to deploy workload", slog.Any("error", err))
-		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to deploy workload: %s", err))
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
 		return
 	}
 
@@ -257,8 +257,8 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 
 	askResp, err := api.self.Ask(ctx, agentSuper, stopRequestToProto(req))
 	if err != nil {
-		api.logger.Error("Failed to undeploy workload", slog.Any("error", err))
-		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to undeploy workload: %s", err))
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 
@@ -283,8 +283,8 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 	// Ask the agent supervisor for a list of all the workloads from all of its children
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.GetNodeInfo))
 	if err != nil {
-		api.logger.Error("Failed to get node info", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get node info: %s", err))
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
 		return
 	}
 
@@ -309,8 +309,8 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 	// Ask the agent supervisor for a list of all the workloads from all of its children
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.SetLameDuck))
 	if err != nil {
-		api.logger.Error("Failed to put node in lame duck mode", slog.Any("error", err))
-		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to put node in lame duck mode: %s", err))
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
 		return
 	}
 
@@ -335,8 +335,8 @@ func (api *ControlAPI) handlePing(m *nats.Msg) {
 
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.PingNode))
 	if err != nil {
-		api.logger.Error("Failed to ping node", slog.Any("error", err))
-		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to ping node: %s", err))
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
 		return
 	}
 
@@ -369,8 +369,8 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.PingAgent))
 	if err != nil {
-		api.logger.Error("Failed to ping agent", slog.Any("error", err))
-		respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to ping agent: %s", err))
+		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
 		return
 	}
 
