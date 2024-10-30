@@ -27,35 +27,46 @@ const (
 	RunResponseType       = "io.nats.nex.v2.run_response"
 	StopResponseType      = "io.nats.nex.v2.stop_response"
 	LameDuckResponseType  = "io.nats.nex.v2.lameduck_response"
-
-	TagOS       = "nex.os"
-	TagArch     = "nex.arch"
-	TagCPUs     = "nex.cpucount"
-	TagLameDuck = "nex.lameduck"
 )
 
-func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string) *ControlAPI {
-	api := &ControlAPI{nc: nc, publicKey: publicKey, subsz: make([]*nats.Subscription, 0)}
-	err := api.initPublicXKey()
+type auctionResponseFunc func(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
+type ControlAPI struct {
+	nc         *nats.Conn
+	logger     *slog.Logger
+	publicKey  string
+	publicXKey string
+	subsz      []*nats.Subscription
+
+	auctionResponse auctionResponseFunc
+
+	self *goakt.PID
+}
+
+func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, aF auctionResponseFunc) *ControlAPI {
+	api := &ControlAPI{
+		nc:              nc,
+		logger:          logger,
+		publicKey:       publicKey,
+		subsz:           make([]*nats.Subscription, 0),
+		auctionResponse: aF,
+	}
+
+	kp, err := nkeys.CreateCurveKeys()
 	if err != nil {
+		logger.Error("Failed to create curve keys", slog.Any("error", err))
+		return nil
+	}
+
+	api.publicXKey, err = kp.PublicKey()
+	if err != nil {
+		logger.Error("Failed to get public key", slog.Any("error", err))
 		return nil
 	}
 
 	return api
 }
 
-type ControlAPI struct {
-	logger     *slog.Logger
-	nc         *nats.Conn
-	publicKey  string
-	publicXKey string
-	subsz      []*nats.Subscription
-
-	self *goakt.PID
-}
-
 func (a *ControlAPI) PreStart(ctx context.Context) error {
-
 	return nil
 }
 
@@ -77,31 +88,9 @@ func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 			ctx.Err(err)
 		}
 		a.logger.Info("Control API NATS server is running", slog.String("name", ctx.Self().Name()))
-	case *actorproto.AuctionRequest:
-	case *actorproto.StartWorkload:
-	case *actorproto.StopWorkload:
-	case *actorproto.GetNodeInfo:
-	case *actorproto.SetLameDuck:
-	case *actorproto.PingNode:
-	case *actorproto.PingAgent:
 	default:
 		ctx.Unhandled()
 	}
-}
-
-func (api *ControlAPI) initPublicXKey() error {
-	kp, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		return err
-	}
-
-	publicXKey, err := kp.PublicKey()
-	if err != nil {
-		return err
-	}
-
-	api.publicXKey = publicXKey
-	return nil
 }
 
 func (api *ControlAPI) shutdown() error {
@@ -195,29 +184,19 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 		return
 	}
 
-	ctx := context.Background()
-	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	convertedAgentType := make([]string, len(req.AgentType))
+	for _, at := range req.AgentType {
+		convertedAgentType = append(convertedAgentType, string(at))
+	}
+
+	auctResp, err := api.auctionResponse(string(req.Os), string(req.Arch), convertedAgentType, req.Tags.Tags)
 	if err != nil {
-		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		api.logger.Error("Failed to generate auction response", slog.Any("error", err))
+		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to generate auction response: %s", err))
 		return
 	}
 
-	askResp, err := api.self.Ask(ctx, agentSuper, auctionRequestToProto(req))
-	if err != nil {
-		api.logger.Error("Failed to getdo auction", slog.Any("error", err))
-		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to do auction: %s", err))
-		return
-	}
-
-	protoResp, ok := askResp.(*actorproto.AuctionResponse)
-	if !ok {
-		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, AuctionResponseType, 500, nil, "Agent supervisor returned the wrong data type")
-		return
-	}
-
-	respondEnvelope(m, AuctionResponseType, 200, auctionResponseFromProto(protoResp), "")
+	respondEnvelope(m, AuctionResponseType, 200, auctionResponseFromProto(auctResp), "")
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {

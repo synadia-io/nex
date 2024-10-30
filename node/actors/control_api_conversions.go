@@ -91,25 +91,6 @@ func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJ
 	return ret
 }
 
-func auctionRequestToProto(request *api.AuctionRequestJson) *actorproto.AuctionRequest {
-	ret := new(actorproto.AuctionRequest)
-	if request.Arch != nil {
-		ret.Architecture = string(*request.Arch)
-	}
-	if request.Os != nil {
-		ret.OperatingSystem = string(*request.Os)
-	}
-	if request.Tags != nil {
-		ret.Tags = request.Tags
-	}
-	if request.AgentType != nil {
-		for _, agentType := range request.AgentType {
-			ret.AgentType = append(ret.AgentType, string(agentType))
-		}
-	}
-	return ret
-}
-
 func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.AuctionResponseJson {
 	convertedStatus := make(map[string]int)
 	if response.Status != nil {

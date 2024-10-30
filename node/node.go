@@ -7,16 +7,33 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"runtime"
 	"slices"
+	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	goakt "github.com/tochemey/goakt/v2/actors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/synadia-io/nex/internal/logger"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
-	goakt "github.com/tochemey/goakt/v2/actors"
+	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
+
+const (
+	TagOS       = "nex.os"
+	TagArch     = "nex.arch"
+	TagCPUs     = "nex.cpucount"
+	TagLameDuck = "nex.lameduck"
+	TagNexus    = "nex.nexus"
+
+	VERSION = "0.0.0"
+)
+
+var ReservedTagPrefixes = []string{"nex."}
 
 type Node interface {
 	Validate() error
@@ -27,8 +44,10 @@ type nexNode struct {
 	ctx context.Context
 	nc  *nats.Conn
 
-	options   *models.NodeOptions
-	publicKey nkeys.KeyPair
+	options       *models.NodeOptions
+	publicKey     nkeys.KeyPair
+	startedAt     time.Time
+	runningActors map[string]*goakt.PID
 }
 
 func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
@@ -37,16 +56,23 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		ctx:       context.Background(),
-		nc:        nc,
-		publicKey: serverKey,
+		ctx:           context.Background(),
+		nc:            nc,
+		publicKey:     serverKey,
+		runningActors: make(map[string]*goakt.PID),
 
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
 			ResourceDirectory:     "./resources",
-			Tags:                  make(map[string]string),
-			ValidIssuers:          []string{},
+			Tags: map[string]string{
+				TagOS:       runtime.GOOS,
+				TagArch:     runtime.GOARCH,
+				TagCPUs:     fmt.Sprintf("%d", runtime.GOMAXPROCS(0)),
+				TagLameDuck: "false",
+				TagNexus:    "nexus",
+			},
+			ValidIssuers: []string{},
 			OtelOptions: models.OTelOptions{
 				MetricsEnabled:   false,
 				MetricsPort:      8085,
@@ -129,6 +155,15 @@ func (nn nexNode) Validate() error {
 		errs = errors.Join(errs, errors.New("could not produce a public key for this node. This should never happen"))
 	}
 
+	for tag, _ := range nn.options.Tags {
+		if slices.ContainsFunc(ReservedTagPrefixes,
+			func(s string) bool {
+				return strings.HasPrefix(tag, s)
+			}) {
+			errs = errors.Join(errs, errors.New("tag ["+tag+"] is using a reserved tag prefix"))
+		}
+	}
+
 	return errs
 }
 
@@ -151,13 +186,13 @@ func (nn *nexNode) Start() error {
 		return err
 	}
 
+	nn.startedAt = time.Now()
 	<-nn.ctx.Done()
 	nn.options.Logger.Info("Shutting down nexnode")
 	return as.Stop(nn.ctx)
 }
 
 func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
-
 	actorSystem, err := goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
 		goakt.WithPassivationDisabled(),
@@ -181,18 +216,22 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-	inats := actors.CreateInternalNatsServer(*nn.options)
+	nn.runningActors[actors.AgentSupervisorActorName] = agentSuper
 
-	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
+	inats := actors.CreateInternalNatsServer(*nn.options)
+	inatsActor, err := actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
 		return nil, err
 	}
+	nn.runningActors[actors.InternalNatsServerActorName] = inatsActor
+
 	allCreds := inats.CredentialsMap()
 
-	_, err = actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	hostServicesActor, err := actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
 	if err != nil {
 		return nil, err
 	}
+	nn.runningActors[actors.HostServicesActorName] = hostServicesActor
 
 	if !nn.options.DisableDirectStart {
 		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
@@ -212,10 +251,13 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, nn.options.Logger, pk))
+
+	controlApiActor, err := actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
+		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse))
 	if err != nil {
 		return nil, err
 	}
+	nn.runningActors[actors.ControlAPIActorName] = controlApiActor
 
 	running := make([]string, len(actorSystem.Actors()))
 	for i, actor := range actorSystem.Actors() {
@@ -224,4 +266,57 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	nn.options.Logger.Debug("Actors started", slog.Any("running", running))
 
 	return actorSystem, nil
+}
+
+func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
+	if os != runtime.GOOS || arch != runtime.GOARCH {
+		return nil, errors.New("node did not satisfy auction os/arch requirements")
+	}
+
+	st := timestamppb.New(nn.startedAt)
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
+		return nil, err
+	}
+
+	resp := &actorproto.AuctionResponse{
+		NodeId:    pk,
+		Version:   VERSION,
+		StartedAt: st,
+		Tags:      nn.options.Tags,
+	}
+
+	agentSuper := nn.runningActors[actors.AgentSupervisorActorName]
+	for _, c := range agentSuper.Children() {
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
+		if err != nil {
+			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
+			return nil, errors.New("failed to ping agent")
+		}
+		aR, ok := agentResp.(*actorproto.PingAgentResponse)
+		if !ok {
+			nn.options.Logger.Error("Failed to convert agent response")
+			return nil, errors.New("failed to convert agent response")
+		}
+		resp.Status[c.Name()] = int32(len(aR.RunningWorkloads))
+	}
+
+	// Node must satisfy all agent types in auction request
+	for name, _ := range resp.Status {
+		if !slices.Contains(agentType, name) {
+			nn.options.Logger.Error("node did not satisfy auction agent type requirements")
+			return nil, errors.New("node did not satisfy auction agent type requirements")
+		}
+	}
+
+	// Node must satisfy all tags in auction request
+	for tag, value := range tags {
+		if tV, ok := nn.options.Tags[tag]; !ok || tV != value {
+			nn.options.Logger.Error("node did not satisfy auction tag requirements")
+			return nil, errors.New("node did not satisfy auction tag requirements")
+		}
+	}
+
+	return resp, nil
 }
