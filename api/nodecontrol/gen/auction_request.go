@@ -11,14 +11,14 @@ type AuctionRequestJson struct {
 	AgentType []NexWorkload `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
 
 	// Specify a required architecture for the auction
-	Arch *AuctionRequestJsonArch `json:"arch,omitempty" yaml:"arch,omitempty" mapstructure:"arch,omitempty"`
+	Arch AuctionRequestJsonArch `json:"arch" yaml:"arch" mapstructure:"arch"`
 
 	// Specify a required operating system for the auction
-	Os *AuctionRequestJsonOs `json:"os,omitempty" yaml:"os,omitempty" mapstructure:"os,omitempty"`
+	Os AuctionRequestJsonOs `json:"os" yaml:"os" mapstructure:"os"`
 
 	// A list of tags to associate with the node during auction. To be returned, node
 	// must satisfy ALL tags
-	Tags []string `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags *AuctionRequestJsonTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
 }
 
 type AuctionRequestJsonArch string
@@ -80,6 +80,36 @@ func (j *AuctionRequestJsonOs) UnmarshalJSON(b []byte) error {
 		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_AuctionRequestJsonOs, v)
 	}
 	*j = AuctionRequestJsonOs(v)
+	return nil
+}
+
+// A list of tags to associate with the node during auction. To be returned, node
+// must satisfy ALL tags
+type AuctionRequestJsonTags struct {
+	// Tags corresponds to the JSON schema field "tags".
+	Tags AuctionRequestJsonTagsTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+}
+
+type AuctionRequestJsonTagsTags map[string]string
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AuctionRequestJson) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["arch"]; raw != nil && !ok {
+		return fmt.Errorf("field arch in AuctionRequestJson: required")
+	}
+	if _, ok := raw["os"]; raw != nil && !ok {
+		return fmt.Errorf("field os in AuctionRequestJson: required")
+	}
+	type Plain AuctionRequestJson
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = AuctionRequestJson(plain)
 	return nil
 }
 

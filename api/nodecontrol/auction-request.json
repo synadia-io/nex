@@ -22,10 +22,15 @@
       ]
     },
     "tags": {
-      "type": "array",
+      "type": "object",
       "description": "A list of tags to associate with the node during auction. To be returned, node must satisfy ALL tags",
-      "items": {
-        "type": "string"
+      "properties": {
+        "tags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
       }
     },
     "agent_type": {
@@ -36,7 +41,7 @@
       }
     }
   },
-  "required": [],
+  "required": ["arch", "os"],
   "definitions": {
     "NexWorkload": {
       "type": "string"

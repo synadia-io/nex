@@ -7,7 +7,7 @@ import "fmt"
 
 type NodePingResponseJson struct {
 	// The name of the nexus - if assigned
-	Nexus *string `json:"nexus,omitempty" yaml:"nexus,omitempty" mapstructure:"nexus,omitempty"`
+	Nexus string `json:"nexus" yaml:"nexus" mapstructure:"nexus"`
 
 	// The unique identifier of the node
 	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
@@ -16,7 +16,7 @@ type NodePingResponseJson struct {
 	RunningAgents NodePingResponseJsonRunningAgents `json:"running_agents" yaml:"running_agents" mapstructure:"running_agents"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags *NodePingResponseJsonTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags NodePingResponseJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
 
 	// The target nodes xkey
 	TargetXkey string `json:"target_xkey" yaml:"target_xkey" mapstructure:"target_xkey"`
@@ -49,11 +49,17 @@ func (j *NodePingResponseJson) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
+	if _, ok := raw["nexus"]; raw != nil && !ok {
+		return fmt.Errorf("field nexus in NodePingResponseJson: required")
+	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
 		return fmt.Errorf("field node_id in NodePingResponseJson: required")
 	}
 	if _, ok := raw["running_agents"]; raw != nil && !ok {
 		return fmt.Errorf("field running_agents in NodePingResponseJson: required")
+	}
+	if _, ok := raw["tags"]; raw != nil && !ok {
+		return fmt.Errorf("field tags in NodePingResponseJson: required")
 	}
 	if _, ok := raw["target_xkey"]; raw != nil && !ok {
 		return fmt.Errorf("field target_xkey in NodePingResponseJson: required")

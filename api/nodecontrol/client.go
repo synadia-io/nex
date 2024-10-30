@@ -58,8 +58,8 @@ func (c *ControlAPIClient) Ping() (*nodegen.NodePingResponseJson, error) {
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindAgent(namespace string) (*nodegen.AgentPingResponseJson, error) {
-	msg, err := c.nc.Request(actors.AgentPingNamespaceRequestSubject(namespace), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) FindAgent(_type, namespace string) (*nodegen.AgentPingResponseJson, error) {
+	msg, err := c.nc.Request(actors.AgentPingNamespaceRequestSubject(_type, namespace), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -87,8 +87,8 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindWorkload(namespace, workloadId string) (*nodegen.AgentPingResponseJson, error) {
-	msg, err := c.nc.Request(actors.AgentPingWorkloadRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*nodegen.AgentPingResponseJson, error) {
+	msg, err := c.nc.Request(actors.AgentPingWorkloadRequestSubject(_type, namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

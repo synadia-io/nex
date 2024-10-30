@@ -7,15 +7,23 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"runtime"
 	"slices"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	goakt "github.com/tochemey/goakt/v2/actors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/synadia-io/nex/internal/logger"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
-	goakt "github.com/tochemey/goakt/v2/actors"
+	actorproto "github.com/synadia-io/nex/node/actors/pb"
+)
+
+const (
+	VERSION = "0.0.0"
 )
 
 type Node interface {
@@ -27,8 +35,10 @@ type nexNode struct {
 	ctx context.Context
 	nc  *nats.Conn
 
-	options   *models.NodeOptions
-	publicKey nkeys.KeyPair
+	options     *models.NodeOptions
+	publicKey   nkeys.KeyPair
+	startedAt   time.Time
+	actorSystem goakt.ActorSystem
 }
 
 func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
@@ -45,8 +55,14 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
 			ResourceDirectory:     "./resources",
-			Tags:                  make(map[string]string),
-			ValidIssuers:          []string{},
+			Tags: map[string]string{
+				models.TagOS:       runtime.GOOS,
+				models.TagArch:     runtime.GOARCH,
+				models.TagCPUs:     fmt.Sprintf("%d", runtime.GOMAXPROCS(0)),
+				models.TagLameDuck: "false",
+				models.TagNexus:    "nexus",
+			},
+			ValidIssuers: []string{},
 			OtelOptions: models.OTelOptions{
 				MetricsEnabled:   false,
 				MetricsPort:      8085,
@@ -67,6 +83,10 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 		if opt != nil {
 			opt(nn.options)
 		}
+	}
+
+	if nn.options.Errs != nil {
+		return nil, nn.options.Errs
 	}
 
 	err := nn.Validate()
@@ -146,19 +166,20 @@ func (nn *nexNode) Start() error {
 		cancel()
 	}()
 
-	as, err := nn.initializeSupervisionTree()
+	err := nn.initializeSupervisionTree()
 	if err != nil {
 		return err
 	}
 
+	nn.startedAt = time.Now()
 	<-nn.ctx.Done()
 	nn.options.Logger.Info("Shutting down nexnode")
-	return as.Stop(nn.ctx)
+	return nn.actorSystem.Stop(nn.ctx)
 }
 
-func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
-
-	actorSystem, err := goakt.NewActorSystem("nexnode",
+func (nn *nexNode) initializeSupervisionTree() error {
+	var err error
+	nn.actorSystem, err = goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
@@ -167,61 +188,202 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 		//goakt.WithTracing(),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// start the actor system
-	err = actorSystem.Start(nn.ctx)
+	err = nn.actorSystem.Start(nn.ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// start the root actors
-	agentSuper, err := actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(actorSystem, *nn.options))
+	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options))
 	if err != nil {
-		return nil, err
+		return err
 	}
-	inats := actors.CreateInternalNatsServer(*nn.options)
 
-	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
+	inats := actors.CreateInternalNatsServer(*nn.options)
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
-		return nil, err
+		return err
 	}
+
 	allCreds := inats.CredentialsMap()
 
-	_, err = actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if !nn.options.DisableDirectStart {
 		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	for _, agent := range nn.options.AgentOptions {
 		// This map lookup works because the agent name is identical to the workload type
 		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(allCreds[agent.Name], agent))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
-		return nil, err
-	}
-	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName, actors.CreateControlAPI(nn.nc, pk))
-	if err != nil {
-		return nil, err
+		return err
 	}
 
-	running := make([]string, len(actorSystem.Actors()))
-	for i, actor := range actorSystem.Actors() {
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
+		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse, nn.pingResponse, nn.infoResponse))
+	if err != nil {
+		return err
+	}
+
+	running := make([]string, len(nn.actorSystem.Actors()))
+	for i, actor := range nn.actorSystem.Actors() {
 		running[i] = actor.Name()
 	}
 	nn.options.Logger.Debug("Actors started", slog.Any("running", running))
 
-	return actorSystem, nil
+	return nil
+}
+
+func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
+	if os != runtime.GOOS || arch != runtime.GOARCH {
+		nn.options.Logger.Debug("node did not satisfy auction os/arch requirements")
+		return nil, nil
+	}
+
+	st := timestamppb.New(nn.startedAt)
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
+		return nil, err
+	}
+
+	resp := &actorproto.AuctionResponse{
+		NodeId:    pk,
+		Version:   VERSION,
+		StartedAt: st,
+		Tags:      nn.options.Tags,
+	}
+
+	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	if err != nil {
+		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
+		return nil, err
+	}
+	for _, c := range agentSuper.Children() {
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
+		if err != nil {
+			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
+			return nil, errors.New("failed to ping agent")
+		}
+		aR, ok := agentResp.(*actorproto.PingAgentResponse)
+		if !ok {
+			nn.options.Logger.Error("Failed to convert agent response")
+			return nil, errors.New("failed to convert agent response")
+		}
+		resp.Status[c.Name()] = int32(len(aR.RunningWorkloads))
+	}
+
+	// Node must satisfy all agent types in auction request
+	for name, _ := range resp.Status {
+		if !slices.Contains(agentType, name) {
+			nn.options.Logger.Debug("node did not satisfy auction agent type requirements")
+			return nil, nil
+		}
+	}
+
+	// Node must satisfy all tags in auction request
+	for tag, value := range tags {
+		if tV, ok := nn.options.Tags[tag]; !ok || tV != value {
+			nn.options.Logger.Debug("node did not satisfy auction tag requirements")
+			return nil, nil
+		}
+	}
+
+	return resp, nil
+}
+
+func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
+	st := timestamppb.New(nn.startedAt)
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
+		return nil, err
+	}
+
+	resp := &actorproto.PingNodeResponse{
+		NodeId:    pk,
+		Version:   VERSION,
+		StartedAt: st,
+		Tags:      nn.options.Tags,
+	}
+
+	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	if err != nil {
+		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
+		return nil, err
+	}
+	for _, c := range agentSuper.Children() {
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
+		if err != nil {
+			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
+			return nil, errors.New("failed to ping agent")
+		}
+		aR, ok := agentResp.(*actorproto.PingAgentResponse)
+		if !ok {
+			nn.options.Logger.Error("Failed to convert agent response")
+			return nil, errors.New("failed to convert agent response")
+		}
+		resp.RunningAgents[c.Name()] = int32(len(aR.RunningWorkloads))
+	}
+
+	return resp, nil
+}
+
+func (nn nexNode) infoResponse() (*actorproto.NodeInfo, error) {
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
+		return nil, err
+	}
+	resp := &actorproto.NodeInfo{
+		Id:      pk,
+		Tags:    nn.options.Tags,
+		Uptime:  time.Since(nn.startedAt).String(),
+		Version: VERSION,
+	}
+
+	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	if err != nil {
+		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
+		return nil, err
+	}
+	for _, c := range agentSuper.Children() {
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
+		if err != nil {
+			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
+			return nil, errors.New("failed to ping agent")
+		}
+		wL, ok := agentResp.(*actorproto.WorkloadList)
+		if !ok {
+			nn.options.Logger.Error("Failed to convert agent response")
+			return nil, errors.New("failed to convert agent response")
+		}
+		for _, w := range wL.Workloads {
+			resp.Workloads = append(resp.Workloads, &actorproto.WorkloadSummary{
+				Id:           w.Id,
+				Name:         w.Name,
+				Runtime:      w.Runtime,
+				StartedAt:    timestamppb.New(w.StartedAt.AsTime()),
+				WorkloadType: c.Name(),
+			})
+		}
+	}
+
+	return resp, nil
 }

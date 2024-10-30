@@ -41,12 +41,12 @@ func InfoSubscribeSubject(inNodeId string) string {
 }
 
 // Request subjects
-func AgentPingNamespaceRequestSubject(inNS string) string {
-	return fmt.Sprintf(APIPrefix+".APING.%s", inNS)
+func AgentPingNamespaceRequestSubject(inType, inNS string) string {
+	return fmt.Sprintf(APIPrefix+".APING.%s.%s", inNS, inType)
 }
 
-func AgentPingWorkloadRequestSubject(inNS, inWorkload string) string {
-	return fmt.Sprintf(APIPrefix+".APING.%s.%s", inNS, inWorkload)
+func AgentPingWorkloadRequestSubject(inType, inNS, inWorkload string) string {
+	return fmt.Sprintf(APIPrefix+".APING.%s.%s.%s", inNS, inType, inWorkload)
 }
 
 func DeployRequestSubject(inNS, inNodeId string) string {

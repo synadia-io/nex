@@ -7,6 +7,9 @@
     "node_id": {
       "type": "string"
     },
+    "workload_type": {
+      "type": "string"
+    },
     "workload_id": {
       "type": "string"
     },
@@ -16,6 +19,7 @@
   },
   "required": [
     "node_id",
+    "workload_type",
     "workload_id",
     "workload_jwt"
   ],

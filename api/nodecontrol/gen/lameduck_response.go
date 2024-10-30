@@ -2,10 +2,34 @@
 
 package gen
 
+import "encoding/json"
+import "fmt"
+
 type LameduckResponseJson struct {
 	// The unique identifier of the node
-	NodeId *string `json:"node_id,omitempty" yaml:"node_id,omitempty" mapstructure:"node_id,omitempty"`
+	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
 
 	// Indicates if the node was successfully placed into lameduck mode
-	Success *bool `json:"success,omitempty" yaml:"success,omitempty" mapstructure:"success,omitempty"`
+	Success bool `json:"success" yaml:"success" mapstructure:"success"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *LameduckResponseJson) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["node_id"]; raw != nil && !ok {
+		return fmt.Errorf("field node_id in LameduckResponseJson: required")
+	}
+	if _, ok := raw["success"]; raw != nil && !ok {
+		return fmt.Errorf("field success in LameduckResponseJson: required")
+	}
+	type Plain LameduckResponseJson
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = LameduckResponseJson(plain)
+	return nil
 }

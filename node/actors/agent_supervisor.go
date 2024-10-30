@@ -63,7 +63,7 @@ func (s *AgentSupervisor) queryWorkloads(ctx *goakt.ReceiveContext) {
 			// TODO: todo
 			continue
 		}
-		workloads = append(workloads, res.(*actorproto.WorkloadListing).Workloads...)
+		workloads = append(workloads, res.(*actorproto.WorkloadList).Workloads...)
 	}
-	ctx.Response(&actorproto.WorkloadListing{Workloads: workloads})
+	ctx.Response(&actorproto.WorkloadList{Workloads: workloads})
 }
