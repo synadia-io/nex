@@ -24,16 +24,8 @@ import (
 )
 
 const (
-	TagOS       = "nex.os"
-	TagArch     = "nex.arch"
-	TagCPUs     = "nex.cpucount"
-	TagLameDuck = "nex.lameduck"
-	TagNexus    = "nex.nexus"
-
 	VERSION = "0.0.0"
 )
-
-var ReservedTagPrefixes = []string{"nex."}
 
 type Node interface {
 	Validate() error
@@ -66,11 +58,11 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			AgentHandshakeTimeout: 5000,
 			ResourceDirectory:     "./resources",
 			Tags: map[string]string{
-				TagOS:       runtime.GOOS,
-				TagArch:     runtime.GOARCH,
-				TagCPUs:     fmt.Sprintf("%d", runtime.GOMAXPROCS(0)),
-				TagLameDuck: "false",
-				TagNexus:    "nexus",
+				models.TagOS:       runtime.GOOS,
+				models.TagArch:     runtime.GOARCH,
+				models.TagCPUs:     fmt.Sprintf("%d", runtime.GOMAXPROCS(0)),
+				models.TagLameDuck: "false",
+				models.TagNexus:    "nexus",
 			},
 			ValidIssuers: []string{},
 			OtelOptions: models.OTelOptions{
@@ -93,6 +85,10 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 		if opt != nil {
 			opt(nn.options)
 		}
+	}
+
+	if nn.options.Errs != nil {
+		return nil, nn.options.Errs
 	}
 
 	err := nn.Validate()

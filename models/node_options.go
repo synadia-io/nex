@@ -2,8 +2,21 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
+	"slices"
+	"strings"
 )
+
+const (
+	TagOS       = "nex.os"
+	TagArch     = "nex.arch"
+	TagCPUs     = "nex.cpucount"
+	TagLameDuck = "nex.lameduck"
+	TagNexus    = "nex.nexus"
+)
+
+var ReservedTagPrefixes = []string{"nex."}
 
 type NodeOptions struct {
 	Logger                *slog.Logger
@@ -15,6 +28,8 @@ type NodeOptions struct {
 	DisableDirectStart    bool
 	AgentOptions          []AgentOptions
 	HostServiceOptions    HostServiceOptions
+
+	Errs error
 }
 
 type NodeOption func(*NodeOptions)
@@ -41,7 +56,16 @@ func WithResourceDirectory(d string) NodeOption {
 
 func WithNodeTags(t map[string]string) NodeOption {
 	return func(n *NodeOptions) {
-		n.Tags = t
+		for tag, v := range t {
+			if slices.ContainsFunc(ReservedTagPrefixes,
+				func(s string) bool {
+					return strings.HasPrefix(tag, s)
+				}) {
+				n.Errs = errors.Join(n.Errs, errors.New("tag ["+tag+"] is using a reserved tag prefix"))
+			} else {
+				n.Tags[tag] = v
+			}
+		}
 	}
 }
 
