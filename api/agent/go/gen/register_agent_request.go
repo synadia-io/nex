@@ -10,7 +10,7 @@ type RegisterAgentRequestJson struct {
 	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
 
 	// The maximum number of workloads this agent can hold. 0 indicates unlimited
-	MaxWorkloads *float64 `json:"max_workloads,omitempty" yaml:"max_workloads,omitempty" mapstructure:"max_workloads,omitempty"`
+	MaxWorkloads *int `json:"max_workloads,omitempty" yaml:"max_workloads,omitempty" mapstructure:"max_workloads,omitempty"`
 
 	// Name of the agent
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
