@@ -35,10 +35,10 @@ type nexNode struct {
 	ctx context.Context
 	nc  *nats.Conn
 
-	options       *models.NodeOptions
-	publicKey     nkeys.KeyPair
-	startedAt     time.Time
-	runningActors map[string]*goakt.PID
+	options     *models.NodeOptions
+	publicKey   nkeys.KeyPair
+	startedAt   time.Time
+	actorSystem goakt.ActorSystem
 }
 
 func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
@@ -47,10 +47,9 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		ctx:           context.Background(),
-		nc:            nc,
-		publicKey:     serverKey,
-		runningActors: make(map[string]*goakt.PID),
+		ctx:       context.Background(),
+		nc:        nc,
+		publicKey: serverKey,
 
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
@@ -172,6 +171,7 @@ func (nn *nexNode) Start() error {
 		return err
 	}
 
+	nn.actorSystem = as
 	nn.startedAt = time.Now()
 	<-nn.ctx.Done()
 	nn.options.Logger.Info("Shutting down nexnode")
@@ -202,22 +202,19 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	if err != nil {
 		return nil, err
 	}
-	nn.runningActors[actors.AgentSupervisorActorName] = agentSuper
 
 	inats := actors.CreateInternalNatsServer(*nn.options)
-	inatsActor, err := actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
+	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
 		return nil, err
 	}
-	nn.runningActors[actors.InternalNatsServerActorName] = inatsActor
 
 	allCreds := inats.CredentialsMap()
 
-	hostServicesActor, err := actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	_, err = actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
 	if err != nil {
 		return nil, err
 	}
-	nn.runningActors[actors.HostServicesActorName] = hostServicesActor
 
 	if !nn.options.DisableDirectStart {
 		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
@@ -238,12 +235,11 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 		return nil, err
 	}
 
-	controlApiActor, err := actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
+	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
 		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse, nn.pingResponse, nn.infoResponse))
 	if err != nil {
 		return nil, err
 	}
-	nn.runningActors[actors.ControlAPIActorName] = controlApiActor
 
 	running := make([]string, len(actorSystem.Actors()))
 	for i, actor := range actorSystem.Actors() {
@@ -274,7 +270,11 @@ func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[
 		Tags:      nn.options.Tags,
 	}
 
-	agentSuper := nn.runningActors[actors.AgentSupervisorActorName]
+	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	if err != nil {
+		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
+		return nil, err
+	}
 	for _, c := range agentSuper.Children() {
 		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
 		if err != nil {
@@ -323,7 +323,11 @@ func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
 		Tags:      nn.options.Tags,
 	}
 
-	agentSuper := nn.runningActors[actors.AgentSupervisorActorName]
+	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	if err != nil {
+		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
+		return nil, err
+	}
 	for _, c := range agentSuper.Children() {
 		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
 		if err != nil {
@@ -354,7 +358,11 @@ func (nn nexNode) infoResponse() (*actorproto.NodeInfo, error) {
 		Version: VERSION,
 	}
 
-	agentSuper := nn.runningActors[actors.AgentSupervisorActorName]
+	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	if err != nil {
+		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
+		return nil, err
+	}
 	for _, c := range agentSuper.Children() {
 		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
 		if err != nil {
