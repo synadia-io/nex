@@ -30,6 +30,8 @@ const (
 )
 
 type auctionResponseFunc func(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
+type nodePingResponseFunc func() (*actorproto.PingNodeResponse, error)
+
 type ControlAPI struct {
 	nc         *nats.Conn
 	logger     *slog.Logger
@@ -37,18 +39,20 @@ type ControlAPI struct {
 	publicXKey string
 	subsz      []*nats.Subscription
 
-	auctionResponse auctionResponseFunc
+	auctionResponse  auctionResponseFunc
+	nodePingResponse nodePingResponseFunc
 
 	self *goakt.PID
 }
 
-func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, aF auctionResponseFunc) *ControlAPI {
+func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, aF auctionResponseFunc, nF nodePingResponseFunc) *ControlAPI {
 	api := &ControlAPI{
-		nc:              nc,
-		logger:          logger,
-		publicKey:       publicKey,
-		subsz:           make([]*nats.Subscription, 0),
-		auctionResponse: aF,
+		nc:               nc,
+		logger:           logger,
+		publicKey:        publicKey,
+		subsz:            make([]*nats.Subscription, 0),
+		auctionResponse:  aF,
+		nodePingResponse: nF,
 	}
 
 	kp, err := nkeys.CreateCurveKeys()
@@ -280,6 +284,7 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
+
 	// Ask the agent supervisor for a list of all the workloads from all of its children
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.GetNodeInfo))
 	if err != nil {
@@ -325,29 +330,14 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {
-	ctx := context.Background()
-	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	pingResponse, err := api.nodePingResponse()
 	if err != nil {
-		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		api.logger.Error("failed to ping node", slog.Any("error", err))
+		respondEnvelope(m, LameDuckResponseType, 500, nil, "failed to ping node")
 		return
 	}
 
-	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.PingNode))
-	if err != nil {
-		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
-		return
-	}
-
-	workloadResponse, ok := response.(*actorproto.PingNodeResponse)
-	if !ok {
-		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, LameDuckResponseType, 500, nil, "Agent supervisor returned the wrong data type")
-		return
-	}
-
-	respondEnvelope(m, PingResponseType, 200, pingResponseFromProto(workloadResponse), "")
+	respondEnvelope(m, PingResponseType, 200, pingResponseFromProto(pingResponse), "")
 }
 
 func (api *ControlAPI) handleAgentPing(m *nats.Msg) {

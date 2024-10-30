@@ -239,7 +239,7 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 	}
 
 	controlApiActor, err := actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
-		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse))
+		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse, nn.pingResponse))
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +303,39 @@ func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[
 			nn.options.Logger.Debug("node did not satisfy auction tag requirements")
 			return nil, nil
 		}
+	}
+
+	return resp, nil
+}
+
+func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
+	st := timestamppb.New(nn.startedAt)
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
+		return nil, err
+	}
+
+	resp := &actorproto.PingNodeResponse{
+		NodeId:    pk,
+		Version:   VERSION,
+		StartedAt: st,
+		Tags:      nn.options.Tags,
+	}
+
+	agentSuper := nn.runningActors[actors.AgentSupervisorActorName]
+	for _, c := range agentSuper.Children() {
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
+		if err != nil {
+			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
+			return nil, errors.New("failed to ping agent")
+		}
+		aR, ok := agentResp.(*actorproto.PingAgentResponse)
+		if !ok {
+			nn.options.Logger.Error("Failed to convert agent response")
+			return nil, errors.New("failed to convert agent response")
+		}
+		resp.RunningAgents[c.Name()] = int32(len(aR.RunningWorkloads))
 	}
 
 	return resp, nil
