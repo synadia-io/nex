@@ -9,7 +9,6 @@ import (
 	"os"
 	"runtime"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -149,15 +148,6 @@ func (nn nexNode) Validate() error {
 	_, err := nn.publicKey.PublicKey()
 	if err != nil {
 		errs = errors.Join(errs, errors.New("could not produce a public key for this node. This should never happen"))
-	}
-
-	for tag, _ := range nn.options.Tags {
-		if slices.ContainsFunc(ReservedTagPrefixes,
-			func(s string) bool {
-				return strings.HasPrefix(tag, s)
-			}) {
-			errs = errors.Join(errs, errors.New("tag ["+tag+"] is using a reserved tag prefix"))
-		}
 	}
 
 	return errs
