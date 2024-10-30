@@ -376,8 +376,8 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 
 	workloadResponse, ok := response.(*actorproto.PingAgentResponse)
 	if !ok {
-		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, AgentPingResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		api.logger.Error("Response from agent ping was not the correct type")
+		respondEnvelope(m, AgentPingResponseType, 500, nil, "Response from agent ping was not the correct type")
 		return
 	}
 
