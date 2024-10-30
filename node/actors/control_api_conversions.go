@@ -157,7 +157,7 @@ func agentPingResponseFromProto(response *actorproto.PingAgentResponse) *api.Age
 func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponseJson {
 	return &api.WorkloadPingResponseJson{
 		NodeId: response.NodeId,
-		WorkloadSummary: &api.WorkloadSummary{
+		WorkloadSummary: &api.Workload{
 			Id:           response.Workload.Id,
 			Name:         response.Workload.Name,
 			Runtime:      response.Workload.Runtime,

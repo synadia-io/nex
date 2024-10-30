@@ -9,7 +9,7 @@
       "description": "The unique identifier of the node on which the agent is running"
     },
     "workload_summary": {
-      "$ref": "#/definitions/WorkloadSummary"
+      "$ref": "#/definitions/Workload"
     }
   },
   "required": [
@@ -21,30 +21,36 @@
     "running_workloads"
   ],
   "definitions": {
-    "WorkloadSummary": {
+    "Workload": {
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
+          "type": "string",
+          "description": "The unique identifier of the workload"
         },
         "name": {
-          "type": "string"
-        },
-        "runtime": {
-          "type": "string"
+          "type": "string",
+          "description": "The name of the workload"
         },
         "start_time": {
-          "type": "string"
+          "type": "string",
+          "description": "The start time of the workload"
+        },
+        "runtime": {
+          "type": "string",
+          "description": "The runtime of the workload"
         },
         "workload_type": {
-          "type": "string"
+          "type": "string",
+          "description": "The type of the workload"
         }
       },
       "required": [
         "id",
         "name",
         "start_time",
-        "type"
+        "runtime",
+        "workload_type"
       ]
     }
   },

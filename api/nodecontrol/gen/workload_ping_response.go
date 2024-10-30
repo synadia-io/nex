@@ -5,12 +5,29 @@ package gen
 import "encoding/json"
 import "fmt"
 
+type Workload struct {
+	// The unique identifier of the workload
+	Id string `json:"id" yaml:"id" mapstructure:"id"`
+
+	// The name of the workload
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+
+	// The runtime of the workload
+	Runtime string `json:"runtime" yaml:"runtime" mapstructure:"runtime"`
+
+	// The start time of the workload
+	StartTime string `json:"start_time" yaml:"start_time" mapstructure:"start_time"`
+
+	// The type of the workload
+	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
+}
+
 type WorkloadPingResponseJson struct {
 	// The unique identifier of the node on which the agent is running
 	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
 
 	// WorkloadSummary corresponds to the JSON schema field "workload_summary".
-	WorkloadSummary *WorkloadSummary `json:"workload_summary,omitempty" yaml:"workload_summary,omitempty" mapstructure:"workload_summary,omitempty"`
+	WorkloadSummary *Workload `json:"workload_summary,omitempty" yaml:"workload_summary,omitempty" mapstructure:"workload_summary,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -31,43 +48,32 @@ func (j *WorkloadPingResponseJson) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type WorkloadSummary struct {
-	// Id corresponds to the JSON schema field "id".
-	Id string `json:"id" yaml:"id" mapstructure:"id"`
-
-	// Name corresponds to the JSON schema field "name".
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
-
-	// Runtime corresponds to the JSON schema field "runtime".
-	Runtime *string `json:"runtime,omitempty" yaml:"runtime,omitempty" mapstructure:"runtime,omitempty"`
-
-	// StartTime corresponds to the JSON schema field "start_time".
-	StartTime string `json:"start_time" yaml:"start_time" mapstructure:"start_time"`
-
-	// WorkloadType corresponds to the JSON schema field "workload_type".
-	WorkloadType *string `json:"workload_type,omitempty" yaml:"workload_type,omitempty" mapstructure:"workload_type,omitempty"`
-}
-
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadSummary) UnmarshalJSON(b []byte) error {
+func (j *Workload) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
-		return fmt.Errorf("field id in WorkloadSummary: required")
+		return fmt.Errorf("field id in Workload: required")
 	}
 	if _, ok := raw["name"]; raw != nil && !ok {
-		return fmt.Errorf("field name in WorkloadSummary: required")
+		return fmt.Errorf("field name in Workload: required")
+	}
+	if _, ok := raw["runtime"]; raw != nil && !ok {
+		return fmt.Errorf("field runtime in Workload: required")
 	}
 	if _, ok := raw["start_time"]; raw != nil && !ok {
-		return fmt.Errorf("field start_time in WorkloadSummary: required")
+		return fmt.Errorf("field start_time in Workload: required")
 	}
-	type Plain WorkloadSummary
+	if _, ok := raw["workload_type"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_type in Workload: required")
+	}
+	type Plain Workload
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = WorkloadSummary(plain)
+	*j = Workload(plain)
 	return nil
 }
