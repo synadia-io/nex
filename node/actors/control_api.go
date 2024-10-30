@@ -306,18 +306,18 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
-	// Ask the agent supervisor for a list of all the workloads from all of its children
+
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.SetLameDuck))
 	if err != nil {
-		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
+		api.logger.Error("Failed to put node in lame duck mode", slog.Any("error", err))
+		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to put node in lame duck mode: %s", err))
 		return
 	}
 
 	workloadResponse, ok := response.(*actorproto.LameDuckResponse)
 	if !ok {
-		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, LameDuckResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		api.logger.Error("LameDuck response from agent supervisor was not the correct type")
+		respondEnvelope(m, LameDuckResponseType, 500, nil, "LameDuck response from agent supervisor was not the correct type")
 		return
 	}
 
