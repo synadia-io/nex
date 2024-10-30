@@ -340,3 +340,42 @@ func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
 
 	return resp, nil
 }
+
+func (nn nexNode) infoResponse() (*actorproto.NodeInfo, error) {
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
+		return nil, err
+	}
+	resp := &actorproto.NodeInfo{
+		Id:      pk,
+		Tags:    nn.options.Tags,
+		Uptime:  time.Since(nn.startedAt).String(),
+		Version: VERSION,
+	}
+
+	agentSuper := nn.runningActors[actors.AgentSupervisorActorName]
+	for _, c := range agentSuper.Children() {
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
+		if err != nil {
+			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
+			return nil, errors.New("failed to ping agent")
+		}
+		wL, ok := agentResp.(*actorproto.WorkloadList)
+		if !ok {
+			nn.options.Logger.Error("Failed to convert agent response")
+			return nil, errors.New("failed to convert agent response")
+		}
+		for _, w := range wL.Workloads {
+			resp.Workloads = append(resp.Workloads, &actorproto.WorkloadSummary{
+				Id:           w.Id,
+				Name:         w.Name,
+				Runtime:      w.Runtime,
+				StartedAt:    timestamppb.New(w.StartedAt.AsTime()),
+				WorkloadType: c.Name(),
+			})
+		}
+	}
+
+	return resp, nil
+}
