@@ -270,7 +270,8 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 
 func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
 	if os != runtime.GOOS || arch != runtime.GOARCH {
-		return nil, errors.New("node did not satisfy auction os/arch requirements")
+		nn.options.Logger.Debug("node did not satisfy auction os/arch requirements")
+		return nil, nil
 	}
 
 	st := timestamppb.New(nn.startedAt)
