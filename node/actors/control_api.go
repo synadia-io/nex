@@ -196,6 +196,11 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 		return
 	}
 
+	if auctResp == nil {
+		respondEnvelope(m, AuctionResponseType, 404, nil, "node does not satisfy auction request")
+		return
+	}
+
 	respondEnvelope(m, AuctionResponseType, 200, auctionResponseFromProto(auctResp), "")
 }
 

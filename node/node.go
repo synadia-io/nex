@@ -305,16 +305,16 @@ func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[
 	// Node must satisfy all agent types in auction request
 	for name, _ := range resp.Status {
 		if !slices.Contains(agentType, name) {
-			nn.options.Logger.Error("node did not satisfy auction agent type requirements")
-			return nil, errors.New("node did not satisfy auction agent type requirements")
+			nn.options.Logger.Debug("node did not satisfy auction agent type requirements")
+			return nil, nil
 		}
 	}
 
 	// Node must satisfy all tags in auction request
 	for tag, value := range tags {
 		if tV, ok := nn.options.Tags[tag]; !ok || tV != value {
-			nn.options.Logger.Error("node did not satisfy auction tag requirements")
-			return nil, errors.New("node did not satisfy auction tag requirements")
+			nn.options.Logger.Debug("node did not satisfy auction tag requirements")
+			return nil, nil
 		}
 	}
 
