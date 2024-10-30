@@ -166,20 +166,20 @@ func (nn *nexNode) Start() error {
 		cancel()
 	}()
 
-	as, err := nn.initializeSupervisionTree()
+	err := nn.initializeSupervisionTree()
 	if err != nil {
 		return err
 	}
 
-	nn.actorSystem = as
 	nn.startedAt = time.Now()
 	<-nn.ctx.Done()
 	nn.options.Logger.Info("Shutting down nexnode")
-	return as.Stop(nn.ctx)
+	return nn.actorSystem.Stop(nn.ctx)
 }
 
-func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
-	actorSystem, err := goakt.NewActorSystem("nexnode",
+func (nn *nexNode) initializeSupervisionTree() error {
+	var err error
+	nn.actorSystem, err = goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
@@ -188,66 +188,66 @@ func (nn *nexNode) initializeSupervisionTree() (goakt.ActorSystem, error) {
 		//goakt.WithTracing(),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// start the actor system
-	err = actorSystem.Start(nn.ctx)
+	err = nn.actorSystem.Start(nn.ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// start the root actors
-	agentSuper, err := actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(actorSystem, *nn.options))
+	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	inats := actors.CreateInternalNatsServer(*nn.options)
-	_, err = actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	allCreds := inats.CredentialsMap()
 
-	_, err = actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if !nn.options.DisableDirectStart {
 		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	for _, agent := range nn.options.AgentOptions {
 		// This map lookup works because the agent name is identical to the workload type
 		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(allCreds[agent.Name], agent))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	_, err = actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
 		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse, nn.pingResponse, nn.infoResponse))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	running := make([]string, len(actorSystem.Actors()))
-	for i, actor := range actorSystem.Actors() {
+	running := make([]string, len(nn.actorSystem.Actors()))
+	for i, actor := range nn.actorSystem.Actors() {
 		running[i] = actor.Name()
 	}
 	nn.options.Logger.Debug("Actors started", slog.Any("running", running))
 
-	return actorSystem, nil
+	return nil
 }
 
 func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
