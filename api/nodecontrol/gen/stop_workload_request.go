@@ -14,6 +14,9 @@ type StopWorkloadRequestJson struct {
 
 	// WorkloadJwt corresponds to the JSON schema field "workload_jwt".
 	WorkloadJwt string `json:"workload_jwt" yaml:"workload_jwt" mapstructure:"workload_jwt"`
+
+	// WorkloadType corresponds to the JSON schema field "workload_type".
+	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -30,6 +33,9 @@ func (j *StopWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["workload_jwt"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_jwt in StopWorkloadRequestJson: required")
+	}
+	if _, ok := raw["workload_type"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_type in StopWorkloadRequestJson: required")
 	}
 	type Plain StopWorkloadRequestJson
 	var plain Plain

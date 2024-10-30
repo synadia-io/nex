@@ -11,6 +11,9 @@ type HostServicesConfig struct {
 
 	// NatsUserJwt corresponds to the JSON schema field "nats_user_jwt".
 	NatsUserJwt *string `json:"nats_user_jwt,omitempty" yaml:"nats_user_jwt,omitempty" mapstructure:"nats_user_jwt,omitempty"`
+
+	// NatsUserSeed corresponds to the JSON schema field "nats_user_seed".
+	NatsUserSeed *string `json:"nats_user_seed,omitempty" yaml:"nats_user_seed,omitempty" mapstructure:"nats_user_seed,omitempty"`
 }
 
 type StartWorkloadRequestJson struct {
