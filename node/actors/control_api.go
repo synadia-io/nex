@@ -201,7 +201,6 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	}
 
 	if auctResp == nil {
-		respondEnvelope(m, AuctionResponseType, 404, nil, "node does not satisfy auction request")
 		return
 	}
 
@@ -252,24 +251,24 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 	}
 
 	ctx := context.Background()
-	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	_, agent, err := api.self.ActorSystem().ActorOf(ctx, req.WorkloadType)
 	if err != nil {
-		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		api.logger.Error("Failed to locate agent actor", slog.String("type", req.WorkloadType), slog.Any("error", err))
+		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to locate agent [%s] actor: %s", req.WorkloadType, err))
 		return
 	}
 
-	askResp, err := api.self.Ask(ctx, agentSuper, stopRequestToProto(req))
+	askResp, err := api.self.Ask(ctx, agent, stopRequestToProto(req))
 	if err != nil {
-		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		api.logger.Error("Failed to stop workload on agent", slog.String("agent", agent.Name()), slog.Any("error", err))
 		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 
 	protoResp, ok := askResp.(*actorproto.WorkloadStopped)
 	if !ok {
-		api.logger.Error("Workload listing response from agent supervisor was not the correct type")
-		respondEnvelope(m, StopResponseType, 500, nil, "Agent supervisor returned the wrong data type")
+		api.logger.Error("Workload stop response from agent was not the correct type")
+		respondEnvelope(m, StopResponseType, 500, nil, "Agent returned the wrong data type for workload stop")
 		return
 	}
 
