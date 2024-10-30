@@ -21,7 +21,16 @@ message PingNodeResponse {
   map<string, int32> running_agents = 7;
 }
 
-message PingAgent {}
+message PingAgent {
+  string namespace = 1;
+  string type = 2;
+}
+
+message PingWorkload {
+  string namespace = 1;
+  string type = 2;
+  string workload_id = 3;
+}
 
 message PingAgentResponse {
   string node_id = 1;
@@ -30,6 +39,11 @@ message PingAgentResponse {
   map<string, string> tags = 4;
   google.protobuf.Timestamp started_at = 5;
   repeated RunningWorkload running_workloads = 6;
+}
+
+message PingWorkloadResponse {
+  string node_id = 1;
+  WorkloadSummary workload = 2;
 }
 
 message RunningWorkload {

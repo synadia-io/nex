@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.workload_ping_response",
+  "title": "WorkloadPingResponse",
+  "type": "object",
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "description": "The unique identifier of the node on which the agent is running"
+    },
+    "workload_summary": {
+      "$ref": "#/definitions/WorkloadSummary"
+    }
+  },
+  "required": [
+    "node_id",
+    "target_xkey",
+    "version",
+    "tags",
+    "uptime",
+    "running_workloads"
+  ],
+  "definitions": {
+    "WorkloadSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "string"
+        },
+        "workload_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "start_time",
+        "type"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

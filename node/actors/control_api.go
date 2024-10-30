@@ -20,13 +20,14 @@ import (
 const ControlAPIActorName = "control_api"
 
 const (
-	AuctionResponseType   = "io.nats.nex.v2.auction_response"
-	InfoResponseType      = "io.nats.nex.v2.info_response"
-	PingResponseType      = "io.nats.nex.v2.ping_response"
-	AgentPingResponseType = "io.nats.nex.v2.agent_ping_response"
-	RunResponseType       = "io.nats.nex.v2.run_response"
-	StopResponseType      = "io.nats.nex.v2.stop_response"
-	LameDuckResponseType  = "io.nats.nex.v2.lameduck_response"
+	AuctionResponseType      = "io.nats.nex.v2.auction_response"
+	InfoResponseType         = "io.nats.nex.v2.info_response"
+	PingResponseType         = "io.nats.nex.v2.ping_response"
+	AgentPingResponseType    = "io.nats.nex.v2.agent_ping_response"
+	WorkloadPingResponseType = "io.nats.nex.v2.workload_ping_response"
+	RunResponseType          = "io.nats.nex.v2.run_response"
+	StopResponseType         = "io.nats.nex.v2.stop_response"
+	LameDuckResponseType     = "io.nats.nex.v2.lameduck_response"
 )
 
 type auctionResponseFunc func(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
@@ -326,37 +327,77 @@ func (api *ControlAPI) handlePing(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
-	req := new(nodecontrol.AgentPingResponseJson)
-	err := json.Unmarshal(m.Data, req)
-	if err != nil {
-		api.logger.Error("Failed to unmarshal agent ping request", slog.Any("error", err))
-		respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to unmarshal agent ping request: %s", err))
-		return
-	}
-
 	ctx := context.Background()
-	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
-	if err != nil {
-		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+
+	splitSub := strings.Split(m.Subject, ".")
+	var workloadType, namespace, workloadID string
+
+	switch len(splitSub) {
+	case 4: // PREFIX.APING.<WORKLOAD_TYPE>.<NAMESPACE>
+		workloadType = splitSub[2]
+		namespace = splitSub[3]
+
+		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
+		if err != nil {
+			api.logger.Error("Failed to locate agent actor", slog.String("type", workloadType), slog.Any("error", err))
+			respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
+			return
+		}
+
+		response, err := api.self.Ask(ctx, agent, &actorproto.PingAgent{
+			Type:      workloadType,
+			Namespace: namespace,
+		})
+		if err != nil {
+			api.logger.Error("failed to ping agent", slog.Any("error", err))
+			respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to ping agent: %s", err))
+			return
+		}
+
+		aPingResponse, ok := response.(*actorproto.PingAgentResponse)
+		if !ok {
+			api.logger.Error("Response from agent ping was not the correct type")
+			respondEnvelope(m, AgentPingResponseType, 500, nil, "Response from agent ping was not the correct type")
+			return
+		}
+
+		respondEnvelope(m, AgentPingResponseType, 200, agentPingResponseFromProto(aPingResponse), "")
+	case 5: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_ID>
+		workloadType = splitSub[2]
+		namespace = splitSub[3]
+		workloadID = splitSub[4]
+
+		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
+		if err != nil {
+			api.logger.Error("Failed to locate agent actor", slog.String("type", workloadType), slog.Any("error", err))
+			respondEnvelope(m, WorkloadPingResponseType, 500, nil, fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
+			return
+		}
+
+		response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
+			Type:       workloadType,
+			Namespace:  namespace,
+			WorkloadId: workloadID,
+		})
+		if err != nil {
+			api.logger.Error("failed to ping workload", slog.Any("error", err))
+			respondEnvelope(m, WorkloadPingResponseType, 500, nil, fmt.Sprintf("failed to ping workload: %s", err))
+			return
+		}
+
+		aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
+		if !ok {
+			api.logger.Error("Response from workload ping was not the correct type")
+			respondEnvelope(m, WorkloadPingResponseType, 500, nil, "Response from workload ping was not the correct type")
+			return
+		}
+
+		respondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
+	default:
+		api.logger.Error("Received a request on a bad APING subject", slog.Any("subjet", m.Subject))
+		respondEnvelope(m, AgentPingResponseType, 500, nil, "Received a request on a bad APING subject")
 		return
 	}
-
-	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.PingAgent))
-	if err != nil {
-		api.logger.Error("Failed to get list of running workloads from agent supervisor", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to get list of running workloads from agent supervisor %s", err))
-		return
-	}
-
-	workloadResponse, ok := response.(*actorproto.PingAgentResponse)
-	if !ok {
-		api.logger.Error("Response from agent ping was not the correct type")
-		respondEnvelope(m, AgentPingResponseType, 500, nil, "Response from agent ping was not the correct type")
-		return
-	}
-
-	respondEnvelope(m, AgentPingResponseType, 200, agentPingResponseFromProto(workloadResponse), "")
 }
 
 type Envelope struct {

@@ -153,3 +153,16 @@ func agentPingResponseFromProto(response *actorproto.PingAgentResponse) *api.Age
 	ret.Version = response.Version
 	return ret
 }
+
+func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponseJson {
+	return &api.WorkloadPingResponseJson{
+		NodeId: response.NodeId,
+		WorkloadSummary: &api.WorkloadSummary{
+			Id:           response.Workload.Id,
+			Name:         response.Workload.Name,
+			Runtime:      response.Workload.Runtime,
+			StartTime:    response.Workload.StartedAt.String(),
+			WorkloadType: response.Workload.WorkloadType,
+		},
+	}
+}
