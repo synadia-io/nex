@@ -89,7 +89,7 @@ func WithDisableDirectStart(b bool) NodeOption {
 
 func WithNexus(nexus string) NodeOption {
 	return func(n *NodeOptions) {
-		n.Tags["nex.nexus"] = nexus
+		n.Tags[TagNexus] = nexus
 	}
 }
 
