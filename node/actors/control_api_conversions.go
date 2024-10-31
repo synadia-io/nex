@@ -16,27 +16,9 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 		Essential:   request.Essential,
 		Hash:        request.Hash,
 		HostServiceConfig: &actorproto.HostServicesConfig{
-			NatsUrl: func() string {
-				if request.HostServiceConfig.NatsUrl == nil {
-					return ""
-				} else {
-					return *request.HostServiceConfig.NatsUrl
-				}
-			}(),
-			NatsUserSeed: func() string {
-				if request.HostServiceConfig.NatsUserSeed == nil {
-					return ""
-				} else {
-					return *request.HostServiceConfig.NatsUserSeed
-				}
-			}(),
-			NatsUserJwt: func() string {
-				if request.HostServiceConfig.NatsUserJwt == nil {
-					return ""
-				} else {
-					return *request.HostServiceConfig.NatsUserJwt
-				}
-			}(),
+			NatsUrl:      request.HostServiceConfig.NatsUrl,
+			NatsUserSeed: request.HostServiceConfig.NatsUserSeed,
+			NatsUserJwt:  request.HostServiceConfig.NatsUserJwt,
 		},
 		Jsdomain:        request.Jsdomain,
 		RetriedAt:       request.RetriedAt,

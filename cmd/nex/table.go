@@ -100,3 +100,11 @@ func (i Info) Table() []table.Row {
 		{"JSON Output", i.JSON, reflect.TypeOf(i.JSON).String()},
 	}
 }
+
+func (r RunWorkload) Table() []table.Row {
+	return []table.Row{}
+}
+
+func (r StopWorkload) Table() []table.Row {
+	return []table.Row{}
+}

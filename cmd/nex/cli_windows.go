@@ -15,7 +15,7 @@ type Globals struct {
 }
 
 type NexCLI struct {
-	Globals Globals `embed:""`
+	Globals Globals `embed:"" group:"Global Options"`
 
 	Node     Node     `cmd:"" help:"Interact with execution engine nodes"`
 	Workload Workload `cmd:"" help:"Interact with workloads"`

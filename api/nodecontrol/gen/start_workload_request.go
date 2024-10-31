@@ -7,13 +7,37 @@ import "fmt"
 
 type HostServicesConfig struct {
 	// NatsUrl corresponds to the JSON schema field "nats_url".
-	NatsUrl *string `json:"nats_url,omitempty" yaml:"nats_url,omitempty" mapstructure:"nats_url,omitempty"`
+	NatsUrl string `json:"nats_url" yaml:"nats_url" mapstructure:"nats_url"`
 
 	// NatsUserJwt corresponds to the JSON schema field "nats_user_jwt".
-	NatsUserJwt *string `json:"nats_user_jwt,omitempty" yaml:"nats_user_jwt,omitempty" mapstructure:"nats_user_jwt,omitempty"`
+	NatsUserJwt string `json:"nats_user_jwt" yaml:"nats_user_jwt" mapstructure:"nats_user_jwt"`
 
 	// NatsUserSeed corresponds to the JSON schema field "nats_user_seed".
-	NatsUserSeed *string `json:"nats_user_seed,omitempty" yaml:"nats_user_seed,omitempty" mapstructure:"nats_user_seed,omitempty"`
+	NatsUserSeed string `json:"nats_user_seed" yaml:"nats_user_seed" mapstructure:"nats_user_seed"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *HostServicesConfig) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["nats_url"]; raw != nil && !ok {
+		return fmt.Errorf("field nats_url in HostServicesConfig: required")
+	}
+	if _, ok := raw["nats_user_jwt"]; raw != nil && !ok {
+		return fmt.Errorf("field nats_user_jwt in HostServicesConfig: required")
+	}
+	if _, ok := raw["nats_user_seed"]; raw != nil && !ok {
+		return fmt.Errorf("field nats_user_seed in HostServicesConfig: required")
+	}
+	type Plain HostServicesConfig
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = HostServicesConfig(plain)
+	return nil
 }
 
 type StartWorkloadRequestJson struct {
