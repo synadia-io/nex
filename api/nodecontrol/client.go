@@ -2,6 +2,7 @@ package nodecontrol
 
 import (
 	"encoding/json"
+	"log/slog"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -14,12 +15,14 @@ var (
 )
 
 type ControlAPIClient struct {
-	nc *nats.Conn
+	nc     *nats.Conn
+	logger *slog.Logger
 }
 
-func NewControlApiClient(nc *nats.Conn) (*ControlAPIClient, error) {
+func NewControlApiClient(nc *nats.Conn, logger *slog.Logger) (*ControlAPIClient, error) {
 	return &ControlAPIClient{
-		nc: nc,
+		nc:     nc,
+		logger: logger,
 	}, nil
 }
 
@@ -44,17 +47,29 @@ func (c *ControlAPIClient) Auction(tags []string) (*nodegen.AuctionResponseJson,
 	return resp, nil
 }
 
-func (c *ControlAPIClient) Ping() (*nodegen.NodePingResponseJson, error) {
-	msg, err := c.nc.Request(actors.PingSubject(), nil, DefaultRequestTimeout)
-	if err != nil {
-		return nil, err
-	}
-	resp := new(nodegen.NodePingResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
+func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
+	resp := []*nodegen.NodePingResponseJson{}
+	pingRespInbox := nats.NewInbox()
+
+	_, err := c.nc.Subscribe(pingRespInbox, func(m *nats.Msg) {
+		envelope := new(actors.Envelope[nodegen.NodePingResponseJson])
+		err := json.Unmarshal(m.Data, envelope)
+		if err != nil {
+			c.logger.Error("failed to unmarshal ping response", slog.Any("err", err), slog.String("data", string(m.Data)))
+			return
+		}
+		resp = append(resp, &envelope.Data)
+	})
 	if err != nil {
 		return nil, err
 	}
 
+	err = c.nc.PublishRequest(actors.PingSubject(), pingRespInbox, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	time.Sleep(5 * time.Second)
 	return resp, nil
 }
 

@@ -320,7 +320,7 @@ func (api *ControlAPI) handlePing(m *nats.Msg) {
 	pingResponse, err := api.nodePingResponse()
 	if err != nil {
 		api.logger.Error("failed to ping node", slog.Any("error", err))
-		respondEnvelope(m, LameDuckResponseType, 500, "", "failed to ping node")
+		respondEnvelope(m, PingResponseType, 500, "", fmt.Sprintf("failed to ping node: %s", err.Error()))
 		return
 	}
 

@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/nats-io/nkeys"
@@ -84,7 +86,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc)
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
@@ -157,7 +159,7 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc)
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}

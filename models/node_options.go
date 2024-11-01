@@ -14,6 +14,7 @@ const (
 	TagCPUs     = "nex.cpucount"
 	TagLameDuck = "nex.lameduck"
 	TagNexus    = "nex.nexus"
+	TagNodeName = "nex.node"
 )
 
 var ReservedTagPrefixes = []string{"nex."}
@@ -89,7 +90,17 @@ func WithDisableDirectStart(b bool) NodeOption {
 
 func WithNexus(nexus string) NodeOption {
 	return func(n *NodeOptions) {
-		n.Tags[TagNexus] = nexus
+		if nexus != "" {
+			n.Tags[TagNexus] = nexus
+		}
+	}
+}
+
+func WithNodeName(name string) NodeOption {
+	return func(n *NodeOptions) {
+		if name != "" {
+			n.Tags[TagNodeName] = name
+		}
 	}
 }
 
