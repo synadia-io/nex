@@ -3,6 +3,7 @@ package actors
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 )
 
@@ -60,21 +61,34 @@ func (proc *OsProcess) Run() error {
 		}
 		return err
 	}
-	if proc.cmd.Process != nil {
+
+	if proc.cmd.Process == nil {
 		proc.logger.Debug("OS process terminated successfully", slog.Int("pid", proc.cmd.Process.Pid))
 	}
 
 	return nil
 }
 
-// Stops the running process (if it's running). Note that this sends
+// Sends an interrupt signal to the running process (if it's running)
+func (proc *OsProcess) Stop(reason string) error {
+	if proc.cmd.Process != nil {
+		return proc.cmd.Process.Signal(os.Interrupt)
+	}
+	return nil
+}
+
+// Kills the running process (if it's running). Note that this sends
 // a signal and then exits, which means the actual OS process might stop
 // "some time" later
-func (proc *OsProcess) Stop(reason string) error {
+func (proc *OsProcess) Kill() error {
 	if proc.cmd.Process != nil {
 		return proc.cmd.Process.Kill()
 	}
 	return nil
+}
+
+func (proc *OsProcess) IsRunning() bool {
+	return proc.cmd.Process != nil
 }
 
 // NOTE: if there is an operating system specific thing that needs to be done to the command

@@ -54,8 +54,8 @@ func getArtifact(name string, uri string) (*ArtifactReference, error) {
 
 func cacheFile(name string, location *url.URL) (*ArtifactReference, error) {
 	filePath, tag := "", ""
-	if strings.Contains(location.Path, ":") {
-		sPath := strings.Split(location.Path, ":")
+	sPath := strings.SplitN(location.Path, ":", 2) // splits on first : only
+	if len(sPath) == 2 {
 		filePath = sPath[0]
 		tag = sPath[1]
 	} else {
