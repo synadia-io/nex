@@ -119,20 +119,20 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 }
 
 func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto.WorkloadStopped, error) {
-	for _, c := range a.self.Children() {
-		if c.Name() == m.WorkloadId {
-			err := c.Tell(context.Background(), c, &actorproto.KillDirectStartProcess{})
-			if err != nil {
-				a.logger.Error("failed to query workload", slog.String("name", a.self.Name()), slog.Any("err", err))
-				return nil, err
-			}
-
-			a.logger.Info("Stopping direct start process", slog.String("name", c.Name()))
-			return &actorproto.WorkloadStopped{Id: m.WorkloadId, Stopped: true}, nil
-		}
+	c, err := a.self.Child(m.WorkloadId)
+	if err != nil {
+		a.logger.Error("workload not found", slog.String("name", a.self.Name()), slog.String("workload", m.WorkloadId))
+		return nil, errors.New("workload not found")
 	}
-	a.logger.Error("workload not found", slog.String("name", a.self.Name()), slog.String("workload", m.WorkloadId))
-	return nil, errors.New("workload not found")
+
+	err = c.Tell(context.Background(), c, &actorproto.KillDirectStartProcess{})
+	if err != nil {
+		a.logger.Error("failed to query workload", slog.String("name", a.self.Name()), slog.Any("err", err))
+		return nil, err
+	}
+
+	a.logger.Info("Stopping direct start process", slog.String("name", c.Name()))
+	return &actorproto.WorkloadStopped{Id: m.WorkloadId, Stopped: true}, nil
 }
 
 func (a *DirectStartAgent) queryWorkloads(m *actorproto.QueryWorkloads) (*actorproto.WorkloadList, error) {

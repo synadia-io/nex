@@ -69,7 +69,7 @@ func (proc *OsProcess) Run() error {
 }
 
 // Sends an interrupt signal to the running process (if it's running)
-func (proc *OsProcess) Stop(reason string) error {
+func (proc *OsProcess) Interrupt(reason string) error {
 	if proc.cmd.Process != nil {
 		return proc.cmd.Process.Signal(os.Interrupt)
 	}

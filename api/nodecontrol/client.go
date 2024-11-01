@@ -113,13 +113,13 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 		return nil, err
 	}
 
-	outerEnv := new(actors.Envelope[nodegen.StartWorkloadResponseJson])
-	err = json.Unmarshal(msg.Data, outerEnv)
+	envelope := new(actors.Envelope[nodegen.StartWorkloadResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return &outerEnv.Data, nil
+	return &envelope.Data, nil
 }
 
 func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodegen.StopWorkloadRequestJson) (*nodegen.StopWorkloadResponseJson, error) {
@@ -133,13 +133,13 @@ func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodeg
 		return nil, err
 	}
 
-	outerEnv := new(actors.Envelope[nodegen.StopWorkloadResponseJson])
-	err = json.Unmarshal(msg.Data, outerEnv)
+	envelope := new(actors.Envelope[nodegen.StopWorkloadResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return &outerEnv.Data, nil
+	return &envelope.Data, nil
 }
 
 func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoResponseJson, error) {
