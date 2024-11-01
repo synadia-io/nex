@@ -42,7 +42,7 @@ func (a *processActor) PreStart(ctx context.Context) error {
 }
 
 func (a *processActor) PostStop(ctx context.Context) error {
-	a.logger.Info("Actor stopped", slog.String("id", a.id))
+	a.logger.Debug("Actor stopped", slog.String("id", a.id))
 	return nil
 }
 
@@ -52,10 +52,8 @@ func (a *processActor) Receive(ctx *goakt.ReceiveContext) {
 		a.self = ctx.Self()
 		ctx.Tell(ctx.Self(), &actorproto.SpawnDirectStartProcess{})
 	case *actorproto.SpawnDirectStartProcess:
-		a.logger.Debug("spawning process", slog.String("id", a.id), slog.String("workload", a.startCommand.WorkloadName))
 		go a.Spawn(ctx)
 	case *actorproto.KillDirectStartProcess:
-		a.logger.Debug("stopping process", slog.String("id", a.id), slog.String("workload", a.startCommand.WorkloadName))
 		err := a.process.Stop("commanded")
 		if err != nil {
 			a.logger.Error("failed to stop process", slog.Any("err", err))
@@ -69,7 +67,7 @@ func (a *processActor) Receive(ctx *goakt.ReceiveContext) {
 
 		// waits 5 seconds for workload to shutdown gracefully
 		shutdownStart := time.Now()
-		ticker := time.NewTicker(1 * time.Second)
+		ticker := time.NewTicker(500 * time.Millisecond)
 		defer ticker.Stop()
 
 		for _ = range ticker.C {

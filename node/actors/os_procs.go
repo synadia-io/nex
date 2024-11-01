@@ -62,9 +62,8 @@ func (proc *OsProcess) Run() error {
 		return err
 	}
 
-	if proc.cmd.Process == nil {
-		proc.logger.Debug("OS process terminated successfully", slog.Int("pid", proc.cmd.Process.Pid))
-	}
+	proc.logger.Debug("OS process terminated successfully", slog.Int("pid", proc.cmd.Process.Pid))
+	proc.cmd = nil
 
 	return nil
 }
@@ -88,7 +87,7 @@ func (proc *OsProcess) Kill() error {
 }
 
 func (proc *OsProcess) IsRunning() bool {
-	return proc.cmd.Process != nil
+	return proc.cmd != nil
 }
 
 // NOTE: if there is an operating system specific thing that needs to be done to the command
