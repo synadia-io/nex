@@ -138,10 +138,12 @@ func (agent *NexAgent) handleStartWorkload(m *nats.Msg) {
 	var req agentapigen.StartWorkloadRequestJson
 	err := json.Unmarshal(m.Data, &req)
 	if err != nil {
+		_ = 0 // for linter
 		// TODO: return error envelope
 	}
 	err = agent.callback.StartWorkload(&req)
 	if err != nil {
+		_ = 0 // for linter
 		// TODO: return error envelope
 	}
 	// TODO: return success envelope
@@ -151,17 +153,19 @@ func (agent *NexAgent) handleStopWorkload(m *nats.Msg) {
 	var req agentapigen.StopWorkloadRequestJson
 	err := json.Unmarshal(m.Data, &req)
 	if err != nil {
+		_ = 0 // for linter
 		// TODO: return error envelope
 	}
 	err = agent.callback.StopWorkload(&req)
 	if err != nil {
+		_ = 0 // for linter
 		// TODO: return error envelope
 	}
 	// TODO: return success envelope
 }
 
 func (agent *NexAgent) handleListWorkloads(m *nats.Msg) {
-	agent.callback.ListWorkloads()
+	_ = agent.callback.ListWorkloads()
 }
 
 // TODO: this should actually get passed the node configuration options to make

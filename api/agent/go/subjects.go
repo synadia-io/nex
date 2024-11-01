@@ -16,9 +16,9 @@ func StartWorkloadSubscribeSubject(workloadType string) string {
 }
 
 func StopWorkloadSubscribeSubject(workloadType string) string {
-	return fmt.Sprintf("agent.%s.workloads.stop")
+	return fmt.Sprintf("agent.%s.workloads.stop", workloadType)
 }
 
 func ListWorkloadsSubscribeSubject(workloadType string) string {
-	return fmt.Sprintf("agent.%s.workloads.list")
+	return fmt.Sprintf("agent.%s.workloads.list", workloadType)
 }
