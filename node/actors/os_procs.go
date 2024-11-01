@@ -1,4 +1,4 @@
-package node
+package actors
 
 import (
 	"fmt"
@@ -11,14 +11,14 @@ type OsProcess struct {
 	executionPath string
 	env           map[string]string
 	argv          []string
-	logger        slog.Logger
+	logger        *slog.Logger
 	cmd           *exec.Cmd
 }
 
 // Creates a new OS process based in the parameters
 // NOTE:: if you want to ensure uniqueness in log eminations coming from this process, make sure you
 // use a unique process name
-func NewOsProcess(name string, executionPath string, env map[string]string, argv []string, logger slog.Logger) (*OsProcess, error) {
+func NewOsProcess(name string, executionPath string, env map[string]string, argv []string, logger *slog.Logger) (*OsProcess, error) {
 	return &OsProcess{
 		name:          name,
 		executionPath: executionPath,
@@ -85,20 +85,17 @@ func (proc *OsProcess) amendCommand(cmd *exec.Cmd) {
 }
 
 type logCapture struct {
-	logger slog.Logger
+	logger *slog.Logger
 	stderr bool
 	name   string
 }
 
 // Log capture implementation of io.Writer for stdout and stderr
 func (cap logCapture) Write(p []byte) (n int, err error) {
-	// TODO: dispatch and/or emit the log somewhere
-
 	if cap.stderr {
-		cap.logger.Error(string(p), slog.Bool("stderr", true), slog.String("process_name", cap.name))
+		cap.logger.Error(string(p), slog.String("process_name", cap.name))
 	} else {
-		cap.logger.Debug(string(p), slog.Bool("stderr", false), slog.String("process_name", cap.name))
+		cap.logger.Debug(string(p), slog.String("process_name", cap.name))
 	}
 	return len(p), nil
-
 }

@@ -2,11 +2,11 @@ package actors
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
-	"github.com/tochemey/goakt/v2/log"
 
 	actorproto "github.com/synadia-io/nex/node/actors/pb"
 )
@@ -14,11 +14,15 @@ import (
 type ExternalAgent struct {
 	agentOptions      models.AgentOptions
 	internalNatsCreds AgentCredential
-	logger            log.Logger
+	logger            *slog.Logger
 }
 
-func CreateExternalAgent(creds AgentCredential, agentOptions models.AgentOptions) *ExternalAgent {
-	return &ExternalAgent{agentOptions: agentOptions, internalNatsCreds: creds}
+func CreateExternalAgent(logger *slog.Logger, creds AgentCredential, agentOptions models.AgentOptions) *ExternalAgent {
+	return &ExternalAgent{
+		agentOptions:      agentOptions,
+		internalNatsCreds: creds,
+		logger:            logger,
+	}
 }
 
 func (a *ExternalAgent) PreStart(ctx context.Context) error {
@@ -32,8 +36,7 @@ func (a *ExternalAgent) PostStop(ctx context.Context) error {
 func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		a.logger = ctx.Self().Logger()
-		a.logger.Infof("External agent for workload type '%s' is running", ctx.Self().Name())
+		a.logger.Info("External agent for workload type is running", slog.String("name", ctx.Self().Name()))
 	case *actorproto.QueryWorkloads:
 		a.queryWorkloads(ctx)
 	default:

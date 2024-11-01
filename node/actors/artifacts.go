@@ -1,6 +1,10 @@
-package node
+package actors
 
-import "net/url"
+import (
+	"net/url"
+	"os"
+	"strings"
+)
 
 const (
 	SchemeFile = "file"
@@ -24,24 +28,57 @@ type ArtifactReference struct {
 	Size int
 }
 
+func extractTag(location *url.URL) string {
+	return location.Fragment
+}
+
 // Obtains an artifact from the specified location. If the indicated location allows for
 // differentiation using tags (e.g. OCI, Object Store), then the supplied tag will be used,
 // otherwise it will be ignored
-func GetArtifact(name string, tag string, location *url.URL) (*ArtifactReference, error) {
+func getArtifact(name string, uri string) (*ArtifactReference, error) {
+	location, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
+	}
+
 	switch location.Scheme {
 	case SchemeFile:
 		return cacheFile(name, location)
 	case SchemeNATS:
-		return cacheObjectStoreArtifact(name, tag, location)
+		return cacheObjectStoreArtifact(name, extractTag(location), location)
 	case SchemeOCI:
-		return cacheOciArtifact(name, tag, location)
+		return cacheOciArtifact(name, extractTag(location), location)
 	}
 	return nil, nil
 }
 
 func cacheFile(name string, location *url.URL) (*ArtifactReference, error) {
-	// TODO: Implement
-	return nil, nil
+	filePath, tag := "", ""
+	if strings.Contains(location.Path, ":") {
+		sPath := strings.Split(location.Path, ":")
+		filePath = sPath[0]
+		tag = sPath[1]
+	} else {
+		filePath = location.Path
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if info.IsDir() {
+		return nil, nil
+	}
+
+	return &ArtifactReference{
+		Name:             name,
+		Tag:              tag,
+		OriginalLocation: location,
+		LocalCachePath:   filePath,
+		Digest:           "",
+		Size:             int(info.Size()),
+	}, nil
 }
 
 func cacheObjectStoreArtifact(name string, tag string, location *url.URL) (*ArtifactReference, error) {

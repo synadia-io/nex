@@ -43,7 +43,6 @@ func (s *AgentSupervisor) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		s.logger = ctx.Self().Logger()
-		s.logger.Infof("Agent supervisor '%v' is running", ctx.Self().Name())
 	case *actorproto.QueryWorkloads:
 		s.queryWorkloads(ctx)
 	default:

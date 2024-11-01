@@ -68,9 +68,9 @@ func (agent *NexAgent) Run() error {
 
 	switch os.Args[1] {
 	case "up":
-		agent.callback.Up()
+		return agent.callback.Up()
 	case "preflight":
-		agent.callback.Preflight()
+		return agent.callback.Preflight()
 	default:
 		fmt.Println("No command supplied")
 	}
