@@ -68,18 +68,21 @@ func (a *processActor) Receive(ctx *goakt.ReceiveContext) {
 		}
 
 		// waits 5 seconds for workload to shutdown gracefully
-		ticker := time.NewTicker(5 * time.Second)
+		shutdownStart := time.Now()
+		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 
 		for _ = range ticker.C {
-			if a.process.IsRunning() {
-				time.Sleep(100 * time.Millisecond)
-				continue
+			if !a.process.IsRunning() {
+				ticker.Stop()
+				a.logger.Debug("workload stopped gracefully", slog.String("id", a.id))
+				ctx.Shutdown()
+				return
 			}
-			ticker.Stop()
-			a.logger.Debug("workload stopped gracefully", slog.String("id", a.id))
-			ctx.Shutdown()
-			return
+			if time.Since(shutdownStart) > 5*time.Second {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		err = a.process.Kill()
