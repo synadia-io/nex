@@ -7,10 +7,16 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/nats-io/nkeys"
 
+	"github.com/synadia-io/nex/api/nodecontrol"
+	"github.com/synadia-io/nex/models"
 	options "github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node"
 )
@@ -136,7 +142,7 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 
 // ----- List Command -----
 type List struct {
-	Filter map[string]string `optional:"" help:"Filter the list of nodes on tags" placeholder:"nex.nexus=mynexus;..."`
+	Filter map[string]string `optional:"" help:"Filter the list of nodes on tags. Node must match all provided tags to be returned" placeholder:"nex.nexus=mynexus"`
 	JSON   bool              `optional:"" help:"Output in JSON format"`
 }
 
@@ -152,7 +158,73 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 	if globals.Check {
 		return printTable("Node List Configuration", append(globals.Table(), l.Table()...)...)
 	}
-	fmt.Println("run list")
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	if err != nil {
+		return err
+	}
+
+	resp, err := controller.Ping()
+	if err != nil {
+		return err
+	}
+
+	if !l.JSON {
+		tW := newTableWriter("NATS Execution Nodes")
+		tW.AppendHeader(table.Row{"Nexus", "ID (* = Lameduck Mode)", "Name", "Version", "Agents", "Workloads", "Uptime", "OS", "Arch"})
+
+	node_loop:
+		for _, n := range resp {
+
+			// Check the filter list
+			for k, v := range l.Filter {
+				if tV, ok := n.Tags.Tags[k]; !ok || tV != v {
+					continue node_loop
+				}
+			}
+
+			lameduck, ok := n.Tags.Tags[models.TagLameDuck]
+			if !ok || strings.ToLower(lameduck) != "true" {
+				lameduck = "false"
+			}
+
+			tW.AppendRow(table.Row{
+				n.Nexus,
+				func() string {
+					if lameduck == "true" {
+						return n.NodeId + "*"
+					}
+					return n.NodeId
+				}(),
+				n.Tags.Tags[models.TagNodeName],
+				n.Version,
+				len(n.RunningAgents.Status),
+				func() string {
+					count := 0
+					for _, v := range n.RunningAgents.Status {
+						count += v
+					}
+					return strconv.Itoa(count)
+				}(),
+				n.Uptime,
+				n.Tags.Tags[models.TagOS],
+				n.Tags.Tags[models.TagArch],
+			})
+		}
+		fmt.Println(tW.Render())
+		return nil
+	}
+
+	resp_b, err := json.Marshal(resp)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(resp_b))
 	return nil
 }
 
@@ -187,6 +259,7 @@ type Up struct {
 	AgentHandshakeTimeoutMillisecond int               `help:"Timeout in milliseconds" name:"agent-timeout" default:"5000"`
 	DefaultResourceDir               string            `name:"resource-directory" default:"${defaultResourcePath}"`
 	NexusName                        string            `default:"nexus" help:"Nexus name"`
+	NodeName                         string            `placeholder:"nex-node" help:"Name of the node; random if not provided"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
 	Agents                           AgentConfigs      `help:"Workload types configurations for nex node to initialize"`
@@ -233,6 +306,8 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 
 	nexNode, err := node.NewNexNode(kp, nc,
 		options.WithLogger(logger),
+		options.WithNodeName(u.NodeName),
+		options.WithNexus(u.NexusName),
 		options.WithAgentHandshakeTimeout(u.AgentHandshakeTimeoutMillisecond),
 		options.WithResourceDirectory(u.DefaultResourceDir),
 		options.WithNodeTags(u.Tags),

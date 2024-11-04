@@ -9,6 +9,7 @@ require (
 	github.com/nats-io/nkeys v0.4.7
 	github.com/nats-io/nuid v1.0.1
 	github.com/opencontainers/image-spec v1.1.0
+	github.com/splode/fname v0.4.1
 	github.com/stretchr/testify v1.9.0
 	github.com/synadia-labs/oci-registry-nats v0.0.0-20241015185448-f4eef68fe962
 	github.com/tochemey/goakt/v2 v2.7.1
