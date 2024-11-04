@@ -188,7 +188,7 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal auction request", slog.Any("error", err))
-		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to unmarshal auction request: %s", err))
+		respondEnvelope(m, AuctionResponseType, 500, "", fmt.Sprintf("failed to unmarshal auction request: %s", err))
 		return
 	}
 
@@ -200,7 +200,7 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	auctResp, err := api.auctionResponse(string(req.Os), string(req.Arch), convertedAgentType, req.Tags.Tags)
 	if err != nil {
 		api.logger.Error("Failed to generate auction response", slog.Any("error", err))
-		respondEnvelope(m, AuctionResponseType, 500, nil, fmt.Sprintf("failed to generate auction response: %s", err))
+		respondEnvelope(m, AuctionResponseType, 500, "", fmt.Sprintf("failed to generate auction response: %s", err))
 		return
 	}
 
@@ -216,7 +216,7 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
-		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to unmarshal deploy request: %s", err))
+		respondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal deploy request: %s", err))
 		return
 	}
 
@@ -224,21 +224,21 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 	_, agent, err := api.self.ActorSystem().ActorOf(ctx, req.WorkloadType)
 	if err != nil {
 		api.logger.Error("Failed to locate agent actor", slog.String("type", req.WorkloadType), slog.Any("error", err))
-		respondEnvelope(m, RunResponseType, 500, nil, fmt.Sprintf("failed to locate [%s] agent actor: %s", req.WorkloadType, err))
+		respondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to locate [%s] agent actor: %s", req.WorkloadType, err))
 		return
 	}
 
 	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to start workload", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to start workload: %s", err))
+		respondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("Failed to start workload: %s", err))
 		return
 	}
 
 	protoResp, ok := askResp.(*actorproto.WorkloadStarted)
 	if !ok {
 		api.logger.Error("Start workload response from agent was not the correct type")
-		respondEnvelope(m, RunResponseType, 500, nil, "Agent returned the wrong data type")
+		respondEnvelope(m, RunResponseType, 500, "", "Agent returned the wrong data type")
 		return
 	}
 
@@ -250,7 +250,7 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal undeploy request", slog.Any("error", err))
-		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to unmarshal undeploy request: %s", err))
+		respondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to unmarshal undeploy request: %s", err))
 		return
 	}
 
@@ -258,21 +258,21 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 	_, agent, err := api.self.ActorSystem().ActorOf(ctx, req.WorkloadType)
 	if err != nil {
 		api.logger.Error("Failed to locate agent actor", slog.String("type", req.WorkloadType), slog.Any("error", err))
-		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to locate agent [%s] actor: %s", req.WorkloadType, err))
+		respondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to locate agent [%s] actor: %s", req.WorkloadType, err))
 		return
 	}
 
 	askResp, err := api.self.Ask(ctx, agent, stopRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to stop workload on agent", slog.String("agent", agent.Name()), slog.Any("error", err))
-		respondEnvelope(m, StopResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		respondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 
 	protoResp, ok := askResp.(*actorproto.WorkloadStopped)
 	if !ok {
 		api.logger.Error("Workload stop response from agent was not the correct type")
-		respondEnvelope(m, StopResponseType, 500, nil, "Agent returned the wrong data type for workload stop")
+		respondEnvelope(m, StopResponseType, 500, "", "Agent returned the wrong data type for workload stop")
 		return
 	}
 
@@ -283,9 +283,10 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 	info, err := api.nodeInfoResponse()
 	if err != nil {
 		api.logger.Error("Failed to get node info", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("failed to get node info: %s", err))
+		respondEnvelope(m, InfoResponseType, 500, "", fmt.Sprintf("failed to get node info: %s", err))
 		return
 	}
+
 	respondEnvelope(m, InfoResponseType, 200, infoResponseFromProto(info), "")
 }
 
@@ -294,21 +295,21 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		respondEnvelope(m, LameDuckResponseType, 500, nil, fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		respondEnvelope(m, LameDuckResponseType, 500, "", fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
 		return
 	}
 
 	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.SetLameDuck))
 	if err != nil {
 		api.logger.Error("Failed to put node in lame duck mode", slog.Any("error", err))
-		respondEnvelope(m, InfoResponseType, 500, nil, fmt.Sprintf("Failed to put node in lame duck mode: %s", err))
+		respondEnvelope(m, InfoResponseType, 500, "", fmt.Sprintf("Failed to put node in lame duck mode: %s", err))
 		return
 	}
 
 	workloadResponse, ok := response.(*actorproto.LameDuckResponse)
 	if !ok {
 		api.logger.Error("LameDuck response from agent supervisor was not the correct type")
-		respondEnvelope(m, LameDuckResponseType, 500, nil, "LameDuck response from agent supervisor was not the correct type")
+		respondEnvelope(m, LameDuckResponseType, 500, "", "LameDuck response from agent supervisor was not the correct type")
 		return
 	}
 
@@ -319,7 +320,7 @@ func (api *ControlAPI) handlePing(m *nats.Msg) {
 	pingResponse, err := api.nodePingResponse()
 	if err != nil {
 		api.logger.Error("failed to ping node", slog.Any("error", err))
-		respondEnvelope(m, LameDuckResponseType, 500, nil, "failed to ping node")
+		respondEnvelope(m, LameDuckResponseType, 500, "", "failed to ping node")
 		return
 	}
 
@@ -340,7 +341,7 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
 		if err != nil {
 			api.logger.Error("Failed to locate agent actor", slog.String("type", workloadType), slog.Any("error", err))
-			respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
+			respondEnvelope(m, AgentPingResponseType, 500, "", fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
 			return
 		}
 
@@ -350,14 +351,14 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 		})
 		if err != nil {
 			api.logger.Error("failed to ping agent", slog.Any("error", err))
-			respondEnvelope(m, AgentPingResponseType, 500, nil, fmt.Sprintf("failed to ping agent: %s", err))
+			respondEnvelope(m, AgentPingResponseType, 500, "", fmt.Sprintf("failed to ping agent: %s", err))
 			return
 		}
 
 		aPingResponse, ok := response.(*actorproto.PingAgentResponse)
 		if !ok {
 			api.logger.Error("Response from agent ping was not the correct type")
-			respondEnvelope(m, AgentPingResponseType, 500, nil, "Response from agent ping was not the correct type")
+			respondEnvelope(m, AgentPingResponseType, 500, "", "Response from agent ping was not the correct type")
 			return
 		}
 
@@ -370,7 +371,7 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
 		if err != nil {
 			api.logger.Error("Failed to locate agent actor", slog.String("type", workloadType), slog.Any("error", err))
-			respondEnvelope(m, WorkloadPingResponseType, 500, nil, fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
+			respondEnvelope(m, WorkloadPingResponseType, 500, "", fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
 			return
 		}
 
@@ -381,41 +382,42 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 		})
 		if err != nil {
 			api.logger.Error("failed to ping workload", slog.Any("error", err))
-			respondEnvelope(m, WorkloadPingResponseType, 500, nil, fmt.Sprintf("failed to ping workload: %s", err))
+			respondEnvelope(m, WorkloadPingResponseType, 500, "", fmt.Sprintf("failed to ping workload: %s", err))
 			return
 		}
 
 		aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
 		if !ok {
 			api.logger.Error("Response from workload ping was not the correct type")
-			respondEnvelope(m, WorkloadPingResponseType, 500, nil, "Response from workload ping was not the correct type")
+			respondEnvelope(m, WorkloadPingResponseType, 500, "", "Response from workload ping was not the correct type")
 			return
 		}
 
 		respondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
+
 	default:
 		api.logger.Error("Received a request on a bad APING subject", slog.Any("subjet", m.Subject))
-		respondEnvelope(m, AgentPingResponseType, 500, nil, "Received a request on a bad APING subject")
+		respondEnvelope(m, AgentPingResponseType, 500, "", "Received a request on a bad APING subject")
 		return
 	}
 }
 
-type Envelope struct {
-	PayloadType string      `json:"type"`
-	Data        interface{} `json:"data,omitempty"`
-	Error       *string     `json:"error,omitempty"`
-	Code        int         `json:"code"`
+type Envelope[T any] struct {
+	PayloadType string  `json:"type"`
+	Data        T       `json:"data,omitempty"`
+	Error       *string `json:"error,omitempty"`
+	Code        int     `json:"code"`
 }
 
-func newEnvelope(dataType string, data interface{}, code int, err *string) Envelope {
-	return Envelope{
+func newEnvelope[T any](dataType string, data T, code int, err *string) Envelope[T] {
+	return Envelope[T]{
 		PayloadType: dataType,
 		Data:        data,
 		Error:       err,
 	}
 }
 
-func respondEnvelope(m *nats.Msg, dataType string, code int, data interface{}, err string) {
+func respondEnvelope[T any](m *nats.Msg, dataType string, code int, data T, err string) {
 	e := &err
 	if len(strings.TrimSpace(err)) == 0 {
 		e = nil

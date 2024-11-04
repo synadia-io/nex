@@ -1,8 +1,9 @@
-package node
+package actors
 
 import (
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 )
 
@@ -11,14 +12,14 @@ type OsProcess struct {
 	executionPath string
 	env           map[string]string
 	argv          []string
-	logger        slog.Logger
+	logger        *slog.Logger
 	cmd           *exec.Cmd
 }
 
 // Creates a new OS process based in the parameters
 // NOTE:: if you want to ensure uniqueness in log eminations coming from this process, make sure you
 // use a unique process name
-func NewOsProcess(name string, executionPath string, env map[string]string, argv []string, logger slog.Logger) (*OsProcess, error) {
+func NewOsProcess(name string, executionPath string, env map[string]string, argv []string, logger *slog.Logger) (*OsProcess, error) {
 	return &OsProcess{
 		name:          name,
 		executionPath: executionPath,
@@ -60,21 +61,33 @@ func (proc *OsProcess) Run() error {
 		}
 		return err
 	}
-	if proc.cmd.Process != nil {
-		proc.logger.Debug("OS process terminated successfully", slog.Int("pid", proc.cmd.Process.Pid))
-	}
+
+	proc.logger.Debug("OS process terminated successfully", slog.Int("pid", proc.cmd.Process.Pid))
+	proc.cmd = nil
 
 	return nil
 }
 
-// Stops the running process (if it's running). Note that this sends
+// Sends an interrupt signal to the running process (if it's running)
+func (proc *OsProcess) Interrupt(reason string) error {
+	if proc.cmd.Process != nil {
+		return proc.cmd.Process.Signal(os.Interrupt)
+	}
+	return nil
+}
+
+// Kills the running process (if it's running). Note that this sends
 // a signal and then exits, which means the actual OS process might stop
 // "some time" later
-func (proc *OsProcess) Stop(reason string) error {
+func (proc *OsProcess) Kill() error {
 	if proc.cmd.Process != nil {
 		return proc.cmd.Process.Kill()
 	}
 	return nil
+}
+
+func (proc *OsProcess) IsRunning() bool {
+	return proc.cmd != nil
 }
 
 // NOTE: if there is an operating system specific thing that needs to be done to the command
@@ -85,20 +98,17 @@ func (proc *OsProcess) amendCommand(cmd *exec.Cmd) {
 }
 
 type logCapture struct {
-	logger slog.Logger
+	logger *slog.Logger
 	stderr bool
 	name   string
 }
 
 // Log capture implementation of io.Writer for stdout and stderr
 func (cap logCapture) Write(p []byte) (n int, err error) {
-	// TODO: dispatch and/or emit the log somewhere
-
 	if cap.stderr {
-		cap.logger.Error(string(p), slog.Bool("stderr", true), slog.String("process_name", cap.name))
+		cap.logger.Error(string(p), slog.String("process_name", cap.name))
 	} else {
-		cap.logger.Debug(string(p), slog.Bool("stderr", false), slog.String("process_name", cap.name))
+		cap.logger.Debug(string(p), slog.String("process_name", cap.name))
 	}
 	return len(p), nil
-
 }

@@ -217,14 +217,14 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options))
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options, nn.options.Logger.WithGroup("direct_start")))
 		if err != nil {
 			return err
 		}
 	}
 	for _, agent := range nn.options.AgentOptions {
 		// This map lookup works because the agent name is identical to the workload type
-		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(allCreds[agent.Name], agent))
+		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(nn.options.Logger.WithGroup(agent.Name), allCreds[agent.Name], agent))
 		if err != nil {
 			return err
 		}

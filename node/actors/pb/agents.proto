@@ -85,6 +85,7 @@ message StartWorkload {
   string workload_jwt = 12;
   string workload_name = 13;
   string workload_type = 14;
+  string namespace = 15;
 }
 
 message HostServicesConfig {
@@ -117,10 +118,14 @@ message WorkloadStopped {
 
 // Asks the target agent for a list of all if its known, running workloads
 message QueryWorkloads {}
+message QueryWorkload {}
 
 message WorkloadList {
   repeated WorkloadSummary workloads = 1;
 }
+
+message SpawnDirectStartProcess {}
+message KillDirectStartProcess {}
 
 message GetNodeInfo {}
 message NodeInfo {
