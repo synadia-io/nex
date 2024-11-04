@@ -42,7 +42,7 @@ type RunWorkload struct {
 	WorkloadPublicKey        string            `name:"public-key" description:"Public key of the workload"`
 	WorkloadUri              string            `name:"uri" description:"URI of the workload.  file:// oci:// nats://" placeholder:"file://./workload"`
 	WorkloadTriggerSubjects  []string          `name:"triggers" description:"Subjects to trigger the workload"`
-	WorkloadType             string            `name:"type" description:"Type of workload" default:"direct"`
+	WorkloadType             string            `name:"type" description:"Type of workload" default:"direct_start"`
 }
 
 func (RunWorkload) AfterApply(globals *Globals) error {
@@ -115,6 +115,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		TriggerSubjects: r.WorkloadTriggerSubjects,
 		Uri:             r.WorkloadUri,
 		WorkloadName:    r.WorkloadName,
+		WorkloadType:    r.WorkloadType,
 	}
 
 	resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
@@ -123,7 +124,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 	}
 
 	if resp.Started {
-		fmt.Printf("Workload %s[%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+		fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
 	} else {
 		fmt.Printf("Workload %s failed to start on node %s\n", r.WorkloadName, r.NodeId)
 	}
@@ -132,8 +133,9 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 }
 
 type StopWorkload struct {
-	NodeId     string `description:"Node ID of the node the workload in running"`
-	WorkloadId string `description:"ID of the workload to stop" required:"true"`
+	NodeId       string `description:"Node ID of the node the workload in running"`
+	WorkloadId   string `description:"ID of the workload to stop" required:"true"`
+	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
 }
 
 func (StopWorkload) AfterApply(globals *Globals) error {
@@ -161,8 +163,9 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 	}
 
 	req := gen.StopWorkloadRequestJson{
-		NodeId:     s.NodeId,
-		WorkloadId: s.WorkloadId,
+		NodeId:       s.NodeId,
+		WorkloadId:   s.WorkloadId,
+		WorkloadType: s.WorkloadType,
 	}
 
 	resp, err := controller.UndeployWorkload(s.NodeId, globals.Namespace, req)
