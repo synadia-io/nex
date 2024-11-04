@@ -13,6 +13,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/splode/fname"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -46,6 +47,12 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 		return nil, fmt.Errorf("no nats connection provided")
 	}
 
+	rng := fname.NewGenerator()
+	nodeName, err := rng.Generate()
+	if err != nil {
+		nodeName = "nexnode"
+	}
+
 	nn := &nexNode{
 		ctx:       context.Background(),
 		nc:        nc,
@@ -61,6 +68,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 				models.TagCPUs:     fmt.Sprintf("%d", runtime.GOMAXPROCS(0)),
 				models.TagLameDuck: "false",
 				models.TagNexus:    "nexus",
+				models.TagNodeName: nodeName,
 			},
 			ValidIssuers: []string{},
 			OtelOptions: models.OTelOptions{
@@ -89,7 +97,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 		return nil, nn.options.Errs
 	}
 
-	err := nn.Validate()
+	err = nn.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -316,11 +324,19 @@ func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
 		return nil, err
 	}
 
+	nexus, ok := nn.options.Tags[models.TagNexus]
+	if !ok {
+		nexus = "_"
+		nn.options.Logger.Warn("Nexus tag not found when responding to ping request")
+	}
+
 	resp := &actorproto.PingNodeResponse{
-		NodeId:    pk,
-		Version:   VERSION,
-		StartedAt: st,
-		Tags:      nn.options.Tags,
+		NodeId:        pk,
+		Nexus:         nexus,
+		Version:       VERSION,
+		StartedAt:     st,
+		Tags:          nn.options.Tags,
+		RunningAgents: make(map[string]int32),
 	}
 
 	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
@@ -329,17 +345,17 @@ func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
 		return nil, err
 	}
 	for _, c := range agentSuper.Children() {
-		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
 		if err != nil {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
 		}
-		aR, ok := agentResp.(*actorproto.PingAgentResponse)
+		aR, ok := agentResp.(*actorproto.WorkloadList)
 		if !ok {
 			nn.options.Logger.Error("Failed to convert agent response")
 			return nil, errors.New("failed to convert agent response")
 		}
-		resp.RunningAgents[c.Name()] = int32(len(aR.RunningWorkloads))
+		resp.RunningAgents[c.Name()] = int32(len(aR.Workloads))
 	}
 
 	return resp, nil
