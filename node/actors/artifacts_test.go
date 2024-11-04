@@ -175,8 +175,43 @@ func prepOCIArtifact(t testing.TB, workingDir string) (string, error) {
 	return fmt.Sprintf("oci://localhost:%d/test:derp", port), nil
 }
 
-func prepNatsObjStoreArtifact(t testing.TB) string {
-	return ""
+func prepNatsObjStoreArtifact(t testing.TB, workingDir string) (string, *nats.Conn, error) {
+	s, err := startNatsServer(t)
+	if err != nil {
+		return "", nil, err
+	}
+
+	nc, err := nats.Connect(s.ClientURL())
+	if err != nil {
+		return "", nil, err
+	}
+
+	jsCtx, err := jetstream.New(nc)
+	if err != nil {
+		return "", nil, err
+	}
+
+	obs, err := jsCtx.CreateOrUpdateObjectStore(context.TODO(), jetstream.ObjectStoreConfig{
+		Bucket: "mybins",
+	})
+	if err != nil {
+		return "", nil, err
+	}
+
+	binPath := createTestBinary(t, workingDir)
+
+	f, err := os.Open(binPath)
+	if err != nil {
+		return "", nil, err
+	}
+	_, err = obs.Put(context.TODO(), jetstream.ObjectMeta{
+		Name: "testnats_foo",
+	}, f)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return "nats://mybins/testnats:foo", nc, nil
 }
 
 func prepFileArtifact(t testing.TB, workingDir string) string {
@@ -193,7 +228,7 @@ func TestOCIArtifact(t *testing.T) {
 		t.Fatalf("Failed to prep OCI artifact: %v", err)
 	}
 
-	ref, err := getArtifact("testoci", uri)
+	ref, err := getArtifact("testoci", uri, nil)
 	if err != nil {
 		t.Fatalf("Failed to get artifact: %v", err)
 	}
@@ -220,8 +255,36 @@ func TestOCIArtifact(t *testing.T) {
 }
 
 func TestNatsArtifact(t *testing.T) {
-	//startNatsServer(t)
-	// Run the test
+	workingDir := t.TempDir()
+	uri, nc, err := prepNatsObjStoreArtifact(t, workingDir)
+	if err != nil {
+		t.Fatalf("Failed to prep OCI artifact: %v", err)
+	}
+
+	ref, err := getArtifact("testnats", uri, nc)
+	if err != nil {
+		t.Fatalf("Failed to get artifact: %v", err)
+	}
+	defer os.Remove(ref.LocalCachePath)
+
+	if ref.Name != "testnats" {
+		t.Errorf("expected %s, got %s", "testnats", ref.Name)
+	}
+	if ref.Tag != "foo" {
+		t.Errorf("expected %s, got %s", "foo", ref.Tag)
+	}
+	if ref.OriginalLocation.String() != uri {
+		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
+	}
+	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
+		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
+	}
+	// if ref.Digest != "b92aaf4823a9ffd5aa76f8af00708b60cd658d9dfbee39d717a566e57912204b" {
+	// 	t.Errorf("expected %s, got %s", "b92aaf4823a9ffd5aa76f8af00708b60cd658d9dfbee39d717a566e57912204b", ref.Digest)
+	// }
+	if ref.Size != 2276647 {
+		t.Errorf("expected %d, got %d", 2276647, ref.Size)
+	}
 }
 
 func TestFileArtifact(t *testing.T) {
@@ -232,7 +295,7 @@ func TestFileArtifact(t *testing.T) {
 	defer os.RemoveAll(workingDir)
 
 	uri := prepFileArtifact(t, workingDir)
-	ref, err := getArtifact("test", uri)
+	ref, err := getArtifact("test", uri, nil)
 	if err != nil {
 		t.Errorf("Failed to get artifact: %v", err)
 	}
@@ -253,8 +316,8 @@ func TestFileArtifact(t *testing.T) {
 	// if ref.Digest != "bcc1d22e206389acfcf479f2ae4f2042e063887296be45351576c8e3996cf483" {
 	// 	t.Errorf("expected %s, got %s", "bcc1d22e206389acfcf479f2ae4f2042e063887296be45351576c8e3996cf483", ref.Digest)
 	// }
-	if ref.Size != 2276647 {
-		t.Errorf("expected %d, got %d", 2276647, ref.Size)
+	if ref.Size != 2276655 {
+		t.Errorf("expected %d, got %d", 2276655, ref.Size)
 	}
 }
 

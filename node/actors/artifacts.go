@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/memory"
@@ -59,7 +61,7 @@ func parsePathTag(location *url.URL) (string, string) {
 // Obtains an artifact from the specified location. If the indicated location allows for
 // differentiation using tags (e.g. OCI, Object Store), then the supplied tag will be used,
 // otherwise it will be ignored
-func getArtifact(name string, uri string) (*ArtifactReference, error) {
+func getArtifact(name string, uri string, nc *nats.Conn) (*ArtifactReference, error) {
 	location, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -69,8 +71,7 @@ func getArtifact(name string, uri string) (*ArtifactReference, error) {
 	case SchemeFile:
 		return cacheFile(name, location)
 	case SchemeNATS:
-		return nil, nil
-		//return cacheObjectStoreArtifact(name, extractTag(location), location)
+		return cacheObjectStoreArtifact(name, location, nc)
 	case SchemeOCI:
 		return cacheOciArtifact(name, location)
 	default:
@@ -135,9 +136,69 @@ func cacheFile(name string, location *url.URL) (*ArtifactReference, error) {
 	}, nil
 }
 
-func cacheObjectStoreArtifact(name string, tag string, location *url.URL) (*ArtifactReference, error) {
-	// TODO: implement
-	return nil, nil
+func cacheObjectStoreArtifact(name string, location *url.URL, nc *nats.Conn) (*ArtifactReference, error) {
+	artifact, tag := parsePathTag(location)
+	if tag == "" {
+		tag = "latest"
+	}
+	binary := strings.TrimPrefix(artifact, "/") + "_" + tag
+
+	if nc == nil {
+		return nil, errors.New("nats connection not provided")
+	}
+
+	jsCtx, err := jetstream.New(nc)
+	if err != nil {
+		return nil, err
+	}
+
+	obs, err := jsCtx.ObjectStore(context.TODO(), strings.TrimPrefix(location.Host, "/"))
+	if err != nil {
+		return nil, err
+	}
+
+	bin_b, err := obs.GetBytes(context.TODO(), binary)
+	if err != nil {
+		return nil, err
+	}
+	fCache, err := os.CreateTemp(os.TempDir(), "workload-*")
+	if err != nil {
+		return nil, err
+	}
+	defer fCache.Close()
+
+	_, err = fCache.Write(bin_b)
+	if err != nil {
+		return nil, err
+	}
+
+	fCacheInfo, err := fCache.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := fCache.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, fCache); err != nil {
+		return nil, err
+	}
+
+	err = os.Chmod(fCache.Name(), 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ArtifactReference{
+		Name:             name,
+		Tag:              tag,
+		OriginalLocation: location,
+		LocalCachePath:   fCache.Name(),
+		Digest:           hex.EncodeToString(hasher.Sum(nil)),
+		Size:             int(fCacheInfo.Size()),
+	}, nil
 }
 
 func cacheOciArtifact(name string, location *url.URL) (*ArtifactReference, error) {
