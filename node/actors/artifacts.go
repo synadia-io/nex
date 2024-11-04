@@ -1,6 +1,10 @@
 package actors
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"io"
 	"net/url"
 	"os"
 	"strings"
@@ -28,8 +32,18 @@ type ArtifactReference struct {
 	Size int
 }
 
-func extractTag(location *url.URL) string {
-	return location.Fragment
+func parsePathTag(location *url.URL) (string, string) {
+	filePath, tag := "", ""
+	sPath := strings.SplitN(location.Path, ":", 2) // splits on first : only
+	if len(sPath) == 2 {
+		filePath = sPath[0]
+		tag = sPath[1]
+	} else {
+		filePath = location.Path
+		tag = "latest"
+	}
+
+	return filePath, tag
 }
 
 // Obtains an artifact from the specified location. If the indicated location allows for
@@ -45,22 +59,15 @@ func getArtifact(name string, uri string) (*ArtifactReference, error) {
 	case SchemeFile:
 		return cacheFile(name, location)
 	case SchemeNATS:
-		return cacheObjectStoreArtifact(name, extractTag(location), location)
+		//return cacheObjectStoreArtifact(name, extractTag(location), location)
 	case SchemeOCI:
-		return cacheOciArtifact(name, extractTag(location), location)
+		//return cacheOciArtifact(name, extractTag(location), location)
 	}
 	return nil, nil
 }
 
 func cacheFile(name string, location *url.URL) (*ArtifactReference, error) {
-	filePath, tag := "", ""
-	sPath := strings.SplitN(location.Path, ":", 2) // splits on first : only
-	if len(sPath) == 2 {
-		filePath = sPath[0]
-		tag = sPath[1]
-	} else {
-		filePath = location.Path
-	}
+	filePath, tag := parsePathTag(location)
 
 	info, err := os.Stat(filePath)
 	if err != nil {
@@ -68,16 +75,41 @@ func cacheFile(name string, location *url.URL) (*ArtifactReference, error) {
 	}
 
 	if info.IsDir() {
-		return nil, nil
+		return nil, errors.New("artifact path is a directory")
 	}
+
+	fOrig, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	fCache, err := os.CreateTemp(os.TempDir(), "workload-*")
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = io.Copy(fCache, fOrig)
+	if err != nil {
+		return nil, err
+	}
+
+	fOrig.Close()
+
+	cacheBytes, err := io.ReadAll(fCache)
+	if err != nil {
+		return nil, err
+	}
+	hash := sha256.New()
+	hash.Write(cacheBytes)
+	fCache.Close()
 
 	return &ArtifactReference{
 		Name:             name,
 		Tag:              tag,
 		OriginalLocation: location,
-		LocalCachePath:   filePath,
-		Digest:           "",
-		Size:             int(info.Size()),
+		LocalCachePath:   fCache.Name(),
+		Digest:           hex.EncodeToString(hash.Sum(nil)),
+		Size:             len(cacheBytes),
 	}, nil
 }
 
