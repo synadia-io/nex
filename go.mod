@@ -8,6 +8,7 @@ require (
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
 	github.com/nats-io/nuid v1.0.1
+	github.com/splode/fname v0.4.1
 	github.com/stretchr/testify v1.9.0
 	github.com/tochemey/goakt/v2 v2.7.1
 	google.golang.org/protobuf v1.35.1
