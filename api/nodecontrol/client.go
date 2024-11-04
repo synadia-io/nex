@@ -7,6 +7,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
+	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node/actors"
 )
 
@@ -52,7 +53,7 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 	pingRespInbox := nats.NewInbox()
 
 	_, err := c.nc.Subscribe(pingRespInbox, func(m *nats.Msg) {
-		envelope := new(actors.Envelope[nodegen.NodePingResponseJson])
+		envelope := new(models.Envelope[nodegen.NodePingResponseJson])
 		err := json.Unmarshal(m.Data, envelope)
 		if err != nil {
 			c.logger.Error("failed to unmarshal ping response", slog.Any("err", err), slog.String("data", string(m.Data)))
@@ -128,7 +129,7 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 		return nil, err
 	}
 
-	envelope := new(actors.Envelope[nodegen.StartWorkloadResponseJson])
+	envelope := new(models.Envelope[nodegen.StartWorkloadResponseJson])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodeg
 		return nil, err
 	}
 
-	envelope := new(actors.Envelope[nodegen.StopWorkloadResponseJson])
+	envelope := new(models.Envelope[nodegen.StopWorkloadResponseJson])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
