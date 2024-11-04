@@ -4,7 +4,6 @@ go 1.23.0
 
 require (
 	disorder.dev/shandler v0.0.0-20241024213922-2d4ad5b6e00c
-	github.com/google/go-containerregistry v0.20.2
 	github.com/nats-io/nats-server/v2 v2.10.22
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/nkeys v0.4.7
