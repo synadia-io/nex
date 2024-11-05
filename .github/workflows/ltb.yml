@@ -69,7 +69,7 @@ jobs:
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan github.com >> ~/.ssh/known_hosts
-        git config --global core.sshCommand "C:\\Program Files\\Git\\usr\\bin\\ssh.exe"
+        git config --global core.sshCommand "C:\\Program\ Files\\Git\\usr\\bin\\ssh.exe"
         git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
     - 
       name: Checkout code
