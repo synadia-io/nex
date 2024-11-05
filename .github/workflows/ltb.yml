@@ -54,12 +54,22 @@ jobs:
       with:
         go-version: ${{ env.GO_VER }}
     - 
-      name: Set up SSH for Go Modules
+      name: Set up SSH for Go Modules | Unix
+      if: runner.os != 'Windows' 
       run: |
         mkdir -p ~/.ssh
-        ssh-keyscan github.com > ~/.ssh/known_hosts
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan github.com > ~/.ssh/known_hosts
+        git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
+    - name: Set up SSH for Go Modules | Windows
+      if: runner.os == 'Windows' 
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+        git config --global core.sshCommand "C:/Program Files/Git/usr/bin/ssh.exe"
         git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
     - 
       name: Checkout code
