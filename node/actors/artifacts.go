@@ -62,24 +62,42 @@ func parsePathTag(location *url.URL) (string, string) {
 // differentiation using tags (e.g. OCI, Object Store), then the supplied tag will be used,
 // otherwise it will be ignored
 func getArtifact(name string, uri string, nc *nats.Conn) (*ArtifactReference, error) {
-	location, err := url.Parse(uri)
-	if err != nil {
-		return nil, err
+	sUri := strings.Split(uri, "://")
+	if len(sUri) != 2 {
+		return nil, errors.New("invalid uri provided")
 	}
 
-	switch location.Scheme {
+	switch sUri[0] {
 	case SchemeFile:
-		return cacheFile(name, location)
+		if len(sUri) != 2 {
+			return nil, errors.New("invalid file path")
+		}
+		return cacheFile(name, sUri[1])
 	case SchemeNATS:
+		location, err := url.Parse(uri)
+		if err != nil {
+			return nil, err
+		}
+
 		return cacheObjectStoreArtifact(name, location, nc)
 	case SchemeOCI:
+		location, err := url.Parse(uri)
+		if err != nil {
+			return nil, err
+		}
+
 		return cacheOciArtifact(name, location)
 	default:
 		return nil, errors.New("unsupported artifact scheme")
 	}
 }
 
-func cacheFile(name string, location *url.URL) (*ArtifactReference, error) {
+func cacheFile(name string, fP string) (*ArtifactReference, error) {
+	location, err := url.Parse(fP)
+	if err != nil {
+		return nil, err
+	}
+
 	filePath := location.Path
 	tag := "latest"
 

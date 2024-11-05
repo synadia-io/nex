@@ -339,7 +339,7 @@ func TestFileArtifact(t *testing.T) {
 	if ref.Tag != "latest" {
 		t.Errorf("expected %s, got %s", "latest", ref.Tag)
 	}
-	if ref.OriginalLocation.String() != uri {
+	if "file://"+ref.OriginalLocation.String() != uri {
 		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
 	}
 	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
