@@ -264,10 +264,10 @@ func TestOCIArtifact(t *testing.T) {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
 	if ref.Digest != binHash {
-		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
+		t.Errorf("expected %s, got %s", binHash, ref.Digest)
 	}
 	if ref.Size != binLen {
-		t.Errorf("expected %d, got %d", 2276655, ref.Size)
+		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
 }
 
@@ -299,10 +299,10 @@ func TestNatsArtifact(t *testing.T) {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
 	if ref.Digest != binHash {
-		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
+		t.Errorf("expected %s, got %s", binHash, ref.Digest)
 	}
 	if ref.Size != binLen {
-		t.Errorf("expected %d, got %d", 2276647, ref.Size)
+		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
 }
 
@@ -336,10 +336,10 @@ func TestFileArtifact(t *testing.T) {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
 	if ref.Digest != binHash {
-		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
+		t.Errorf("expected %s, got %s", binHash, ref.Digest)
 	}
 	if ref.Size != binLen {
-		t.Errorf("expected %d, got %d", 2276655, ref.Size)
+		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
 }
 
