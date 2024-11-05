@@ -10,7 +10,6 @@ env:
   GO_VER: '1.23.0'
   GOPRIVATE: github.com/synadia-labs/oci-registry-nats
   GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
-  GITHUB_PAT: ${{ secrets.GH_ACCESS_TOKEN }}
 
 
 jobs:
@@ -58,9 +57,9 @@ jobs:
       name: Set up SSH for Go Modules
       run: |
         mkdir -p ~/.ssh
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan github.com >> ~/.ssh/known_hosts
         git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
     - 
       name: Checkout code
