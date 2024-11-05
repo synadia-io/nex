@@ -351,7 +351,6 @@ func TestFileArtifact(t *testing.T) {
 	}
 
 	os.Remove(ref.LocalCachePath)
-	os.RemoveAll(workingDir)
 }
 
 func TestTagCalculator(t *testing.T) {
