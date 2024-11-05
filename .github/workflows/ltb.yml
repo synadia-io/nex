@@ -9,7 +9,6 @@ on:
 env:
   GO_VER: '1.23.0'
   GOPRIVATE: github.com/synadia-labs/oci-registry-nats
-  GH_ACCESS_USER: ${{ secrets.GH_ACCESS_USER }}
   GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
   GITHUB_PAT: ${{ secrets.GH_ACCESS_TOKEN }}
 
@@ -20,10 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - 
+      name: Set up SSH for Go Modules
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+        git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
+    - 
       uses: actions/checkout@v4
-    -
-      name: GOPRIVATE Support
-      run: git config --global url.https://${GH_ACCESS_TOKEN}@github.com/.insteadOf https://github.com/
     - 
       name: Set up Go
       uses: actions/setup-go@v5
@@ -46,20 +50,21 @@ jobs:
     timeout-minutes: 20
     steps:
     - 
-      uses: actions/checkout@v4
-    -
-      name: GOPRIVATE Support
-      if: runner.os != 'Windows'
-      run: git config --global url.https://${GH_ACCESS_TOKEN}@github.com/.insteadOf https://github.com/
-    -
-      name: GOPRIVATE Support
-      if: runner.os == 'Windows'
-      run: git config --global url.https://${GH_ACCESS_TOKEN}:x-oauth-basic@github.com/.insteadOf https://github.com/
-    - 
       name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VER }}
+    - 
+      name: Set up SSH for Go Modules
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan github.com >> ~/.ssh/known_hosts
+        git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
+    - 
+      name: Checkout code
+      uses: actions/checkout@v4
     - 
       name: Run test suite | node
       run: |
@@ -80,14 +85,19 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
+      - 
+        name: Set up SSH for Go Modules
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
       -
         name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      -
-        name: GOPRIVATE Support
-        run: git config --global url.https://${GH_ACCESS_TOKEN}@github.com/.insteadOf https://github.com/
       -
         name: Set up Go
         uses: actions/setup-go@v5
