@@ -65,12 +65,7 @@ jobs:
     - name: Set up SSH for Go Modules | Windows
       if: runner.os == 'Windows' 
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan github.com >> ~/.ssh/known_hosts
-        git config --global core.sshCommand "C:\\Program\ Files\\Git\\usr\\bin\\ssh.exe"
-        git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}@github.com/".insteadOf "https://github.com/"
     - 
       name: Checkout code
       uses: actions/checkout@v4
