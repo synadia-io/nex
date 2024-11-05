@@ -35,7 +35,6 @@ func startNatsServer(t testing.TB) (*server.Server, error) {
 	s, err := server.NewServer(&server.Options{
 		Port:      -1,
 		JetStream: true,
-		StoreDir:  t.TempDir(),
 	})
 
 	if err != nil {
@@ -158,7 +157,11 @@ func prepOCIArtifact(t testing.TB, workingDir, binPath string) (string, error) {
 		Cache:  auth.NewCache(),
 	}
 
-	fs, err := file.New(t.TempDir())
+	tDir, err := os.MkdirTemp(os.TempDir(), "oci-registry-cache")
+	if err != nil {
+		return "", err
+	}
+	fs, err := file.New(tDir)
 	if err != nil {
 		return "", err
 	}
@@ -237,10 +240,13 @@ func prepFileArtifact(t testing.TB, workingDir, binPath string) string {
 }
 
 func TestOCIArtifact(t *testing.T) {
-	workingDir := t.TempDir()
-	binPath, binHash, binLen := createTestBinary(t, workingDir)
+	tDir, err := os.MkdirTemp(os.TempDir(), "nex-test-working-dir-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	binPath, binHash, binLen := createTestBinary(t, tDir)
 
-	uri, err := prepOCIArtifact(t, workingDir, binPath)
+	uri, err := prepOCIArtifact(t, tDir, binPath)
 	if err != nil {
 		t.Fatalf("Failed to prep OCI artifact: %v", err)
 	}
@@ -273,10 +279,13 @@ func TestOCIArtifact(t *testing.T) {
 }
 
 func TestNatsArtifact(t *testing.T) {
-	workingDir := t.TempDir()
-	binPath, binHash, binLen := createTestBinary(t, workingDir)
+	tDir, err := os.MkdirTemp(os.TempDir(), "nex-test-working-dir-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	binPath, binHash, binLen := createTestBinary(t, tDir)
 
-	uri, nc, err := prepNatsObjStoreArtifact(t, workingDir, binPath)
+	uri, nc, err := prepNatsObjStoreArtifact(t, tDir, binPath)
 	if err != nil {
 		t.Fatalf("Failed to prep OCI artifact: %v", err)
 	}
@@ -309,7 +318,6 @@ func TestNatsArtifact(t *testing.T) {
 }
 
 func TestFileArtifact(t *testing.T) {
-
 	workingDir, err := os.MkdirTemp(os.TempDir(), "nex-test-working-dir")
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %v", err)
