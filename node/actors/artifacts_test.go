@@ -260,8 +260,8 @@ func TestOCIArtifact(t *testing.T) {
 	if ref.OriginalLocation.String() != uri {
 		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
 	}
-	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
-		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
+	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
+		t.Errorf("expected %s, got %s", filepath.Join(os.TempDir(), "/workload-"), ref.LocalCachePath)
 	}
 	if ref.Digest != binHash {
 		t.Errorf("expected %s, got %s", binHash, ref.Digest)
@@ -295,8 +295,8 @@ func TestNatsArtifact(t *testing.T) {
 	if ref.OriginalLocation.String() != uri {
 		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
 	}
-	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
-		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
+	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
+		t.Errorf("expected %s, got %s", filepath.Join(os.TempDir(), "workload-"), ref.LocalCachePath)
 	}
 	if ref.Digest != binHash {
 		t.Errorf("expected %s, got %s", binHash, ref.Digest)
@@ -332,8 +332,8 @@ func TestFileArtifact(t *testing.T) {
 	if ref.OriginalLocation.String() != uri {
 		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
 	}
-	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
-		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
+	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
+		t.Errorf("expected %s, got %s", filepath.Join(os.TempDir(), "workload-"), ref.LocalCachePath)
 	}
 	if ref.Digest != binHash {
 		t.Errorf("expected %s, got %s", binHash, ref.Digest)
