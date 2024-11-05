@@ -80,7 +80,8 @@ func getArtifact(name string, uri string, nc *nats.Conn) (*ArtifactReference, er
 }
 
 func cacheFile(name string, location *url.URL) (*ArtifactReference, error) {
-	filePath, tag := parsePathTag(location)
+	filePath := location.Path
+	tag := "latest"
 
 	info, err := os.Stat(filePath)
 	if err != nil {
