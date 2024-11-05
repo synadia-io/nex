@@ -162,7 +162,6 @@ func prepOCIArtifact(t testing.TB, workingDir, binPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer fs.Close()
 	ctx := context.Background()
 
 	mediaType := "application/nex.artifact.binary"
@@ -190,6 +189,7 @@ func prepOCIArtifact(t testing.TB, workingDir, binPath string) (string, error) {
 		return "", err
 	}
 
+	fs.Close()
 	return fmt.Sprintf("oci://localhost:%d/test:derp", port), nil
 }
 
@@ -249,7 +249,6 @@ func TestOCIArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get artifact: %v", err)
 	}
-	defer os.Remove(ref.LocalCachePath)
 
 	if ref.Name != "testoci" {
 		t.Errorf("expected %s, got %s", "testoci", ref.Name)
@@ -269,6 +268,8 @@ func TestOCIArtifact(t *testing.T) {
 	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
+
+	os.Remove(ref.LocalCachePath)
 }
 
 func TestNatsArtifact(t *testing.T) {
@@ -284,7 +285,6 @@ func TestNatsArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to get artifact: %v", err)
 	}
-	defer os.Remove(ref.LocalCachePath)
 
 	if ref.Name != "testnats" {
 		t.Errorf("expected %s, got %s", "testnats", ref.Name)
@@ -304,6 +304,8 @@ func TestNatsArtifact(t *testing.T) {
 	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
+
+	os.Remove(ref.LocalCachePath)
 }
 
 func TestFileArtifact(t *testing.T) {
@@ -312,7 +314,6 @@ func TestFileArtifact(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(workingDir)
 
 	binPath, binHash, binLen := createTestBinary(t, workingDir)
 
@@ -321,7 +322,6 @@ func TestFileArtifact(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get artifact: %v", err)
 	}
-	defer os.Remove(ref.LocalCachePath)
 
 	if ref.Name != "test" {
 		t.Errorf("expected %s, got %s", "test", ref.Name)
@@ -341,6 +341,9 @@ func TestFileArtifact(t *testing.T) {
 	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
+
+	os.Remove(ref.LocalCachePath)
+	os.RemoveAll(workingDir)
 }
 
 func TestTagCalculator(t *testing.T) {
