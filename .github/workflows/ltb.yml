@@ -20,11 +20,7 @@ jobs:
     - 
       name: Set up SSH for Go Modules
       run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan github.com >> ~/.ssh/known_hosts
-        git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
+          git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}@github.com/".insteadOf "https://github.com/"
     - 
       uses: actions/checkout@v4
     - 
@@ -54,16 +50,7 @@ jobs:
       with:
         go-version: ${{ env.GO_VER }}
     - 
-      name: Set up SSH for Go Modules | Unix
-      if: runner.os != 'Windows' 
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan github.com > ~/.ssh/known_hosts
-        git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
-    - name: Set up SSH for Go Modules | Windows
-      if: runner.os == 'Windows' 
+      name: Set up SSH for Go Modules
       run: |
           git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}@github.com/".insteadOf "https://github.com/"
     - 
@@ -92,11 +79,7 @@ jobs:
       - 
         name: Set up SSH for Go Modules
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
-          git config --global url."ssh://git@github.com/".insteadOf "https://github.com/"
+            git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}@github.com/".insteadOf "https://github.com/"
       -
         name: Checkout
         uses: actions/checkout@v4
