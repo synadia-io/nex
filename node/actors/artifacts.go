@@ -6,11 +6,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"net/url"
 	"os"
-	"strings"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -34,7 +31,7 @@ type ArtifactReference struct {
 	// An optional tag for the artifact. Empty string if one isn't used
 	Tag string
 	// The location URL as contained on the original deployment request
-	OriginalLocation *url.URL
+	OriginalLocation string
 	// Once downloaded, this is the local file system path to the artifact. Used for loading
 	// or execution
 	LocalCachePath string
@@ -44,64 +41,29 @@ type ArtifactReference struct {
 	Size int
 }
 
-func parsePathTag(location *url.URL) (string, string) {
-	filePath, tag := "", ""
-	sPath := strings.SplitN(location.Path, ":", 2) // splits on first : only
-	if len(sPath) == 2 {
-		filePath = sPath[0]
-		tag = sPath[1]
-	} else {
-		filePath = location.Path
-		tag = "latest"
-	}
-
-	return filePath, tag
-}
-
 // Obtains an artifact from the specified location. If the indicated location allows for
 // differentiation using tags (e.g. OCI, Object Store), then the supplied tag will be used,
 // otherwise it will be ignored
-func getArtifact(name string, uri string, nc *nats.Conn) (*ArtifactReference, error) {
-	sUri := strings.Split(uri, "://")
-	if len(sUri) != 2 {
-		return nil, errors.New("invalid uri provided")
+func getArtifact(name string, inUri string, nc *nats.Conn) (*ArtifactReference, error) {
+	uri, err := parseUri(inUri)
+	if err != nil {
+		return nil, err
 	}
 
-	switch sUri[0] {
+	switch uri.schema {
 	case SchemeFile:
-		if len(sUri) != 2 {
-			return nil, errors.New("invalid file path")
-		}
-		return cacheFile(name, sUri[1])
+		return cacheFile(name, uri)
 	case SchemeNATS:
-		location, err := url.Parse(uri)
-		if err != nil {
-			return nil, err
-		}
-
-		return cacheObjectStoreArtifact(name, location, nc)
+		return cacheObjectStoreArtifact(name, uri, nc)
 	case SchemeOCI:
-		location, err := url.Parse(uri)
-		if err != nil {
-			return nil, err
-		}
-
-		return cacheOciArtifact(name, location)
+		return cacheOciArtifact(name, uri)
 	default:
 		return nil, errors.New("unsupported artifact scheme")
 	}
 }
 
-func cacheFile(name string, fP string) (*ArtifactReference, error) {
-	location, err := url.Parse(fP)
-	if err != nil {
-		return nil, err
-	}
-
-	filePath := location.Path
-	tag := "latest"
-
-	info, err := os.Stat(filePath)
+func cacheFile(name string, uri *uri) (*ArtifactReference, error) {
+	info, err := os.Stat(uri.path)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +72,7 @@ func cacheFile(name string, fP string) (*ArtifactReference, error) {
 		return nil, errors.New("artifact path is a directory")
 	}
 
-	fOrig, err := os.Open(filePath)
+	fOrig, err := os.Open(uri.path)
 	if err != nil {
 		return nil, err
 	}
@@ -147,20 +109,17 @@ func cacheFile(name string, fP string) (*ArtifactReference, error) {
 
 	return &ArtifactReference{
 		Name:             name,
-		Tag:              tag,
-		OriginalLocation: location,
+		Tag:              uri.tag,
+		OriginalLocation: uri.schema + "://" + uri.path,
 		LocalCachePath:   fCache.Name(),
 		Digest:           hex.EncodeToString(hasher.Sum(nil)),
 		Size:             int(fCacheInfo.Size()),
 	}, nil
 }
 
-func cacheObjectStoreArtifact(name string, location *url.URL, nc *nats.Conn) (*ArtifactReference, error) {
-	artifact, tag := parsePathTag(location)
-	if tag == "" {
-		tag = "latest"
-	}
-	binary := strings.TrimPrefix(artifact, "/") + "_" + tag
+func cacheObjectStoreArtifact(name string, uri *uri, nc *nats.Conn) (*ArtifactReference, error) {
+
+	binary := uri.path + "_" + uri.tag
 
 	if nc == nil {
 		return nil, errors.New("nats connection not provided")
@@ -171,7 +130,7 @@ func cacheObjectStoreArtifact(name string, location *url.URL, nc *nats.Conn) (*A
 		return nil, err
 	}
 
-	obs, err := jsCtx.ObjectStore(context.TODO(), strings.TrimPrefix(location.Host, "/"))
+	obs, err := jsCtx.ObjectStore(context.TODO(), uri.location)
 	if err != nil {
 		return nil, err
 	}
@@ -210,21 +169,27 @@ func cacheObjectStoreArtifact(name string, location *url.URL, nc *nats.Conn) (*A
 		return nil, err
 	}
 
+	ol := func() string {
+		if uri.tag == "" {
+			return uri.schema + "://" + uri.location + "/" + uri.path
+		}
+		return uri.schema + "://" + uri.location + "/" + uri.path + ":" + uri.tag
+	}()
+
 	return &ArtifactReference{
 		Name:             name,
-		Tag:              tag,
-		OriginalLocation: location,
+		Tag:              uri.tag,
+		OriginalLocation: ol,
 		LocalCachePath:   fCache.Name(),
 		Digest:           hex.EncodeToString(hasher.Sum(nil)),
 		Size:             int(fCacheInfo.Size()),
 	}, nil
 }
 
-func cacheOciArtifact(name string, location *url.URL) (*ArtifactReference, error) {
+func cacheOciArtifact(name string, uri *uri) (*ArtifactReference, error) {
 	// TODO/NOTE: for now let's assume that if the target registry requires auth, it will be supplied in the location.User field
 
-	artifact, tag := parsePathTag(location)
-	repo, err := remote.NewRepository(fmt.Sprintf("%s%s", location.Host, artifact))
+	repo, err := remote.NewRepository(uri.location + "/" + uri.path)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +200,7 @@ func cacheOciArtifact(name string, location *url.URL) (*ArtifactReference, error
 	}
 
 	store := memory.New()
-	descriptor, err := oras.Copy(context.TODO(), repo, tag, store, "", oras.DefaultCopyOptions)
+	descriptor, err := oras.Copy(context.TODO(), repo, uri.tag, store, "", oras.DefaultCopyOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -301,10 +266,17 @@ func cacheOciArtifact(name string, location *url.URL) (*ArtifactReference, error
 			return nil, err
 		}
 
+		ol := func() string {
+			if uri.tag == "" {
+				return uri.schema + "://" + uri.location + "/" + uri.path
+			}
+			return uri.schema + "://" + uri.location + "/" + uri.path + ":" + uri.tag
+		}()
+
 		return &ArtifactReference{
 			Name:             name,
-			Tag:              tag,
-			OriginalLocation: location,
+			Tag:              uri.tag,
+			OriginalLocation: ol,
 			LocalCachePath:   fCache.Name(),
 			Digest:           hex.EncodeToString(hasher.Sum(nil)),
 			Size:             int(fCacheInfo.Size()),

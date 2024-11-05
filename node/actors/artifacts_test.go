@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -262,8 +261,8 @@ func TestOCIArtifact(t *testing.T) {
 	if ref.Tag != "derp" {
 		t.Errorf("expected %s, got %s", "derp", ref.Tag)
 	}
-	if ref.OriginalLocation.String() != uri {
-		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
+	if ref.OriginalLocation != uri {
+		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation)
 	}
 	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
 		t.Errorf("expected %s, got %s", filepath.Join(os.TempDir(), "/workload-"), ref.LocalCachePath)
@@ -302,8 +301,8 @@ func TestNatsArtifact(t *testing.T) {
 	if ref.Tag != "foo" {
 		t.Errorf("expected %s, got %s", "foo", ref.Tag)
 	}
-	if ref.OriginalLocation.String() != uri {
-		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
+	if ref.OriginalLocation != uri {
+		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation)
 	}
 	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
 		t.Errorf("expected %s, got %s", filepath.Join(os.TempDir(), "workload-"), ref.LocalCachePath)
@@ -336,11 +335,11 @@ func TestFileArtifact(t *testing.T) {
 	if ref.Name != "test" {
 		t.Errorf("expected %s, got %s", "test", ref.Name)
 	}
-	if ref.Tag != "latest" {
-		t.Errorf("expected %s, got %s", "latest", ref.Tag)
+	if ref.Tag != "" {
+		t.Errorf("expected no tag, got %s", ref.Tag)
 	}
-	if "file://"+ref.OriginalLocation.String() != uri {
-		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation.String())
+	if ref.OriginalLocation != uri {
+		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation)
 	}
 	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
 		t.Errorf("expected %s, got %s", filepath.Join(os.TempDir(), "workload-"), ref.LocalCachePath)
@@ -354,41 +353,6 @@ func TestFileArtifact(t *testing.T) {
 
 	os.Remove(ref.LocalCachePath)
 	os.RemoveAll(workingDir)
-}
-
-func TestTagCalculator(t *testing.T) {
-	tests := []struct {
-		uri              string
-		expectedFilePath string
-		expectedTag      string
-		expectedError    error
-	}{
-		// tests latest tags
-		{"file:///tmp/foo", "/tmp/foo", "latest", nil},
-		{"oci://synadia/foo", "/foo", "latest", nil},
-		{"nats://myobject/foo", "/foo", "latest", nil},
-		// tests with a tag
-		{"file:///tmp/foo:derp", "/tmp/foo", "derp", nil},
-		{"oci://synadia/foo:derp", "/foo", "derp", nil},
-		{"oci://synadia:8000/foo:derp", "/foo", "derp", nil},
-		{"nats://myobject/foo:derp", "/foo", "derp", nil},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.uri, func(t *testing.T) {
-			u, err := url.Parse(tt.uri)
-			if err != nil {
-				t.Errorf("failed to parse url: %v", err)
-			}
-			file, tag := parsePathTag(u)
-			if file != tt.expectedFilePath {
-				t.Errorf("expected %s, got %s", tt.expectedFilePath, file)
-			}
-			if tag != tt.expectedTag {
-				t.Errorf("expected %s, got %s", tt.expectedTag, tag)
-			}
-		})
-	}
 }
 
 const testProg string = `package main
