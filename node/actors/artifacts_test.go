@@ -2,7 +2,10 @@ package actors
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/url"
@@ -66,7 +69,7 @@ func startNatsServer(t testing.TB) (*server.Server, error) {
 	return s, nil
 }
 
-func createTestBinary(t testing.TB, tmpDir string) string {
+func createTestBinary(t testing.TB, tmpDir string) (string, string, int) {
 	t.Helper()
 
 	f, err := os.Create(filepath.Join(tmpDir, "main.go"))
@@ -81,7 +84,7 @@ func createTestBinary(t testing.TB, tmpDir string) string {
 
 	// Command to compile the Go code into a binary
 	// go build -trimpath -ldflags="-buildid= -X 'main.buildTime=static_time'"
-	cmd := exec.Command("go", "build", "-trimpath", "-ldflags", `-buildid= -X "main.buildTime=static_time"`, "-o", filepath.Join(tmpDir, "output_binary"), f.Name())
+	cmd := exec.Command("go", "build", "-trimpath", "-o", filepath.Join(tmpDir, "output_binary"), f.Name())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -90,10 +93,26 @@ func createTestBinary(t testing.TB, tmpDir string) string {
 		log.Fatalf("Failed to compile Go code: %v", err)
 	}
 
-	return filepath.Join(tmpDir, "output_binary")
+	f, err = os.Open(filepath.Join(tmpDir, "output_binary"))
+	if err != nil {
+		t.Fatalf("Failed to open binary: %v", err)
+	}
+
+	f_b, err := io.ReadAll(f)
+	if err != nil {
+		t.Fatalf("Failed to read binary: %v", err)
+	}
+
+	hash := sha256.New()
+	_, err = hash.Write(f_b)
+	if err != nil {
+		t.Fatalf("Failed to hash binary: %v", err)
+	}
+
+	return filepath.Join(tmpDir, "output_binary"), hex.EncodeToString(hash.Sum(nil)), len(f_b)
 }
 
-func prepOCIArtifact(t testing.TB, workingDir string) (string, error) {
+func prepOCIArtifact(t testing.TB, workingDir, binPath string) (string, error) {
 	t.Helper()
 	s, err := startNatsServer(t)
 	if err != nil {
@@ -139,8 +158,6 @@ func prepOCIArtifact(t testing.TB, workingDir string) (string, error) {
 		Cache:  auth.NewCache(),
 	}
 
-	binPath := createTestBinary(t, workingDir)
-
 	fs, err := file.New(t.TempDir())
 	if err != nil {
 		return "", err
@@ -176,7 +193,7 @@ func prepOCIArtifact(t testing.TB, workingDir string) (string, error) {
 	return fmt.Sprintf("oci://localhost:%d/test:derp", port), nil
 }
 
-func prepNatsObjStoreArtifact(t testing.TB, workingDir string) (string, *nats.Conn, error) {
+func prepNatsObjStoreArtifact(t testing.TB, workingDir, binPath string) (string, *nats.Conn, error) {
 	s, err := startNatsServer(t)
 	if err != nil {
 		return "", nil, err
@@ -199,8 +216,6 @@ func prepNatsObjStoreArtifact(t testing.TB, workingDir string) (string, *nats.Co
 		return "", nil, err
 	}
 
-	binPath := createTestBinary(t, workingDir)
-
 	f, err := os.Open(binPath)
 	if err != nil {
 		return "", nil, err
@@ -215,16 +230,17 @@ func prepNatsObjStoreArtifact(t testing.TB, workingDir string) (string, *nats.Co
 	return "nats://mybins/testnats:foo", nc, nil
 }
 
-func prepFileArtifact(t testing.TB, workingDir string) string {
+func prepFileArtifact(t testing.TB, workingDir, binPath string) string {
 	t.Helper()
 
-	binary := createTestBinary(t, workingDir)
-	return "file://" + binary
+	return "file://" + binPath
 }
 
 func TestOCIArtifact(t *testing.T) {
 	workingDir := t.TempDir()
-	uri, err := prepOCIArtifact(t, workingDir)
+	binPath, binHash, binLen := createTestBinary(t, workingDir)
+
+	uri, err := prepOCIArtifact(t, workingDir, binPath)
 	if err != nil {
 		t.Fatalf("Failed to prep OCI artifact: %v", err)
 	}
@@ -247,17 +263,19 @@ func TestOCIArtifact(t *testing.T) {
 	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
-	if ref.Digest != "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6" {
+	if ref.Digest != binHash {
 		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
 	}
-	if ref.Size != 2276655 {
+	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", 2276655, ref.Size)
 	}
 }
 
 func TestNatsArtifact(t *testing.T) {
 	workingDir := t.TempDir()
-	uri, nc, err := prepNatsObjStoreArtifact(t, workingDir)
+	binPath, binHash, binLen := createTestBinary(t, workingDir)
+
+	uri, nc, err := prepNatsObjStoreArtifact(t, workingDir, binPath)
 	if err != nil {
 		t.Fatalf("Failed to prep OCI artifact: %v", err)
 	}
@@ -280,22 +298,25 @@ func TestNatsArtifact(t *testing.T) {
 	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
-	if ref.Digest != "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6" {
+	if ref.Digest != binHash {
 		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
 	}
-	if ref.Size != 2276647 {
+	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", 2276647, ref.Size)
 	}
 }
 
 func TestFileArtifact(t *testing.T) {
+
 	workingDir, err := os.MkdirTemp(os.TempDir(), "nex-test-working-dir")
 	if err != nil {
 		t.Errorf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(workingDir)
 
-	uri := prepFileArtifact(t, workingDir)
+	binPath, binHash, binLen := createTestBinary(t, workingDir)
+
+	uri := prepFileArtifact(t, workingDir, binPath)
 	ref, err := getArtifact("test", uri, nil)
 	if err != nil {
 		t.Errorf("Failed to get artifact: %v", err)
@@ -314,10 +335,10 @@ func TestFileArtifact(t *testing.T) {
 	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
-	if ref.Digest != "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6" {
+	if ref.Digest != binHash {
 		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
 	}
-	if ref.Size != 2276655 {
+	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", 2276655, ref.Size)
 	}
 }
