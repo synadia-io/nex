@@ -9,7 +9,7 @@ import (
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
 
-	actorproto "github.com/synadia-io/nex/node/actors/pb"
+	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
 const AgentSupervisorActorName = "agent_supervisor"

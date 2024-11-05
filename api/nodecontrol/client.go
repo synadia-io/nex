@@ -8,7 +8,6 @@ import (
 	"github.com/nats-io/nats.go"
 	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
-	"github.com/synadia-io/nex/node/actors"
 )
 
 var (
@@ -34,7 +33,7 @@ func (c *ControlAPIClient) Auction(tags []string) (*nodegen.AuctionResponseJson,
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(actors.AuctionSubject(), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.AuctionSubject(), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 		return nil, err
 	}
 
-	err = c.nc.PublishRequest(actors.PingSubject(), pingRespInbox, nil)
+	err = c.nc.PublishRequest(models.PingSubject(), pingRespInbox, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +74,7 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 }
 
 func (c *ControlAPIClient) FindAgent(_type, namespace string) (*nodegen.AgentPingResponseJson, error) {
-	msg, err := c.nc.Request(actors.AgentPingNamespaceRequestSubject(_type, namespace), nil, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.AgentPingNamespaceRequestSubject(_type, namespace), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +89,7 @@ func (c *ControlAPIClient) FindAgent(_type, namespace string) (*nodegen.AgentPin
 }
 
 func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJson, error) {
-	msg, err := c.nc.Request(actors.DirectPingSubject(nodeId), nil, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.DirectPingSubject(nodeId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +103,7 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 }
 
 func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*nodegen.AgentPingResponseJson, error) {
-	msg, err := c.nc.Request(actors.AgentPingWorkloadRequestSubject(_type, namespace, workloadId), nil, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.AgentPingWorkloadRequestSubject(_type, namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +123,7 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(actors.DeployRequestSubject(namespace, nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.DeployRequestSubject(namespace, nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +143,7 @@ func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodeg
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(actors.UndeployRequestSubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.UndeployRequestSubject(nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +158,7 @@ func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodeg
 }
 
 func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoResponseJson, error) {
-	msg, err := c.nc.Request(actors.InfoRequestSubject(nodeId, namespace), nil, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.InfoRequestSubject(nodeId, namespace), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +173,7 @@ func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoR
 }
 
 func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponseJson, error) {
-	msg, err := c.nc.Request(actors.LameduckSubject(nodeId), nil, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.LameduckSubject(nodeId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

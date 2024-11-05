@@ -1,4 +1,4 @@
-package actors
+package models
 
 import "fmt"
 
@@ -25,19 +25,6 @@ func LameduckSubject(inNodeId string) string {
 
 func DirectPingSubject(inNodeId string) string {
 	return fmt.Sprintf(APIPrefix+".PING.%s", inNodeId)
-}
-
-// Subscribe Subjects
-func UndeploySubscribeSubject(inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".UNDEPLOY.*.%s", inNodeId)
-}
-
-func DeploySubscribeSubject(inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".DEPLOY.*.%s", inNodeId)
-}
-
-func InfoSubscribeSubject(inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".INFO.*.%s", inNodeId)
 }
 
 // Request subjects

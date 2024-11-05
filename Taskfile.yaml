@@ -5,7 +5,7 @@ tasks:
   # 'go install google.golang.org/protobuf/cmd/protoc-gen-go@latest'
 
   proto:
-    dir: node/actors/pb
+    dir: node/internal/actors/pb
     sources:
       - "*.proto"
     generates:

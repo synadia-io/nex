@@ -5,7 +5,7 @@ import (
 
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	api "github.com/synadia-io/nex/api/nodecontrol/gen"
-	actorproto "github.com/synadia-io/nex/node/actors/pb"
+	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
 func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.StartWorkload {

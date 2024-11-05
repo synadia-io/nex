@@ -15,7 +15,7 @@ import (
 
 	nodecontrol "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
-	actorproto "github.com/synadia-io/nex/node/actors/pb"
+	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
 const ControlAPIActorName = "control_api"
@@ -124,7 +124,7 @@ func (api *ControlAPI) subscribe() error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = api.nc.Subscribe(AuctionSubject(), api.handleAuction)
+	sub, err = api.nc.Subscribe(models.AuctionSubject(), api.handleAuction)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -145,21 +145,21 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(LameduckSubject(api.publicKey), api.handleLameDuck)
+	sub, err = api.nc.Subscribe(models.LameduckSubject(api.publicKey), api.handleLameDuck)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(PingSubject(), api.handlePing)
+	sub, err = api.nc.Subscribe(models.PingSubject(), api.handlePing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(DirectPingSubject(api.publicKey), api.handlePing)
+	sub, err = api.nc.Subscribe(models.DirectPingSubject(api.publicKey), api.handlePing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to node-specific ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -173,7 +173,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(AgentPingSubscribeSubject(), api.handleAgentPing)
+	sub, err = api.nc.Subscribe(models.AgentPingSubscribeSubject(), api.handleAgentPing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
