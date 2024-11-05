@@ -274,8 +274,6 @@ func TestOCIArtifact(t *testing.T) {
 	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
-
-	os.Remove(ref.LocalCachePath)
 }
 
 func TestNatsArtifact(t *testing.T) {
@@ -313,8 +311,6 @@ func TestNatsArtifact(t *testing.T) {
 	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
-
-	os.Remove(ref.LocalCachePath)
 }
 
 func TestFileArtifact(t *testing.T) {
@@ -349,8 +345,6 @@ func TestFileArtifact(t *testing.T) {
 	if ref.Size != binLen {
 		t.Errorf("expected %d, got %d", binLen, ref.Size)
 	}
-
-	os.Remove(ref.LocalCachePath)
 }
 
 func TestTagCalculator(t *testing.T) {
