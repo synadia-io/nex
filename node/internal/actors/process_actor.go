@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	actorproto "github.com/synadia-io/nex/node/actors/pb"
+	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"google.golang.org/protobuf/types/known/timestamppb"

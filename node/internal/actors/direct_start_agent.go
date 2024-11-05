@@ -13,7 +13,7 @@ import (
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 
-	actorproto "github.com/synadia-io/nex/node/actors/pb"
+	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
 const (

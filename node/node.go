@@ -19,8 +19,8 @@ import (
 
 	"github.com/synadia-io/nex/internal/logger"
 	"github.com/synadia-io/nex/models"
-	"github.com/synadia-io/nex/node/actors"
-	actorproto "github.com/synadia-io/nex/node/actors/pb"
+	"github.com/synadia-io/nex/node/internal/actors"
+	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
 const (
