@@ -64,8 +64,7 @@ func startNextNodeCmd(t testing.TB, workingDir string) (*exec.Cmd, *server.Serve
 		return nil, nil, err
 	}
 
-	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", s.ClientURL())
-
+	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", s.ClientURL(), "--resource-directory", workingDir)
 	return cmd, s, nil
 }
 
