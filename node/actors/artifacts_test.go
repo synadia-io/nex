@@ -80,7 +80,8 @@ func createTestBinary(t testing.TB, tmpDir string) string {
 	f.Close()
 
 	// Command to compile the Go code into a binary
-	cmd := exec.Command("go", "build", "-o", filepath.Join(tmpDir, "output_binary"), f.Name())
+	// go build -trimpath -ldflags="-buildid= -X 'main.buildTime=static_time'"
+	cmd := exec.Command("go", "build", "-trimpath", "-ldflags", `-buildid= -X "main.buildTime=static_time"`, "-o", filepath.Join(tmpDir, "output_binary"), f.Name())
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -246,9 +247,9 @@ func TestOCIArtifact(t *testing.T) {
 	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
-	// if ref.Digest != "b92aaf4823a9ffd5aa76f8af00708b60cd658d9dfbee39d717a566e57912204b" {
-	// 	t.Errorf("expected %s, got %s", "b92aaf4823a9ffd5aa76f8af00708b60cd658d9dfbee39d717a566e57912204b", ref.Digest)
-	// }
+	if ref.Digest != "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6" {
+		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
+	}
 	if ref.Size != 2276655 {
 		t.Errorf("expected %d, got %d", 2276655, ref.Size)
 	}
@@ -279,9 +280,9 @@ func TestNatsArtifact(t *testing.T) {
 	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
-	// if ref.Digest != "b92aaf4823a9ffd5aa76f8af00708b60cd658d9dfbee39d717a566e57912204b" {
-	// 	t.Errorf("expected %s, got %s", "b92aaf4823a9ffd5aa76f8af00708b60cd658d9dfbee39d717a566e57912204b", ref.Digest)
-	// }
+	if ref.Digest != "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6" {
+		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
+	}
 	if ref.Size != 2276647 {
 		t.Errorf("expected %d, got %d", 2276647, ref.Size)
 	}
@@ -313,9 +314,9 @@ func TestFileArtifact(t *testing.T) {
 	if !strings.HasPrefix(ref.LocalCachePath, os.TempDir()+"/workload-") {
 		t.Errorf("expected %s, got %s", os.TempDir()+"/workload-", ref.LocalCachePath)
 	}
-	// if ref.Digest != "bcc1d22e206389acfcf479f2ae4f2042e063887296be45351576c8e3996cf483" {
-	// 	t.Errorf("expected %s, got %s", "bcc1d22e206389acfcf479f2ae4f2042e063887296be45351576c8e3996cf483", ref.Digest)
-	// }
+	if ref.Digest != "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6" {
+		t.Errorf("expected %s, got %s", "0c2815a4b3fc024e7e2e6b49778b83039c3e9a39f5817588071f6f4121314cb6", ref.Digest)
+	}
 	if ref.Size != 2276655 {
 		t.Errorf("expected %d, got %d", 2276655, ref.Size)
 	}
