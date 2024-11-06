@@ -13,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/synadia-labs/oci-registry-nats v0.0.0-20241015185448-f4eef68fe962
 	github.com/tochemey/goakt/v2 v2.7.1
+	golang.org/x/sys v0.26.0
 	google.golang.org/protobuf v1.35.1
 	oras.land/oras-go/v2 v2.5.0
 )
@@ -72,7 +73,6 @@ require (
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.26.0 // indirect
 	golang.org/x/text v0.19.0 // indirect
 	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
