@@ -264,6 +264,7 @@ type Up struct {
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
 	Agents                           AgentConfigs      `help:"Workload types configurations for nex node to initialize"`
 	DisableDirectStart               bool              `help:"Disable direct start (no sandbox) workloads" default:"false"`
+	NodeSeed                         string            `help:"Node Seed used for identifier.  Default is generated" placeholder:"NBTAFHAKW..."`
 	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false" hidden:""`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
@@ -279,6 +280,12 @@ func (u Up) Validate() error {
 	if len(u.Agents) < 1 && u.DisableDirectStart {
 		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration or enable direct start"))
 	}
+
+	prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeSeed))
+	if err != nil || prefix != nkeys.PrefixByteServer {
+		errs = errors.Join(errs, errors.New("invalid node seed provided"))
+	}
+
 	return errs
 }
 
@@ -292,9 +299,17 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	kp, err := nkeys.CreateServer()
-	if err != nil {
-		return err
+	var kp nkeys.KeyPair
+	if u.NodeSeed == "" {
+		kp, err = nkeys.CreateServer()
+		if err != nil {
+			return err
+		}
+	} else {
+		kp, err = nkeys.FromSeed([]byte(u.NodeSeed))
+		if err != nil {
+			return err
+		}
 	}
 
 	pubKey, err := kp.PublicKey()

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 )
 
@@ -70,7 +71,7 @@ func startNatsSever(t testing.TB, workingDir string) (*server.Server, error) {
 	return s, nil
 }
 
-func startNextNodeCmd(t testing.TB, workingDir, natsServer, name, nexus string) (*exec.Cmd, error) {
+func startNexNodeCmd(t testing.TB, workingDir, seed, natsServer, name, nexus string) (*exec.Cmd, error) {
 	t.Helper()
 
 	cli, err := buildNexCli(t, workingDir)
@@ -78,7 +79,19 @@ func startNextNodeCmd(t testing.TB, workingDir, natsServer, name, nexus string) 
 		return nil, err
 	}
 
-	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", natsServer, "--resource-directory", workingDir, "--node-name", name, "--nexus", nexus)
+	if seed == "" {
+		kp, err := nkeys.CreateServer()
+		if err != nil {
+			return nil, err
+		}
+		s, err := kp.Seed()
+		if err != nil {
+			return nil, err
+		}
+		seed = string(s)
+	}
+
+	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", natsServer, "--resource-directory", workingDir, "--node-name", name, "--nexus", nexus, "--node-seed", seed)
 	return cmd, nil
 }
 
@@ -89,7 +102,7 @@ func TestStartNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd, err := startNextNodeCmd(t, workingDir, s.ClientURL(), "node", "nexus")
+	cmd, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,15 +159,15 @@ func TestStartNexus(t *testing.T) {
 	}
 	defer s.Shutdown()
 
-	nex1, err := startNextNodeCmd(t, workingDir, s.ClientURL(), "node1", "nexus3node")
+	nex1, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node1", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}
-	nex2, err := startNextNodeCmd(t, workingDir, s.ClientURL(), "node2", "nexus3node")
+	nex2, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node2", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}
-	nex3, err := startNextNodeCmd(t, workingDir, s.ClientURL(), "node3", "nexus3node")
+	nex3, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node3", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}
