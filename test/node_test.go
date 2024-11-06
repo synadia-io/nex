@@ -165,14 +165,18 @@ func TestStartNexus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	nex1.SysProcAttr = sysProcAttr()
 	nex2, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node2", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}
+	nex2.SysProcAttr = sysProcAttr()
 	nex3, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node3", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}
+	nex3.SysProcAttr = sysProcAttr()
+
 	err = nex1.Start()
 	if err != nil {
 		t.Fatal(err)
