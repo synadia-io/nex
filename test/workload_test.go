@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -95,10 +96,18 @@ func TestStartNode(t *testing.T) {
 		case <-ticker.C:
 			if bytes.Contains(stdout.Bytes(), []byte("NATS execution engine awaiting commands")) {
 				passed = true
-				_ = cmd.Process.Signal(os.Interrupt)
+				if runtime.GOOS != "windows" {
+					_ = cmd.Process.Signal(os.Interrupt)
+				} else {
+					_ = cmd.Process.Kill()
+				}
 			}
 		case <-ctx.Done():
-			_ = cmd.Process.Signal(os.Interrupt)
+			if runtime.GOOS != "windows" {
+				_ = cmd.Process.Signal(os.Interrupt)
+			} else {
+				_ = cmd.Process.Kill()
+			}
 		}
 	}()
 
