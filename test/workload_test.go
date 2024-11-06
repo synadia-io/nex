@@ -36,12 +36,12 @@ func buildDirectStartBinary(t testing.TB, workingDir string) (string, error) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	if _, err := os.Stat(filepath.Join(workingDir, binName())); err != nil {
+	err := cmd.Run()
+	if err != nil {
 		return "", err
 	}
 
-	err := cmd.Run()
-	if err != nil {
+	if _, err := os.Stat(filepath.Join(workingDir, binName())); err != nil {
 		return "", err
 	}
 
