@@ -45,7 +45,7 @@ func buildDirectStartBinary(t testing.TB, workingDir string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(workingDir, "test"), nil
+	return filepath.Join(workingDir, binName()), nil
 }
 
 func TestDirectStart(t *testing.T) {
@@ -122,6 +122,7 @@ func TestDirectStart(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
+		t.Log("Running binary: ", binPath)
 		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, fmt.Sprintf("--argv=-port=%d", port))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
