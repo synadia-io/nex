@@ -133,7 +133,7 @@ func TestDirectStart(t *testing.T) {
 			t.Error("expected node id", pub, "got", match[2])
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(5000 * time.Millisecond)
 		resp, err := http.Get("http://localhost:8087")
 		if err != nil {
 			t.Error(err)

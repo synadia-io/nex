@@ -7,17 +7,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"testing"
 	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
-)
-
-var (
-	exitSyscall = syscall.SIGINT
 )
 
 func buildNexCli(t testing.TB, workingDir string) (string, error) {
@@ -130,7 +125,10 @@ func TestStartNode(t *testing.T) {
 		for {
 			select {
 			case <-ctx.Done():
-				stopProcess(cmd.Process)
+				err = stopProcess(cmd.Process)
+				if err != nil {
+					t.Error(err)
+				}
 				return
 			case <-ticker.C:
 				if bytes.Contains(stdout.Bytes(), []byte("NATS execution engine awaiting commands")) {
@@ -209,9 +207,18 @@ func TestStartNexus(t *testing.T) {
 
 			select {
 			case <-ctx.Done():
-				stopProcess(nex1.Process)
-				stopProcess(nex2.Process)
-				stopProcess(nex3.Process)
+				err = stopProcess(nex1.Process)
+				if err != nil {
+					t.Error(err)
+				}
+				err = stopProcess(nex2.Process)
+				if err != nil {
+					t.Error(err)
+				}
+				err = stopProcess(nex3.Process)
+				if err != nil {
+					t.Error(err)
+				}
 				return
 			case <-ticker.C:
 				err := nodels.Run()
