@@ -78,7 +78,7 @@ func cacheFile(name string, uri *uri) (*ArtifactReference, error) {
 	}
 	defer fOrig.Close()
 
-	fCache, err := os.CreateTemp(os.TempDir(), "workload-*")
+	fCache, err := os.CreateTemp(os.TempDir(), getFileName())
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func cacheObjectStoreArtifact(name string, uri *uri, nc *nats.Conn) (*ArtifactRe
 	if err != nil {
 		return nil, err
 	}
-	fCache, err := os.CreateTemp(os.TempDir(), "workload-*")
+	fCache, err := os.CreateTemp(os.TempDir(), getFileName())
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func cacheOciArtifact(name string, uri *uri) (*ArtifactReference, error) {
 		}
 		defer l.Close()
 
-		fCache, err := os.CreateTemp(os.TempDir(), "workload-*")
+		fCache, err := os.CreateTemp(os.TempDir(), getFileName())
 		if err != nil {
 			return nil, err
 		}

@@ -258,12 +258,13 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 type Up struct {
 	AgentHandshakeTimeoutMillisecond int               `help:"Timeout in milliseconds" name:"agent-timeout" default:"5000"`
 	DefaultResourceDir               string            `name:"resource-directory" default:"${defaultResourcePath}"`
-	NexusName                        string            `default:"nexus" help:"Nexus name"`
+	NexusName                        string            `name:"nexus" default:"nexus" help:"Nexus name"`
 	NodeName                         string            `placeholder:"nex-node" help:"Name of the node; random if not provided"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
 	Agents                           AgentConfigs      `help:"Workload types configurations for nex node to initialize"`
 	DisableDirectStart               bool              `help:"Disable direct start (no sandbox) workloads" default:"false"`
+	NodeSeed                         string            `help:"Node Seed used for identifier.  Default is generated" placeholder:"NBTAFHAKW..."`
 	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false" hidden:""`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
@@ -279,6 +280,14 @@ func (u Up) Validate() error {
 	if len(u.Agents) < 1 && u.DisableDirectStart {
 		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration or enable direct start"))
 	}
+
+	if u.NodeSeed != "" {
+		prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeSeed))
+		if err != nil || prefix != nkeys.PrefixByteServer {
+			errs = errors.Join(errs, errors.New("invalid node seed provided"))
+		}
+	}
+
 	return errs
 }
 
@@ -292,9 +301,17 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	kp, err := nkeys.CreateServer()
-	if err != nil {
-		return err
+	var kp nkeys.KeyPair
+	if u.NodeSeed == "" {
+		kp, err = nkeys.CreateServer()
+		if err != nil {
+			return err
+		}
+	} else {
+		kp, err = nkeys.FromSeed([]byte(u.NodeSeed))
+		if err != nil {
+			return err
+		}
 	}
 
 	pubKey, err := kp.PublicKey()
