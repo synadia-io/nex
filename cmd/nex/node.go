@@ -258,7 +258,7 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 type Up struct {
 	AgentHandshakeTimeoutMillisecond int               `help:"Timeout in milliseconds" name:"agent-timeout" default:"5000"`
 	DefaultResourceDir               string            `name:"resource-directory" default:"${defaultResourcePath}"`
-	NexusName                        string            `default:"nexus" help:"Nexus name"`
+	NexusName                        string            `name:"nexus" default:"nexus" help:"Nexus name"`
 	NodeName                         string            `placeholder:"nex-node" help:"Name of the node; random if not provided"`
 	Tags                             map[string]string `placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 	ValidIssuers                     []string          `placeholder:"NBTAFHAKW..." help:"List of valid issuers for public nkey"`
