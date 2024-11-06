@@ -70,12 +70,12 @@ func TestDirectStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd.SysProcAttr = sysProcAttr()
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	// cmd.Stdout = os.Stdout
-	// cmd.Stderr = os.Stderr
+	// stdout := new(bytes.Buffer)
+	// stderr := new(bytes.Buffer)
+	// cmd.Stdout = stdout
+	// cmd.Stderr = stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
 	err = cmd.Start()
 	if err != nil {
