@@ -87,7 +87,10 @@ func TestDirectStart(t *testing.T) {
 
 	go func() {
 		<-ctx.Done()
-		stopProcess(cmd.Process)
+		err = stopProcess(cmd.Process)
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	go func() {
@@ -106,7 +109,7 @@ func TestDirectStart(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--argv", fmt.Sprintf("\"-port=%d\"", port))
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--argv", fmt.Sprintf("-port,%d", port))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
