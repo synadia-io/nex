@@ -112,13 +112,16 @@ func TestStartNode(t *testing.T) {
 		ticker := time.NewTicker(time.Millisecond * 500)
 		for {
 			select {
+			case <-ctx.Done():
+				t.Log("Sending SIGINT to Nex Node")
+				_ = cmd.Process.Signal(syscall.SIGINT)
+				return
 			case <-ticker.C:
 				if bytes.Contains(stdout.Bytes(), []byte("NATS execution engine awaiting commands")) {
 					passed = true
+					ticker.Stop()
 					cancel()
 				}
-			case <-ctx.Done():
-				_ = cmd.Process.Signal(syscall.SIGINT)
 			}
 		}
 	}()
@@ -189,10 +192,16 @@ func TestStartNexus(t *testing.T) {
 			nodels.Stderr = stderr
 
 			select {
+			case <-ctx.Done():
+				_ = nex1.Process.Signal(syscall.SIGINT)
+				_ = nex2.Process.Signal(syscall.SIGINT)
+				_ = nex3.Process.Signal(syscall.SIGINT)
+				return
 			case <-ticker.C:
 				err := nodels.Run()
 				if err != nil {
 					t.Error(err)
+					ticker.Stop()
 					cancel()
 				}
 
@@ -208,18 +217,15 @@ func TestStartNexus(t *testing.T) {
 				err = json.Unmarshal(stdout.Bytes(), &resp)
 				if err != nil {
 					t.Error()
+					ticker.Stop()
 					cancel()
 				}
 
 				if len(resp) == 3 {
 					passed = true
+					ticker.Stop()
 					cancel()
 				}
-
-			case <-ctx.Done():
-				_ = nex1.Process.Signal(syscall.SIGINT)
-				_ = nex2.Process.Signal(syscall.SIGINT)
-				_ = nex3.Process.Signal(syscall.SIGINT)
 			}
 		}
 	}()
