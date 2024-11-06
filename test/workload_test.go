@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -20,13 +21,24 @@ import (
 
 func buildDirectStartBinary(t testing.TB, workingDir string) (string, error) {
 	t.Helper()
-	if _, err := os.Stat(filepath.Join(workingDir, "test")); err == nil {
-		return filepath.Join(workingDir, "test"), nil
+	binName := func() string {
+		if runtime.GOOS == "windows" {
+			return "test.exe"
+		}
+		return "test"
 	}
 
-	cmd := exec.Command("go", "build", "-o", filepath.Join(workingDir, "test"), "./testdata/direct_start/main.go")
+	if _, err := os.Stat(filepath.Join(workingDir, binName())); err == nil {
+		return filepath.Join(workingDir, binName()), nil
+	}
+
+	cmd := exec.Command("go", "build", "-o", filepath.Join(workingDir, binName()), "./testdata/direct_start/main.go")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
+	if _, err := os.Stat(filepath.Join(workingDir, binName())); err != nil {
+		return "", err
+	}
 
 	err := cmd.Run()
 	if err != nil {
