@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
+	"syscall"
 	"testing"
 	"time"
 
@@ -53,25 +53,26 @@ func startNatsSever(t testing.TB, workingDir string) (*server.Server, error) {
 	return s, nil
 }
 
-func startNextNodeCmd(t testing.TB, workingDir string) (*exec.Cmd, *server.Server, error) {
+func startNextNodeCmd(t testing.TB, workingDir, natsServer string) (*exec.Cmd, error) {
 	t.Helper()
-	s, err := startNatsSever(t, workingDir)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	cli, err := buildNexCli(t, workingDir)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", s.ClientURL(), "--resource-directory", workingDir)
-	return cmd, s, nil
+	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", natsServer, "--resource-directory", workingDir)
+	return cmd, nil
 }
 
 func TestStartNode(t *testing.T) {
 	workingDir := t.TempDir()
-	cmd, s, err := startNextNodeCmd(t, workingDir)
+	s, err := startNatsSever(t, workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmd, err := startNextNodeCmd(t, workingDir, s.ClientURL())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,18 +97,10 @@ func TestStartNode(t *testing.T) {
 		case <-ticker.C:
 			if bytes.Contains(stdout.Bytes(), []byte("NATS execution engine awaiting commands")) {
 				passed = true
-				if runtime.GOOS != "windows" {
-					_ = cmd.Process.Signal(os.Interrupt)
-				} else {
-					_ = cmd.Process.Kill()
-				}
+				_ = cmd.Process.Signal(syscall.SIGTERM)
 			}
 		case <-ctx.Done():
-			if runtime.GOOS != "windows" {
-				_ = cmd.Process.Signal(os.Interrupt)
-			} else {
-				_ = cmd.Process.Kill()
-			}
+			_ = cmd.Process.Signal(syscall.SIGTERM)
 		}
 	}()
 
