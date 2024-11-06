@@ -16,6 +16,10 @@ import (
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 )
 
+var (
+	exitSyscall = syscall.SIGINT
+)
+
 func buildNexCli(t testing.TB, workingDir string) (string, error) {
 	t.Helper()
 
@@ -126,8 +130,7 @@ func TestStartNode(t *testing.T) {
 		for {
 			select {
 			case <-ctx.Done():
-				t.Log("Sending SIGINT to Nex Node")
-				_ = cmd.Process.Signal(syscall.SIGINT)
+				stopProcess(cmd.Process)
 				return
 			case <-ticker.C:
 				if bytes.Contains(stdout.Bytes(), []byte("NATS execution engine awaiting commands")) {
@@ -206,9 +209,9 @@ func TestStartNexus(t *testing.T) {
 
 			select {
 			case <-ctx.Done():
-				_ = nex1.Process.Signal(syscall.SIGINT)
-				_ = nex2.Process.Signal(syscall.SIGINT)
-				_ = nex3.Process.Signal(syscall.SIGINT)
+				stopProcess(nex1.Process)
+				stopProcess(nex2.Process)
+				stopProcess(nex3.Process)
 				return
 			case <-ticker.C:
 				err := nodels.Run()

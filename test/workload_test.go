@@ -3,14 +3,15 @@ package test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -86,7 +87,7 @@ func TestDirectStart(t *testing.T) {
 
 	go func() {
 		<-ctx.Done()
-		_ = cmd.Process.Signal(syscall.SIGINT)
+		stopProcess(cmd.Process)
 	}()
 
 	go func() {
@@ -96,7 +97,16 @@ func TestDirectStart(t *testing.T) {
 			return
 		}
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub)
+		// find unused port
+		listener, err := net.Listen("tcp", ":0")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		port := listener.Addr().(*net.TCPAddr).Port
+		listener.Close()
+
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--argv", fmt.Sprintf("\"-port=%d\"", port))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
@@ -139,6 +149,8 @@ func TestDirectStart(t *testing.T) {
 		if string(body) != "passing" {
 			t.Error("expected passing, got", string(body))
 		}
+
+		t.Log(string(body))
 
 		cancel()
 	}()
