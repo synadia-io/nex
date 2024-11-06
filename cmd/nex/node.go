@@ -265,6 +265,7 @@ type Up struct {
 	Agents                           AgentConfigs      `help:"Workload types configurations for nex node to initialize"`
 	DisableDirectStart               bool              `help:"Disable direct start (no sandbox) workloads" default:"false"`
 	NodeSeed                         string            `help:"Node Seed used for identifier.  Default is generated" placeholder:"NBTAFHAKW..."`
+	HideWorkloadLogs                 bool              `name:"hide-workload-logs" help:"Hide logs from workloads" default:"false"`
 	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false" hidden:""`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
@@ -319,7 +320,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	logger := configureLogger(globals, nc, pubKey, u.ShowSystemLogs)
+	logger := configureLogger(globals, nc, pubKey, u.ShowSystemLogs, u.HideWorkloadLogs)
 
 	nexNode, err := node.NewNexNode(kp, nc,
 		options.WithLogger(logger),
