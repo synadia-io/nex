@@ -281,9 +281,11 @@ func (u Up) Validate() error {
 		errs = errors.Join(errs, errors.New("attempting to start nex node with no workload types configured. Please provide at least 1 workload type configuration or enable direct start"))
 	}
 
-	prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeSeed))
-	if err != nil || prefix != nkeys.PrefixByteServer {
-		errs = errors.Join(errs, errors.New("invalid node seed provided"))
+	if u.NodeSeed != "" {
+		prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeSeed))
+		if err != nil || prefix != nkeys.PrefixByteServer {
+			errs = errors.Join(errs, errors.New("invalid node seed provided"))
+		}
 	}
 
 	return errs
