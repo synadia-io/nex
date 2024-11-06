@@ -110,7 +110,7 @@ func TestDirectStart(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--argv", fmt.Sprintf("-port,%d", port))
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, fmt.Sprintf("--argv=-port=%d", port))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
@@ -138,7 +138,7 @@ func TestDirectStart(t *testing.T) {
 		}
 
 		time.Sleep(5000 * time.Millisecond)
-		resp, err := http.Get("http://localhost:8087")
+		resp, err := http.Get(fmt.Sprintf("http://localhost:%d", port))
 		if err != nil {
 			t.Error(err)
 			return
