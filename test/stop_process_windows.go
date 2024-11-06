@@ -3,6 +3,8 @@ package test
 import (
 	"os"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 func stopProcess(proc *os.Process) error {
@@ -24,4 +26,10 @@ func stopProcess(proc *os.Process) error {
 	}
 
 	return nil
+}
+
+func sysProcAttr() *syscall.SysProcAttr {
+	return &windows.SysProcAttr{
+		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,
+	}
 }

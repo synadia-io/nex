@@ -111,6 +111,7 @@ func TestStartNode(t *testing.T) {
 	stderr := new(bytes.Buffer)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
+	cmd.SysProcAttr = sysProcAttr()
 
 	err = cmd.Start()
 	if err != nil {
