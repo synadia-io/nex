@@ -3,7 +3,6 @@ package actors
 import (
 	"fmt"
 	"log/slog"
-	"os"
 	"os/exec"
 )
 
@@ -42,6 +41,7 @@ func (proc *OsProcess) Run() error {
 
 	cmd.Stdout = logCapture{logger: proc.logger, stderr: false, name: proc.name}
 	cmd.Stderr = logCapture{logger: proc.logger, stderr: true, name: proc.name}
+	cmd.SysProcAttr = sysProcAttr()
 
 	proc.amendCommand(cmd)
 
@@ -71,7 +71,7 @@ func (proc *OsProcess) Run() error {
 // Sends an interrupt signal to the running process (if it's running)
 func (proc *OsProcess) Interrupt(reason string) error {
 	if proc.cmd.Process != nil {
-		return proc.cmd.Process.Signal(os.Interrupt)
+		return stopProcess(proc.cmd.Process)
 	}
 	return nil
 }
