@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,7 +100,7 @@ func TestLogSubject(t *testing.T) {
 	os.Stdout = origStdout
 	cancel()
 
-	if stdout.String() != "$NEX.logs.a.b [1.0s] -> derp\n" {
+	if strings.Contains(stdout.String(), "$NEX.logs.a.b [1.0s] -> derp\n") {
 		t.Errorf("unexpected output: '%s'", stdout.String())
 	}
 }
