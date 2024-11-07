@@ -2,9 +2,6 @@ package test
 
 import (
 	"bytes"
-	"context"
-	"errors"
-	"os"
 	"os/exec"
 	"testing"
 	"time"
@@ -53,22 +50,14 @@ func TestLameDuckMode(t *testing.T) {
 	}
 	time.Sleep(500 * time.Millisecond)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	go func() {
-		<-ctx.Done()
-		err = stopProcess(cmd.Process)
-		if errors.Is(err, os.ErrProcessDone) {
-			return
-		}
-		if err != nil {
-			t.Error(err)
-		}
+		time.Sleep(10 * time.Second)
+		t.Fail()
+		t.Log("hit timeout")
+		return
 	}()
 
 	ldStdout := new(bytes.Buffer)
-
 	go func() {
 		pub, err := kp.PublicKey()
 		if err != nil {
