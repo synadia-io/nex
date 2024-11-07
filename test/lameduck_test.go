@@ -54,7 +54,6 @@ func TestLameDuckMode(t *testing.T) {
 		time.Sleep(10 * time.Second)
 		t.Fail()
 		t.Log("hit timeout")
-		return
 	}()
 
 	ldStdout := new(bytes.Buffer)
