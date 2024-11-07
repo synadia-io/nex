@@ -113,10 +113,10 @@ type logCapture struct {
 // Log capture implementation of io.Writer for stdout and stderr
 func (cap logCapture) Write(p []byte) (n int, err error) {
 	if !cap.stderr {
-		cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stdout", cap.name), p)
+		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stdout", cap.name), p)
 		cap.logger.Debug(string(p), slog.String("process_name", cap.name))
 	} else {
-		cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stderr", cap.name), p)
+		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stderr", cap.name), p)
 		cap.logger.Error(string(p), slog.String("process_name", cap.name))
 	}
 	return len(p), nil
