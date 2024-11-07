@@ -88,6 +88,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			Success: true,
 		})
 	case *goaktpb.Terminated:
+		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
 		a.logger.Warn("Direct start agent received unhandled message", slog.String("name", ctx.Self().Name()), slog.Any("message_type", fmt.Sprintf("%T", m)))
 		ctx.Unhandled()
@@ -184,10 +185,19 @@ func (a *DirectStartAgent) SetLameDuck() error {
 		select {
 		case <-ticker.C:
 			if len(a.self.Children()) == 0 {
+				err := a.self.Shutdown(ctx)
+				if err != nil {
+					a.logger.Error("Failed to shutdown direct start agent", slog.String("name", a.self.Name()), slog.Any("err", err))
+					return err
+				}
 				return nil
 			}
 		case <-ctx.Done():
 			a.logger.Error("Failed to stop all workloads", slog.String("name", a.self.Name()))
+			err := a.self.Shutdown(ctx)
+			if err != nil {
+				a.logger.Error("Failed to shutdown direct start agent", slog.String("name", a.self.Name()), slog.Any("err", err))
+			}
 			return errors.New("failed to stop all workloads in timelimit")
 		}
 	}

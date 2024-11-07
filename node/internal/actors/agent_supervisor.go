@@ -40,7 +40,7 @@ func (s *AgentSupervisor) PostStop(ctx context.Context) error {
 }
 
 func (s *AgentSupervisor) Receive(ctx *goakt.ReceiveContext) {
-	switch ctx.Message().(type) {
+	switch m := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		s.logger = s.nodeOptions.Logger.WithGroup(AgentSupervisorActorName)
 	case *actorproto.QueryWorkloads:
@@ -48,6 +48,8 @@ func (s *AgentSupervisor) Receive(ctx *goakt.ReceiveContext) {
 	case *actorproto.SetLameDuck:
 		s.logger.Debug("Received set lame duck message")
 		ctx.Response(s.setLameDuck(ctx))
+	case *goaktpb.Terminated:
+		s.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
 		s.logger.Warn("Received unhandled message", slog.Any("msg", ctx.Message()), slog.String("actor", ctx.Self().ID()))
 		ctx.Unhandled()
