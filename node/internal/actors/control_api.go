@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
@@ -34,7 +35,7 @@ const (
 type auctionResponseFunc func(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
 type nodePingResponseFunc func() (*actorproto.PingNodeResponse, error)
 type nodeInfoResponseFunc func() (*actorproto.NodeInfo, error)
-type nodeLameDuckFunc func()
+type nodeLameDuckFunc func(context.Context)
 
 type ControlAPI struct {
 	nc         *nats.Conn
@@ -295,7 +296,12 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
-	ctx := context.Background()
+	// Set a timeout for the lame duck request of 1 minute
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	api.nodeLameDuck(ctx)
+
 	api.logger.Info("Received lame duck request")
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
@@ -323,8 +329,6 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		models.RespondEnvelope(m, LameDuckResponseType, 500, "", "Failed to put node in lame duck mode")
 		return
 	}
-
-	api.nodeLameDuck()
 
 	workloadResponse.Id = api.publicKey
 	models.RespondEnvelope(m, LameDuckResponseType, 200, lameDuckResponseFromProto(workloadResponse), "")

@@ -407,10 +407,11 @@ func (nn nexNode) infoResponse() (*actorproto.NodeInfo, error) {
 	return resp, nil
 }
 
-func (nn nexNode) Shutdown() {
-	// err := nn.actorSystem.Stop(context.Background())
-	// if err != nil {
-	// 	nn.options.Logger.Error("Failed to stop actor system", slog.Any("err", err))
-	// }
-	nn.interrupt <- os.Interrupt
+func (nn nexNode) Shutdown(ctx context.Context) {
+	nn.options.Tags[models.TagLameDuck] = "true"
+
+	go func() {
+		<-ctx.Done()
+		nn.interrupt <- os.Interrupt
+	}()
 }
