@@ -174,12 +174,12 @@ func (nn *nexNode) Start() error {
 		cancel()
 	}()
 
+	nn.startedAt = time.Now()
 	err := nn.initializeSupervisionTree()
 	if err != nil {
 		return err
 	}
 
-	nn.startedAt = time.Now()
 	<-nn.ctx.Done()
 	nn.options.Logger.Info("Shutting down nexnode")
 	return nn.actorSystem.Stop(nn.ctx)
