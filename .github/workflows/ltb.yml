@@ -8,8 +8,6 @@ on:
 
 env:
   GO_VER: '1.23.0'
-  GOPRIVATE: github.com/synadia-labs/oci-registry-nats
-  GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
 
 
 jobs:
@@ -18,10 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - 
-      name: Set up SSH for Go Modules
-      run: |
-          git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}@github.com/".insteadOf "https://github.com/"
-    - 
+      name: Checkout code
       uses: actions/checkout@v4
     - 
       name: Set up Go
@@ -45,17 +40,13 @@ jobs:
     timeout-minutes: 5
     steps:
     - 
+      name: Checkout code
+      uses: actions/checkout@v4
+    - 
       name: Set up Go
       uses: actions/setup-go@v5
       with:
         go-version: ${{ env.GO_VER }}
-    - 
-      name: Set up SSH for Go Modules
-      run: |
-          git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}@github.com/".insteadOf "https://github.com/"
-    - 
-      name: Checkout code
-      uses: actions/checkout@v4
     - 
       name: Run test suite | node
       run: |
@@ -76,10 +67,6 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - 
-        name: Set up SSH for Go Modules
-        run: |
-            git config --global url."https://${{ secrets.GH_ACCESS_TOKEN }}@github.com/".insteadOf "https://github.com/"
       -
         name: Checkout
         uses: actions/checkout@v4
