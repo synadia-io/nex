@@ -94,11 +94,9 @@ func (l *Logs) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	startTime := time.Now()
-
-	fmt.Printf("##### Subscribing to: %s | %s\n", f_subject, startTime.Format(time.RFC850))
+	fmt.Printf("##### Subscribing to: %s\n", f_subject)
 	sub, err := nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		fmt.Printf("[%.1fs] -> %s\n", time.Since(startTime).Seconds(), msg.Data)
+		fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), msg.Data)
 	})
 	if err != nil {
 		return err
