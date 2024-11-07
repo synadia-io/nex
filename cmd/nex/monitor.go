@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/api/nodecontrol"
 	"golang.org/x/net/context"
 )
 
@@ -37,30 +37,38 @@ func (e *Events) Run(ctx context.Context, globals *Globals) error {
 		cancel()
 	}()
 
-	subject := models.EVENTS_SUBJECT
-	f_subject, err := subject.Filter(e.WorkloadID, e.EventType)
-	if err != nil {
-		return err
-	}
-
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
 	}
 
-	startTime := time.Now()
-
-	fmt.Printf("##### Subscribing to: %s\n", f_subject)
-	sub, err := nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		fmt.Printf("%s [%.1fs] -> %s\n", msg.Subject, time.Since(startTime).Seconds(), msg.Data)
-	})
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
 
-	<-ctx.Done()
+	logs, err := controller.MonitorEvents(e.WorkloadID, e.EventType)
+	if err != nil {
+		return err
+	}
 
-	return sub.Drain()
+	eWord := "All"
+	if e.EventType != "*" {
+		eWord = e.EventType
+	}
+	fmt.Printf("##### %s event types for application: %s\n", eWord, e.WorkloadID)
+
+logloop:
+	for {
+		select {
+		case <-ctx.Done():
+			break logloop
+		case ll := <-logs:
+			fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), string(ll))
+		}
+	}
+
+	return nil
 }
 
 type Logs struct {
@@ -83,26 +91,32 @@ func (l *Logs) Run(ctx context.Context, globals *Globals) error {
 		cancel()
 	}()
 
-	subject := models.LOGS_SUBJECT
-	f_subject, err := subject.Filter(l.WorkloadID, l.Level)
-	if err != nil {
-		return err
-	}
-
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("##### Subscribing to: %s\n", f_subject)
-	sub, err := nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), msg.Data)
-	})
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
 
-	<-ctx.Done()
+	logs, err := controller.MonitorLogs(l.WorkloadID, l.Level)
+	if err != nil {
+		return err
+	}
 
-	return sub.Drain()
+	fmt.Printf("##### Logs for application: %s\n", l.WorkloadID)
+
+logloop:
+	for {
+		select {
+		case <-ctx.Done():
+			break logloop
+		case ll := <-logs:
+			fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), string(ll))
+		}
+	}
+
+	return nil
 }

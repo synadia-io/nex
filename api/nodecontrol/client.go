@@ -186,3 +186,39 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponse
 
 	return resp, nil
 }
+
+func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, error) {
+	subject := models.LOGS_SUBJECT
+	f_subject, err := subject.Filter(workloadId, level)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make(chan []byte)
+	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
+		ret <- msg.Data
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan []byte, error) {
+	subject := models.EVENTS_SUBJECT
+	f_subject, err := subject.Filter(workloadId, eventType)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make(chan []byte)
+	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
+		ret <- msg.Data
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
