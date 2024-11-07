@@ -59,7 +59,7 @@ func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 			return
 		}
 		a.self = ctx.Self()
-		a.self.ActorSystem().ScheduleOnce(
+		_ = a.self.ActorSystem().ScheduleOnce(
 			context.Background(),
 			&actorproto.CheckRegistered{},
 			a.self,
@@ -110,6 +110,10 @@ func (a *ExternalAgent) startBinary() error {
 func (a *ExternalAgent) createNatsConnection(url string, _ string, seed string) {
 	var err error
 	opt, err := nats.NkeyOptionFromSeed(seed)
+	if err != nil {
+		a.logger.Error("Failed to extract an nkey option from the nkey seed", slog.Any("error", err))
+		return
+	}
 	a.conn, err = nats.Connect(url, opt)
 	if err != nil {
 		a.logger.Error("Failed to create a connection to internal NATS server for agent", slog.String("agent", a.agentOptions.Name))
