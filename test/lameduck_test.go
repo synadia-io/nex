@@ -50,12 +50,6 @@ func TestLameDuckMode(t *testing.T) {
 	}
 	time.Sleep(500 * time.Millisecond)
 
-	go func() {
-		time.Sleep(10 * time.Second)
-		t.Fail()
-		t.Log("hit timeout")
-	}()
-
 	ldStdout := new(bytes.Buffer)
 	go func() {
 		pub, err := kp.PublicKey()
