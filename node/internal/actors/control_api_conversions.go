@@ -98,7 +98,7 @@ func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.Auction
 
 func lameDuckResponseFromProto(response *actorproto.LameDuckResponse) *api.LameduckResponseJson {
 	return &api.LameduckResponseJson{
-		NodeId:  response.NodeId,
+		Id:      response.Id,
 		Success: response.Success,
 	}
 }

@@ -34,6 +34,7 @@ const (
 type auctionResponseFunc func(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
 type nodePingResponseFunc func() (*actorproto.PingNodeResponse, error)
 type nodeInfoResponseFunc func() (*actorproto.NodeInfo, error)
+type nodeLameDuckFunc func()
 
 type ControlAPI struct {
 	nc         *nats.Conn
@@ -45,11 +46,12 @@ type ControlAPI struct {
 	auctionResponse  auctionResponseFunc
 	nodePingResponse nodePingResponseFunc
 	nodeInfoResponse nodeInfoResponseFunc
+	nodeLameDuck     nodeLameDuckFunc
 
 	self *goakt.PID
 }
 
-func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, aF auctionResponseFunc, nF nodePingResponseFunc, iF nodeInfoResponseFunc) *ControlAPI {
+func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, aF auctionResponseFunc, nF nodePingResponseFunc, iF nodeInfoResponseFunc, ldF nodeLameDuckFunc) *ControlAPI {
 	api := &ControlAPI{
 		nc:               nc,
 		logger:           logger,
@@ -58,6 +60,7 @@ func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, aF a
 		auctionResponse:  aF,
 		nodePingResponse: nF,
 		nodeInfoResponse: iF,
+		nodeLameDuck:     ldF,
 	}
 
 	kp, err := nkeys.CreateCurveKeys()
@@ -293,6 +296,7 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 	ctx := context.Background()
+	api.logger.Info("Received lame duck request")
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
@@ -314,6 +318,15 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		return
 	}
 
+	if !workloadResponse.Success {
+		api.logger.Error("Failed to put node in lame duck mode")
+		models.RespondEnvelope(m, LameDuckResponseType, 500, "", "Failed to put node in lame duck mode")
+		return
+	}
+
+	api.nodeLameDuck()
+
+	workloadResponse.Id = api.publicKey
 	models.RespondEnvelope(m, LameDuckResponseType, 200, lameDuckResponseFromProto(workloadResponse), "")
 }
 

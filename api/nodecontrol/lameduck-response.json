@@ -4,15 +4,15 @@
   "title": "LameduckResponse",
   "type": "object",
   "properties": {
-    "node_id": {
+    "id": {
       "type": "string",
-      "description": "The unique identifier of the node"
+      "description": "The unique identifier of the actor"
     },
     "success": {
       "type": "boolean",
       "description": "Indicates if the node was successfully placed into lameduck mode"
     }
   },
-  "required": ["node_id", "success"],
+  "required": ["id", "success"],
   "additionalProperties": false
 }

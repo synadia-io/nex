@@ -33,8 +33,9 @@ type Node interface {
 }
 
 type nexNode struct {
-	ctx context.Context
-	nc  *nats.Conn
+	ctx       context.Context
+	nc        *nats.Conn
+	interrupt chan os.Signal
 
 	options     *models.NodeOptions
 	publicKey   nkeys.KeyPair
@@ -167,10 +168,10 @@ func (nn *nexNode) Start() error {
 	nn.ctx, cancel = context.WithCancel(nn.ctx)
 	defer cancel()
 
-	interrupt := make(chan os.Signal, 1)
-	signalReset(interrupt)
+	nn.interrupt = make(chan os.Signal, 1)
+	signalReset(nn.interrupt)
 	go func() {
-		<-interrupt
+		<-nn.interrupt
 		cancel()
 	}()
 
@@ -246,7 +247,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
-		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse, nn.pingResponse, nn.infoResponse))
+		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse, nn.pingResponse, nn.infoResponse, nn.Shutdown))
 	if err != nil {
 		return err
 	}
@@ -404,4 +405,12 @@ func (nn nexNode) infoResponse() (*actorproto.NodeInfo, error) {
 	}
 
 	return resp, nil
+}
+
+func (nn nexNode) Shutdown() {
+	// err := nn.actorSystem.Stop(context.Background())
+	// if err != nil {
+	// 	nn.options.Logger.Error("Failed to stop actor system", slog.Any("err", err))
+	// }
+	nn.interrupt <- os.Interrupt
 }
