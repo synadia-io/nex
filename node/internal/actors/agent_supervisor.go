@@ -2,9 +2,9 @@ package actors
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/tochemey/goakt/v2/goaktpb"
-	"github.com/tochemey/goakt/v2/log"
 
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
@@ -24,7 +24,7 @@ func CreateAgentSupervisor(system goakt.ActorSystem, options models.NodeOptions)
 // the right parameters, and keeping track of the information received from its initial
 // registration
 type AgentSupervisor struct {
-	logger log.Logger
+	logger *slog.Logger
 
 	nodeOptions models.NodeOptions
 }
@@ -42,7 +42,7 @@ func (s *AgentSupervisor) PostStop(ctx context.Context) error {
 func (s *AgentSupervisor) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		s.logger = ctx.Self().Logger()
+		s.logger = s.nodeOptions.Logger.WithGroup(AgentSupervisorActorName)
 	case *actorproto.QueryWorkloads:
 		s.queryWorkloads(ctx)
 	default:

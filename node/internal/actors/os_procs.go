@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+
+	"github.com/nats-io/nats.go"
 )
 
 type OsProcess struct {
@@ -12,19 +14,23 @@ type OsProcess struct {
 	env           map[string]string
 	argv          []string
 	logger        *slog.Logger
+	stdout        logCapture
+	stderr        logCapture
 	cmd           *exec.Cmd
 }
 
 // Creates a new OS process based in the parameters
 // NOTE:: if you want to ensure uniqueness in log eminations coming from this process, make sure you
 // use a unique process name
-func NewOsProcess(name string, executionPath string, env map[string]string, argv []string, logger *slog.Logger) (*OsProcess, error) {
+func NewOsProcess(name string, executionPath string, env map[string]string, argv []string, logger *slog.Logger, stdout, stderr logCapture) (*OsProcess, error) {
 	return &OsProcess{
 		name:          name,
 		executionPath: executionPath,
 		env:           env,
 		argv:          argv,
 		logger:        logger,
+		stdout:        stdout,
+		stderr:        stderr,
 	}, nil
 }
 
@@ -39,8 +45,8 @@ func (proc *OsProcess) Run() error {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	cmd.Stdout = logCapture{logger: proc.logger, stderr: false, name: proc.name}
-	cmd.Stderr = logCapture{logger: proc.logger, stderr: true, name: proc.name}
+	cmd.Stdout = proc.stdout
+	cmd.Stderr = proc.stderr
 	cmd.SysProcAttr = sysProcAttr()
 
 	proc.amendCommand(cmd)
@@ -99,16 +105,19 @@ func (proc *OsProcess) amendCommand(cmd *exec.Cmd) {
 
 type logCapture struct {
 	logger *slog.Logger
+	nc     *nats.Conn
 	stderr bool
 	name   string
 }
 
 // Log capture implementation of io.Writer for stdout and stderr
 func (cap logCapture) Write(p []byte) (n int, err error) {
-	if cap.stderr {
-		cap.logger.Error(string(p), slog.String("process_name", cap.name))
-	} else {
+	if !cap.stderr {
+		cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stdout", cap.name), p)
 		cap.logger.Debug(string(p), slog.String("process_name", cap.name))
+	} else {
+		cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stderr", cap.name), p)
+		cap.logger.Error(string(p), slog.String("process_name", cap.name))
 	}
 	return len(p), nil
 }

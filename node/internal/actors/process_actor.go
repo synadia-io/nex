@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
@@ -22,10 +23,14 @@ type processActor struct {
 	process *OsProcess
 }
 
-func createNewProcessActor(logger *slog.Logger, workloadId string, m *actorproto.StartWorkload, ref *ArtifactReference, env map[string]string) (*processActor, error) {
+func createNewProcessActor(logger *slog.Logger, ncLog *nats.Conn, workloadId string, m *actorproto.StartWorkload, ref *ArtifactReference, env map[string]string) (*processActor, error) {
 	ret := new(processActor)
 	var err error
-	ret.process, err = NewOsProcess(workloadId, ref.LocalCachePath, env, m.Argv, logger)
+
+	stdout := logCapture{logger: logger, nc: ncLog, name: workloadId, stderr: false}
+	stderr := logCapture{logger: logger, nc: ncLog, name: workloadId, stderr: true}
+
+	ret.process, err = NewOsProcess(workloadId, ref.LocalCachePath, env, m.Argv, logger, stdout, stderr)
 	if err != nil {
 		return nil, err
 	}
