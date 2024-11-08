@@ -62,23 +62,22 @@ func (h *HTTPService) HandleRequest(
 	namespace string,
 	workloadId string,
 	method string,
-	workloadName string,
 	metadata map[string]string,
 	request []byte,
 ) (hostservices.ServiceResult, error) {
 	switch method {
 	case httpServiceMethodGet:
-		return h.handleGet(workloadId, workloadName, request, metadata)
+		return h.handleGet(workloadId, request, metadata)
 	case httpServiceMethodPost:
-		return h.handlePost(workloadId, workloadName, request, metadata)
+		return h.handlePost(workloadId, request, metadata)
 	case httpServiceMethodPut:
-		return h.handlePut(workloadId, workloadName, request, metadata)
+		return h.handlePut(workloadId, request, metadata)
 	case httpServiceMethodPatch:
-		return h.handlePatch(workloadId, workloadName, request, metadata)
+		return h.handlePatch(workloadId, request, metadata)
 	case httpServiceMethodDelete:
-		return h.handleDelete(workloadId, workloadName, request, metadata)
+		return h.handleDelete(workloadId, request, metadata)
 	case httpServiceMethodHead:
-		return h.handleHead(workloadId, workloadName, request, metadata)
+		return h.handleHead(workloadId, request, metadata)
 	default:
 		h.log.Warn("Received invalid host services RPC request",
 			slog.String("service", "http"),
@@ -88,7 +87,7 @@ func (h *HTTPService) HandleRequest(
 	}
 }
 
-func (h *HTTPService) handleGet(_, _ string, _ []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
+func (h *HTTPService) handleGet(_ string, _ []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
 	url, err := url.Parse(metadata[hostservices.HttpURLHeader])
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
@@ -115,7 +114,7 @@ func (h *HTTPService) handleGet(_, _ string, _ []byte, metadata map[string]strin
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-func (h *HTTPService) handlePost(_, _ string, data []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
+func (h *HTTPService) handlePost(_ string, data []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
 	url, err := url.Parse(metadata[hostservices.HttpURLHeader])
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
@@ -143,7 +142,7 @@ func (h *HTTPService) handlePost(_, _ string, data []byte, metadata map[string]s
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-func (h *HTTPService) handlePut(_, _ string, data []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
+func (h *HTTPService) handlePut(_ string, data []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
 	url, err := url.Parse(metadata[hostservices.HttpURLHeader])
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
@@ -170,7 +169,7 @@ func (h *HTTPService) handlePut(_, _ string, data []byte, metadata map[string]st
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-func (h *HTTPService) handlePatch(_, _ string, data []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
+func (h *HTTPService) handlePatch(_ string, data []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
 	url, err := url.Parse(metadata[hostservices.HttpURLHeader])
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
@@ -197,7 +196,7 @@ func (h *HTTPService) handlePatch(_, _ string, data []byte, metadata map[string]
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-func (h *HTTPService) handleDelete(_, _ string, _ []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
+func (h *HTTPService) handleDelete(_ string, _ []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
 	url, err := url.Parse(metadata[hostservices.HttpURLHeader])
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))
@@ -224,7 +223,7 @@ func (h *HTTPService) handleDelete(_, _ string, _ []byte, metadata map[string]st
 	return hostservices.ServiceResultPass(200, "", resp), nil
 }
 
-func (h *HTTPService) handleHead(_, _ string, _ []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
+func (h *HTTPService) handleHead(_ string, _ []byte, metadata map[string]string) (hostservices.ServiceResult, error) {
 	url, err := url.Parse(metadata[hostservices.HttpURLHeader])
 	if err != nil {
 		h.log.Debug("failed to parse url for http RPC request", slog.String("error", err.Error()))

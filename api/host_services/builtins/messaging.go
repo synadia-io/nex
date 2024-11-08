@@ -70,17 +70,16 @@ func (m *MessagingService) HandleRequest(
 	namespace string,
 	workloadId string,
 	method string,
-	workloadName string,
 	metadata map[string]string,
 	request []byte) (hostservices.ServiceResult, error) {
 
 	switch method {
 	case messagingServiceMethodPublish:
-		return m.handlePublish(conn, workloadId, workloadName, request, metadata, namespace)
+		return m.handlePublish(conn, workloadId, request, metadata, namespace)
 	case messagingServiceMethodRequest:
-		return m.handleRequest(conn, workloadId, workloadName, request, metadata, namespace)
+		return m.handleRequest(conn, workloadId, request, metadata, namespace)
 	case messagingServiceMethodRequestMany:
-		return m.handleRequestMany(conn, workloadId, workloadName, request, metadata, namespace)
+		return m.handleRequestMany(conn, workloadId, request, metadata, namespace)
 	default:
 		m.log.Warn("Received invalid host services RPC request",
 			slog.String("service", "messaging"),
@@ -92,7 +91,7 @@ func (m *MessagingService) HandleRequest(
 
 func (m *MessagingService) handlePublish(
 	nc *nats.Conn,
-	_, _ string,
+	_ string,
 	data []byte, metadata map[string]string,
 	_ string,
 ) (hostservices.ServiceResult, error) {
@@ -115,7 +114,7 @@ func (m *MessagingService) handlePublish(
 
 func (m *MessagingService) handleRequest(
 	nc *nats.Conn,
-	_, _ string,
+	_ string,
 	data []byte, metadata map[string]string,
 	_ string,
 ) (hostservices.ServiceResult, error) {
@@ -136,7 +135,7 @@ func (m *MessagingService) handleRequest(
 
 func (m *MessagingService) handleRequestMany(
 	_ *nats.Conn,
-	_, _ string,
+	_ string,
 	_ []byte, metadata map[string]string,
 	_ string,
 ) (hostservices.ServiceResult, error) {

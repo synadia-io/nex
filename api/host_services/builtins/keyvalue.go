@@ -29,6 +29,13 @@ type KeyValueService struct {
 	config kvConfig
 }
 
+type HostServicesKeyValueResponse struct {
+	Revision int64 `json:"revision,omitempty"`
+	Success  *bool `json:"success,omitempty"`
+
+	Errors []string `json:"errors,omitempty"`
+}
+
 type kvConfig struct {
 	MaxBytes      int    `json:"max_bytes"`
 	AutoProvision bool   `json:"auto_provision"`
@@ -63,7 +70,6 @@ func (k *KeyValueService) HandleRequest(
 	namespace string,
 	workloadId string,
 	method string,
-	workloadName string,
 	metadata map[string]string,
 	request []byte,
 ) (hostservices.ServiceResult, error) {

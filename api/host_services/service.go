@@ -60,7 +60,6 @@ type HostService interface {
 		namespace string,
 		workloadId string,
 		method string,
-		workloadName string,
 		metadata map[string]string,
 		request []byte,
 	) (ServiceResult, error)

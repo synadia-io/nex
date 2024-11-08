@@ -73,7 +73,6 @@ func (o *ObjectStoreService) HandleRequest(
 	namespace string,
 	workloadId string,
 	method string,
-	workloadName string,
 	metadata map[string]string,
 	request []byte) (hostservices.ServiceResult, error) {
 
