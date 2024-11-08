@@ -14,23 +14,21 @@ import (
 // The HostServicesClient is to be used by an agent for communicating with host services
 // on behalf of a managed workload
 type HostServicesClient struct {
-	ncInternal   *nats.Conn
-	namespace    string
-	workloadName string
-	workloadId   string
-	timeout      time.Duration
+	ncInternal *nats.Conn
+	namespace  string
+	workloadId string
+	timeout    time.Duration
 }
 
 func NewHostServicesClient(
 	ncInternal *nats.Conn,
 	timeout time.Duration,
-	namespace, workloadName, workloadId string) *HostServicesClient {
+	namespace, workloadId string) *HostServicesClient {
 	return &HostServicesClient{
-		ncInternal:   ncInternal,
-		namespace:    namespace,
-		workloadName: workloadName,
-		workloadId:   workloadId,
-		timeout:      timeout,
+		ncInternal: ncInternal,
+		namespace:  namespace,
+		workloadId: workloadId,
+		timeout:    timeout,
 	}
 }
 

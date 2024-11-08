@@ -86,16 +86,16 @@ func (h *HostServicesServer) Start() error {
 }
 
 func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
-	// host.%s.rpc.%s.%s.%s.%s
-	// 0                2         3          4        5
+	// host.amazeballs.rpc.testspace.abc12346.kv.set
 	// workloadType, namespace, workloadId, service, method
+	//  0     1              3        4                    5        6
 	// host.javascript.rpc.default.couhd3752omu7o74h4fg.messaging.publish
 
 	tokens := strings.Split(msg.Subject, ".")
-	workloadID := tokens[3]
-	namespace := tokens[2]
-	serviceName := tokens[4]
-	method := tokens[5]
+	namespace := tokens[3]
+	workloadID := tokens[4]
+	serviceName := tokens[5]
+	method := tokens[6]
 
 	h.log.Debug("Handling host service RPC request",
 		slog.String("workload_id", workloadID),
@@ -105,7 +105,7 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 
 	service, ok := h.services[serviceName]
 	if !ok {
-		serverMsg := serverFailMessage(msg.Reply, 404, fmt.Sprintf("No such host service: %s", serviceName))
+		serverMsg := serverFailMessage(msg.Reply, 404, fmt.Sprintf("No such host service: %s (subject '%s')", serviceName, msg.Subject))
 		_ = msg.RespondMsg(serverMsg)
 		return
 	}
@@ -128,7 +128,12 @@ func (h *HostServicesServer) handleRPC(msg *nats.Msg) {
 
 	span.AddEvent("RPC Request Began")
 
-	conn := h.hsClientConnections[workloadID]
+	conn, ok := h.hsClientConnections[workloadID]
+	if !ok {
+		serverMsg := serverFailMessage(msg.Reply, 500, fmt.Sprintf("No connection found for workload '%s'", workloadID))
+		_ = msg.RespondMsg(serverMsg)
+		return
+	}
 
 	result, err := service.HandleRequest(conn,
 		namespace,
