@@ -14,6 +14,12 @@ const (
 
 	DefaultConnection      = "default"
 	HostServicesConnection = "hostservices"
+
+	HttpURLHeader               = "x-http-url"
+	KeyValueKeyHeader           = "x-keyvalue-key"
+	BucketContextHeader         = "x-context-bucket"
+	MessagingSubjectHeader      = "x-subject"
+	ObjectStoreObjectNameHeader = "x-object-name"
 )
 
 type ServiceResult struct {
@@ -59,5 +65,3 @@ type HostService interface {
 		request []byte,
 	) (ServiceResult, error)
 }
-
-const ()

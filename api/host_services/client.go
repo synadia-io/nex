@@ -7,10 +7,9 @@ import (
 
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/api/agent/go"
-	/*
-		"go.opentelemetry.io/otel"
-		"go.opentelemetry.io/otel/propagation"
-	*/)
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+)
 
 // The HostServicesClient is to be used by an agent for communicating with host services
 // on behalf of a managed workload
@@ -56,7 +55,7 @@ func (c *HostServicesClient) PerformRPC(
 		msg.Header.Set(k, v)
 	}
 
-	//	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(msg.Header))
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(msg.Header))
 
 	result, err := c.ncInternal.RequestMsg(msg, c.timeout)
 	if err != nil {
