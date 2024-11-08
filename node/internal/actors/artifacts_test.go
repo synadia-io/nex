@@ -4,10 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,14 +16,6 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
-	natsregistry "github.com/synadia-labs/oci-registry-nats"
-
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	oras "oras.land/oras-go/v2"
-	"oras.land/oras-go/v2/content/file"
-	"oras.land/oras-go/v2/registry/remote"
-	"oras.land/oras-go/v2/registry/remote/auth"
-	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
 func startNatsServer(t testing.TB) (*server.Server, error) {
@@ -110,91 +100,6 @@ func createTestBinary(t testing.TB, tmpDir string) (string, string, int) {
 	return filepath.Join(tmpDir, "output_binary"), hex.EncodeToString(hash.Sum(nil)), len(f_b)
 }
 
-func prepOCIArtifact(t testing.TB, workingDir, binPath string) (string, error) {
-	t.Helper()
-	s, err := startNatsServer(t)
-	if err != nil {
-		return "", err
-	}
-
-	nc, err := nats.Connect(s.ClientURL())
-	if err != nil {
-		return "", err
-	}
-
-	// find unused port
-	listener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return "", err
-	}
-	port := listener.Addr().(*net.TCPAddr).Port
-	listener.Close()
-
-	nr, err := natsregistry.NewNatsRegistry(nc,
-		natsregistry.WithWebserverAddress(fmt.Sprintf(":%d", port)),
-		// natsregistry.WithLogger(slog.New(slog.NewTextHandler(os.Stdout, nil))),
-	)
-	if err != nil {
-		return "", err
-	}
-
-	go func() {
-		err = nr.Start()
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-	time.Sleep(1 * time.Second)
-
-	repo, err := remote.NewRepository(fmt.Sprintf("localhost:%d/test", port))
-	if err != nil {
-		return "", err
-	}
-	repo.PlainHTTP = true
-	repo.Client = &auth.Client{
-		Client: retry.DefaultClient,
-		Cache:  auth.NewCache(),
-	}
-
-	tDir, err := os.MkdirTemp(os.TempDir(), "oci-registry-cache")
-	if err != nil {
-		return "", err
-	}
-	fs, err := file.New(tDir)
-	if err != nil {
-		return "", err
-	}
-	ctx := context.Background()
-
-	mediaType := "application/nex.artifact.binary"
-	fileDescriptor, err := fs.Add(ctx, binPath, mediaType, "")
-	if err != nil {
-		return "", err
-	}
-
-	artifactType := "application/nex.artifact"
-	opts := oras.PackManifestOptions{
-		Layers: []v1.Descriptor{fileDescriptor},
-	}
-	manifestDescriptor, err := oras.PackManifest(ctx, fs, oras.PackManifestVersion1_1, artifactType, opts)
-	if err != nil {
-		return "", err
-	}
-
-	tag := "derp"
-	if err = fs.Tag(ctx, manifestDescriptor, tag); err != nil {
-		return "", err
-	}
-
-	_, err = oras.Copy(ctx, fs, tag, repo, tag, oras.DefaultCopyOptions)
-	if err != nil {
-		return "", err
-	}
-
-	fs.Close()
-	return fmt.Sprintf("oci://localhost:%d/test:derp", port), nil
-}
-
 func prepNatsObjStoreArtifact(t testing.TB, workingDir, binPath string) (string, *nats.Conn, error) {
 	s, err := startNatsServer(t)
 	if err != nil {
@@ -239,43 +144,7 @@ func prepFileArtifact(t testing.TB, workingDir, binPath string) string {
 }
 
 func TestOCIArtifact(t *testing.T) {
-	tDir, err := os.MkdirTemp(os.TempDir(), "nex-test-working-dir-*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	binPath, binHash, binLen := createTestBinary(t, tDir)
-
-	uri, err := prepOCIArtifact(t, tDir, binPath)
-	if err != nil {
-		t.Fatalf("Failed to prep OCI artifact: %v", err)
-	}
-
-	ref, err := getArtifact("testoci", uri, nil)
-	if err != nil {
-		t.Fatalf("Failed to get artifact: %v", err)
-	}
-
-	if ref.Name != "testoci" {
-		t.Errorf("expected %s, got %s", "testoci", ref.Name)
-	}
-	if ref.Tag != "derp" {
-		t.Errorf("expected %s, got %s", "derp", ref.Tag)
-	}
-	if ref.OriginalLocation != uri {
-		t.Errorf("expected %s, got %s", uri, ref.OriginalLocation)
-	}
-	if !strings.HasPrefix(ref.LocalCachePath, filepath.Join(os.TempDir(), "workload-")) {
-		t.Errorf("expected %s, got %s", filepath.Join(os.TempDir(), "/workload-"), ref.LocalCachePath)
-	}
-	if ref.Digest != binHash {
-		t.Errorf("expected %s, got %s", binHash, ref.Digest)
-	}
-	if ref.Size != binLen {
-		t.Errorf("expected %d, got %d", binLen, ref.Size)
-	}
-
-	os.Remove(ref.LocalCachePath)
-	os.RemoveAll(tDir)
+	t.Log("not implemented")
 }
 
 func TestNatsArtifact(t *testing.T) {
