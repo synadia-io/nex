@@ -39,6 +39,8 @@ const httpServiceMethodHead = "head"
 
 const defaultHTTPRequestTimeoutMillis = 2500
 
+var _ hostservices.HostService = &HTTPService{}
+
 type HTTPService struct {
 	log *slog.Logger
 }
@@ -56,7 +58,7 @@ func (h *HTTPService) Initialize(_ json.RawMessage) error {
 }
 
 func (h *HTTPService) HandleRequest(
-	_ map[string]*nats.Conn,
+	_ *nats.Conn,
 	namespace string,
 	workloadId string,
 	method string,
