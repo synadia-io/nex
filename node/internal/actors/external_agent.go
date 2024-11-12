@@ -114,7 +114,7 @@ func (a *ExternalAgent) createNatsConnection(url string, _ string, seed string) 
 		a.logger.Error("Failed to extract an nkey option from the nkey seed", slog.Any("error", err))
 		return
 	}
-	a.conn, err = nats.Connect(url, opt)
+	a.conn, err = nats.Connect(url, opt, nats.Name(a.agentOptions.Name))
 	if err != nil {
 		a.logger.Error("Failed to create a connection to internal NATS server for agent", slog.String("agent", a.agentOptions.Name))
 		return
