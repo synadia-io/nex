@@ -1527,6 +1527,131 @@ func (x *LameDuckResponse) GetSuccess() bool {
 	return false
 }
 
+type AgentRegistered struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	WorkloadType string `protobuf:"bytes,1,opt,name=workload_type,json=workloadType,proto3" json:"workload_type,omitempty"`
+	// The public nkey used by the external agent binary to connect to the internal NATS server
+	AgentbinPublicNkey string `protobuf:"bytes,2,opt,name=agentbin_public_nkey,json=agentbinPublicNkey,proto3" json:"agentbin_public_nkey,omitempty"`
+	// The seed nkey used by the external agent binary to connect to the internal NATS server
+	AgentbinNkeySeed string `protobuf:"bytes,3,opt,name=agentbin_nkey_seed,json=agentbinNkeySeed,proto3" json:"agentbin_nkey_seed,omitempty"`
+	InternalNatsUrl  string `protobuf:"bytes,4,opt,name=internal_nats_url,json=internalNatsUrl,proto3" json:"internal_nats_url,omitempty"`
+	// The nkey used by the external agent _actor_ to connect to the internal NATS server
+	InternalNkey string `protobuf:"bytes,5,opt,name=internal_nkey,json=internalNkey,proto3" json:"internal_nkey,omitempty"`
+	// The nkey seed used by the external agent _actor_ to connect to the internal NATS server
+	InternalNkeySeed string `protobuf:"bytes,6,opt,name=internal_nkey_seed,json=internalNkeySeed,proto3" json:"internal_nkey_seed,omitempty"`
+}
+
+func (x *AgentRegistered) Reset() {
+	*x = AgentRegistered{}
+	mi := &file_agents_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentRegistered) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentRegistered) ProtoMessage() {}
+
+func (x *AgentRegistered) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentRegistered.ProtoReflect.Descriptor instead.
+func (*AgentRegistered) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *AgentRegistered) GetWorkloadType() string {
+	if x != nil {
+		return x.WorkloadType
+	}
+	return ""
+}
+
+func (x *AgentRegistered) GetAgentbinPublicNkey() string {
+	if x != nil {
+		return x.AgentbinPublicNkey
+	}
+	return ""
+}
+
+func (x *AgentRegistered) GetAgentbinNkeySeed() string {
+	if x != nil {
+		return x.AgentbinNkeySeed
+	}
+	return ""
+}
+
+func (x *AgentRegistered) GetInternalNatsUrl() string {
+	if x != nil {
+		return x.InternalNatsUrl
+	}
+	return ""
+}
+
+func (x *AgentRegistered) GetInternalNkey() string {
+	if x != nil {
+		return x.InternalNkey
+	}
+	return ""
+}
+
+func (x *AgentRegistered) GetInternalNkeySeed() string {
+	if x != nil {
+		return x.InternalNkeySeed
+	}
+	return ""
+}
+
+type CheckRegistered struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+}
+
+func (x *CheckRegistered) Reset() {
+	*x = CheckRegistered{}
+	mi := &file_agents_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckRegistered) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckRegistered) ProtoMessage() {}
+
+func (x *CheckRegistered) ProtoReflect() protoreflect.Message {
+	mi := &file_agents_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckRegistered.ProtoReflect.Descriptor instead.
+func (*CheckRegistered) Descriptor() ([]byte, []int) {
+	return file_agents_proto_rawDescGZIP(), []int{25}
+}
+
 // Request made by the actor system and/or control API asking the agent to stop. Note
 // that the direct start agent will ignore this
 type Halt struct {
@@ -1537,7 +1662,7 @@ type Halt struct {
 
 func (x *Halt) Reset() {
 	*x = Halt{}
-	mi := &file_agents_proto_msgTypes[24]
+	mi := &file_agents_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1549,7 +1674,7 @@ func (x *Halt) String() string {
 func (*Halt) ProtoMessage() {}
 
 func (x *Halt) ProtoReflect() protoreflect.Message {
-	mi := &file_agents_proto_msgTypes[24]
+	mi := &file_agents_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1562,7 +1687,7 @@ func (x *Halt) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Halt.ProtoReflect.Descriptor instead.
 func (*Halt) Descriptor() ([]byte, []int) {
-	return file_agents_proto_rawDescGZIP(), []int{24}
+	return file_agents_proto_rawDescGZIP(), []int{26}
 }
 
 var File_agents_proto protoreflect.FileDescriptor
@@ -1784,11 +1909,30 @@ var file_agents_proto_rawDesc = []byte{
 	0x17, 0x0a, 0x07, 0x6e, 0x6f, 0x64, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09,
 	0x52, 0x06, 0x6e, 0x6f, 0x64, 0x65, 0x49, 0x64, 0x12, 0x18, 0x0a, 0x07, 0x73, 0x75, 0x63, 0x63,
 	0x65, 0x73, 0x73, 0x18, 0x02, 0x20, 0x01, 0x28, 0x08, 0x52, 0x07, 0x73, 0x75, 0x63, 0x63, 0x65,
-	0x73, 0x73, 0x22, 0x06, 0x0a, 0x04, 0x48, 0x61, 0x6c, 0x74, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69,
-	0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x73, 0x79, 0x6e, 0x61, 0x64, 0x69, 0x61,
-	0x2d, 0x69, 0x6f, 0x2f, 0x6e, 0x65, 0x78, 0x2f, 0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x61, 0x63, 0x74,
-	0x6f, 0x72, 0x73, 0x2f, 0x70, 0x62, 0x3b, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x73, 0x73, 0x22, 0x95, 0x02, 0x0a, 0x0f, 0x41, 0x67, 0x65, 0x6e, 0x74, 0x52, 0x65, 0x67, 0x69,
+	0x73, 0x74, 0x65, 0x72, 0x65, 0x64, 0x12, 0x23, 0x0a, 0x0d, 0x77, 0x6f, 0x72, 0x6b, 0x6c, 0x6f,
+	0x61, 0x64, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x77,
+	0x6f, 0x72, 0x6b, 0x6c, 0x6f, 0x61, 0x64, 0x54, 0x79, 0x70, 0x65, 0x12, 0x30, 0x0a, 0x14, 0x61,
+	0x67, 0x65, 0x6e, 0x74, 0x62, 0x69, 0x6e, 0x5f, 0x70, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x5f, 0x6e,
+	0x6b, 0x65, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x12, 0x61, 0x67, 0x65, 0x6e, 0x74,
+	0x62, 0x69, 0x6e, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x4e, 0x6b, 0x65, 0x79, 0x12, 0x2c, 0x0a,
+	0x12, 0x61, 0x67, 0x65, 0x6e, 0x74, 0x62, 0x69, 0x6e, 0x5f, 0x6e, 0x6b, 0x65, 0x79, 0x5f, 0x73,
+	0x65, 0x65, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x10, 0x61, 0x67, 0x65, 0x6e, 0x74,
+	0x62, 0x69, 0x6e, 0x4e, 0x6b, 0x65, 0x79, 0x53, 0x65, 0x65, 0x64, 0x12, 0x2a, 0x0a, 0x11, 0x69,
+	0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x5f, 0x6e, 0x61, 0x74, 0x73, 0x5f, 0x75, 0x72, 0x6c,
+	0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c,
+	0x4e, 0x61, 0x74, 0x73, 0x55, 0x72, 0x6c, 0x12, 0x23, 0x0a, 0x0d, 0x69, 0x6e, 0x74, 0x65, 0x72,
+	0x6e, 0x61, 0x6c, 0x5f, 0x6e, 0x6b, 0x65, 0x79, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c,
+	0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x4e, 0x6b, 0x65, 0x79, 0x12, 0x2c, 0x0a, 0x12,
+	0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x5f, 0x6e, 0x6b, 0x65, 0x79, 0x5f, 0x73, 0x65,
+	0x65, 0x64, 0x18, 0x06, 0x20, 0x01, 0x28, 0x09, 0x52, 0x10, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e,
+	0x61, 0x6c, 0x4e, 0x6b, 0x65, 0x79, 0x53, 0x65, 0x65, 0x64, 0x22, 0x11, 0x0a, 0x0f, 0x43, 0x68,
+	0x65, 0x63, 0x6b, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x65, 0x72, 0x65, 0x64, 0x22, 0x06, 0x0a,
+	0x04, 0x48, 0x61, 0x6c, 0x74, 0x42, 0x35, 0x5a, 0x33, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e,
+	0x63, 0x6f, 0x6d, 0x2f, 0x73, 0x79, 0x6e, 0x61, 0x64, 0x69, 0x61, 0x2d, 0x69, 0x6f, 0x2f, 0x6e,
+	0x65, 0x78, 0x2f, 0x6e, 0x6f, 0x64, 0x65, 0x2f, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x73, 0x2f, 0x70,
+	0x62, 0x3b, 0x61, 0x63, 0x74, 0x6f, 0x72, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x06, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1803,7 +1947,7 @@ func file_agents_proto_rawDescGZIP() []byte {
 	return file_agents_proto_rawDescData
 }
 
-var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
+var file_agents_proto_msgTypes = make([]protoimpl.MessageInfo, 33)
 var file_agents_proto_goTypes = []any{
 	(*PingNode)(nil),                // 0: agents.PingNode
 	(*PingNodeResponse)(nil),        // 1: agents.PingNodeResponse
@@ -1829,31 +1973,33 @@ var file_agents_proto_goTypes = []any{
 	(*WorkloadSummary)(nil),         // 21: agents.WorkloadSummary
 	(*SetLameDuck)(nil),             // 22: agents.SetLameDuck
 	(*LameDuckResponse)(nil),        // 23: agents.LameDuckResponse
-	(*Halt)(nil),                    // 24: agents.Halt
-	nil,                             // 25: agents.PingNodeResponse.TagsEntry
-	nil,                             // 26: agents.PingNodeResponse.RunningAgentsEntry
-	nil,                             // 27: agents.PingAgentResponse.TagsEntry
-	nil,                             // 28: agents.AuctionResponse.TagsEntry
-	nil,                             // 29: agents.AuctionResponse.StatusEntry
-	nil,                             // 30: agents.NodeInfo.TagsEntry
-	(*timestamppb.Timestamp)(nil),   // 31: google.protobuf.Timestamp
+	(*AgentRegistered)(nil),         // 24: agents.AgentRegistered
+	(*CheckRegistered)(nil),         // 25: agents.CheckRegistered
+	(*Halt)(nil),                    // 26: agents.Halt
+	nil,                             // 27: agents.PingNodeResponse.TagsEntry
+	nil,                             // 28: agents.PingNodeResponse.RunningAgentsEntry
+	nil,                             // 29: agents.PingAgentResponse.TagsEntry
+	nil,                             // 30: agents.AuctionResponse.TagsEntry
+	nil,                             // 31: agents.AuctionResponse.StatusEntry
+	nil,                             // 32: agents.NodeInfo.TagsEntry
+	(*timestamppb.Timestamp)(nil),   // 33: google.protobuf.Timestamp
 }
 var file_agents_proto_depIdxs = []int32{
-	31, // 0: agents.PingNodeResponse.started_at:type_name -> google.protobuf.Timestamp
-	25, // 1: agents.PingNodeResponse.tags:type_name -> agents.PingNodeResponse.TagsEntry
-	26, // 2: agents.PingNodeResponse.running_agents:type_name -> agents.PingNodeResponse.RunningAgentsEntry
-	27, // 3: agents.PingAgentResponse.tags:type_name -> agents.PingAgentResponse.TagsEntry
-	31, // 4: agents.PingAgentResponse.started_at:type_name -> google.protobuf.Timestamp
+	33, // 0: agents.PingNodeResponse.started_at:type_name -> google.protobuf.Timestamp
+	27, // 1: agents.PingNodeResponse.tags:type_name -> agents.PingNodeResponse.TagsEntry
+	28, // 2: agents.PingNodeResponse.running_agents:type_name -> agents.PingNodeResponse.RunningAgentsEntry
+	29, // 3: agents.PingAgentResponse.tags:type_name -> agents.PingAgentResponse.TagsEntry
+	33, // 4: agents.PingAgentResponse.started_at:type_name -> google.protobuf.Timestamp
 	6,  // 5: agents.PingAgentResponse.running_workloads:type_name -> agents.RunningWorkload
 	21, // 6: agents.PingWorkloadResponse.workload:type_name -> agents.WorkloadSummary
-	31, // 7: agents.AuctionResponse.started_at:type_name -> google.protobuf.Timestamp
-	28, // 8: agents.AuctionResponse.tags:type_name -> agents.AuctionResponse.TagsEntry
-	29, // 9: agents.AuctionResponse.status:type_name -> agents.AuctionResponse.StatusEntry
+	33, // 7: agents.AuctionResponse.started_at:type_name -> google.protobuf.Timestamp
+	30, // 8: agents.AuctionResponse.tags:type_name -> agents.AuctionResponse.TagsEntry
+	31, // 9: agents.AuctionResponse.status:type_name -> agents.AuctionResponse.StatusEntry
 	10, // 10: agents.StartWorkload.host_service_config:type_name -> agents.HostServicesConfig
 	21, // 11: agents.WorkloadList.workloads:type_name -> agents.WorkloadSummary
-	30, // 12: agents.NodeInfo.tags:type_name -> agents.NodeInfo.TagsEntry
+	32, // 12: agents.NodeInfo.tags:type_name -> agents.NodeInfo.TagsEntry
 	21, // 13: agents.NodeInfo.workloads:type_name -> agents.WorkloadSummary
-	31, // 14: agents.WorkloadSummary.started_at:type_name -> google.protobuf.Timestamp
+	33, // 14: agents.WorkloadSummary.started_at:type_name -> google.protobuf.Timestamp
 	15, // [15:15] is the sub-list for method output_type
 	15, // [15:15] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
@@ -1872,7 +2018,7 @@ func file_agents_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_agents_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   31,
+			NumMessages:   33,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
