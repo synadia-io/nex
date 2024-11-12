@@ -232,7 +232,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 	for _, agent := range nn.options.AgentOptions {
 		// This map lookup works because the agent name is identical to the workload type
-		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(nn.options.Logger.WithGroup(agent.Name), allCreds[agent.Name], agent))
+		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name,
+			actors.CreateExternalAgent(nn.options.Logger.WithGroup(agent.Name),
+				allCreds[agent.Name], agent, nn.options))
 		if err != nil {
 			return err
 		}

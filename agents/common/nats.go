@@ -12,11 +12,6 @@ const (
 	EnvNatsHost = "NEX_NODE_NATS_HOST"
 	EnvNatsNkey = "NEX_NODE_NATS_NKEY_SEED"
 	EnvNatsPort = "NEX_NODE_NATS_PORT"
-
-	EnvHostServicesHost     = "NEX_HOSTSERVICES_NATS_SERVER"
-	EnvHostServicesPort     = "NEX_HOSTSERVICES_NATS_PORT"
-	EnvHostServicesJWT      = "NEX_HOSTSERVICES_NATS_USER_JWT"
-	EnvHostServicesUserSeed = "NEX_HOSTSERVICES_NATS_USER_SEED"
 )
 
 // Creates a connection that allows the agent to communicate with the Nex node itself. This
