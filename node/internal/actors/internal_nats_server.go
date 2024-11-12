@@ -313,13 +313,13 @@ accounts: {
 		]
 		exports: [
 			{
-				service: hostint.>
+				service: host.>
 			}
 		],
 		imports: [
 			{{ range .Credentials }}
 			{
-				service: {subject: "agentint.{{ .WorkloadType }}.>", account: "{{ .WorkloadType }}"}
+				service: {subject: "agent.{{ .WorkloadType }}.>", account: "{{ .WorkloadType }}"}
 			},
 			{
 				stream: {subject: agentevt.>, account: "{{ .WorkloadType }}"}, prefix: "{{ .WorkloadType }}"
@@ -335,7 +335,7 @@ accounts: {
 		]
 		exports: [
 			{
-				service: "agentint.{{ .WorkloadType }}.>", accounts: [nexhost]
+				service: "agent.{{ .WorkloadType }}.>", accounts: [nexhost]
 			}
 			{
 				stream: agentevt.>, accounts: [nexhost]
@@ -343,7 +343,7 @@ accounts: {
 		]
 		imports: [
 			{
-				service: {account: nexhost, subject: "hostint.{{ .WorkloadType }}.>"}, to: "hostint.>"
+				service: {account: nexhost, subject: "host.{{ .WorkloadType }}.>"}, to: "host.>"
 			}
 		]
 

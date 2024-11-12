@@ -22,3 +22,16 @@ func StopWorkloadSubscribeSubject(workloadType string) string {
 func ListWorkloadsSubscribeSubject(workloadType string) string {
 	return fmt.Sprintf("agent.%s.workloads.list", workloadType)
 }
+
+func PerformRPCSubject(
+	workloadType string,
+	workloadId string,
+	namespace string,
+	service string,
+	method string) string {
+	return fmt.Sprintf("host.%s.rpc.%s.%s.%s.%s", workloadType, namespace, workloadId, service, method)
+}
+
+func PerformRPCSubscribeSubject() string {
+	return "host.*.rpc.>"
+}
