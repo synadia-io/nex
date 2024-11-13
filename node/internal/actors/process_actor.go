@@ -27,8 +27,8 @@ func createNewProcessActor(logger *slog.Logger, ncLog *nats.Conn, workloadId str
 	ret := new(processActor)
 	var err error
 
-	stdout := logCapture{logger: logger, nc: ncLog, name: workloadId, stderr: false}
-	stderr := logCapture{logger: logger, nc: ncLog, name: workloadId, stderr: true}
+	stdout := logCapture{logger: logger, nc: ncLog, namespace: m.Namespace, name: workloadId, stderr: false}
+	stderr := logCapture{logger: logger, nc: ncLog, namespace: m.Namespace, name: workloadId, stderr: true}
 
 	ret.process, err = NewOsProcess(workloadId, ref.LocalCachePath, env, m.Argv, logger, stdout, stderr)
 	if err != nil {
