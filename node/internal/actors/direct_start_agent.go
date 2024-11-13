@@ -78,13 +78,11 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		err := a.SetLameDuck()
 		if err != nil {
 			ctx.Response(&actorproto.LameDuckResponse{
-				Id:      a.self.ID(),
 				Success: false,
 			})
 			return
 		}
 		ctx.Response(&actorproto.LameDuckResponse{
-			Id:      a.self.ID(),
 			Success: true,
 		})
 	case *goaktpb.Terminated:

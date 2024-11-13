@@ -326,7 +326,6 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		return
 	}
 
-	workloadResponse.Id = api.publicKey
 	models.RespondEnvelope(m, LameDuckResponseType, 200, lameDuckResponseFromProto(workloadResponse), "")
 }
 

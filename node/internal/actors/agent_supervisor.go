@@ -78,17 +78,17 @@ func (s *AgentSupervisor) setLameDuck(ctx *goakt.ReceiveContext) *actorproto.Lam
 		r, err := ctx.Self().Ask(context.Background(), pid, &actorproto.SetLameDuck{})
 		if err != nil {
 			s.logger.Error("Child actor failed to set lame duck", slog.Any("err", err), slog.String("parent", ctx.Self().ID()), slog.String("child", pid.ID()))
-			return &actorproto.LameDuckResponse{Id: ctx.Self().ID(), Success: false}
+			return &actorproto.LameDuckResponse{Success: false}
 		}
 		resp, ok := r.(*actorproto.LameDuckResponse)
 		if !ok {
 			s.logger.Warn("Unexpected response from agent")
-			return &actorproto.LameDuckResponse{Id: ctx.Self().ID(), Success: false}
+			return &actorproto.LameDuckResponse{Success: false}
 		}
 		if !resp.Success {
 			s.logger.Error("Child workload failed to shutdown", slog.String("child", pid.ID()), slog.Any("err", err))
-			return &actorproto.LameDuckResponse{Id: ctx.Self().ID(), Success: false}
+			return &actorproto.LameDuckResponse{Success: false}
 		}
 	}
-	return &actorproto.LameDuckResponse{Id: ctx.Self().ID(), Success: true}
+	return &actorproto.LameDuckResponse{Success: true}
 }
