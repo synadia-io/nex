@@ -40,12 +40,18 @@ func (s *AgentSupervisor) PostStop(ctx context.Context) error {
 }
 
 func (s *AgentSupervisor) Receive(ctx *goakt.ReceiveContext) {
-	switch ctx.Message().(type) {
+	switch m := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		s.logger = s.nodeOptions.Logger.WithGroup(AgentSupervisorActorName)
 	case *actorproto.QueryWorkloads:
 		s.queryWorkloads(ctx)
+	case *actorproto.SetLameDuck:
+		s.logger.Debug("Received set lame duck message")
+		ctx.Response(s.setLameDuck(ctx))
+	case *goaktpb.Terminated:
+		s.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
+		s.logger.Warn("Received unhandled message", slog.Any("msg", ctx.Message()), slog.String("actor", ctx.Self().ID()))
 		ctx.Unhandled()
 	}
 }
@@ -65,4 +71,24 @@ func (s *AgentSupervisor) queryWorkloads(ctx *goakt.ReceiveContext) {
 		workloads = append(workloads, res.(*actorproto.WorkloadList).Workloads...)
 	}
 	ctx.Response(&actorproto.WorkloadList{Workloads: workloads})
+}
+
+func (s *AgentSupervisor) setLameDuck(ctx *goakt.ReceiveContext) *actorproto.LameDuckResponse {
+	for _, pid := range ctx.Self().Children() {
+		r, err := ctx.Self().Ask(context.Background(), pid, &actorproto.SetLameDuck{})
+		if err != nil {
+			s.logger.Error("Child actor failed to set lame duck", slog.Any("err", err), slog.String("parent", ctx.Self().ID()), slog.String("child", pid.ID()))
+			return &actorproto.LameDuckResponse{Success: false}
+		}
+		resp, ok := r.(*actorproto.LameDuckResponse)
+		if !ok {
+			s.logger.Warn("Unexpected response from agent")
+			return &actorproto.LameDuckResponse{Success: false}
+		}
+		if !resp.Success {
+			s.logger.Error("Child workload failed to shutdown", slog.String("child", pid.ID()), slog.Any("err", err))
+			return &actorproto.LameDuckResponse{Success: false}
+		}
+	}
+	return &actorproto.LameDuckResponse{Success: true}
 }
