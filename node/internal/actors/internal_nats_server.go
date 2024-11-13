@@ -86,6 +86,10 @@ func (ns *InternalNatsServer) CredentialsMap() map[string]AgentCredential {
 	return out
 }
 
+func (ns *InternalNatsServer) HostUserKeypair() nkeys.KeyPair {
+	return ns.hostUser
+}
+
 func (ns *InternalNatsServer) PreStart(ctx context.Context) error {
 	return nil
 }
