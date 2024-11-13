@@ -30,7 +30,6 @@ const (
 	RunResponseType          = "io.nats.nex.v2.run_response"
 	StopResponseType         = "io.nats.nex.v2.stop_response"
 	LameDuckResponseType     = "io.nats.nex.v2.lameduck_response"
-	WorkloadLogType          = "io.nats.nex.v2.workload_log"
 )
 
 type ControlAPI struct {

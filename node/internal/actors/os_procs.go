@@ -1,13 +1,11 @@
 package actors
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os/exec"
 
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nex/models"
 )
 
 type OsProcess struct {
@@ -114,16 +112,11 @@ type logCapture struct {
 
 // Log capture implementation of io.Writer for stdout and stderr
 func (cap logCapture) Write(p []byte) (n int, err error) {
-	e := models.NewEnvelope[string](WorkloadLogType, string(p), 200, nil)
-	e_b, err := json.Marshal(e)
-	if err != nil {
-		return 0, err
-	}
 	if !cap.stderr {
-		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stdout", cap.name), e_b)
-		cap.logger.Info(string(p), slog.String("process_name", cap.name))
+		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stdout", cap.name), p)
+		cap.logger.Debug(string(p), slog.String("process_name", cap.name))
 	} else {
-		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stderr", cap.name), e_b)
+		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.stderr", cap.name), p)
 		cap.logger.Error(string(p), slog.String("process_name", cap.name))
 	}
 	return len(p), nil
