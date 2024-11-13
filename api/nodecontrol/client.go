@@ -178,11 +178,11 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponse
 		return nil, err
 	}
 
-	resp := new(nodegen.LameduckResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
+	envelope := new(models.Envelope[nodegen.LameduckResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	return &envelope.Data, nil
 }

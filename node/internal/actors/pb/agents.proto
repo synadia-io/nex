@@ -148,8 +148,7 @@ message WorkloadSummary {
 
 message SetLameDuck {}
 message LameDuckResponse {
-  string node_id = 1;
-  bool success = 2;
+  bool success = 1;
 }
 
 message AgentRegistered {
