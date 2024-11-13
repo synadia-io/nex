@@ -55,6 +55,9 @@ func (a *testAgent) Up() error {
 	return nil
 }
 
+func (a *testAgent) Trigger(_ string, _ []byte) error {
+    return nil 
+}
 func (a *testAgent) Preflight() error {
 	slog.Info("Tester agent preflight")
 	return nil
