@@ -1,25 +1,46 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os"
+	"path/filepath"
+
+	//"path/filepath"
 	"strings"
 
-	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/api/nodecontrol"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
+
+	"github.com/nats-io/nkeys"
+	"github.com/opencontainers/go-digest"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	oras "oras.land/oras-go/v2"
+	"oras.land/oras-go/v2/content/memory"
+	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/retry"
+)
+
+const (
+	NexOCIArtifactTypePrefix string = "application/nex."
+	NexOCIManifestType       string = "application/nex-workload"
 )
 
 var validURIPrefix []string = []string{"nats://", "file://", "oci://"}
 
 type Workload struct {
-	Run  RunWorkload  `cmd:"" help:"Run a workload on a target node" aliases:"start,deploy"`
-	Stop StopWorkload `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
+	Run    RunWorkload    `cmd:"" help:"Run a workload on a target node" aliases:"start,deploy"`
+	Stop   StopWorkload   `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
+	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into a compatable OCI image" aliases:"build,package"`
 }
 
 type NatsCreds struct {
@@ -179,6 +200,237 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 		fmt.Printf("Workload %s stopped on node %s\n", s.WorkloadId, s.NodeId)
 	} else {
 		fmt.Printf("Workload %s failed to stop on node %s\n", s.WorkloadId, s.NodeId)
+	}
+
+	return nil
+}
+
+type BundleWorkload struct {
+	Binary string `description:"Binary to package"`
+	OS     string `description:"Operating system of the binary" enum:"linux,darwin" default:"linux"`
+	Arch   string `description:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
+	Output string `description:"Output file name" default:"./artifact.tar"`
+
+	Push                bool   `description:"Push the workload to the registry"`
+	Registry            string `description:"Registry to push the workload to" default:"ghcr.io"`
+	RegistryUser        string `description:"Registry username"`
+	RegistryPassword    string `description:"Registry password"`
+	WorkloadName        string `name:"name" description:"Name of the workload"`
+	WorkloadTag         string `name:"tag" description:"Tag of the workload" default:"latest"`
+	WorkloadDescription string `name:"description" description:"Description of the workload"`
+	WorkloadSigningKey  string `name:"public-key" description:"Public key of the workload. OCI layers will be signed with this key" default:"${defaultResourcePath}/issuer.nk"`
+	WorkloadType        string `name:"type" description:"Type of workload" default:"direct_start"`
+}
+
+func (BundleWorkload) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
+func (b BundleWorkload) Validate() error {
+	var errs error
+
+	if i, err := os.Stat(b.WorkloadSigningKey); err != nil || i.IsDir() {
+		errs = errors.Join(errs, errors.New("Public key file does not exist"))
+	}
+
+	return errs
+}
+
+func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
+	if globals.Check {
+		return printTable("Build Workload Configuration", append(globals.Table(), b.Table()...)...)
+	}
+
+	binFile, err := os.Open(b.Binary)
+	if err != nil {
+		return err
+	}
+
+	b_b, err := io.ReadAll(binFile)
+	if err != nil {
+		return err
+	}
+
+	detectWith := b_b
+	if len(b_b) >= 512 {
+		detectWith = b_b[:512]
+	}
+
+	fileDescriptor := v1.Descriptor{
+		MediaType:    http.DetectContentType(detectWith),
+		ArtifactType: NexOCIArtifactTypePrefix + b.WorkloadType,
+		Digest:       digest.FromBytes(b_b),
+		Size:         int64(len(b_b)),
+	}
+
+	store := memory.New()
+	err = store.Push(ctx, fileDescriptor, bytes.NewBuffer(b_b))
+	if err != nil {
+		return err
+	}
+
+	err = store.Tag(ctx, fileDescriptor, string(digest.FromBytes(b_b)))
+	if err != nil {
+		return err
+	}
+
+	opts := oras.PackManifestOptions{
+		Layers: []v1.Descriptor{fileDescriptor},
+	}
+
+	manifestDescriptor, err := oras.PackManifest(ctx, store, oras.PackManifestVersion1_1, NexOCIManifestType, opts)
+	if err != nil {
+		return err
+	}
+
+	if err = store.Tag(ctx, manifestDescriptor, b.WorkloadTag); err != nil {
+		return err
+	}
+
+	// prepare artifact
+	tDir, err := os.MkdirTemp(os.TempDir(), "nex-artifact-builder-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tDir)
+
+	f, err := os.Create(filepath.Join(tDir, "oci-layout"))
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(`{"imageLayoutVersion":"1.0.0"}`)
+	if err != nil {
+		return err
+	}
+	f.Close()
+
+	rc, err := store.Fetch(ctx, manifestDescriptor)
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+	manifestRaw, _ := io.ReadAll(rc)
+	f, err = os.Create(filepath.Join(tDir, "index.json"))
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(manifestRaw)
+	if err != nil {
+		return err
+	}
+	f.Close()
+
+	var manifest v1.Manifest
+	err = json.Unmarshal(manifestRaw, &manifest)
+	if err != nil {
+		return err
+	}
+
+	for _, l := range manifest.Layers {
+		rc, err := store.Fetch(ctx, l)
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+		algDig := strings.Split(l.Digest.String(), ":")
+		if len(algDig) != 2 {
+			return errors.New("Invalid digest")
+		}
+
+		bPath := filepath.Join(tDir, fmt.Sprintf("blobs/%s/%s", algDig[0], algDig[1]))
+
+		err = os.MkdirAll(filepath.Dir(bPath), 0755)
+		if err != nil {
+			return err
+		}
+
+		f, err := os.Create(bPath)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(f, rc)
+		if err != nil {
+			return err
+		}
+		f.Close()
+	}
+
+	if b.Push {
+		repo, err := remote.NewRepository(fmt.Sprintf("%s/%s", b.Registry, b.WorkloadName))
+		if err != nil {
+			return err
+		}
+		repo.Client = &auth.Client{
+			Client: retry.DefaultClient,
+			Cache:  auth.NewCache(),
+			Credential: auth.StaticCredential(b.Registry, auth.Credential{
+				Username: b.RegistryUser,
+				Password: b.RegistryPassword,
+			}),
+		}
+
+		_, err = oras.Copy(ctx, store, b.WorkloadTag, repo, b.WorkloadTag, oras.DefaultCopyOptions)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Workload push successful: %s/%s:%s\n", b.Registry, b.WorkloadName, b.WorkloadTag)
+		return nil
+	}
+	// tar temp directory and move artifact to b.Output
+	err = os.MkdirAll(filepath.Dir(b.Output), 0755)
+	if err != nil {
+		return err
+	}
+
+	f, err = os.Create(b.Output)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	tw := tar.NewWriter(f)
+	defer tw.Close()
+
+	err = filepath.Walk(tDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Create a header
+		header, err := tar.FileInfoHeader(info, path)
+		if err != nil {
+			return err
+		}
+
+		// Update the header name to be relative to the source directory
+		//	header.Name, _ = filepath.Rel(filepath.Base(b.Output), path)
+		header.Name, _ = filepath.Rel(tDir, path)
+
+		// Write the header
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+
+		// If it's a directory, skip writing content
+		if info.IsDir() {
+			return nil
+		}
+
+		// Open the file for reading
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		// Copy the file content to the tar writer
+		_, err = io.Copy(tw, file)
+		return err
+	})
+
+	if err != nil {
+		return err
 	}
 
 	return nil

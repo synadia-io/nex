@@ -109,16 +109,20 @@ func (r StopWorkload) Table() []table.Row {
 	return []table.Row{}
 }
 
-func (l Logs) Table() []table.Row {
+func (b BundleWorkload) Table() []table.Row {
 	return []table.Row{
-		{"Workload ID", l.WorkloadID, reflect.TypeOf(l.WorkloadID).String()},
-		{"Level", l.Level, reflect.TypeOf(l.Level).String()},
-	}
-}
-
-func (e Events) Table() []table.Row {
-	return []table.Row{
-		{"Workload ID", e.WorkloadID, reflect.TypeOf(e.WorkloadID).String()},
-		{"Event Type", e.EventType, reflect.TypeOf(e.EventType).String()},
+		{"Binary", b.Binary, reflect.TypeOf(b.Binary).String()},
+		{"Operating System", b.OS, reflect.TypeOf(b.OS).String()},
+		{"Architecture", b.Arch, reflect.TypeOf(b.Arch).String()},
+		{"Output Path", b.Output, reflect.TypeOf(b.Output).String()},
+		{"Push", b.Push, reflect.TypeOf(b.Push).String()},
+		{"Registry", b.Registry, reflect.TypeOf(b.Registry).String()},
+		{"Registry User", b.RegistryUser, reflect.TypeOf(b.RegistryUser).String()},
+		{"Registry Password", b.RegistryPassword, reflect.TypeOf(b.RegistryPassword).String()},
+		{"Workload name", b.WorkloadName, reflect.TypeOf(b.WorkloadName).String()},
+		{"Workload Tag", b.WorkloadTag, reflect.TypeOf(b.WorkloadTag).String()},
+		{"Workload Description", b.WorkloadDescription, reflect.TypeOf(b.WorkloadDescription).String()},
+		{"Workload Signing Key Path", b.WorkloadSigningKey, reflect.TypeOf(b.WorkloadSigningKey).String()},
+		{"Workload Type", b.WorkloadType, reflect.TypeOf(b.WorkloadType).String()},
 	}
 }
