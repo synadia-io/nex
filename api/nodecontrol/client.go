@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
 	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
@@ -211,16 +212,16 @@ func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan *models.E
 	return ret, nil
 }
 
-func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *models.Envelope[string], error) {
+func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *cloudevents.Event, error) {
 	subject := models.EVENTS_SUBJECT
 	f_subject, err := subject.Filter(workloadId, eventType)
 	if err != nil {
 		return nil, err
 	}
 
-	ret := make(chan *models.Envelope[string])
+	ret := make(chan *cloudevents.Event)
 	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		e := new(models.Envelope[string])
+		e := new(cloudevents.Event)
 		err := json.Unmarshal(msg.Data, e)
 		if err != nil {
 			c.logger.Error("failed to unmarshal log message", slog.Any("err", err), slog.String("data", string(msg.Data)))
