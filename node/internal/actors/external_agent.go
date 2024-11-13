@@ -80,9 +80,17 @@ func (a *ExternalAgent) RegisteredAgentReceive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *actorproto.QueryWorkloads:
 		a.queryWorkloads(ctx)
+	case *actorproto.StartWorkload:
+		a.startWorkload(ctx, msg)
 	default:
 		ctx.Unhandled()
 	}
+}
+
+func (a *ExternalAgent) startWorkload(ctx *goakt.ReceiveContext, req *actorproto.StartWorkload) {
+	// TODO: send start workload request to agent
+
+	// TODO: handle result (ctx.Error, etc)
 }
 
 func (a *ExternalAgent) startBinary() error {

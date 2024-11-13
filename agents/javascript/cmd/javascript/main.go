@@ -1,12 +1,32 @@
 package main
 
 import (
-	"fmt"
 	"github.com/synadia-io/nex/agents/common"
+	jsagent "github.com/synadia-io/nex/agents/javascript"
+	"log/slog"
+)
+
+const (
+	AgentName        = "javascript"
+	AgentVersion     = "0.0.1"
+	AgentDescription = "Nex JavaScript execution agent"
 )
 
 func main() {
-	agent, err := agentcommon.NewNexAgent(doUp, doPreflight)
+
+	jsAgent, err := jsagent.NewAgent()
+	if err != nil {
+		panic(err)
+	}
+
+	slog.Info("JavaScript agent starting")
+	agent, err := agentcommon.NewNexAgent(
+		AgentName,
+		AgentVersion,
+		AgentDescription,
+		0,
+		slog.Default(),
+		jsAgent)
 	if err != nil {
 		panic(err)
 	}
@@ -15,14 +35,4 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func doUp() error {
-	fmt.Println("Nex JavaScript Agent Started")
-	return nil
-}
-
-func doPreflight() error {
-	fmt.Println("Doing JavaScript Agent Preflight Check")
-	return nil
 }
