@@ -187,16 +187,22 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponse
 	return resp, nil
 }
 
-func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, error) {
+func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan *models.Envelope[string], error) {
 	subject := models.LOGS_SUBJECT
 	f_subject, err := subject.Filter(workloadId, level)
 	if err != nil {
 		return nil, err
 	}
 
-	ret := make(chan []byte)
+	ret := make(chan *models.Envelope[string])
 	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		ret <- msg.Data
+		e := new(models.Envelope[string])
+		err := json.Unmarshal(msg.Data, e)
+		if err != nil {
+			c.logger.Error("failed to unmarshal log message", slog.Any("err", err), slog.String("data", string(msg.Data)))
+			return
+		}
+		ret <- e
 	})
 	if err != nil {
 		return nil, err
@@ -205,16 +211,22 @@ func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, e
 	return ret, nil
 }
 
-func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan []byte, error) {
+func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *models.Envelope[string], error) {
 	subject := models.EVENTS_SUBJECT
 	f_subject, err := subject.Filter(workloadId, eventType)
 	if err != nil {
 		return nil, err
 	}
 
-	ret := make(chan []byte)
+	ret := make(chan *models.Envelope[string])
 	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		ret <- msg.Data
+		e := new(models.Envelope[string])
+		err := json.Unmarshal(msg.Data, e)
+		if err != nil {
+			c.logger.Error("failed to unmarshal log message", slog.Any("err", err), slog.String("data", string(msg.Data)))
+			return
+		}
+		ret <- e
 	})
 	if err != nil {
 		return nil, err
