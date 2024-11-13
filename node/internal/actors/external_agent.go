@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	agentcommon "github.com/synadia-io/nex/agents/common"
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
@@ -20,26 +21,34 @@ const (
 	registrationTimeout = 5 * time.Second
 )
 
+// The ExternalAgent is responsible for managing and communicating with a single external agent.
+// It is responsible for starting the executable and passing the `agentBinaryCreds` to the agent
+// via environment variables, while the actor itself connects to the internal NATS via the
+// `internalNatsUrl` and the `hostUserKeypair`
 type ExternalAgent struct {
-	agentOptions      models.AgentOptions
-	internalNatsCreds AgentCredential
-	logger            *slog.Logger
-	self              *goakt.PID
-	conn              *nats.Conn
-	internalNatsUrl   string
-	nodeOptions       *models.NodeOptions
+	agentOptions     models.AgentOptions
+	agentBinaryCreds AgentCredential
+	hostUserKeypair  nkeys.KeyPair
+	logger           *slog.Logger
+	self             *goakt.PID
+	conn             *nats.Conn
+	agentClient      *agentcommon.AgentClient
+	internalNatsUrl  string
+	nodeOptions      *models.NodeOptions
 }
 
 func CreateExternalAgent(logger *slog.Logger,
-	creds AgentCredential,
+	agentBinaryCreds AgentCredential,
+	hostUserKeyPair nkeys.KeyPair,
 	agentOptions models.AgentOptions,
 	nodeOptions *models.NodeOptions) *ExternalAgent {
 
 	return &ExternalAgent{
-		agentOptions:      agentOptions,
-		internalNatsCreds: creds,
-		logger:            logger,
-		nodeOptions:       nodeOptions,
+		agentOptions:     agentOptions,
+		agentBinaryCreds: agentBinaryCreds,
+		hostUserKeypair:  hostUserKeyPair,
+		logger:           logger,
+		nodeOptions:      nodeOptions,
 	}
 }
 
@@ -66,7 +75,11 @@ func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 			registrationTimeout)
 		a.logger.Info("External agent for workload type is running", slog.String("name", ctx.Self().Name()))
 	case *actorproto.AgentRegistered:
-		a.createNatsConnection(msg.InternalNatsUrl, msg.InternalNkey, msg.InternalNkeySeed)
+		err := a.createAgentClient(msg.InternalNatsUrl, msg.InternalNkey, msg.InternalNkeySeed)
+		if err != nil {
+			ctx.Err(err)
+			return
+		}
 		ctx.Become(a.RegisteredAgentReceive)
 	case *actorproto.CheckRegistered:
 		a.logger.Error("Agent was not registered within timeout period. Agent actor terminating", slog.String("agent", a.agentOptions.Name))
@@ -100,7 +113,7 @@ func (a *ExternalAgent) startBinary() error {
 	if err != nil {
 		return err
 	}
-	seed, err := a.internalNatsCreds.nkey.Seed()
+	seed, err := a.agentBinaryCreds.nkey.Seed()
 	if err != nil {
 		return err
 	}
@@ -115,20 +128,27 @@ func (a *ExternalAgent) startBinary() error {
 	return nil
 }
 
-func (a *ExternalAgent) createNatsConnection(url string, _ string, seed string) {
+func (a *ExternalAgent) createAgentClient(url string, _ string, seed string) error {
 	var err error
 	opt, err := nats.NkeyOptionFromSeed(seed)
 	if err != nil {
 		a.logger.Error("Failed to extract an nkey option from the nkey seed", slog.Any("error", err))
-		return
+		return err
 	}
 	a.conn, err = nats.Connect(url, opt, nats.Name(a.agentOptions.Name))
 	if err != nil {
 		a.logger.Error("Failed to create a connection to internal NATS server for agent", slog.String("agent", a.agentOptions.Name))
-		return
+		return err
 	}
 	a.internalNatsUrl = url
 	a.logger.Debug("External agent actor connected to internal NATS", slog.String("agent", a.agentOptions.Name))
+
+	a.agentClient, err = agentcommon.NewAgentClient(a.conn, a.agentOptions.Name)
+	if err != nil {
+		a.logger.Error("Failed to create agent client", slog.Any("error", err), slog.String("agent", a.agentOptions.Name))
+		return err
+	}
+	return nil
 }
 
 func (a *ExternalAgent) queryWorkloads(ctx *goakt.ReceiveContext) {
