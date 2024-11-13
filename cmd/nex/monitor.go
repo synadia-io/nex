@@ -114,7 +114,7 @@ logloop:
 		case <-ctx.Done():
 			break logloop
 		case ll := <-logs:
-			fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), ll.Data)
+			fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), string(ll))
 		}
 	}
 

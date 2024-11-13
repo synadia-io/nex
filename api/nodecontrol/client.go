@@ -188,22 +188,16 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponse
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan *models.Envelope[string], error) {
+func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, error) {
 	subject := models.LOGS_SUBJECT
 	f_subject, err := subject.Filter(workloadId, level)
 	if err != nil {
 		return nil, err
 	}
 
-	ret := make(chan *models.Envelope[string])
+	ret := make(chan []byte)
 	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
-		e := new(models.Envelope[string])
-		err := json.Unmarshal(msg.Data, e)
-		if err != nil {
-			c.logger.Error("failed to unmarshal log message", slog.Any("err", err), slog.String("data", string(msg.Data)))
-			return
-		}
-		ret <- e
+		ret <- msg.Data
 	})
 	if err != nil {
 		return nil, err
