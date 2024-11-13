@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"time"
+	"strings"
+	
 
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/api/agent/go"
@@ -32,6 +34,7 @@ type AgentCallback interface {
 	StartWorkload(request *agentapigen.StartWorkloadRequestJson) error
 	StopWorkload(request *agentapigen.StopWorkloadRequestJson) error
 	ListWorkloads() error
+	Trigger(workloadId string, data []byte) error
 }
 
 func NewNexAgent(name, version, description string,
@@ -131,6 +134,13 @@ func (agent *NexAgent) createSubscriptions() error {
 		return err
 	}
 
+	_, err = agent.embeddedNats.Subscribe(
+		agentapi.WorkloadTriggerSubscribeSubject(agent.name),
+		agent.handleTrigger)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -144,6 +154,19 @@ func (agent *NexAgent) handleStartWorkload(m *nats.Msg) {
 	err = agent.callback.StartWorkload(&req)
 	if err != nil {
 		_ = 0 // for linter
+		// TODO: return error envelope
+	}
+	// TODO: return success envelope
+}
+
+func (agent *NexAgent) handleTrigger(m *nats.Msg) {
+	tokens := strings.Split(m.Subject, ".")
+	// agent.{workload type}.workloads.{workload id}.trigger
+	workloadId := tokens[3]
+
+	err := agent.callback.Trigger(workloadId, m.Data)
+	if err != nil {
+		_ = 0
 		// TODO: return error envelope
 	}
 	// TODO: return success envelope

@@ -23,6 +23,14 @@ func ListWorkloadsSubscribeSubject(workloadType string) string {
 	return fmt.Sprintf("agent.%s.workloads.list", workloadType)
 }
 
+func WorkloadTriggerSubscribeSubject(workloadType string) string {
+	return fmt.Sprintf("agent.%s.workloads.*.trigger", workloadType)
+}
+
+func WorkloadTriggerSubject(workloadType string, workloadId string) string {
+	return fmt.Sprintf("agent.%s.workloads.%s.trigger", workloadType, workloadId)
+}
+
 func PerformRPCSubject(
 	workloadType string,
 	workloadId string,
