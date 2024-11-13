@@ -122,7 +122,6 @@ func TestDirectStart(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		t.Log("Running binary: ", binPath)
 		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, fmt.Sprintf("--argv=-port=%d", port))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)

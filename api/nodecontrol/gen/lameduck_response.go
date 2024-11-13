@@ -6,10 +6,7 @@ import "encoding/json"
 import "fmt"
 
 type LameduckResponseJson struct {
-	// The unique identifier of the node
-	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
-
-	// Indicates if the node was successfully placed into lameduck mode
+	// Indicates lameduck mode successfully set
 	Success bool `json:"success" yaml:"success" mapstructure:"success"`
 }
 
@@ -18,9 +15,6 @@ func (j *LameduckResponseJson) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
-	}
-	if _, ok := raw["node_id"]; raw != nil && !ok {
-		return fmt.Errorf("field node_id in LameduckResponseJson: required")
 	}
 	if _, ok := raw["success"]; raw != nil && !ok {
 		return fmt.Errorf("field success in LameduckResponseJson: required")

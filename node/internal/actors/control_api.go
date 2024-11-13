@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
@@ -31,10 +32,6 @@ const (
 	LameDuckResponseType     = "io.nats.nex.v2.lameduck_response"
 )
 
-type auctionResponseFunc func(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
-type nodePingResponseFunc func() (*actorproto.PingNodeResponse, error)
-type nodeInfoResponseFunc func() (*actorproto.NodeInfo, error)
-
 type ControlAPI struct {
 	nc         *nats.Conn
 	logger     *slog.Logger
@@ -42,22 +39,25 @@ type ControlAPI struct {
 	publicXKey string
 	subsz      []*nats.Subscription
 
-	auctionResponse  auctionResponseFunc
-	nodePingResponse nodePingResponseFunc
-	nodeInfoResponse nodeInfoResponseFunc
+	nodeCallback ControlAPINodeCallback
 
 	self *goakt.PID
 }
 
-func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, aF auctionResponseFunc, nF nodePingResponseFunc, iF nodeInfoResponseFunc) *ControlAPI {
+type ControlAPINodeCallback interface {
+	Auction(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
+	Ping() (*actorproto.PingNodeResponse, error)
+	GetInfo() (*actorproto.NodeInfo, error)
+	SetLameDuck(context.Context)
+}
+
+func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, callback ControlAPINodeCallback) *ControlAPI {
 	api := &ControlAPI{
-		nc:               nc,
-		logger:           logger,
-		publicKey:        publicKey,
-		subsz:            make([]*nats.Subscription, 0),
-		auctionResponse:  aF,
-		nodePingResponse: nF,
-		nodeInfoResponse: iF,
+		nc:           nc,
+		logger:       logger,
+		publicKey:    publicKey,
+		subsz:        make([]*nats.Subscription, 0),
+		nodeCallback: callback,
 	}
 
 	kp, err := nkeys.CreateCurveKeys()
@@ -198,7 +198,7 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 		convertedAgentType = append(convertedAgentType, string(at))
 	}
 
-	auctResp, err := api.auctionResponse(string(req.Os), string(req.Arch), convertedAgentType, req.Tags.Tags)
+	auctResp, err := api.nodeCallback.Auction(string(req.Os), string(req.Arch), convertedAgentType, req.Tags.Tags)
 	if err != nil {
 		api.logger.Error("Failed to generate auction response", slog.Any("error", err))
 		models.RespondEnvelope(m, AuctionResponseType, 500, "", fmt.Sprintf("failed to generate auction response: %s", err))
@@ -281,7 +281,7 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-	info, err := api.nodeInfoResponse()
+	info, err := api.nodeCallback.GetInfo()
 	if err != nil {
 		api.logger.Error("Failed to get node info", slog.Any("error", err))
 		models.RespondEnvelope(m, InfoResponseType, 500, "", fmt.Sprintf("failed to get node info: %s", err))
@@ -292,7 +292,13 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
-	ctx := context.Background()
+	// Set a timeout for the lame duck request of 1 minute
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	api.nodeCallback.SetLameDuck(ctx)
+
+	api.logger.Info("Received lame duck request")
 	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
 		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
@@ -314,11 +320,17 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		return
 	}
 
+	if !workloadResponse.Success {
+		api.logger.Error("Failed to put node in lame duck mode")
+		models.RespondEnvelope(m, LameDuckResponseType, 500, "", "Failed to put node in lame duck mode")
+		return
+	}
+
 	models.RespondEnvelope(m, LameDuckResponseType, 200, lameDuckResponseFromProto(workloadResponse), "")
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {
-	pingResponse, err := api.nodePingResponse()
+	pingResponse, err := api.nodeCallback.Ping()
 	if err != nil {
 		api.logger.Error("failed to ping node", slog.Any("error", err))
 		models.RespondEnvelope(m, PingResponseType, 500, "", fmt.Sprintf("failed to ping node: %s", err.Error()))

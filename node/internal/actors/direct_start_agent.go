@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/nats-io/nuid"
 	"github.com/synadia-io/nex/models"
@@ -72,7 +73,20 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			return
 		}
 		ctx.Response(resp)
+	case *actorproto.SetLameDuck:
+		a.logger.Debug("SetLameDuck received", slog.String("name", ctx.Self().Name()))
+		err := a.SetLameDuck()
+		if err != nil {
+			ctx.Response(&actorproto.LameDuckResponse{
+				Success: false,
+			})
+			return
+		}
+		ctx.Response(&actorproto.LameDuckResponse{
+			Success: true,
+		})
 	case *goaktpb.Terminated:
+		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
 		a.logger.Warn("Direct start agent received unhandled message", slog.String("name", ctx.Self().Name()), slog.Any("message_type", fmt.Sprintf("%T", m)))
 		ctx.Unhandled()
@@ -152,4 +166,37 @@ func (a *DirectStartAgent) queryWorkloads(m *actorproto.QueryWorkloads) (*actorp
 		ret.Workloads = append(ret.Workloads, workloadSummary)
 	}
 	return ret, nil
+}
+
+func (a *DirectStartAgent) SetLameDuck() error {
+	for _, c := range a.self.Children() {
+		err := c.Tell(context.Background(), c, &actorproto.KillDirectStartProcess{})
+		if err != nil {
+			return err
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			if len(a.self.Children()) == 0 {
+				err := a.self.Shutdown(ctx)
+				if err != nil {
+					a.logger.Error("Failed to shutdown direct start agent", slog.String("name", a.self.Name()), slog.Any("err", err))
+					return err
+				}
+				return nil
+			}
+		case <-ctx.Done():
+			a.logger.Error("Failed to stop all workloads", slog.String("name", a.self.Name()))
+			err := a.self.Shutdown(ctx)
+			if err != nil {
+				a.logger.Error("Failed to shutdown direct start agent", slog.String("name", a.self.Name()), slog.Any("err", err))
+			}
+			return errors.New("failed to stop all workloads in timelimit")
+		}
+	}
 }
