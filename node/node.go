@@ -247,7 +247,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
-		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn.auctionResponse, nn.pingResponse, nn.infoResponse, nn.Shutdown))
+		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn))
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	return nil
 }
 
-func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
+func (nn nexNode) Auction(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
 	if os != runtime.GOOS || arch != runtime.GOARCH {
 		nn.options.Logger.Debug("node did not satisfy auction os/arch requirements")
 		return nil, nil
@@ -319,7 +319,7 @@ func (nn nexNode) auctionResponse(os, arch string, agentType []string, tags map[
 	return resp, nil
 }
 
-func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
+func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 	st := timestamppb.New(nn.startedAt)
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
@@ -364,7 +364,7 @@ func (nn nexNode) pingResponse() (*actorproto.PingNodeResponse, error) {
 	return resp, nil
 }
 
-func (nn nexNode) infoResponse() (*actorproto.NodeInfo, error) {
+func (nn nexNode) GetInfo() (*actorproto.NodeInfo, error) {
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
 		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
@@ -407,7 +407,7 @@ func (nn nexNode) infoResponse() (*actorproto.NodeInfo, error) {
 	return resp, nil
 }
 
-func (nn nexNode) Shutdown(ctx context.Context) {
+func (nn nexNode) SetLameDuck(ctx context.Context) {
 	nn.options.Tags[models.TagLameDuck] = "true"
 
 	go func() {
