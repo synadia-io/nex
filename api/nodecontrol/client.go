@@ -224,7 +224,7 @@ func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *cl
 		e := new(cloudevents.Event)
 		err := json.Unmarshal(msg.Data, e)
 		if err != nil {
-			c.logger.Error("failed to unmarshal log message", slog.Any("err", err), slog.String("data", string(msg.Data)))
+			c.logger.Error("failed to unmarshal cloud event", slog.Any("err", err), slog.String("data", string(msg.Data)))
 			return
 		}
 		ret <- e
