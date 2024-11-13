@@ -77,7 +77,7 @@ func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 }
 
 func (a *ExternalAgent) RegisteredAgentReceive(ctx *goakt.ReceiveContext) {
-	switch ctx.Message().(type) {
+	switch msg := ctx.Message().(type) {
 	case *actorproto.QueryWorkloads:
 		a.queryWorkloads(ctx)
 	case *actorproto.StartWorkload:
