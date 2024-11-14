@@ -109,6 +109,14 @@ func (r StopWorkload) Table() []table.Row {
 	return []table.Row{}
 }
 
+func (e Events) Table() []table.Row {
+	return []table.Row{}
+}
+
+func (l Logs) Table() []table.Row {
+	return []table.Row{}
+}
+
 func (b BundleWorkload) Table() []table.Row {
 	return []table.Row{
 		{"Binary", b.Binary, reflect.TypeOf(b.Binary).String()},
