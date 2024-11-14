@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
 	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
@@ -185,4 +186,46 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponse
 	}
 
 	return &envelope.Data, nil
+}
+
+func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, error) {
+	subject := models.LOGS_SUBJECT
+	f_subject, err := subject.Filter(workloadId, level)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make(chan []byte)
+	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
+		ret <- msg.Data
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *cloudevents.Event, error) {
+	subject := models.EVENTS_SUBJECT
+	f_subject, err := subject.Filter(workloadId, eventType)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make(chan *cloudevents.Event)
+	_, err = c.nc.Subscribe(f_subject, func(msg *nats.Msg) {
+		e := new(cloudevents.Event)
+		err := json.Unmarshal(msg.Data, e)
+		if err != nil {
+			c.logger.Error("failed to unmarshal cloud event", slog.Any("err", err), slog.String("data", string(msg.Data)))
+			return
+		}
+		ret <- e
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
 }

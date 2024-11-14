@@ -226,7 +226,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(*nn.options, nn.options.Logger.WithGroup("direct_start")))
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, *nn.options, nn.options.Logger.WithGroup("direct_start")))
 		if err != nil {
 			return err
 		}
