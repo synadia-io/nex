@@ -119,7 +119,7 @@ func (l Logs) Table() []table.Row {
 
 func (b BundleWorkload) Table() []table.Row {
 	return []table.Row{
-		{"Binary", b.Binary, reflect.TypeOf(b.Binary).String()},
+		{"Binaries", b.Binaries, reflect.TypeOf(b.Binaries).String()},
 		{"Operating System", b.OS, reflect.TypeOf(b.OS).String()},
 		{"Architecture", b.Arch, reflect.TypeOf(b.Arch).String()},
 		{"Output Path", b.Output, reflect.TypeOf(b.Output).String()},

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.namespace_ping_response",
+  "title": "NamespacePingResponse",
+  "type": "object",
+  "additionalProperties": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "$ref": "./shared-machine-summary.json"
+    }
+  }
+}
