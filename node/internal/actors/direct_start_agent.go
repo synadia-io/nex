@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nuid"
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
@@ -24,13 +25,14 @@ const (
 	VERSION = "0.0.0"
 )
 
-func CreateDirectStartAgent(options models.NodeOptions, logger *slog.Logger) *DirectStartAgent {
-	return &DirectStartAgent{options: options, logger: logger}
+func CreateDirectStartAgent(nc *nats.Conn, options models.NodeOptions, logger *slog.Logger) *DirectStartAgent {
+	return &DirectStartAgent{nc: nc, options: options, logger: logger}
 }
 
 type DirectStartAgent struct {
 	self *goakt.PID
 
+	nc      *nats.Conn
 	options models.NodeOptions
 	logger  *slog.Logger
 }
@@ -117,7 +119,7 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 	}
 
 	workloadId := nuid.New().Next()
-	pa, err := createNewProcessActor(a.logger.WithGroup("workload"), workloadId, m, ref, env)
+	pa, err := createNewProcessActor(a.logger.WithGroup("workload"), a.nc, workloadId, m, ref, env)
 	if err != nil {
 		a.logger.Error("Failed to create process actor", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err
