@@ -24,9 +24,9 @@ type NexCLI struct {
 	Globals Globals `embed:"" group:"Global Options"`
 
 	Node     Node     `cmd:"" help:"Interact with execution engine nodes"`
-	Workload Workload `cmd:"" help:"Interact with workloads"`
+	Workload Workload `cmd:"" help:"Interact with workloads" aliases:"workloads"`
 	Monitor  Monitor  `cmd:"" help:"Live monitor workload log emissions"`
-	RootFS   RootFS   `cmd:"" name:"rootfs" help:"Build custom rootfs" alias:"fs"`
+	RootFS   RootFS   `cmd:"" name:"rootfs" help:"Build custom rootfs" aliases:"fs"`
 	Upgrade  Upgrade  `cmd:"" help:"Upgrade the NEX CLI to the latest version"`
 }
 
