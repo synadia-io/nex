@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -227,7 +228,7 @@ func cacheOciArtifact(name string, uri *uri) (*ArtifactReference, error) {
 	}
 
 	for _, layer := range manifest.Layers {
-		if layer.MediaType != "application/nex.artifact.binary" {
+		if !strings.HasPrefix(layer.ArtifactType, "application/nex.") {
 			continue
 		}
 

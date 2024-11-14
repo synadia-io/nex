@@ -20,6 +20,8 @@ func TestUriParser(t *testing.T) {
 		// tests with a tag
 		{"oci://synadia/foo:derp", SchemeOCI, "synadia", "foo", "derp"},
 		{"oci://synadia:8000/foo:derp", SchemeOCI, "synadia:8000", "foo", "derp"},
+		{"oci://url.io/repo/derp:latest", SchemeOCI, "url.io", "repo/derp", "latest"},
+		{"oci://url.io:10000/repo/derp:latest", SchemeOCI, "url.io:10000", "repo/derp", "latest"},
 		{"nats://myobject/foo:derp", SchemeNATS, "myobject", "foo", "derp"},
 	}
 

@@ -20,6 +20,7 @@ func parseUri(inUri string) (*uri, error) {
 	if len(sUri) != 2 {
 		return nil, fmt.Errorf("invalid uri: %s", inUri)
 	}
+
 	// oci
 	u.schema = sUri[0]
 
@@ -30,7 +31,7 @@ func parseUri(inUri string) (*uri, error) {
 	}
 
 	// split should be: [0]=domain:port [1]=repo:tag
-	sUriPath := strings.Split(sUri[1], "/")
+	sUriPath := strings.SplitN(sUri[1], "/", 2)
 	if len(sUriPath) != 2 {
 		return nil, fmt.Errorf("invalid uri: %s", inUri)
 	}
