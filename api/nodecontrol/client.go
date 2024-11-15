@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	DefaultRequestTimeout = 5 * time.Second
+	DefaultRequestTimeout = 60 * time.Second
 )
 
 type ControlAPIClient struct {
@@ -159,18 +159,18 @@ func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodeg
 }
 
 func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoResponseJson, error) {
-	msg, err := c.nc.Request(models.InfoRequestSubject(nodeId, namespace), nil, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.InfoRequestSubject(namespace, nodeId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := new(nodegen.NodeInfoResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
+	envelope := new(models.Envelope[nodegen.NodeInfoResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	return &envelope.Data, nil
 }
 
 func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponseJson, error) {
