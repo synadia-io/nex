@@ -70,7 +70,7 @@ func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJ
 			Id:           workload.Id,
 			Name:         workload.Name,
 			Runtime:      workload.Runtime,
-			StartTime:    workload.StartedAt.String(),
+			StartTime:    workload.StartedAt.AsTime().Format(time.DateTime),
 			WorkloadType: workload.WorkloadType,
 		})
 	}
