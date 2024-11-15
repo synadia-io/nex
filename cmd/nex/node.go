@@ -15,6 +15,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/nats-io/nkeys"
 
+	"github.com/nats-io/natscli/columns"
 	"github.com/synadia-io/nex/api/nodecontrol"
 	"github.com/synadia-io/nex/models"
 	options "github.com/synadia-io/nex/models"
@@ -265,7 +266,57 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 	if globals.Check {
 		return printTable("Node Info Configuration", append(globals.Table(), i.Table()...)...)
 	}
-	fmt.Println("run info")
+
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	if err != nil {
+		return err
+	}
+
+	resp, err := controller.GetInfo(i.NodeID, globals.Namespace)
+	if err != nil {
+		return err
+	}
+	if !i.JSON {
+
+		tags := make([]string, 0)
+		for k, v := range resp.Tags.Tags {
+			tags = append(tags, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		w := columns.New(fmt.Sprintf("Information about Node %s", resp.NodeId))
+		w.AddRow("Nexus", resp.Tags.Tags[models.TagNexus])
+		w.AddRow("Node Name", resp.Tags.Tags[models.TagNodeName])
+		w.AddRow("Tags", tags)
+		// w.AddRow("XKey", resp.TargetXkey) // This isnt implemented yet
+		w.AddRow("Uptime", resp.Uptime)
+		w.AddRow("Version", resp.Version)
+		details, err := w.Render()
+		if err != nil {
+			return err
+		}
+
+		tW := newTableWriter("Running Workloads")
+		tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Type"})
+		for _, wl := range resp.WorkloadSummaries {
+			tW.AppendRow(table.Row{wl.Id, wl.Name, wl.StartTime, wl.WorkloadType})
+		}
+
+		fmt.Println(details)
+		fmt.Println(tW.Render())
+		return nil
+	}
+
+	resp_b, err := json.Marshal(resp)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(resp_b))
 	return nil
 }
 

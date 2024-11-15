@@ -375,7 +375,9 @@ func (nn nexNode) GetInfo() (*actorproto.NodeInfo, error) {
 		return nil, err
 	}
 	resp := &actorproto.NodeInfo{
-		Id:      pk,
+		Id: pk,
+		//FINDME
+		//TargetXkey: nn.options.
 		Tags:    nn.options.Tags,
 		Uptime:  time.Since(nn.startedAt).String(),
 		Version: VERSION,
