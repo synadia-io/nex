@@ -301,9 +301,9 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		}
 
 		tW := newTableWriter("Running Workloads")
-		tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Type"})
+		tW.AppendHeader(table.Row{"Id", "Name", "Type", "Start Time", "Runtime"})
 		for _, wl := range resp.WorkloadSummaries {
-			tW.AppendRow(table.Row{wl.Id, wl.Name, wl.StartTime, wl.WorkloadType})
+			tW.AppendRow(table.Row{wl.Id, wl.Name, wl.WorkloadType, wl.StartTime, wl.Runtime})
 		}
 
 		fmt.Println(details)
