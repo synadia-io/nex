@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/nats-io/nats.go"
@@ -229,6 +230,10 @@ func cacheOciArtifact(name string, uri *uri) (*ArtifactReference, error) {
 
 	for _, layer := range manifest.Layers {
 		if !strings.HasPrefix(layer.ArtifactType, "application/nex.") {
+			continue
+		}
+
+		if layer.Annotations["os"] != runtime.GOOS && layer.Annotations["arch"] != runtime.GOARCH {
 			continue
 		}
 

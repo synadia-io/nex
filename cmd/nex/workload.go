@@ -4,6 +4,9 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"debug/elf"
+	"debug/macho"
+	"debug/pe"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -206,10 +209,10 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 }
 
 type BundleWorkload struct {
-	Binary string `description:"Binary to package"`
-	OS     string `description:"Operating system of the binary" enum:"linux,darwin" default:"linux"`
-	Arch   string `description:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
-	Output string `description:"Output file name" default:"./artifact.tar"`
+	Binaries []string `description:"Binary to package"`
+	OS       string   `description:"Operating system of the binary" enum:"linux,darwin" default:"linux"`
+	Arch     string   `description:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
+	Output   string   `description:"Output file name" default:"./artifact.tar"`
 
 	Push                bool   `description:"Push the workload to the registry"`
 	Registry            string `description:"Registry to push the workload to" default:"ghcr.io"`
@@ -241,41 +244,62 @@ func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
 		return printTable("Build Workload Configuration", append(globals.Table(), b.Table()...)...)
 	}
 
-	binFile, err := os.Open(b.Binary)
-	if err != nil {
-		return err
-	}
-
-	b_b, err := io.ReadAll(binFile)
-	if err != nil {
-		return err
-	}
-
-	detectWith := b_b
-	if len(b_b) >= 512 {
-		detectWith = b_b[:512]
-	}
-
-	fileDescriptor := v1.Descriptor{
-		MediaType:    http.DetectContentType(detectWith),
-		ArtifactType: NexOCIArtifactTypePrefix + b.WorkloadType,
-		Digest:       digest.FromBytes(b_b),
-		Size:         int64(len(b_b)),
-	}
-
+	layers := []v1.Descriptor{}
 	store := memory.New()
-	err = store.Push(ctx, fileDescriptor, bytes.NewBuffer(b_b))
-	if err != nil {
-		return err
-	}
 
-	err = store.Tag(ctx, fileDescriptor, string(digest.FromBytes(b_b)))
-	if err != nil {
-		return err
+	for _, bin := range b.Binaries {
+		binFile, err := os.Open(bin)
+		if err != nil {
+			return err
+		}
+		defer binFile.Close()
+
+		os, arch, err := getBinPair(bin)
+		if err != nil {
+			return err
+		}
+
+		_, err = binFile.Seek(0, 0)
+		if err != nil {
+			return err
+		}
+
+		b_b, err := io.ReadAll(binFile)
+		if err != nil {
+			return err
+		}
+
+		detectWith := b_b
+		if len(b_b) >= 512 {
+			detectWith = b_b[:512]
+		}
+
+		fileDescriptor := v1.Descriptor{
+			MediaType:    http.DetectContentType(detectWith),
+			ArtifactType: NexOCIArtifactTypePrefix + b.WorkloadType,
+			Digest:       digest.FromBytes(b_b),
+			Size:         int64(len(b_b)),
+			Annotations: map[string]string{
+				"os":   os,
+				"arch": arch,
+			},
+		}
+
+		err = store.Push(ctx, fileDescriptor, bytes.NewBuffer(b_b))
+		if err != nil {
+			return err
+		}
+
+		err = store.Tag(ctx, fileDescriptor, string(digest.FromBytes(b_b)))
+		if err != nil {
+			return err
+		}
+
+		layers = append(layers, fileDescriptor)
 	}
 
 	opts := oras.PackManifestOptions{
-		Layers: []v1.Descriptor{fileDescriptor},
+		Layers: layers,
 	}
 
 	manifestDescriptor, err := oras.PackManifest(ctx, store, oras.PackManifestVersion1_1, NexOCIManifestType, opts)
@@ -434,4 +458,80 @@ func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
 	}
 
 	return nil
+}
+
+func getBinPair(filePath string) (string, string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", "", err
+	}
+	defer file.Close()
+
+	// Check for ELF (Linux)
+	if elfFile, err := elf.NewFile(file); err == nil {
+		var arch string
+		switch elfFile.Machine {
+		case elf.EM_ARM:
+			arch = "arm"
+		case elf.EM_AARCH64:
+			arch = "arm64"
+		case elf.EM_386:
+			arch = "386"
+		case elf.EM_X86_64:
+			arch = "amd64"
+		default:
+			arch = "unknown"
+		}
+		return "linux", arch, nil
+	}
+
+	// Reset the file to the beginning for the next check
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Check for Mach-O (macOS)
+	if machoFile, err := macho.NewFile(file); err == nil {
+		var arch string
+		switch machoFile.Cpu {
+		case macho.Cpu386:
+			arch = "386"
+		case macho.CpuAmd64:
+			arch = "amd64"
+		case macho.CpuArm:
+			arch = "arm"
+		case macho.CpuArm64:
+			arch = "arm64"
+		default:
+			arch = "unknown"
+		}
+		return "darwin", arch, nil
+	}
+
+	// Reset the file to the beginning for the next check
+	_, err = file.Seek(0, 0)
+	if err != nil {
+		return "", "", err
+	}
+
+	// Check for PE (Windows)
+	if peFile, err := pe.NewFile(file); err == nil {
+		var arch string
+		switch peFile.Machine {
+		case pe.IMAGE_FILE_MACHINE_I386:
+			arch = "386"
+		case pe.IMAGE_FILE_MACHINE_AMD64:
+			arch = "amd64"
+		case pe.IMAGE_FILE_MACHINE_ARM:
+			arch = "arm"
+		case pe.IMAGE_FILE_MACHINE_ARM64:
+			arch = "arm64"
+		default:
+			arch = "unknown"
+		}
+		return "windows", arch, nil
+	}
+
+	return "", "", nil
 }
