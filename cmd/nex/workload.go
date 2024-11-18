@@ -24,7 +24,6 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/natscli/columns"
-	"github.com/nats-io/nkeys"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	oras "oras.land/oras-go/v2"
@@ -56,7 +55,8 @@ type NatsCreds struct {
 
 // Workload subcommands
 type RunWorkload struct {
-	NodeId string `description:"Node ID to run the workload on"`
+	NodeId   string            `description:"Node ID to run the workload on"`
+	NodeTags map[string]string `description:"Node tags to run the workload on; --node-id will take precedence"`
 
 	WorkloadName             string            `name:"name" description:"Name of the workload"`
 	WorkloadArguments        []string          `name:"argv" description:"Arguments to pass to the workload"`
@@ -80,10 +80,6 @@ func (RunWorkload) AfterApply(globals *Globals) error {
 func (r RunWorkload) Validate() error {
 	var errs error
 
-	if !nkeys.IsValidPublicServerKey(r.NodeId) {
-		errs = errors.Join(errs, errors.New("Node ID is not a valid public server key"))
-	}
-
 	if r.WorkloadUri == "" {
 		errs = errors.Join(errs, errors.New("Workload URI is required"))
 	}
@@ -105,6 +101,10 @@ func (r RunWorkload) Validate() error {
 func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) error {
 	if globals.Check {
 		return printTable("Run Workload Configuration", append(globals.Table(), r.Table()...)...)
+	}
+
+	if r.NodeTags == nil {
+		r.NodeTags = map[string]string{}
 	}
 
 	nc, err := configureNatsConnection(globals)
@@ -146,7 +146,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		WorkloadType:    r.WorkloadType,
 	}
 
-	resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
+	resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, r.NodeTags, startRequest)
 	if err != nil {
 		return err
 	}

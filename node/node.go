@@ -225,8 +225,13 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		return err
 	}
 
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		return err
+	}
+
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, *nn.options, nn.options.Logger.WithGroup("direct_start")))
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, pk, *nn.options, nn.options.Logger.WithGroup("direct_start")))
 		if err != nil {
 			return err
 		}
@@ -247,11 +252,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		}
 	}
 
-	pk, err := nn.publicKey.PublicKey()
-	if err != nil {
-		return err
-	}
-
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
 		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn))
 	if err != nil {
@@ -267,12 +267,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	return nil
 }
 
-func (nn nexNode) Auction(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
-	if os != runtime.GOOS || arch != runtime.GOARCH {
-		nn.options.Logger.Debug("node did not satisfy auction os/arch requirements")
-		return nil, nil
-	}
-
+func (nn nexNode) Auction(agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
 	st := timestamppb.New(nn.startedAt)
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
@@ -285,6 +280,7 @@ func (nn nexNode) Auction(os, arch string, agentType []string, tags map[string]s
 		Version:   VERSION,
 		StartedAt: st,
 		Tags:      nn.options.Tags,
+		Status:    make(map[string]int32),
 	}
 
 	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
@@ -307,8 +303,8 @@ func (nn nexNode) Auction(os, arch string, agentType []string, tags map[string]s
 	}
 
 	// Node must satisfy all agent types in auction request
-	for name, _ := range resp.Status {
-		if !slices.Contains(agentType, name) {
+	for _, aT := range agentType {
+		if _, ok := resp.Status[aT]; !ok {
 			nn.options.Logger.Debug("node did not satisfy auction agent type requirements")
 			return nil, nil
 		}

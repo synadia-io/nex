@@ -2,7 +2,9 @@ package nodecontrol
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"math/rand"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -27,24 +29,39 @@ func NewControlApiClient(nc *nats.Conn, logger *slog.Logger) (*ControlAPIClient,
 	}, nil
 }
 
-func (c *ControlAPIClient) Auction(tags []string) (*nodegen.AuctionResponseJson, error) {
-	req := nodegen.AuctionRequestJson{}
+func (c *ControlAPIClient) Auction(tags map[string]string) ([]*nodegen.AuctionResponseJson, error) {
+	resp := []*nodegen.AuctionResponseJson{}
+	auctionRespInbox := nats.NewInbox()
+
+	_, err := c.nc.Subscribe(auctionRespInbox, func(m *nats.Msg) {
+		envelope := new(models.Envelope[nodegen.AuctionResponseJson])
+		err := json.Unmarshal(m.Data, envelope)
+		if err != nil {
+			c.logger.Error("failed to unmarshal auction response", slog.Any("err", err), slog.String("data", string(m.Data)))
+			return
+		}
+		resp = append(resp, &envelope.Data)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req := nodegen.AuctionRequestJson{
+		Tags: &nodegen.AuctionRequestJsonTags{
+			Tags: tags,
+		},
+	}
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.AuctionSubject(), req_b, DefaultRequestTimeout)
+	err = c.nc.PublishRequest(models.AuctionSubject(), auctionRespInbox, req_b)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := new(nodegen.AuctionResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
-	if err != nil {
-		return nil, err
-	}
-
+	time.Sleep(5 * time.Second)
 	return resp, nil
 }
 
@@ -118,7 +135,19 @@ func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*n
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
+func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, nodeTags map[string]string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
+	if nodeId == "" {
+		auctionResponse, err := c.Auction(nodeTags)
+		if err != nil {
+			return nil, err
+		}
+		if len(auctionResponse) == 0 {
+			return nil, fmt.Errorf("No nodes available for deployment")
+		}
+
+		nodeId = auctionResponse[rand.Intn(len(auctionResponse))].NodeId
+	}
+
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err

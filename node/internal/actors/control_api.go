@@ -45,7 +45,7 @@ type ControlAPI struct {
 }
 
 type ControlAPINodeCallback interface {
-	Auction(string, string, []string, map[string]string) (*actorproto.AuctionResponse, error)
+	Auction([]string, map[string]string) (*actorproto.AuctionResponse, error)
 	Ping() (*actorproto.PingNodeResponse, error)
 	GetInfo() (*actorproto.NodeInfo, error)
 	SetLameDuck(context.Context)
@@ -198,7 +198,7 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 		convertedAgentType = append(convertedAgentType, string(at))
 	}
 
-	auctResp, err := api.nodeCallback.Auction(string(req.Os), string(req.Arch), convertedAgentType, req.Tags.Tags)
+	auctResp, err := api.nodeCallback.Auction(convertedAgentType, req.Tags.Tags)
 	if err != nil {
 		api.logger.Error("Failed to generate auction response", slog.Any("error", err))
 		models.RespondEnvelope(m, AuctionResponseType, 500, "", fmt.Sprintf("failed to generate auction response: %s", err))

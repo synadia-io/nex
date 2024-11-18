@@ -4,23 +4,6 @@
   "title": "AuctionRequest",
   "type": "object",
   "properties": {
-    "arch": {
-      "type": "string",
-      "description": "Specify a required architecture for the auction",
-      "enum": [
-        "amd64",
-        "arm64"
-      ]
-    },
-    "os": {
-      "type": "string",
-      "description": "Specify a required operating system for the auction",
-      "enum": [
-        "linux",
-        "darwin",
-        "windows"
-      ]
-    },
     "tags": {
       "type": "object",
       "description": "A list of tags to associate with the node during auction. To be returned, node must satisfy ALL tags",
