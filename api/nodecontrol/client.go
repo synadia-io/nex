@@ -146,6 +146,7 @@ func (c *ControlAPIClient) AuctionDeployWorkload(namespace string, nodeTags map[
 	}
 
 	nodeIdx := rand.IntN(len(auctionResults))
+	// This "NodeID" is acutally the BidderID
 	node := auctionResults[nodeIdx].NodeId
 
 	req_b, err := json.Marshal(req)
