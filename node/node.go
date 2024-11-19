@@ -13,6 +13,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nuid"
 	"github.com/splode/fname"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -41,6 +42,8 @@ type nexNode struct {
 	publicKey   nkeys.KeyPair
 	startedAt   time.Time
 	actorSystem goakt.ActorSystem
+
+	auctionBidId string
 }
 
 func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
@@ -55,9 +58,10 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		ctx:       context.Background(),
-		nc:        nc,
-		publicKey: serverKey,
+		ctx:          context.Background(),
+		nc:           nc,
+		publicKey:    serverKey,
+		auctionBidId: "",
 
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
@@ -267,24 +271,18 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	return nil
 }
 
-func (nn nexNode) Auction(agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
-	lameduck, ok := nn.options.Tags[models.TagLameDuck]
-	if ok && lameduck == "true" {
-		nn.options.Logger.Debug("node is in lame duck mode")
+func (nn *nexNode) Auction(agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
+	if lameduck, ok := nn.options.Tags[models.TagLameDuck]; ok && lameduck == "true" {
+		nn.options.Logger.Debug("node is in lame duck mode; not participating in auction")
 		return nil, nil
 	}
 
-	st := timestamppb.New(nn.startedAt)
-	pk, err := nn.publicKey.PublicKey()
-	if err != nil {
-		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
-		return nil, err
-	}
-
+	// Gets new auction id & replace nodeid
+	nn.auctionBidId = nuid.New().Next()
 	resp := &actorproto.AuctionResponse{
-		NodeId:    pk,
+		NodeId:    nn.auctionBidId,
 		Version:   VERSION,
-		StartedAt: st,
+		StartedAt: timestamppb.New(nn.startedAt),
 		Tags:      nn.options.Tags,
 		Status:    make(map[string]int32),
 	}
@@ -424,4 +422,15 @@ func (nn nexNode) SetLameDuck(ctx context.Context) {
 		<-ctx.Done()
 		nn.interrupt <- os.Interrupt
 	}()
+}
+
+func (nn nexNode) IsTargetNode(inId string) (bool, error) {
+	pub, err := nn.publicKey.PublicKey()
+	if err != nil {
+		return false, err
+	}
+	if inId == pub || inId == nn.auctionBidId {
+		return true, nil
+	}
+	return false, nil
 }

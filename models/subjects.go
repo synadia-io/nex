@@ -40,6 +40,10 @@ func DeployRequestSubject(inNS, inNodeId string) string {
 	return fmt.Sprintf(APIPrefix+".DEPLOY.%s.%s", inNS, inNodeId)
 }
 
+func AuctionDeployRequestSubject(inNS, inBidId string) string {
+	return fmt.Sprintf(APIPrefix+".ADEPLOY.%s.%s", inNS, inBidId)
+}
+
 func UndeployRequestSubject(inNodeId string) string {
 	return fmt.Sprintf(APIPrefix+".UNDEPLOY.*.%s", inNodeId)
 }

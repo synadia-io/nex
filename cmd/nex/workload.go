@@ -146,15 +146,27 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		WorkloadType:    r.WorkloadType,
 	}
 
-	resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, r.NodeTags, startRequest)
-	if err != nil {
-		return err
+	var resp *gen.StartWorkloadResponseJson
+	if r.NodeId != "" {
+		resp, err = controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
+		if err != nil {
+			return err
+		}
+	} else {
+		resp, err = controller.AuctionDeployWorkload(globals.Namespace, r.NodeTags, startRequest)
+		if err != nil {
+			return err
+		}
 	}
 
 	if resp.Started {
-		fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+		if r.NodeId != "" {
+			fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+		} else {
+			fmt.Printf("Workload %s [%s] started\n", r.WorkloadName, resp.Id)
+		}
 	} else {
-		fmt.Printf("Workload %s failed to start on node %s\n", r.WorkloadName, r.NodeId)
+		fmt.Printf("Workload %s failed to start\n", r.WorkloadName)
 	}
 
 	return nil

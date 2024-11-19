@@ -49,6 +49,7 @@ type ControlAPINodeCallback interface {
 	Ping() (*actorproto.PingNodeResponse, error)
 	GetInfo() (*actorproto.NodeInfo, error)
 	SetLameDuck(context.Context)
+	IsTargetNode(string) (bool, error)
 }
 
 func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, callback ControlAPINodeCallback) *ControlAPI {
@@ -138,6 +139,13 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
+	sub, err = api.nc.Subscribe(AuctionDeploySubscribeSubject(), api.handleADeploy)
+	if err != nil {
+		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
+	}
+	api.subsz = append(api.subsz, sub)
+
 	sub, err = api.nc.Subscribe(InfoSubscribeSubject(api.publicKey), api.handleInfo)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
@@ -210,6 +218,55 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	}
 
 	models.RespondEnvelope(m, AuctionResponseType, 200, auctionResponseFromProto(auctResp), "")
+}
+
+func (api *ControlAPI) handleADeploy(m *nats.Msg) {
+	// $NEX.ADEPLOY.default.OdXiuMFTfXp1njwcArUzD2
+	splitSub := strings.SplitN(m.Subject, ".", 4)
+
+	req := new(nodecontrol.StartWorkloadRequestJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal deploy request: %s", err))
+		return
+	}
+
+	target, err := api.nodeCallback.IsTargetNode(splitSub[3])
+	if err != nil {
+		api.logger.Error("Failed to check if target node", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to check if target node: %s", err))
+		return
+	}
+
+	if !target {
+		return
+	}
+
+	ctx := context.Background()
+	_, agent, err := api.self.ActorSystem().ActorOf(ctx, req.WorkloadType)
+	if err != nil {
+		api.logger.Error("Failed to locate agent actor", slog.String("type", req.WorkloadType), slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to locate [%s] agent actor: %s", req.WorkloadType, err))
+		return
+	}
+
+	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req))
+	if err != nil {
+		api.logger.Error("Failed to start workload", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("Failed to start workload: %s", err))
+		return
+	}
+
+	protoResp, ok := askResp.(*actorproto.WorkloadStarted)
+	if !ok {
+		api.logger.Error("Start workload response from agent was not the correct type")
+		models.RespondEnvelope(m, RunResponseType, 500, "", "Agent returned the wrong data type")
+		return
+	}
+
+	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(protoResp), "")
+
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {

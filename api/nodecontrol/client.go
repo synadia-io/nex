@@ -2,9 +2,8 @@ package nodecontrol
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
-	"math/rand"
+	"math/rand/v2"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -135,19 +134,40 @@ func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*n
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, nodeTags map[string]string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
-	if nodeId == "" {
-		auctionResponse, err := c.Auction(nodeTags)
-		if err != nil {
-			return nil, err
-		}
-		if len(auctionResponse) == 0 {
-			return nil, fmt.Errorf("No nodes available for deployment")
-		}
-
-		nodeId = auctionResponse[rand.Intn(len(auctionResponse))].NodeId
+func (c *ControlAPIClient) AuctionDeployWorkload(namespace string, nodeTags map[string]string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
+	auctionResults, err := c.Auction(nodeTags)
+	if err != nil {
+		return nil, err
 	}
 
+	if len(auctionResults) == 0 {
+		c.logger.Info("no nodes available for deployment")
+		return nil, nil
+	}
+
+	nodeIdx := rand.IntN(len(auctionResults))
+	node := auctionResults[nodeIdx].NodeId
+
+	req_b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, node), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope := new(models.Envelope[nodegen.StartWorkloadResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
+	if err != nil {
+		return nil, err
+	}
+
+	return &envelope.Data, nil
+}
+
+func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
