@@ -268,6 +268,12 @@ func (nn *nexNode) initializeSupervisionTree() error {
 }
 
 func (nn nexNode) Auction(agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
+	lameduck, ok := nn.options.Tags[models.TagLameDuck]
+	if ok && lameduck == "true" {
+		nn.options.Logger.Debug("node is in lame duck mode")
+		return nil, nil
+	}
+
 	st := timestamppb.New(nn.startedAt)
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
