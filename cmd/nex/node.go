@@ -105,6 +105,7 @@ type LameDuck struct {
 	NodeID string `optional:"" help:"Node ID to command into lame duck mode" placeholder:"NBTAFHAKW..."`
 	// TODO: implement label filtering - option hidden for now
 	Label map[string]string `optional:"" help:"Put all nodes with label in lameduck.  Only 1 label allowed" placeholder:"nex.nexus=mynexus" hidden:""`
+	Delay time.Duration     `optional:"" help:"Delay in seconds to wait before stopping workloads.  Allows for user to migrate workloads" default:"0s"`
 }
 
 func (LameDuck) AfterApply(globals *Globals) error {
@@ -143,7 +144,7 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	resp, err := controller.SetLameDuck(l.NodeID)
+	resp, err := controller.SetLameDuck(l.NodeID, l.Delay)
 	if err != nil {
 		return err
 	}
@@ -152,7 +153,11 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 		return fmt.Errorf("failed to put node in lameduck mode")
 	}
 
-	fmt.Printf("Node %s is now in lameduck mode. Workloads will begin stopping gracefully.\n", l.NodeID)
+	if l.Delay == time.Second*0 {
+		fmt.Printf("Node %s is now in lameduck mode. Workloads will begin stopping gracefully.\n", l.NodeID)
+	} else {
+		fmt.Printf("Node %s is now in lameduck mode. Workloads will begin stopping gracefully in %s.\n", l.NodeID, l.Delay.String())
+	}
 	return nil
 }
 

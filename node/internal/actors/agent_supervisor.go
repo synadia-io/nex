@@ -47,7 +47,7 @@ func (s *AgentSupervisor) Receive(ctx *goakt.ReceiveContext) {
 		s.queryWorkloads(ctx)
 	case *actorproto.SetLameDuck:
 		s.logger.Debug("Received set lame duck message")
-		ctx.Response(s.setLameDuck(ctx))
+		s.setLameDuck(ctx)
 	case *goaktpb.Terminated:
 		s.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
@@ -73,22 +73,21 @@ func (s *AgentSupervisor) queryWorkloads(ctx *goakt.ReceiveContext) {
 	ctx.Response(&actorproto.WorkloadList{Workloads: workloads})
 }
 
-func (s *AgentSupervisor) setLameDuck(ctx *goakt.ReceiveContext) *actorproto.LameDuckResponse {
+func (s *AgentSupervisor) setLameDuck(ctx *goakt.ReceiveContext) {
 	for _, pid := range ctx.Self().Children() {
 		r, err := ctx.Self().Ask(context.Background(), pid, &actorproto.SetLameDuck{})
 		if err != nil {
 			s.logger.Error("Child actor failed to set lame duck", slog.Any("err", err), slog.String("parent", ctx.Self().ID()), slog.String("child", pid.ID()))
-			return &actorproto.LameDuckResponse{Success: false}
+			return
 		}
 		resp, ok := r.(*actorproto.LameDuckResponse)
 		if !ok {
 			s.logger.Warn("Unexpected response from agent")
-			return &actorproto.LameDuckResponse{Success: false}
+			return
 		}
 		if !resp.Success {
 			s.logger.Error("Child workload failed to shutdown", slog.String("child", pid.ID()), slog.Any("err", err))
-			return &actorproto.LameDuckResponse{Success: false}
+			return
 		}
 	}
-	return &actorproto.LameDuckResponse{Success: true}
 }

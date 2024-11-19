@@ -173,8 +173,17 @@ func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoR
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) SetLameDuck(nodeId string) (*nodegen.LameduckResponseJson, error) {
-	msg, err := c.nc.Request(models.LameduckSubject(nodeId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nodegen.LameduckResponseJson, error) {
+	req := nodegen.LameduckRequestJson{
+		Delay: delay.String(),
+	}
+
+	req_b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := c.nc.Request(models.LameduckSubject(nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

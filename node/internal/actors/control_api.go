@@ -292,41 +292,51 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
-	// Set a timeout for the lame duck request of 1 minute
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
+	api.logger.Debug("Received lame duck request")
 
+	req := new(nodecontrol.LameduckRequestJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal lame duck request", slog.Any("error", err))
+		models.RespondEnvelope(m, LameDuckResponseType, 500, "", fmt.Sprintf("failed to unmarshal lame duck request: %s", err))
+		return
+	}
+
+	delay, err := time.ParseDuration(req.Delay)
+	if err != nil {
+		api.logger.Error("Failed to parse lame duck delay", slog.Any("error", err))
+		models.RespondEnvelope(m, LameDuckResponseType, 500, "", fmt.Sprintf("failed to parse lame duck delay: %s", err))
+		return
+	}
+
+	// adds 30 seconds to the delay to allow workloads to shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), delay+30*time.Second)
 	api.nodeCallback.SetLameDuck(ctx)
+	go func() {
+		api.logger.Warn("Lameduck mode enabled. Will start shutting down workloads.", slog.String("workload_shutdown", time.Now().Add(delay).Format(time.DateTime)))
+		time.Sleep(delay)
+		_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+		if err != nil {
+			api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+			return
+		}
 
-	api.logger.Info("Received lame duck request")
-	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
-	if err != nil {
-		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
-		models.RespondEnvelope(m, LameDuckResponseType, 500, "", fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
-		return
-	}
+		err = api.self.Tell(ctx, agentSuper, &actorproto.SetLameDuck{})
+		if err != nil {
+			api.logger.Error("Failed to put node in lame duck mode", slog.Any("error", err))
+			return
+		}
 
-	response, err := api.self.Ask(ctx, agentSuper, new(actorproto.SetLameDuck))
-	if err != nil {
-		api.logger.Error("Failed to put node in lame duck mode", slog.Any("error", err))
-		models.RespondEnvelope(m, InfoResponseType, 500, "", fmt.Sprintf("Failed to put node in lame duck mode: %s", err))
-		return
-	}
+		ticker := time.NewTicker(100 * time.Millisecond)
+		for _ = range ticker.C {
+			if agentSuper.ChildrenCount() == 0 {
+				cancel()
+			}
+		}
 
-	workloadResponse, ok := response.(*actorproto.LameDuckResponse)
-	if !ok {
-		api.logger.Error("LameDuck response from agent supervisor was not the correct type")
-		models.RespondEnvelope(m, LameDuckResponseType, 500, "", "LameDuck response from agent supervisor was not the correct type")
-		return
-	}
+	}()
 
-	if !workloadResponse.Success {
-		api.logger.Error("Failed to put node in lame duck mode")
-		models.RespondEnvelope(m, LameDuckResponseType, 500, "", "Failed to put node in lame duck mode")
-		return
-	}
-
-	models.RespondEnvelope(m, LameDuckResponseType, 200, lameDuckResponseFromProto(workloadResponse), "")
+	models.RespondEnvelope(m, LameDuckResponseType, 200, &nodecontrol.LameduckResponseJson{Success: true}, "")
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {
