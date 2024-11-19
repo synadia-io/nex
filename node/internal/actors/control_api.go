@@ -330,10 +330,11 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		ticker := time.NewTicker(100 * time.Millisecond)
 		for _ = range ticker.C {
 			if agentSuper.ChildrenCount() == 0 {
+				ticker.Stop()
 				cancel()
+				break
 			}
 		}
-
 	}()
 
 	models.RespondEnvelope(m, LameDuckResponseType, 200, &nodecontrol.LameduckResponseJson{Success: true}, "")
