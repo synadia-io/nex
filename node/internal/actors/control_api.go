@@ -182,7 +182,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(WorkloadPingSubscribeSubject(), api.handleAgentPing)
+	sub, err = api.nc.Subscribe(WorkloadPingSubscribeSubject(), api.handleWorkloadPing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -409,65 +409,35 @@ func (api *ControlAPI) handlePing(m *nats.Msg) {
 	models.RespondEnvelope(m, PingResponseType, 200, pingResponseFromProto(pingResponse), "")
 }
 
-func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
+func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 	ctx := context.Background()
 
-	splitSub := strings.Split(m.Subject, ".")
+	splitSub := strings.SplitN(m.Subject, ".", 6)
 	var workloadType, namespace, workloadID string
 
-	switch len(splitSub) {
-	case 4: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_TYPE>
-		namespace = splitSub[2]
-		workloadType = splitSub[3]
+	// PREFIX.control.<NAMESPACE>.WPING.<WORKLOAD_TYPE>.<WORKLOAD_ID>
+	namespace = splitSub[2]
+	workloadType = splitSub[4]
+	workloadID = splitSub[5]
 
-		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
-		if err != nil {
-			return
-		}
-
-		response, err := api.self.Ask(ctx, agent, &actorproto.PingAgent{
-			Type:      workloadType,
-			Namespace: namespace,
-		})
-		if err != nil {
-			return
-		}
-
-		aPingResponse, ok := response.(*actorproto.PingAgentResponse)
-		if !ok {
-			return
-		}
-
-		models.RespondEnvelope(m, AgentPingResponseType, 200, agentPingResponseFromProto(aPingResponse), "")
-	case 5: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_TYPE>.<WORKLOAD_ID>
-		namespace = splitSub[2]
-		workloadType = splitSub[3]
-		workloadID = splitSub[4]
-
-		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
-		if err != nil {
-			return
-		}
-
-		response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
-			Type:       workloadType,
-			Namespace:  namespace,
-			WorkloadId: workloadID,
-		})
-		if err != nil {
-			return
-		}
-
-		aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
-		if !ok {
-			return
-		}
-
-		models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
-
-	default:
-		api.logger.Error("Received a request on a bad APING subject", slog.Any("subjet", m.Subject))
-		models.RespondEnvelope(m, AgentPingResponseType, 500, "", "Received a request on a bad APING subject")
+	_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
+	if err != nil {
 		return
 	}
+
+	response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
+		Type:       workloadType,
+		Namespace:  namespace,
+		WorkloadId: workloadID,
+	})
+	if err != nil {
+		return
+	}
+
+	aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
+	if !ok {
+		return
+	}
+
+	models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
 }

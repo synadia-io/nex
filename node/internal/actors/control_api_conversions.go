@@ -21,6 +21,7 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 			NatsUserJwt:  request.HostServiceConfig.NatsUserJwt,
 		},
 		Jsdomain:        request.Jsdomain,
+		Namespace:       request.Namespace,
 		RetryCount:      int32(request.RetryCount),
 		TriggerSubjects: request.TriggerSubjects,
 		Uri:             request.Uri,

@@ -94,7 +94,8 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		})
 	case *actorproto.PingWorkload:
 		a.logger.Debug("PingWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId))
-		resp, err := a.pingWorkload(m.WorkloadId)
+		fmt.Printf("%#v\n", m)
+		resp, err := a.pingWorkload(m.Namespace, m.WorkloadId)
 		if err != nil {
 			// Pings dont respond negatively...they just dont respond
 			return
@@ -113,7 +114,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		for _, w := range workloads.Workloads {
 			runningWorkloads = append(runningWorkloads, &actorproto.RunningWorkload{
 				Id:        w.Id,
-				Namespace: "", // TODO: this is missing
+				Namespace: w.Namespace,
 				Name:      w.Name,
 			})
 		}
@@ -133,7 +134,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 	}
 }
 
-func (a DirectStartAgent) pingWorkload(workloadId string) (*actorproto.PingWorkloadResponse, error) {
+func (a DirectStartAgent) pingWorkload(namespace, workloadId string) (*actorproto.PingWorkloadResponse, error) {
 	wl, err := a.self.Child(workloadId)
 	if err != nil {
 		return nil, err
@@ -149,6 +150,12 @@ func (a DirectStartAgent) pingWorkload(workloadId string) (*actorproto.PingWorkl
 		a.logger.Log(context.Background(), shandler.LevelTrace, "query workload unexpected response type", slog.String("name", a.self.Name()), slog.String("workload", wl.Name()))
 		return nil, err
 	}
+
+	if namespace != workloadSummary.Namespace {
+		a.logger.Warn("ping workload namespace mismatch", slog.String("name", a.self.Name()), slog.String("workload", workloadId), slog.String("request_namespace", namespace), slog.String("actual_namespace", workloadSummary.Namespace))
+		return nil, errors.New("namespace mismatch")
+	}
+
 	return &actorproto.PingWorkloadResponse{
 		Workload: workloadSummary,
 	}, nil
@@ -177,6 +184,7 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 		return nil, err
 	}
 
+	fmt.Println("********", m.Namespace)
 	workloadId := nuid.New().Next()
 	pa, err := createNewProcessActor(
 		a.logger.WithGroup("workload"),

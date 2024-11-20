@@ -138,6 +138,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			NatsUserSeed: r.WorkloadHostServiceCreds.NatsUserSeed,
 		},
 		Jsdomain:        r.WorkloadJsDomain,
+		Namespace:       globals.Namespace,
 		RetryCount:      r.WorkloadRetryCount,
 		SenderPublicKey: r.WorkloadPublicKey,
 		TriggerSubjects: r.WorkloadTriggerSubjects,
