@@ -86,7 +86,7 @@ func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.Auction
 
 	return &api.AuctionResponseJson{
 		Nexus:      response.Nexus,
-		NodeId:     response.NodeId,
+		BidderId:   response.BidderId,
 		Status:     gen.AuctionResponseJsonStatus{Status: convertedStatus},
 		Tags:       api.AuctionResponseJsonTags{Tags: response.Tags},
 		TargetXkey: response.TargetXkey,

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"disorder.dev/shandler"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	goakt "github.com/tochemey/goakt/v2/actors"
@@ -45,7 +46,7 @@ type ControlAPI struct {
 }
 
 type ControlAPINodeCallback interface {
-	Auction([]string, map[string]string) (*actorproto.AuctionResponse, error)
+	Auction(string, []string, map[string]string) (*actorproto.AuctionResponse, error)
 	Ping() (*actorproto.PingNodeResponse, error)
 	GetInfo() (*actorproto.NodeInfo, error)
 	SetLameDuck(context.Context)
@@ -196,8 +197,7 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	req := new(nodecontrol.AuctionRequestJson)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
-		api.logger.Error("Failed to unmarshal auction request", slog.Any("error", err))
-		models.RespondEnvelope(m, AuctionResponseType, 500, "", fmt.Sprintf("failed to unmarshal auction request: %s", err))
+		api.logger.Log(context.Background(), shandler.LevelTrace, "Failed to unmarshal auction request", slog.Any("error", err))
 		return
 	}
 
@@ -206,14 +206,14 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 		convertedAgentType = append(convertedAgentType, string(at))
 	}
 
-	auctResp, err := api.nodeCallback.Auction(convertedAgentType, req.Tags.Tags)
+	auctResp, err := api.nodeCallback.Auction(req.AuctionId, convertedAgentType, req.Tags.Tags)
 	if err != nil {
-		api.logger.Error("Failed to generate auction response", slog.Any("error", err))
-		models.RespondEnvelope(m, AuctionResponseType, 500, "", fmt.Sprintf("failed to generate auction response: %s", err))
+		api.logger.Log(context.Background(), shandler.LevelTrace, "Failed to generate auction response", slog.Any("error", err))
 		return
 	}
 
 	if auctResp == nil {
+		api.logger.Log(context.Background(), shandler.LevelTrace, "No auction response generated")
 		return
 	}
 
@@ -232,6 +232,7 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
+	// splitSub[3] is the bidderId
 	target, err := api.nodeCallback.IsTargetNode(splitSub[3])
 	if err != nil {
 		api.logger.Error("Failed to check if target node", slog.Any("error", err))

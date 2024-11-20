@@ -8,6 +8,7 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nuid"
 	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
 )
@@ -46,7 +47,8 @@ func (c *ControlAPIClient) Auction(tags map[string]string) ([]*nodegen.AuctionRe
 	}
 
 	req := nodegen.AuctionRequestJson{
-		Tags: &nodegen.AuctionRequestJsonTags{
+		AuctionId: nuid.New().Next(),
+		Tags: nodegen.AuctionRequestJsonTags{
 			Tags: tags,
 		},
 	}
@@ -145,16 +147,15 @@ func (c *ControlAPIClient) AuctionDeployWorkload(namespace string, nodeTags map[
 		return nil, nil
 	}
 
-	nodeIdx := rand.IntN(len(auctionResults))
-	// This "NodeID" is acutally the BidderID
-	node := auctionResults[nodeIdx].NodeId
+	nodeX := rand.IntN(len(auctionResults))
+	bidderId := auctionResults[nodeX].BidderId
 
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, node), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, bidderId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

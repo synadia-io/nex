@@ -2,13 +2,19 @@
 
 package gen
 
+import "encoding/json"
+import "fmt"
+
 type AuctionRequestJson struct {
 	// The type of agent to auction for
 	AgentType []NexWorkload `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
 
+	// A unique identifier for the auction
+	AuctionId string `json:"auction_id" yaml:"auction_id" mapstructure:"auction_id"`
+
 	// A list of tags to associate with the node during auction. To be returned, node
 	// must satisfy ALL tags
-	Tags *AuctionRequestJsonTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags AuctionRequestJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
 }
 
 // A list of tags to associate with the node during auction. To be returned, node
@@ -19,5 +25,26 @@ type AuctionRequestJsonTags struct {
 }
 
 type AuctionRequestJsonTagsTags map[string]string
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AuctionRequestJson) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["auction_id"]; raw != nil && !ok {
+		return fmt.Errorf("field auction_id in AuctionRequestJson: required")
+	}
+	if _, ok := raw["tags"]; raw != nil && !ok {
+		return fmt.Errorf("field tags in AuctionRequestJson: required")
+	}
+	type Plain AuctionRequestJson
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = AuctionRequestJson(plain)
+	return nil
+}
 
 type NexWorkload string

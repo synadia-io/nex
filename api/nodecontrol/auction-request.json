@@ -4,6 +4,10 @@
   "title": "AuctionRequest",
   "type": "object",
   "properties": {
+    "auction_id": {
+      "type": "string",
+      "description": "A unique identifier for the auction"
+    },
     "tags": {
       "type": "object",
       "description": "A list of tags to associate with the node during auction. To be returned, node must satisfy ALL tags",
@@ -24,7 +28,7 @@
       }
     }
   },
-  "required": ["arch", "os"],
+  "required": ["auction_id", "tags"],
   "definitions": {
     "NexWorkload": {
       "type": "string"

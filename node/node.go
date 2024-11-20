@@ -271,17 +271,18 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	return nil
 }
 
-func (nn *nexNode) Auction(agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
+func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
 	if lameduck, ok := nn.options.Tags[models.TagLameDuck]; ok && lameduck == "true" {
 		nn.options.Logger.Debug("node is in lame duck mode; not participating in auction")
 		return nil, nil
 	}
 
 	// Gets new auction id & replace nodeid
-	auctionBidId := nuid.New().Next()
-	nn.auctionMap.Put(auctionBidId, "")
+	bidderId := nuid.New().Next()
+	nn.auctionMap.Put(bidderId, auctionId)
+
 	resp := &actorproto.AuctionResponse{
-		NodeId:    auctionBidId,
+		BidderId:  bidderId,
 		Version:   VERSION,
 		StartedAt: timestamppb.New(nn.startedAt),
 		Tags:      nn.options.Tags,
@@ -430,7 +431,12 @@ func (nn nexNode) IsTargetNode(inId string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if inId == pub || nn.auctionMap.Exists(inId) {
+	if inId == pub {
+		return true, nil
+	}
+	if nn.auctionMap.Exists(inId) {
+		auctionId := nn.auctionMap.Get(inId)
+		nn.options.Logger.Debug("Accepting auction", slog.String("auctionId", auctionId))
 		nn.auctionMap.Delete(inId)
 		return true, nil
 	}
