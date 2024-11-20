@@ -134,3 +134,10 @@ func (b BundleWorkload) Table() []table.Row {
 		{"Workload Type", b.WorkloadType, reflect.TypeOf(b.WorkloadType).String()},
 	}
 }
+
+func (i InfoWorkload) Table() []table.Row {
+	return []table.Row{
+		{"Workload ID", i.WorkloadId, reflect.TypeOf(i.WorkloadId).String()},
+		{"Workload Type", i.WorkloadType, reflect.TypeOf(i.WorkloadType).String()},
+	}
+}
