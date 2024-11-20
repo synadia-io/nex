@@ -3,10 +3,12 @@ package nodecontrol
 import (
 	"encoding/json"
 	"log/slog"
+	"math/rand/v2"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nuid"
 	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
 )
@@ -27,24 +29,40 @@ func NewControlApiClient(nc *nats.Conn, logger *slog.Logger) (*ControlAPIClient,
 	}, nil
 }
 
-func (c *ControlAPIClient) Auction(tags []string) (*nodegen.AuctionResponseJson, error) {
-	req := nodegen.AuctionRequestJson{}
+func (c *ControlAPIClient) Auction(tags map[string]string) ([]*nodegen.AuctionResponseJson, error) {
+	resp := []*nodegen.AuctionResponseJson{}
+	auctionRespInbox := nats.NewInbox()
+
+	_, err := c.nc.Subscribe(auctionRespInbox, func(m *nats.Msg) {
+		envelope := new(models.Envelope[nodegen.AuctionResponseJson])
+		err := json.Unmarshal(m.Data, envelope)
+		if err != nil {
+			c.logger.Error("failed to unmarshal auction response", slog.Any("err", err), slog.String("data", string(m.Data)))
+			return
+		}
+		resp = append(resp, &envelope.Data)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req := nodegen.AuctionRequestJson{
+		AuctionId: nuid.New().Next(),
+		Tags: nodegen.AuctionRequestJsonTags{
+			Tags: tags,
+		},
+	}
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.AuctionSubject(), req_b, DefaultRequestTimeout)
+	err = c.nc.PublishRequest(models.AuctionSubject(), auctionRespInbox, req_b)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := new(nodegen.AuctionResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
-	if err != nil {
-		return nil, err
-	}
-
+	time.Sleep(5 * time.Second)
 	return resp, nil
 }
 
@@ -110,6 +128,39 @@ func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*n
 	}
 
 	envelope := new(models.Envelope[nodegen.WorkloadPingResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
+	if err != nil {
+		return nil, err
+	}
+
+	return &envelope.Data, nil
+}
+
+func (c *ControlAPIClient) AuctionDeployWorkload(namespace string, nodeTags map[string]string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
+	auctionResults, err := c.Auction(nodeTags)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(auctionResults) == 0 {
+		c.logger.Info("no nodes available for deployment")
+		return nil, nil
+	}
+
+	nodeX := rand.IntN(len(auctionResults))
+	bidderId := auctionResults[nodeX].BidderId
+
+	req_b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, bidderId), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope := new(models.Envelope[nodegen.StartWorkloadResponseJson])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err

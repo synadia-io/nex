@@ -64,17 +64,11 @@ type StartWorkloadRequestJson struct {
 	// The NATS JSDomain for the workload
 	Jsdomain string `json:"jsdomain" yaml:"jsdomain" mapstructure:"jsdomain"`
 
-	// The time at which the workload was last retried
-	RetriedAt string `json:"retried_at" yaml:"retried_at" mapstructure:"retried_at"`
-
 	// The number of times the workload has been retried
 	RetryCount int `json:"retry_count" yaml:"retry_count" mapstructure:"retry_count"`
 
 	// The public key of the sender
 	SenderPublicKey string `json:"sender_public_key" yaml:"sender_public_key" mapstructure:"sender_public_key"`
-
-	// The target node for the workload
-	TargetNode string `json:"target_node" yaml:"target_node" mapstructure:"target_node"`
 
 	// The subjects that trigger the workload
 	TriggerSubjects []string `json:"trigger_subjects" yaml:"trigger_subjects" mapstructure:"trigger_subjects"`
@@ -119,17 +113,11 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	if _, ok := raw["jsdomain"]; raw != nil && !ok {
 		return fmt.Errorf("field jsdomain in StartWorkloadRequestJson: required")
 	}
-	if _, ok := raw["retried_at"]; raw != nil && !ok {
-		return fmt.Errorf("field retried_at in StartWorkloadRequestJson: required")
-	}
 	if _, ok := raw["retry_count"]; raw != nil && !ok {
 		return fmt.Errorf("field retry_count in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["sender_public_key"]; raw != nil && !ok {
 		return fmt.Errorf("field sender_public_key in StartWorkloadRequestJson: required")
-	}
-	if _, ok := raw["target_node"]; raw != nil && !ok {
-		return fmt.Errorf("field target_node in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["trigger_subjects"]; raw != nil && !ok {
 		return fmt.Errorf("field trigger_subjects in StartWorkloadRequestJson: required")

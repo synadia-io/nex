@@ -21,7 +21,6 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 			NatsUserJwt:  request.HostServiceConfig.NatsUserJwt,
 		},
 		Jsdomain:        request.Jsdomain,
-		RetriedAt:       request.RetriedAt,
 		RetryCount:      int32(request.RetryCount),
 		TriggerSubjects: request.TriggerSubjects,
 		Uri:             request.Uri,
@@ -87,7 +86,7 @@ func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.Auction
 
 	return &api.AuctionResponseJson{
 		Nexus:      response.Nexus,
-		NodeId:     response.NodeId,
+		BidderId:   response.BidderId,
 		Status:     gen.AuctionResponseJsonStatus{Status: convertedStatus},
 		Tags:       api.AuctionResponseJsonTags{Tags: response.Tags},
 		TargetXkey: response.TargetXkey,

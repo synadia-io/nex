@@ -4,83 +4,17 @@ package gen
 
 import "encoding/json"
 import "fmt"
-import "reflect"
 
 type AuctionRequestJson struct {
 	// The type of agent to auction for
 	AgentType []NexWorkload `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
 
-	// Specify a required architecture for the auction
-	Arch AuctionRequestJsonArch `json:"arch" yaml:"arch" mapstructure:"arch"`
-
-	// Specify a required operating system for the auction
-	Os AuctionRequestJsonOs `json:"os" yaml:"os" mapstructure:"os"`
+	// A unique identifier for the auction
+	AuctionId string `json:"auction_id" yaml:"auction_id" mapstructure:"auction_id"`
 
 	// A list of tags to associate with the node during auction. To be returned, node
 	// must satisfy ALL tags
-	Tags *AuctionRequestJsonTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
-}
-
-type AuctionRequestJsonArch string
-
-const AuctionRequestJsonArchAmd64 AuctionRequestJsonArch = "amd64"
-const AuctionRequestJsonArchArm64 AuctionRequestJsonArch = "arm64"
-
-var enumValues_AuctionRequestJsonArch = []interface{}{
-	"amd64",
-	"arm64",
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionRequestJsonArch) UnmarshalJSON(b []byte) error {
-	var v string
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-	var ok bool
-	for _, expected := range enumValues_AuctionRequestJsonArch {
-		if reflect.DeepEqual(v, expected) {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_AuctionRequestJsonArch, v)
-	}
-	*j = AuctionRequestJsonArch(v)
-	return nil
-}
-
-type AuctionRequestJsonOs string
-
-const AuctionRequestJsonOsDarwin AuctionRequestJsonOs = "darwin"
-const AuctionRequestJsonOsLinux AuctionRequestJsonOs = "linux"
-const AuctionRequestJsonOsWindows AuctionRequestJsonOs = "windows"
-
-var enumValues_AuctionRequestJsonOs = []interface{}{
-	"linux",
-	"darwin",
-	"windows",
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionRequestJsonOs) UnmarshalJSON(b []byte) error {
-	var v string
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-	var ok bool
-	for _, expected := range enumValues_AuctionRequestJsonOs {
-		if reflect.DeepEqual(v, expected) {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_AuctionRequestJsonOs, v)
-	}
-	*j = AuctionRequestJsonOs(v)
-	return nil
+	Tags AuctionRequestJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
 }
 
 // A list of tags to associate with the node during auction. To be returned, node
@@ -98,11 +32,11 @@ func (j *AuctionRequestJson) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	if _, ok := raw["arch"]; raw != nil && !ok {
-		return fmt.Errorf("field arch in AuctionRequestJson: required")
+	if _, ok := raw["auction_id"]; raw != nil && !ok {
+		return fmt.Errorf("field auction_id in AuctionRequestJson: required")
 	}
-	if _, ok := raw["os"]; raw != nil && !ok {
-		return fmt.Errorf("field os in AuctionRequestJson: required")
+	if _, ok := raw["tags"]; raw != nil && !ok {
+		return fmt.Errorf("field tags in AuctionRequestJson: required")
 	}
 	type Plain AuctionRequestJson
 	var plain Plain

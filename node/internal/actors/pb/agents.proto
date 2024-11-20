@@ -59,7 +59,7 @@ message AuctionRequest {
 }
 
 message AuctionResponse {
-  string node_id = 1;
+  string bidder_id = 1;
   string nexus = 2;
   string version = 3;
   string target_xkey = 4;

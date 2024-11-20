@@ -13,6 +13,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nuid"
 	"github.com/splode/fname"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -41,6 +42,8 @@ type nexNode struct {
 	publicKey   nkeys.KeyPair
 	startedAt   time.Time
 	actorSystem goakt.ActorSystem
+
+	auctionMap *TTLMap
 }
 
 func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
@@ -55,9 +58,10 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		ctx:       context.Background(),
-		nc:        nc,
-		publicKey: serverKey,
+		ctx:        context.Background(),
+		nc:         nc,
+		publicKey:  serverKey,
+		auctionMap: NewTTLMap(time.Second * 10),
 
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
@@ -225,8 +229,13 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		return err
 	}
 
+	pk, err := nn.publicKey.PublicKey()
+	if err != nil {
+		return err
+	}
+
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, *nn.options, nn.options.Logger.WithGroup("direct_start")))
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, pk, *nn.options, nn.options.Logger.WithGroup("direct_start")))
 		if err != nil {
 			return err
 		}
@@ -247,11 +256,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		}
 	}
 
-	pk, err := nn.publicKey.PublicKey()
-	if err != nil {
-		return err
-	}
-
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
 		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn))
 	if err != nil {
@@ -267,24 +271,22 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	return nil
 }
 
-func (nn nexNode) Auction(os, arch string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
-	if os != runtime.GOOS || arch != runtime.GOARCH {
-		nn.options.Logger.Debug("node did not satisfy auction os/arch requirements")
+func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string]string) (*actorproto.AuctionResponse, error) {
+	if lameduck, ok := nn.options.Tags[models.TagLameDuck]; ok && lameduck == "true" {
+		nn.options.Logger.Debug("node is in lame duck mode; not participating in auction")
 		return nil, nil
 	}
 
-	st := timestamppb.New(nn.startedAt)
-	pk, err := nn.publicKey.PublicKey()
-	if err != nil {
-		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
-		return nil, err
-	}
+	// Gets new auction id & replace nodeid
+	bidderId := nuid.New().Next()
+	nn.auctionMap.Put(bidderId, auctionId)
 
 	resp := &actorproto.AuctionResponse{
-		NodeId:    pk,
+		BidderId:  bidderId,
 		Version:   VERSION,
-		StartedAt: st,
+		StartedAt: timestamppb.New(nn.startedAt),
 		Tags:      nn.options.Tags,
+		Status:    make(map[string]int32),
 	}
 
 	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
@@ -307,8 +309,8 @@ func (nn nexNode) Auction(os, arch string, agentType []string, tags map[string]s
 	}
 
 	// Node must satisfy all agent types in auction request
-	for name, _ := range resp.Status {
-		if !slices.Contains(agentType, name) {
+	for _, aT := range agentType {
+		if _, ok := resp.Status[aT]; !ok {
 			nn.options.Logger.Debug("node did not satisfy auction agent type requirements")
 			return nil, nil
 		}
@@ -422,4 +424,21 @@ func (nn nexNode) SetLameDuck(ctx context.Context) {
 		<-ctx.Done()
 		nn.interrupt <- os.Interrupt
 	}()
+}
+
+func (nn nexNode) IsTargetNode(inId string) (bool, error) {
+	pub, err := nn.publicKey.PublicKey()
+	if err != nil {
+		return false, err
+	}
+	if inId == pub {
+		return true, nil
+	}
+	if nn.auctionMap.Exists(inId) {
+		auctionId := nn.auctionMap.Get(inId)
+		nn.options.Logger.Debug("Accepting workload from auction", slog.String("auctionId", auctionId))
+		nn.auctionMap.Delete(inId)
+		return true, nil
+	}
+	return false, nil
 }

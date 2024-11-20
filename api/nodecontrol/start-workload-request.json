@@ -39,17 +39,9 @@
       "type": "integer",
       "description": "The number of times the workload has been retried"
     },
-    "retried_at": {
-      "type": "string",
-      "description": "The time at which the workload was last retried"
-    },
     "sender_public_key": {
       "type": "string",
       "description": "The public key of the sender"
-    },
-    "target_node": {
-      "type": "string",
-      "description": "The target node for the workload"
     },
     "trigger_subjects": {
       "type": "array",
