@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"disorder.dev/shandler"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nuid"
 	"github.com/synadia-io/nex/models"
@@ -87,12 +88,41 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		ctx.Response(&actorproto.LameDuckResponse{
 			Success: true,
 		})
+	case *actorproto.PingWorkload:
+		a.logger.Debug("PingWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId))
+		resp, err := a.pingWorkload(m.WorkloadId)
+		if err != nil {
+			// Pings dont respond negatively...they just dont respond
+			return
+		}
+		ctx.Response(resp)
 	case *goaktpb.Terminated:
 		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
 		a.logger.Warn("Direct start agent received unhandled message", slog.String("name", ctx.Self().Name()), slog.Any("message_type", fmt.Sprintf("%T", m)))
 		ctx.Unhandled()
 	}
+}
+
+func (a DirectStartAgent) pingWorkload(workloadId string) (*actorproto.PingWorkloadResponse, error) {
+	wl, err := a.self.Child(workloadId)
+	if err != nil {
+		return nil, err
+	}
+
+	askResp, err := wl.Ask(context.Background(), wl, &actorproto.QueryWorkload{})
+	if err != nil {
+		a.logger.Log(context.Background(), shandler.LevelTrace, "Failed to query workload", slog.String("name", a.self.Name()), slog.String("workload", workloadId))
+		return nil, err
+	}
+	workloadSummary, ok := askResp.(*actorproto.WorkloadSummary)
+	if !ok {
+		a.logger.Log(context.Background(), shandler.LevelTrace, "query workload unexpected response type", slog.String("name", a.self.Name()), slog.String("workload", wl.Name()))
+		return nil, err
+	}
+	return &actorproto.PingWorkloadResponse{
+		Workload: workloadSummary,
+	}, nil
 }
 
 func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorproto.WorkloadStarted, error) {

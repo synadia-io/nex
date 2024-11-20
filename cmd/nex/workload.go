@@ -17,12 +17,13 @@ import (
 	"os"
 	"path/filepath"
 
-	//"path/filepath"
 	"strings"
 
 	"github.com/synadia-io/nex/api/nodecontrol"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/natscli/columns"
 	"github.com/nats-io/nkeys"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -43,6 +44,7 @@ var validURIPrefix []string = []string{"nats://", "file://", "oci://"}
 type Workload struct {
 	Run    RunWorkload    `cmd:"" help:"Run a workload on a target node" aliases:"start,deploy"`
 	Stop   StopWorkload   `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
+	Info   InfoWorkload   `cmd:"" help:"Get information about a workload"`
 	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into a compatable OCI image" aliases:"build,package"`
 }
 
@@ -205,6 +207,58 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 		fmt.Printf("Workload %s failed to stop on node %s\n", s.WorkloadId, s.NodeId)
 	}
 
+	return nil
+}
+
+type InfoWorkload struct {
+	WorkloadId   string `arg:"" description:"ID of the workload"`
+	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+}
+
+func (InfoWorkload) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
+func (i InfoWorkload) Validate() error {
+	var errs error
+
+	return errs
+}
+
+func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
+	if globals.Check {
+		return printTable("Build Workload Configuration", append(globals.Table(), i.Table()...)...)
+	}
+
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	if err != nil {
+		return err
+	}
+
+	resp, err := controller.FindWorkload(i.WorkloadType, globals.Namespace, i.WorkloadId)
+	if errors.Is(err, nats.ErrTimeout) {
+		fmt.Println("Workload not found")
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	w := columns.New("Information about Workload %s", i.WorkloadId)
+	w.AddRow("Name", resp.WorkloadSummary.Name)
+	w.AddRow("Start Time", resp.WorkloadSummary.StartTime)
+	w.AddRowIf("Run Time", resp.WorkloadSummary.Runtime, resp.WorkloadSummary.Runtime != "")
+	w.AddRow("Workload Type", resp.WorkloadSummary.WorkloadType)
+	s, err := w.Render()
+	if err != nil {
+		return err
+	}
+	fmt.Println(s)
 	return nil
 }
 

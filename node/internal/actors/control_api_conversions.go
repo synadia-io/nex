@@ -135,12 +135,11 @@ func agentPingResponseFromProto(response *actorproto.PingAgentResponse) *api.Age
 
 func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponseJson {
 	return &api.WorkloadPingResponseJson{
-		NodeId: response.NodeId,
 		WorkloadSummary: &api.Workload{
 			Id:           response.Workload.Id,
 			Name:         response.Workload.Name,
 			Runtime:      response.Workload.Runtime,
-			StartTime:    response.Workload.StartedAt.String(),
+			StartTime:    response.Workload.StartedAt.AsTime().Format(time.DateTime),
 			WorkloadType: response.Workload.WorkloadType,
 		},
 	}
