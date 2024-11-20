@@ -3,51 +3,54 @@ package models
 import "fmt"
 
 const (
-	APIPrefix = "$NEX"
+	ControlAPIPrefix = "$NEX.control"
+	LogAPIPrefix     = "$NEX.logs"
+	EventAPIPrefix   = "$NEX.events"
 )
 
-// Shared subscribe/request subjects
-func AuctionSubject() string {
-	return APIPrefix + ".AUCTION"
-}
-
+// System only subjects
 func PingSubject() string {
-	return APIPrefix + ".PING"
+	return ControlAPIPrefix + ".system.PING"
 }
 
-func AgentPingSubscribeSubject() string {
-	return APIPrefix + ".APING.>"
+func DeploySubject(nodeId string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".system.DEPLOY.%s", nodeId)
 }
 
 func LameduckSubject(inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".LAMEDUCK.%s", inNodeId)
+	return fmt.Sprintf(ControlAPIPrefix+".system.LAMEDUCK.%s", inNodeId)
 }
 
 func DirectPingSubject(inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".PING.%s", inNodeId)
+	return fmt.Sprintf(ControlAPIPrefix+".system.PING.%s", inNodeId)
+}
+
+// WPING subjects
+func NamespacePingRequestSubject(inNS string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".%s.WPING", inNS)
+}
+
+func WorkloadPingRequestSubject(inType, inNS, inWorkload string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".%s.WPING.%s.%s", inNS, inType, inWorkload)
 }
 
 // Request subjects
-func AgentPingNamespaceRequestSubject(inType, inNS string) string {
-	return fmt.Sprintf(APIPrefix+".APING.%s.%s", inNS, inType)
-}
-
-func AgentPingWorkloadRequestSubject(inType, inNS, inWorkload string) string {
-	return fmt.Sprintf(APIPrefix+".APING.%s.%s.%s", inNS, inType, inWorkload)
-}
-
-func DeployRequestSubject(inNS, inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".DEPLOY.%s.%s", inNS, inNodeId)
+func AuctionRequestSubject(inNS string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".%s.AUCTION", inNS)
 }
 
 func AuctionDeployRequestSubject(inNS, inBidId string) string {
-	return fmt.Sprintf(APIPrefix+".ADEPLOY.%s.%s", inNS, inBidId)
+	return fmt.Sprintf(ControlAPIPrefix+".%s.ADEPLOY.%s", inNS, inBidId)
 }
 
-func UndeployRequestSubject(inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".UNDEPLOY.*.%s", inNodeId)
+func UndeployRequestSubject(inNS, inWorkloadID string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".%s.UNDEPLOY.%s", inNS, inWorkloadID)
 }
 
 func InfoRequestSubject(inNS, inNodeId string) string {
-	return fmt.Sprintf(APIPrefix+".INFO.%s.%s", inNS, inNodeId)
+	return fmt.Sprintf(ControlAPIPrefix+".%s.INFO.%s", inNS, inNodeId)
+}
+
+func CloneWorkloadRequestSubject(inNS, inWorkloadID string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".%s.CLONE.%s", inNS, inWorkloadID)
 }

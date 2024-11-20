@@ -208,7 +208,7 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 		WorkloadType: s.WorkloadType,
 	}
 
-	resp, err := controller.UndeployWorkload(s.NodeId, globals.Namespace, req)
+	resp, err := controller.UndeployWorkload(globals.Namespace, s.NodeId, globals.Namespace, req)
 	if err != nil {
 		return err
 	}

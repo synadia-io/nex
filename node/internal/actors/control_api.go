@@ -126,14 +126,14 @@ func (api *ControlAPI) subscribe() error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = api.nc.Subscribe(models.AuctionSubject(), api.handleAuction)
+	sub, err = api.nc.Subscribe(AuctionSubscribeSubject(), api.handleAuction)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(DeploySubscribeSubject(api.publicKey), api.handleDeploy)
+	sub, err = api.nc.Subscribe(models.DeploySubject(api.publicKey), api.handleDeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -147,7 +147,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(InfoSubscribeSubject(api.publicKey), api.handleInfo)
+	sub, err = api.nc.Subscribe(InfoSubscribeSubject(), api.handleInfo)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -175,14 +175,14 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(UndeploySubscribeSubject(api.publicKey), api.handleUndeploy)
+	sub, err = api.nc.Subscribe(UndeploySubscribeSubject(), api.handleUndeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to undeploy subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(models.AgentPingSubscribeSubject(), api.handleAgentPing)
+	sub, err = api.nc.Subscribe(WorkloadPingSubscribeSubject(), api.handleAgentPing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -221,8 +221,8 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleADeploy(m *nats.Msg) {
-	// $NEX.ADEPLOY.default.OdXiuMFTfXp1njwcArUzD2
-	splitSub := strings.SplitN(m.Subject, ".", 4)
+	// $NEX.control.default.ADEPLOY.OdXiuMFTfXp1njwcArUzD2
+	splitSub := strings.SplitN(m.Subject, ".", 5)
 
 	req := new(nodecontrol.StartWorkloadRequestJson)
 	err := json.Unmarshal(m.Data, req)
@@ -232,8 +232,8 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
-	// splitSub[3] is the bidderId
-	target, err := api.nodeCallback.IsTargetNode(splitSub[3])
+	// splitSub[4] is the bidderId
+	target, err := api.nodeCallback.IsTargetNode(splitSub[4])
 	if err != nil {
 		api.logger.Error("Failed to check if target node", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to check if target node: %s", err))
