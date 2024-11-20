@@ -64,6 +64,9 @@ type StartWorkloadRequestJson struct {
 	// The NATS JSDomain for the workload
 	Jsdomain string `json:"jsdomain" yaml:"jsdomain" mapstructure:"jsdomain"`
 
+	// The namespace of the workload
+	Namespace string `json:"namespace" yaml:"namespace" mapstructure:"namespace"`
+
 	// The number of times the workload has been retried
 	RetryCount int `json:"retry_count" yaml:"retry_count" mapstructure:"retry_count"`
 
@@ -112,6 +115,9 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["jsdomain"]; raw != nil && !ok {
 		return fmt.Errorf("field jsdomain in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["namespace"]; raw != nil && !ok {
+		return fmt.Errorf("field namespace in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["retry_count"]; raw != nil && !ok {
 		return fmt.Errorf("field retry_count in StartWorkloadRequestJson: required")

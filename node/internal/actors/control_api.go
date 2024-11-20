@@ -126,14 +126,14 @@ func (api *ControlAPI) subscribe() error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = api.nc.Subscribe(models.AuctionSubject(), api.handleAuction)
+	sub, err = api.nc.Subscribe(AuctionSubscribeSubject(), api.handleAuction)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(DeploySubscribeSubject(api.publicKey), api.handleDeploy)
+	sub, err = api.nc.Subscribe(models.DirectDeploySubject(api.publicKey), api.handleDeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -147,7 +147,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(InfoSubscribeSubject(api.publicKey), api.handleInfo)
+	sub, err = api.nc.Subscribe(InfoSubscribeSubject(), api.handleInfo)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -175,14 +175,14 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(UndeploySubscribeSubject(api.publicKey), api.handleUndeploy)
+	sub, err = api.nc.Subscribe(UndeploySubscribeSubject(), api.handleUndeploy)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to undeploy subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(models.AgentPingSubscribeSubject(), api.handleAgentPing)
+	sub, err = api.nc.Subscribe(WorkloadPingSubscribeSubject(), api.handleWorkloadPing)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -221,8 +221,8 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleADeploy(m *nats.Msg) {
-	// $NEX.ADEPLOY.default.OdXiuMFTfXp1njwcArUzD2
-	splitSub := strings.SplitN(m.Subject, ".", 4)
+	// $NEX.control.default.ADEPLOY.OdXiuMFTfXp1njwcArUzD2
+	splitSub := strings.SplitN(m.Subject, ".", 5)
 
 	req := new(nodecontrol.StartWorkloadRequestJson)
 	err := json.Unmarshal(m.Data, req)
@@ -232,8 +232,8 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
-	// splitSub[3] is the bidderId
-	target, err := api.nodeCallback.IsTargetNode(splitSub[3])
+	// splitSub[4] is the bidderId
+	target, err := api.nodeCallback.IsTargetNode(splitSub[4])
 	if err != nil {
 		api.logger.Error("Failed to check if target node", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to check if target node: %s", err))
@@ -409,65 +409,35 @@ func (api *ControlAPI) handlePing(m *nats.Msg) {
 	models.RespondEnvelope(m, PingResponseType, 200, pingResponseFromProto(pingResponse), "")
 }
 
-func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
+func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 	ctx := context.Background()
 
-	splitSub := strings.Split(m.Subject, ".")
+	splitSub := strings.SplitN(m.Subject, ".", 6)
 	var workloadType, namespace, workloadID string
 
-	switch len(splitSub) {
-	case 4: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_TYPE>
-		namespace = splitSub[2]
-		workloadType = splitSub[3]
+	// PREFIX.control.<NAMESPACE>.WPING.<WORKLOAD_TYPE>.<WORKLOAD_ID>
+	namespace = splitSub[2]
+	workloadType = splitSub[4]
+	workloadID = splitSub[5]
 
-		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
-		if err != nil {
-			return
-		}
-
-		response, err := api.self.Ask(ctx, agent, &actorproto.PingAgent{
-			Type:      workloadType,
-			Namespace: namespace,
-		})
-		if err != nil {
-			return
-		}
-
-		aPingResponse, ok := response.(*actorproto.PingAgentResponse)
-		if !ok {
-			return
-		}
-
-		models.RespondEnvelope(m, AgentPingResponseType, 200, agentPingResponseFromProto(aPingResponse), "")
-	case 5: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_TYPE>.<WORKLOAD_ID>
-		namespace = splitSub[2]
-		workloadType = splitSub[3]
-		workloadID = splitSub[4]
-
-		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
-		if err != nil {
-			return
-		}
-
-		response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
-			Type:       workloadType,
-			Namespace:  namespace,
-			WorkloadId: workloadID,
-		})
-		if err != nil {
-			return
-		}
-
-		aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
-		if !ok {
-			return
-		}
-
-		models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
-
-	default:
-		api.logger.Error("Received a request on a bad APING subject", slog.Any("subjet", m.Subject))
-		models.RespondEnvelope(m, AgentPingResponseType, 500, "", "Received a request on a bad APING subject")
+	_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
+	if err != nil {
 		return
 	}
+
+	response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
+		Type:       workloadType,
+		Namespace:  namespace,
+		WorkloadId: workloadID,
+	})
+	if err != nil {
+		return
+	}
+
+	aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
+	if !ok {
+		return
+	}
+
+	models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
 }

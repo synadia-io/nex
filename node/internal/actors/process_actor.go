@@ -87,6 +87,7 @@ func (a *processActor) Receive(ctx *goakt.ReceiveContext) {
 		ctx.Response(&actorproto.WorkloadSummary{
 			Id:           a.id,
 			Name:         a.processName,
+			Namespace:    a.namespace,
 			StartedAt:    timestamppb.New(a.startedAt),
 			WorkloadType: a.workloadType,
 		})
