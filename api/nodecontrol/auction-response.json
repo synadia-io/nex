@@ -4,9 +4,9 @@
   "title": "AuctionResponse",
   "type": "object",
   "properties": {
-    "node_id": {
+    "bidder_id": {
       "type": "string",
-      "description": "The unique identifier of the node"
+      "description": "A one-time identifier used to target deployments"
     },
     "nexus": {
       "type": "string",
@@ -49,7 +49,7 @@
     }
   },
   "required": [
-    "node_id",
+    "bidder_id",
     "nexus",
     "version",
     "uptime",

@@ -4,22 +4,9 @@
   "title": "AuctionRequest",
   "type": "object",
   "properties": {
-    "arch": {
+    "auction_id": {
       "type": "string",
-      "description": "Specify a required architecture for the auction",
-      "enum": [
-        "amd64",
-        "arm64"
-      ]
-    },
-    "os": {
-      "type": "string",
-      "description": "Specify a required operating system for the auction",
-      "enum": [
-        "linux",
-        "darwin",
-        "windows"
-      ]
+      "description": "A unique identifier for the auction"
     },
     "tags": {
       "type": "object",
@@ -41,7 +28,7 @@
       }
     }
   },
-  "required": ["arch", "os"],
+  "required": ["auction_id", "tags"],
   "definitions": {
     "NexWorkload": {
       "type": "string"

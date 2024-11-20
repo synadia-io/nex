@@ -15,6 +15,7 @@ import (
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
@@ -26,16 +27,18 @@ const (
 	VERSION = "0.0.0"
 )
 
-func CreateDirectStartAgent(nc *nats.Conn, options models.NodeOptions, logger *slog.Logger) *DirectStartAgent {
-	return &DirectStartAgent{nc: nc, options: options, logger: logger}
+func CreateDirectStartAgent(nc *nats.Conn, nodeId string, options models.NodeOptions, logger *slog.Logger) *DirectStartAgent {
+	return &DirectStartAgent{nc: nc, nodeId: nodeId, options: options, logger: logger}
 }
 
 type DirectStartAgent struct {
 	self *goakt.PID
 
-	nc      *nats.Conn
-	options models.NodeOptions
-	logger  *slog.Logger
+	nodeId    string
+	startedAt time.Time
+	nc        *nats.Conn
+	options   models.NodeOptions
+	logger    *slog.Logger
 }
 
 func (a *DirectStartAgent) PreStart(ctx context.Context) error {
@@ -51,6 +54,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 	switch m := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		a.self = ctx.Self()
+		a.startedAt = time.Now()
 		a.logger.Info("Direct start agent is running", slog.String("name", ctx.Self().Name()))
 	case *actorproto.StartWorkload:
 		a.logger.Debug("StartWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadName))
@@ -96,6 +100,31 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			return
 		}
 		ctx.Response(resp)
+	case *actorproto.PingAgent:
+		a.logger.Debug("PingAgent received", slog.String("name", ctx.Self().Name()))
+		workloads, err := a.queryWorkloads(&actorproto.QueryWorkloads{})
+		if err != nil {
+			a.logger.Error("Failed to query workloads", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
+			ctx.Err(err)
+			return
+		}
+
+		runningWorkloads := []*actorproto.RunningWorkload{}
+		for _, w := range workloads.Workloads {
+			runningWorkloads = append(runningWorkloads, &actorproto.RunningWorkload{
+				Id:        w.Id,
+				Namespace: "", // TODO: this is missing
+				Name:      w.Name,
+			})
+		}
+		ctx.Response(&actorproto.PingAgentResponse{
+			NodeId:           a.nodeId,
+			TargetXkey:       "",
+			Version:          VERSION,
+			Tags:             map[string]string{},
+			StartedAt:        timestamppb.New(a.startedAt),
+			RunningWorkloads: runningWorkloads,
+		})
 	case *goaktpb.Terminated:
 		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:

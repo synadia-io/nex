@@ -15,6 +15,10 @@ func DeploySubscribeSubject(inNodeId string) string {
 	return fmt.Sprintf(models.APIPrefix+".DEPLOY.*.%s", inNodeId)
 }
 
+func AuctionDeploySubscribeSubject() string {
+	return fmt.Sprintf(models.APIPrefix + ".ADEPLOY.*.*")
+}
+
 func InfoSubscribeSubject(inNodeId string) string {
 	return fmt.Sprintf(models.APIPrefix+".INFO.*.%s", inNodeId)
 }
