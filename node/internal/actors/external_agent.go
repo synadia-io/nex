@@ -3,6 +3,7 @@ package actors
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/url"
 	"time"
@@ -31,7 +32,8 @@ type ExternalAgent struct {
 	hostUserKeypair  nkeys.KeyPair
 	logger           *slog.Logger
 	self             *goakt.PID
-	conn             *nats.Conn
+	internalConn     *nats.Conn
+	controlConn      *nats.Conn
 	agentClient      *agentcommon.AgentClient
 	internalNatsUrl  string
 	nodeOptions      *models.NodeOptions
@@ -40,7 +42,9 @@ type ExternalAgent struct {
 func CreateExternalAgent(logger *slog.Logger,
 	agentBinaryCreds AgentCredential,
 	hostUserKeyPair nkeys.KeyPair,
+	internalNatsUrl string,
 	agentOptions models.AgentOptions,
+	nc *nats.Conn,
 	nodeOptions *models.NodeOptions) *ExternalAgent {
 
 	return &ExternalAgent{
@@ -48,7 +52,9 @@ func CreateExternalAgent(logger *slog.Logger,
 		agentBinaryCreds: agentBinaryCreds,
 		hostUserKeypair:  hostUserKeyPair,
 		logger:           logger,
+		internalNatsUrl:  internalNatsUrl,
 		nodeOptions:      nodeOptions,
+		controlConn:      nc,
 	}
 }
 
@@ -57,23 +63,44 @@ func (a *ExternalAgent) PreStart(ctx context.Context) error {
 }
 
 func (a *ExternalAgent) PostStop(ctx context.Context) error {
+	a.logger.Debug("External agent actor stopped", slog.String("agent_name", a.agentOptions.Name))
+	/*
+		child, err := a.self.Child(a.childActorName())
+		if err == nil && child != nil && child.IsRunning() {
+			err = child.Tell(context.Background(), child, &actorproto.KillDirectStartProcess{})
+			if err != nil {
+				a.logger.Error("failed to stop agent OS process",
+					slog.String("agent_name", a.agentOptions.Name),
+					slog.String("name", a.self.Name()),
+					slog.Any("err", err))
+				return err
+			}
+		}
+	*/
 	return nil
 }
 
 func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		if err := a.startBinary(); err != nil {
-			ctx.Err(errors.Join(errors.New("Failed to load and start agent binary"), err))
-			return
-		}
+		a.logger.Info("External agent starting", slog.String("agent_name", a.agentOptions.Name))
 		a.self = ctx.Self()
+		a.self.Tell(context.Background(), a.self, &actorproto.SpawnAgentBinary{})
 		_ = a.self.ActorSystem().ScheduleOnce(
 			context.Background(),
 			&actorproto.CheckRegistered{},
 			a.self,
 			registrationTimeout)
 		a.logger.Info("External agent for workload type is running", slog.String("name", ctx.Self().Name()))
+	case *actorproto.SpawnAgentBinary:
+		if err := a.startBinary(); err != nil {
+			a.logger.Error("Failed to load and start agent binary",
+				slog.String("agent_name", a.agentOptions.Name),
+				slog.Any("error", err))
+			ctx.Err(errors.Join(errors.New("Failed to load and start agent binary"), err))
+			return
+		}
+
 	case *actorproto.AgentRegistered:
 		err := a.createAgentClient(msg.InternalNatsUrl, msg.InternalNkey, msg.InternalNkeySeed)
 		if err != nil {
@@ -107,43 +134,92 @@ func (a *ExternalAgent) startWorkload(ctx *goakt.ReceiveContext, req *actorproto
 }
 
 func (a *ExternalAgent) startBinary() error {
-	// TODO: download the artifact, create an OsProcess, run it
+	artRef, err := GetArtifact(a.agentOptions.Name, a.agentOptions.Uri, a.internalConn)
+	if err != nil {
+		a.logger.Error("Failed to retrieve artifact",
+			slog.String("agent_name", a.agentOptions.Name),
+			slog.Any("error", err))
+		return err
+	}
 
 	u, err := url.Parse(a.internalNatsUrl)
 	if err != nil {
+		a.logger.Error("Failed to parse internal NATS url")
 		return err
 	}
+
 	seed, err := a.agentBinaryCreds.nkey.Seed()
 	if err != nil {
+		a.logger.Error("Invalid internal NATS creds", slog.Any("error", err))
 		return err
 	}
 	env := make(map[string]string)
-	env[agentcommon.EnvNatsHost] = u.Host
+	env[agentcommon.EnvNatsHost] = u.Hostname()
 	env[agentcommon.EnvNatsPort] = u.Port()
 	env[agentcommon.EnvNatsNkey] = string(seed)
 
 	// TODO: Note that host services information needs to be passed to the agent in start
 	// workload request because the Hs connections are per-workload
 
+	processActor, err := createNewProcessActor(
+		a.logger.WithGroup(fmt.Sprintf("proc-%s", a.agentOptions.Name)),
+		a.controlConn,
+		a.agentOptions.Name,
+		[]string{"up"},
+		"agent",
+		"agent",
+		a.agentOptions.Name,
+		artRef,
+		env,
+	)
+	if err != nil {
+		a.logger.Error("Failed to spawn OS process actor child",
+			slog.Any("error", err),
+			slog.String("agent_name", a.agentOptions.Name))
+		return err
+	}
+	c, err := a.self.SpawnChild(context.Background(), a.childActorName(), processActor)
+	if err != nil {
+		a.logger.Error("Failed to spawn agent process",
+			slog.String("name", a.self.Name()),
+			slog.String("agent_name", a.agentOptions.Name),
+			slog.Any("err", err))
+		return err
+	}
+
+	a.logger.Info("Spawned direct start process", slog.String("name", c.Name()))
+
 	return nil
 }
 
 func (a *ExternalAgent) createAgentClient(url string, _ string, seed string) error {
 	var err error
-	opt, err := nats.NkeyOptionFromSeed(seed)
+	pair, err := nkeys.FromSeed([]byte(seed))
+	if err != nil {
+		a.logger.Error("Bad seed!", slog.Any("error", err))
+		return err
+	}
+	pk, err := pair.PublicKey()
+	if err != nil {
+		a.logger.Error("Bad public key", slog.Any("error", err))
+		return err
+	}
+	opt := nats.Nkey(pk, func(b []byte) ([]byte, error) {
+		return pair.Sign(b)
+	})
 	if err != nil {
 		a.logger.Error("Failed to extract an nkey option from the nkey seed", slog.Any("error", err))
 		return err
 	}
-	a.conn, err = nats.Connect(url, opt, nats.Name(a.agentOptions.Name))
+	a.internalConn, err = nats.Connect(url, opt, nats.Name(a.agentOptions.Name))
 	if err != nil {
 		a.logger.Error("Failed to create a connection to internal NATS server for agent", slog.String("agent", a.agentOptions.Name))
 		return err
 	}
 	a.internalNatsUrl = url
-	a.logger.Debug("External agent actor connected to internal NATS", slog.String("agent", a.agentOptions.Name))
+	a.logger.Debug("External agent actor connected to internal NATS")
 
-	a.agentClient, err = agentcommon.NewAgentClient(a.conn, a.agentOptions.Name)
+	a.agentClient, err = agentcommon.NewAgentClient(a.internalConn, a.agentOptions.Name)
 	if err != nil {
 		a.logger.Error("Failed to create agent client", slog.Any("error", err), slog.String("agent", a.agentOptions.Name))
 		return err
@@ -152,5 +228,13 @@ func (a *ExternalAgent) createAgentClient(url string, _ string, seed string) err
 }
 
 func (a *ExternalAgent) queryWorkloads(ctx *goakt.ReceiveContext) {
+	a.logger.Debug("QueryWorkloads received", slog.String("name", a.agentOptions.Name))
 	// TODO: make this real
+	ctx.Response(&actorproto.WorkloadList{
+		Workloads: []*actorproto.WorkloadSummary{},
+	})
+}
+
+func (a *ExternalAgent) childActorName() string {
+	return fmt.Sprintf("agent-%s-proc", a.agentOptions.Name)
 }

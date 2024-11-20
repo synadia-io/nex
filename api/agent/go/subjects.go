@@ -8,7 +8,8 @@ import "fmt"
 // As always, the code is the source of truth
 
 func AgentRegisterSubject(workloadType string) string {
-	return fmt.Sprintf("host.%s.register", workloadType)
+	//	return fmt.Sprintf("host.register", workloadType)
+	return "host.register"
 }
 
 func StartWorkloadSubscribeSubject(workloadType string) string {

@@ -288,7 +288,7 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 			tags = append(tags, fmt.Sprintf("%s=%s", k, v))
 		}
 
-		w := columns.New(fmt.Sprintf("Information about Node %s", resp.NodeId))
+		w := columns.New("Information about Node %s", resp.NodeId)
 		w.AddRow("Nexus", resp.Tags.Tags[models.TagNexus])
 		w.AddRow("Node Name", resp.Tags.Tags[models.TagNodeName])
 		w.AddRow("Tags", tags)

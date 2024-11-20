@@ -212,7 +212,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		return err
 	}
 
-	inats := actors.CreateInternalNatsServer(*nn.options)
+	inats := actors.CreateInternalNatsServer(*nn.options, nn.options.Logger.WithGroup("internal-nats"))
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
 	if err != nil {
 		return err
@@ -238,7 +238,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 				nn.options.Logger.WithGroup(agent.Name),
 				allCreds[agent.Name],
 				inats.HostUserKeypair(),
+				inats.ServerUrl(),
 				agent,
+				nn.nc,
 				nn.options))
 		if err != nil {
 			return err
@@ -354,8 +356,8 @@ func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 	for _, c := range agentSuper.Children() {
 		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
 		if err != nil {
-			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
-			return nil, errors.New("failed to ping agent")
+			nn.options.Logger.Error("Failed to get workloads from agent", slog.Any("err", err))
+			return nil, errors.New("failed to get workloads from agent")
 		}
 		aR, ok := agentResp.(*actorproto.WorkloadList)
 		if !ok {

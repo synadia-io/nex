@@ -3,11 +3,9 @@ package agentcommon
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
-	"time"
 	"strings"
-	
+	"time"
 
 	"github.com/nats-io/nats.go"
 	agentapi "github.com/synadia-io/nex/api/agent/go"
@@ -23,8 +21,6 @@ type NexAgent struct {
 	version      string
 	description  string
 	maxWorkloads int
-
-	logger *slog.Logger
 }
 
 // TODO: these callbacks need appropriate parameters
@@ -38,16 +34,16 @@ type AgentCallback interface {
 }
 
 func NewNexAgent(name, version, description string,
-	maxWorkloads int, logger *slog.Logger, callback AgentCallback) (*NexAgent, error) {
+	maxWorkloads int, callback AgentCallback) (*NexAgent, error) {
 
-	// TODO: generate whatever context we need
+	fmt.Fprintf(os.Stdout, "Starting Nex Agent %s (v%s)\n", name, version)
 
-	embedded, err := CreateEmbeddedNatsConnection()
+	embedded, err := CreateEmbeddedNatsConnection(name)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to create connection to NATS server: %s\n", err)
 		return nil, err
 	}
 	return &NexAgent{
-		logger:       logger,
 		embeddedNats: embedded,
 		callback:     callback,
 		name:         name,
@@ -58,9 +54,6 @@ func NewNexAgent(name, version, description string,
 }
 
 func (agent *NexAgent) Run() error {
-	// TODO: based on argv, decide which handler to call
-	// get error from handler and return here
-
 	if err := agent.registerWithNode(); err != nil {
 		return err
 	}
@@ -85,7 +78,7 @@ func (agent *NexAgent) NewHostServicesConnection(workloadId string, host string,
 }
 
 func (agent *NexAgent) registerWithNode() error {
-	agent.logger.Info("Registering agent with node", slog.String("name", agent.name))
+	fmt.Fprintln(os.Stdout, "Registering agent with node")
 
 	req := agentapigen.RegisterAgentRequestJson{
 		Description:  &agent.description,
@@ -96,7 +89,7 @@ func (agent *NexAgent) registerWithNode() error {
 	subject := agentapi.AgentRegisterSubject(agent.name)
 	bytes, err := json.Marshal(&req)
 	if err != nil {
-		agent.logger.Error("Failed to register agent with node", slog.Any("error", err))
+		fmt.Fprintln(os.Stderr, "Failed to marshal register request")
 		return err
 	}
 
@@ -105,6 +98,9 @@ func (agent *NexAgent) registerWithNode() error {
 
 	_, err = agent.embeddedNats.Request(subject, bytes, 1*time.Second)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to register agent with node: %s (%s)\n",
+			err,
+			subject)
 		return err
 	}
 

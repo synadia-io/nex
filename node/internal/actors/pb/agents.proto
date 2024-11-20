@@ -126,6 +126,7 @@ message WorkloadList {
 
 message SpawnDirectStartProcess {}
 message KillDirectStartProcess {}
+message SpawnAgentBinary {}
 
 message GetNodeInfo {}
 message NodeInfo {
