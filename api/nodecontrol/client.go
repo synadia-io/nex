@@ -108,7 +108,6 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 }
 
 func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
-	fmt.Println(models.WorkloadPingRequestSubject(inType, namespace, workloadId))
 	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(inType, namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
