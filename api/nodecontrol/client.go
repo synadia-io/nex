@@ -2,7 +2,6 @@ package nodecontrol
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"math/rand/v2"
 	"time"

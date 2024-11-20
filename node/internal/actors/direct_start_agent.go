@@ -184,7 +184,6 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 		return nil, err
 	}
 
-	fmt.Println("********", m.Namespace)
 	workloadId := nuid.New().Next()
 	pa, err := createNewProcessActor(
 		a.logger.WithGroup("workload"),
