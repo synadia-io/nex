@@ -59,6 +59,10 @@ tasks:
       --schema-package=io.nats.nex.v2.workload-ping-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       workload-ping-response.json"
       - "go-jsonschema \
+      --package=gen -o=./gen/lameduck_request.go \
+      --schema-package=io.nats.nex.v2.lame-duck-request=github.com/synadia-io/nex/api/nodecontrol/gen \
+      lameduck-request.json"
+      - "go-jsonschema \
       --package=gen -o=./gen/lameduck_response.go \
       --schema-package=io.nats.nex.v2.lame-duck-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       lameduck-response.json"

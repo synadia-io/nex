@@ -96,12 +96,6 @@ func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.Auction
 	}
 }
 
-func lameDuckResponseFromProto(response *actorproto.LameDuckResponse) *api.LameduckResponseJson {
-	return &api.LameduckResponseJson{
-		Success: response.Success,
-	}
-}
-
 func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingResponseJson {
 	convertedStatus := make(map[string]int)
 	if response.RunningAgents != nil {
