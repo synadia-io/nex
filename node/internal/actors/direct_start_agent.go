@@ -94,7 +94,6 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		})
 	case *actorproto.PingWorkload:
 		a.logger.Debug("PingWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId))
-		fmt.Printf("%#v\n", m)
 		resp, err := a.pingWorkload(m.Namespace, m.WorkloadId)
 		if err != nil {
 			// Pings dont respond negatively...they just dont respond
