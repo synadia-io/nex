@@ -64,19 +64,6 @@ func (a *ExternalAgent) PreStart(ctx context.Context) error {
 
 func (a *ExternalAgent) PostStop(ctx context.Context) error {
 	a.logger.Debug("External agent actor stopped", slog.String("agent_name", a.agentOptions.Name))
-	/*
-		child, err := a.self.Child(a.childActorName())
-		if err == nil && child != nil && child.IsRunning() {
-			err = child.Tell(context.Background(), child, &actorproto.KillDirectStartProcess{})
-			if err != nil {
-				a.logger.Error("failed to stop agent OS process",
-					slog.String("agent_name", a.agentOptions.Name),
-					slog.String("name", a.self.Name()),
-					slog.Any("err", err))
-				return err
-			}
-		}
-	*/
 	return nil
 }
 

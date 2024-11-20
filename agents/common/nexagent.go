@@ -86,7 +86,7 @@ func (agent *NexAgent) registerWithNode() error {
 		Name:         agent.name,
 		Version:      agent.version,
 	}
-	subject := agentapi.AgentRegisterSubject(agent.name)
+	subject := agentapi.AgentRegisterSubject()
 	bytes, err := json.Marshal(&req)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Failed to marshal register request")
