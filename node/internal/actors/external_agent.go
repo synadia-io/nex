@@ -85,7 +85,7 @@ func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 	case *goaktpb.PostStart:
 		a.logger.Info("External agent starting", slog.String("agent_name", a.agentOptions.Name))
 		a.self = ctx.Self()
-		a.self.Tell(context.Background(), a.self, &actorproto.SpawnAgentBinary{})
+		_ = a.self.Tell(context.Background(), a.self, &actorproto.SpawnAgentBinary{})
 		_ = a.self.ActorSystem().ScheduleOnce(
 			context.Background(),
 			&actorproto.CheckRegistered{},
