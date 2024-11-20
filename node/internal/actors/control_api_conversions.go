@@ -21,6 +21,7 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 			NatsUserJwt:  request.HostServiceConfig.NatsUserJwt,
 		},
 		Jsdomain:        request.Jsdomain,
+		Namespace:       request.Namespace,
 		RetryCount:      int32(request.RetryCount),
 		TriggerSubjects: request.TriggerSubjects,
 		Uri:             request.Uri,
@@ -111,25 +112,6 @@ func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingR
 		Uptime:        time.Since(response.StartedAt.AsTime()).String(),
 		Version:       response.Version,
 	}
-}
-
-func agentPingResponseFromProto(response *actorproto.PingAgentResponse) *api.AgentPingResponseJson {
-	ret := new(api.AgentPingResponseJson)
-
-	for _, w := range response.RunningWorkloads {
-		ret.RunningWorkloads = append(ret.RunningWorkloads, api.WorkloadPingMachineSummary{
-			Id:        w.Id,
-			Name:      w.Name,
-			Namespace: w.Namespace,
-		})
-	}
-
-	ret.NodeId = response.NodeId
-	ret.Tags = api.AgentPingResponseJsonTags{Tags: response.Tags}
-	ret.TargetXkey = response.TargetXkey
-	ret.Uptime = time.Since(response.StartedAt.AsTime()).String()
-	ret.Version = response.Version
-	return ret
 }
 
 func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponseJson {

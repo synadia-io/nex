@@ -29,7 +29,7 @@ func NewControlApiClient(nc *nats.Conn, logger *slog.Logger) (*ControlAPIClient,
 	}, nil
 }
 
-func (c *ControlAPIClient) Auction(tags map[string]string) ([]*nodegen.AuctionResponseJson, error) {
+func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]*nodegen.AuctionResponseJson, error) {
 	resp := []*nodegen.AuctionResponseJson{}
 	auctionRespInbox := nats.NewInbox()
 
@@ -57,7 +57,7 @@ func (c *ControlAPIClient) Auction(tags map[string]string) ([]*nodegen.AuctionRe
 		return nil, err
 	}
 
-	err = c.nc.PublishRequest(models.AuctionSubject(), auctionRespInbox, req_b)
+	err = c.nc.PublishRequest(models.AuctionRequestSubject(namespace), auctionRespInbox, req_b)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 		envelope := new(models.Envelope[nodegen.NodePingResponseJson])
 		err := json.Unmarshal(m.Data, envelope)
 		if err != nil {
-			c.logger.Error("failed to unmarshal ping response", slog.Any("err", err), slog.String("data", string(m.Data)))
+			c.logger.Debug("failed to unmarshal ping response", slog.Any("err", err), slog.String("data", string(m.Data)))
 			return
 		}
 		resp = append(resp, &envelope.Data)
@@ -92,21 +92,6 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindAgent(_type, namespace string) (*nodegen.AgentPingResponseJson, error) {
-	msg, err := c.nc.Request(models.AgentPingNamespaceRequestSubject(_type, namespace), nil, DefaultRequestTimeout)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := new(nodegen.AgentPingResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
-}
-
 func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJson, error) {
 	msg, err := c.nc.Request(models.DirectPingSubject(nodeId), nil, DefaultRequestTimeout)
 	if err != nil {
@@ -121,8 +106,8 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
-	msg, err := c.nc.Request(models.AgentPingWorkloadRequestSubject(_type, namespace, workloadId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
+	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(inType, namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +122,7 @@ func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*n
 }
 
 func (c *ControlAPIClient) AuctionDeployWorkload(namespace string, nodeTags map[string]string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
-	auctionResults, err := c.Auction(nodeTags)
+	auctionResults, err := c.Auction(namespace, nodeTags)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +139,6 @@ func (c *ControlAPIClient) AuctionDeployWorkload(namespace string, nodeTags map[
 	if err != nil {
 		return nil, err
 	}
-
 	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, bidderId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
@@ -175,7 +159,7 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.DeployRequestSubject(namespace, nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.DirectDeploySubject(nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -189,13 +173,13 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) UndeployWorkload(nodeId, workloadId string, req nodegen.StopWorkloadRequestJson) (*nodegen.StopWorkloadResponseJson, error) {
+func (c *ControlAPIClient) UndeployWorkload(namespace, nodeId, workloadId string, req nodegen.StopWorkloadRequestJson) (*nodegen.StopWorkloadResponseJson, error) {
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.UndeployRequestSubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.UndeployRequestSubject(namespace, nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

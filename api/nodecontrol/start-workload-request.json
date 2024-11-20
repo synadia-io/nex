@@ -35,6 +35,10 @@
       "type": "string",
       "description": "The NATS JSDomain for the workload"
     },
+    "namespace": {
+      "type": "string",
+      "description": "The namespace of the workload"
+    },
     "retry_count": {
       "type": "integer",
       "description": "The number of times the workload has been retried"
@@ -75,6 +79,7 @@
     "essential",
     "environment",
     "jsdomain",
+    "namespace",
     "retry_count",
     "retried_at",
     "sender_public_key",
