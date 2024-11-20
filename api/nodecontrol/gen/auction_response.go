@@ -6,7 +6,7 @@ import "encoding/json"
 import "fmt"
 
 type AuctionResponseJson struct {
-	// The unique identifier of the node
+	// A one-time identifier used to target deployments
 	BidderId string `json:"bidder_id" yaml:"bidder_id" mapstructure:"bidder_id"`
 
 	// The name of the nexus

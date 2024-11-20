@@ -6,7 +6,7 @@
   "properties": {
     "bidder_id": {
       "type": "string",
-      "description": "The unique identifier of the node"
+      "description": "A one-time identifier used to target deployments"
     },
     "nexus": {
       "type": "string",

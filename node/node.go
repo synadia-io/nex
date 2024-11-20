@@ -436,7 +436,7 @@ func (nn nexNode) IsTargetNode(inId string) (bool, error) {
 	}
 	if nn.auctionMap.Exists(inId) {
 		auctionId := nn.auctionMap.Get(inId)
-		nn.options.Logger.Debug("Accepting auction", slog.String("auctionId", auctionId))
+		nn.options.Logger.Debug("Accepting workload from auction", slog.String("auctionId", auctionId))
 		nn.auctionMap.Delete(inId)
 		return true, nil
 	}
