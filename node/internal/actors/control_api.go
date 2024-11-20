@@ -358,14 +358,12 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 	var workloadType, namespace, workloadID string
 
 	switch len(splitSub) {
-	case 4: // PREFIX.APING.<WORKLOAD_TYPE>.<NAMESPACE>
-		workloadType = splitSub[2]
-		namespace = splitSub[3]
+	case 4: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_TYPE>
+		namespace = splitSub[2]
+		workloadType = splitSub[3]
 
 		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
 		if err != nil {
-			api.logger.Error("Failed to locate agent actor", slog.String("type", workloadType), slog.Any("error", err))
-			models.RespondEnvelope(m, AgentPingResponseType, 500, "", fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
 			return
 		}
 
@@ -374,28 +372,22 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 			Namespace: namespace,
 		})
 		if err != nil {
-			api.logger.Error("failed to ping agent", slog.Any("error", err))
-			models.RespondEnvelope(m, AgentPingResponseType, 500, "", fmt.Sprintf("failed to ping agent: %s", err))
 			return
 		}
 
 		aPingResponse, ok := response.(*actorproto.PingAgentResponse)
 		if !ok {
-			api.logger.Error("Response from agent ping was not the correct type")
-			models.RespondEnvelope(m, AgentPingResponseType, 500, "", "Response from agent ping was not the correct type")
 			return
 		}
 
 		models.RespondEnvelope(m, AgentPingResponseType, 200, agentPingResponseFromProto(aPingResponse), "")
-	case 5: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_ID>
-		workloadType = splitSub[2]
-		namespace = splitSub[3]
+	case 5: // PREFIX.APING.<NAMESPACE>.<WORKLOAD_TYPE>.<WORKLOAD_ID>
+		namespace = splitSub[2]
+		workloadType = splitSub[3]
 		workloadID = splitSub[4]
 
 		_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
 		if err != nil {
-			api.logger.Error("Failed to locate agent actor", slog.String("type", workloadType), slog.Any("error", err))
-			models.RespondEnvelope(m, WorkloadPingResponseType, 500, "", fmt.Sprintf("failed to locate agent [%s] actor: %s", workloadType, err))
 			return
 		}
 
@@ -405,15 +397,11 @@ func (api *ControlAPI) handleAgentPing(m *nats.Msg) {
 			WorkloadId: workloadID,
 		})
 		if err != nil {
-			api.logger.Error("failed to ping workload", slog.Any("error", err))
-			models.RespondEnvelope(m, WorkloadPingResponseType, 500, "", fmt.Sprintf("failed to ping workload: %s", err))
 			return
 		}
 
 		aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
 		if !ok {
-			api.logger.Error("Response from workload ping was not the correct type")
-			models.RespondEnvelope(m, WorkloadPingResponseType, 500, "", "Response from workload ping was not the correct type")
 			return
 		}
 

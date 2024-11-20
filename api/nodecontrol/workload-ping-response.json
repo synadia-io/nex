@@ -4,16 +4,11 @@
   "title": "WorkloadPingResponse",
   "type": "object",
   "properties": {
-    "node_id": {
-      "type": "string",
-      "description": "The unique identifier of the node on which the agent is running"
-    },
     "workload_summary": {
       "$ref": "#/definitions/Workload"
     }
   },
   "required": [
-    "node_id",
     "target_xkey",
     "version",
     "tags",

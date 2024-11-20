@@ -87,6 +87,28 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		ctx.Response(&actorproto.LameDuckResponse{
 			Success: true,
 		})
+	case *actorproto.PingWorkload:
+		a.logger.Debug("PingWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId))
+		wl, err := a.self.Child(m.WorkloadId)
+		if err != nil {
+			return
+		}
+
+		askResp, err := wl.Ask(context.Background(), wl, &actorproto.QueryWorkload{})
+		if err != nil {
+			a.logger.Error("Failed to query workload", slog.String("name", a.self.Name()), slog.String("workload", m.WorkloadId))
+			ctx.Err(err)
+			return
+		}
+		workloadSummary, ok := askResp.(*actorproto.WorkloadSummary)
+		if !ok {
+			a.logger.Error("query workload unexpected response type", slog.String("name", a.self.Name()), slog.String("workload", wl.Name()))
+			ctx.Err(err)
+			return
+		}
+		ctx.Response(&actorproto.PingWorkloadResponse{
+			Workload: workloadSummary,
+		})
 	case *goaktpb.Terminated:
 		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:

@@ -23,29 +23,8 @@ type Workload struct {
 }
 
 type WorkloadPingResponseJson struct {
-	// The unique identifier of the node on which the agent is running
-	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
-
 	// WorkloadSummary corresponds to the JSON schema field "workload_summary".
 	WorkloadSummary *Workload `json:"workload_summary,omitempty" yaml:"workload_summary,omitempty" mapstructure:"workload_summary,omitempty"`
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadPingResponseJson) UnmarshalJSON(b []byte) error {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return err
-	}
-	if _, ok := raw["node_id"]; raw != nil && !ok {
-		return fmt.Errorf("field node_id in WorkloadPingResponseJson: required")
-	}
-	type Plain WorkloadPingResponseJson
-	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
-		return err
-	}
-	*j = WorkloadPingResponseJson(plain)
-	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

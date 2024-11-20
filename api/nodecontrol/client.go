@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	DefaultRequestTimeout = 60 * time.Second
+	DefaultRequestTimeout = 10 * time.Second
 )
 
 type ControlAPIClient struct {
@@ -103,19 +103,19 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*nodegen.AgentPingResponseJson, error) {
+func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
 	msg, err := c.nc.Request(models.AgentPingWorkloadRequestSubject(_type, namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := new(nodegen.AgentPingResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
+	envelope := new(models.Envelope[nodegen.WorkloadPingResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	return &envelope.Data, nil
 }
 
 func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {

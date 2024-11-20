@@ -42,8 +42,7 @@ message PingAgentResponse {
 }
 
 message PingWorkloadResponse {
-  string node_id = 1;
-  WorkloadSummary workload = 2;
+  WorkloadSummary workload = 1;
 }
 
 message RunningWorkload {
