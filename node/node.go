@@ -43,7 +43,7 @@ type nexNode struct {
 	startedAt   time.Time
 	actorSystem goakt.ActorSystem
 
-	auctionBidId string
+	auctionMap *TTLMap
 }
 
 func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOption) (Node, error) {
@@ -58,10 +58,10 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		ctx:          context.Background(),
-		nc:           nc,
-		publicKey:    serverKey,
-		auctionBidId: "",
+		ctx:        context.Background(),
+		nc:         nc,
+		publicKey:  serverKey,
+		auctionMap: NewTTLMap(time.Second * 10),
 
 		options: &models.NodeOptions{
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
@@ -278,9 +278,10 @@ func (nn *nexNode) Auction(agentType []string, tags map[string]string) (*actorpr
 	}
 
 	// Gets new auction id & replace nodeid
-	nn.auctionBidId = nuid.New().Next()
+	auctionBidId := nuid.New().Next()
+	nn.auctionMap.Put(auctionBidId, "")
 	resp := &actorproto.AuctionResponse{
-		NodeId:    nn.auctionBidId,
+		NodeId:    auctionBidId,
 		Version:   VERSION,
 		StartedAt: timestamppb.New(nn.startedAt),
 		Tags:      nn.options.Tags,
@@ -429,7 +430,8 @@ func (nn nexNode) IsTargetNode(inId string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if inId == pub || inId == nn.auctionBidId {
+	if inId == pub || nn.auctionMap.Exists(inId) {
+		nn.auctionMap.Delete(inId)
 		return true, nil
 	}
 	return false, nil
