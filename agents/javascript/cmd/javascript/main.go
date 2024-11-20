@@ -1,9 +1,8 @@
 package main
 
 import (
-	"github.com/synadia-io/nex/agents/common"
+	agentcommon "github.com/synadia-io/nex/agents/common"
 	jsagent "github.com/synadia-io/nex/agents/javascript"
-	"log/slog"
 )
 
 const (
@@ -19,13 +18,11 @@ func main() {
 		panic(err)
 	}
 
-	slog.Info("JavaScript agent starting")
 	agent, err := agentcommon.NewNexAgent(
 		AgentName,
 		AgentVersion,
 		AgentDescription,
 		0,
-		slog.Default(),
 		jsAgent)
 	if err != nil {
 		panic(err)

@@ -7,8 +7,8 @@ import "fmt"
 // NOTE: there are some subjects that are different here than the original ADR.
 // As always, the code is the source of truth
 
-func AgentRegisterSubject(workloadType string) string {
-	return fmt.Sprintf("host.%s.register", workloadType)
+func AgentRegisterSubject() string {
+	return "host.register"
 }
 
 func StartWorkloadSubscribeSubject(workloadType string) string {

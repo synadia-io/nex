@@ -46,7 +46,7 @@ type ArtifactReference struct {
 // Obtains an artifact from the specified location. If the indicated location allows for
 // differentiation using tags (e.g. OCI, Object Store), then the supplied tag will be used,
 // otherwise it will be ignored
-func getArtifact(name string, inUri string, nc *nats.Conn) (*ArtifactReference, error) {
+func GetArtifact(name string, inUri string, nc *nats.Conn) (*ArtifactReference, error) {
 	uri, err := parseUri(inUri)
 	if err != nil {
 		return nil, err

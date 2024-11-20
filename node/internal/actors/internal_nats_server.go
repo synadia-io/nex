@@ -44,8 +44,8 @@ type InternalNatsServer struct {
 	storeDir string
 }
 
-func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
-	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger}
+func CreateInternalNatsServer(options models.NodeOptions, logger *slog.Logger) *InternalNatsServer {
+	ns := &InternalNatsServer{nodeOptions: options, logger: logger}
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {
@@ -61,6 +61,12 @@ func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
 	}
 	ns.creds = creds
 
+	ns.storeDir, err = os.MkdirTemp(os.TempDir(), "pnats_*")
+	if err != nil {
+		options.Logger.Error("Failed to create store temp directory", slog.Any("error", err))
+		return nil
+	}
+
 	opts, err := ns.generateConfig()
 	if err != nil {
 		options.Logger.Error("Failed to generate NATS server config", slog.Any("error", err))
@@ -68,9 +74,9 @@ func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
 	}
 	ns.serverOptions = opts
 
-	ns.storeDir, err = os.MkdirTemp(os.TempDir(), "pnats_*")
+	err = ns.startNatsServer(opts)
 	if err != nil {
-		options.Logger.Error("Failed to create store temp directory", slog.Any("error", err))
+		options.Logger.Error("Failed to start server", slog.Any("error", err))
 		return nil
 	}
 
@@ -84,6 +90,10 @@ func (ns *InternalNatsServer) CredentialsMap() map[string]AgentCredential {
 	}
 
 	return out
+}
+
+func (ns *InternalNatsServer) ServerUrl() string {
+	return ns.internalNatsUrl
 }
 
 func (ns *InternalNatsServer) HostUserKeypair() nkeys.KeyPair {
@@ -103,10 +113,6 @@ func (s *InternalNatsServer) Receive(ctx *goakt.ReceiveContext) {
 	case *goaktpb.PostStart:
 		s.self = ctx.Self()
 		s.logger.Debug("Internal NATS server actor is running", slog.String("name", ctx.Self().Name()))
-		err := s.startNatsServer(s.serverOptions)
-		if err != nil {
-			ctx.Err(err)
-		}
 	default:
 		ctx.Unhandled()
 	}
@@ -143,13 +149,14 @@ type credentials struct {
 }
 
 func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
-	ns.logger.Debug("Starting internal NATS server")
 	var err error
 	ns.server, err = server.NewServer(opts)
 	if err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
 		return err
 	}
+	// NOTE: uncomment this if you need to troubleshoot internal NATS comms
+	// ns.server.ConfigureLogger()
 
 	if err := server.Run(ns.server); err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
@@ -159,17 +166,22 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 	clientUrl := ns.server.ClientURL()
 	ns.internalNatsUrl = clientUrl
 
-	seed, err := ns.hostUser.Seed()
-	if err != nil {
-		return err
-	}
-	nkeyOpt, err := nats.NkeyOptionFromSeed(string(seed))
-	if err != nil {
-		return err
-	}
+	ns.logger.Debug("Starting internal NATS server", slog.String("client_url", clientUrl))
 
-	internalClient, err := nats.Connect(clientUrl, nkeyOpt)
+	pk, err := ns.hostUser.PublicKey()
 	if err != nil {
+		ns.logger.Error("Failed to get public key for host user")
+		return err
+	}
+	nkeyOpt := nats.Nkey(pk, func(b []byte) ([]byte, error) {
+		return ns.hostUser.Sign(b)
+	})
+
+	internalClient, err := nats.Connect(clientUrl, nkeyOpt, nats.Name("Nex Node Host User"))
+	if err != nil {
+		ns.logger.Error("Failed to connect to internal NATS server",
+			slog.String("client_url", clientUrl),
+			slog.Any("error", err))
 		return err
 	}
 
@@ -177,12 +189,17 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 
 	_, err = ns.conn.Subscribe("host.*.register", ns.handleAgentRegistration)
 	if err != nil {
+		ns.logger.Error("Failed to subscribe to registration subject",
+			slog.Any("error", err))
 		return err
 	}
+
+	ns.logger.Debug("Connected to internal NATS server as host user", slog.String("client_url", clientUrl))
 	return nil
 }
 
 func (ns *InternalNatsServer) handleAgentRegistration(msg *nats.Msg) {
+	ns.logger.Debug("Received request to register agent", slog.String("subject", msg.Subject))
 	tokens := strings.Split(msg.Subject, ".")
 	if len(tokens) != 3 {
 		ns.logger.Error("Somehow got incorrect number of tokens", slog.String("subject", msg.Subject))
@@ -269,8 +286,8 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 		StoreDir:  ns.storeDir,
 		Port:      -1,
 		NoSigs:    true,
-		// Debug:     debug, FIXME-- make configurable
-		// Trace:     trace,
+		//Debug:     true,
+		//Trace: true,
 	}
 
 	f, err := os.CreateTemp(os.TempDir(), defaultInternalNatsConfigFile)
@@ -281,6 +298,10 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 
 	if _, err := f.Write(bytes); err != nil {
 		ns.logger.Error("Failed to write internal nats server config file", slog.Any("error", err))
+		return nil, err
+	}
+	err = f.Close()
+	if err != nil {
 		return nil, err
 	}
 

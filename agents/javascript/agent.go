@@ -1,8 +1,10 @@
 package agent
 
 import (
-	"context"
+	"fmt"
 	"log/slog"
+	"os"
+	"os/signal"
 
 	agentcommon "github.com/synadia-io/nex/agents/common"
 	agentapigen "github.com/synadia-io/nex/api/agent/go/gen"
@@ -21,11 +23,12 @@ func NewAgent() (*JavaScriptAgent, error) {
 }
 
 func (a *JavaScriptAgent) Up() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	slog.Info("JavaScript agent is up")
+	exit := make(chan os.Signal, 1)
+	signal.Notify(exit, os.Interrupt)
+	fmt.Fprintln(os.Stdout, "JavaScript agent is up")
 
-	<-ctx.Done()
+	<-exit
+	fmt.Println("JavaScript agent shutting down")
 	return nil
 }
 
