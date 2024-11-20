@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strings"
 
 	"github.com/nats-io/nats.go"
 )
@@ -115,10 +116,10 @@ type logCapture struct {
 func (cap logCapture) Write(p []byte) (n int, err error) {
 	if !cap.stderr {
 		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.%s.stdout", cap.namespace, cap.name), p)
-		cap.logger.Debug(string(p), slog.String("process_name", cap.name))
+		cap.logger.Debug(strings.TrimSpace(string(p)), slog.String("process_name", cap.name))
 	} else {
 		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.%s.stderr", cap.namespace, cap.name), p)
-		cap.logger.Error(string(p), slog.String("process_name", cap.name))
+		cap.logger.Error(strings.TrimSpace(string(p)), slog.String("process_name", cap.name))
 	}
 	return len(p), nil
 }

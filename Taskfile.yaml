@@ -87,6 +87,11 @@ tasks:
       --schema-package=io.nats.nex.v2.start-workload-response=github.com/synadia-io/nex/api/nodecontrol/gen \
       start-workload-response.json"
   
+  javascript:
+    dir: agents/javascript/cmd/javascript
+    cmds:
+      - go build .
+
   nex:
     deps: [proto]
     dir: cmd/nex

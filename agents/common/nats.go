@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 // and the agent can register with the Nex node (mandatory).
 //
 // This is NOT the connection used to expose the host services APIs
-func CreateEmbeddedNatsConnection() (*nats.Conn, error) {
+func CreateEmbeddedNatsConnection(agentName string) (*nats.Conn, error) {
 
 	host, exists := os.LookupEnv(EnvNatsHost)
 	if !exists {
@@ -36,9 +37,27 @@ func CreateEmbeddedNatsConnection() (*nats.Conn, error) {
 		p = 4222
 	}
 
+	kp, err := nkeys.FromSeed([]byte(os.Getenv(EnvNatsNkey)))
+	if err != nil {
+		return nil, err
+	}
+	pk, err := kp.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	nkey := nats.Nkey(pk, func(b []byte) ([]byte, error) {
+		return kp.Sign(b)
+	})
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("Connecting to %s:%d\n", host, p)
+
+	clientName := fmt.Sprintf("Nex Agent - %s", agentName)
 	return nats.Connect(fmt.Sprintf("nats://%s:%d", host, p),
-		nats.Nkey(os.Getenv(EnvNatsNkey), nats.GetDefaultOptions().SignatureCB),
-		nats.Name("Nex Node Agent Client (embedded)"))
+		nkey,
+		nats.Name(clientName))
 }
 
 // Creates a host services connection for use by an agent. This connects the agent to resources contained
