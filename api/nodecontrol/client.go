@@ -106,8 +106,8 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindWorkload(_type, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
-	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(_type, namespace, workloadId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
+	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(inType, namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.DeploySubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.DirectDeploySubject(nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

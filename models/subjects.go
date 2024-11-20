@@ -13,8 +13,8 @@ func PingSubject() string {
 	return ControlAPIPrefix + ".system.PING"
 }
 
-func DeploySubject(nodeId string) string {
-	return fmt.Sprintf(ControlAPIPrefix+".system.DEPLOY.%s", nodeId)
+func DirectDeploySubject(nodeId string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".system.DDEPLOY.%s", nodeId)
 }
 
 func LameduckSubject(inNodeId string) string {
