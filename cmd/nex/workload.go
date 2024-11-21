@@ -59,7 +59,7 @@ type NatsCreds struct {
 type RunWorkload struct {
 	NodeId      string            `description:"Node ID to run the workload on"`
 	NodeTags    map[string]string `description:"Node tags to run the workload on; --node-id will take precedence"`
-	NodePubXKey string            `name:"node-xkey-pub" description:"Node public key to run the workload on"`
+	NodePubXKey string            `name:"node-xkey-pub" description:"Node public xkey used for encryption"`
 
 	WorkloadName             string            `name:"name" description:"Name of the workload"`
 	WorkloadArguments        []string          `name:"argv" description:"Arguments to pass to the workload"`
