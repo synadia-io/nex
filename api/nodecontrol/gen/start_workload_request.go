@@ -5,6 +5,35 @@ package gen
 import "encoding/json"
 import "fmt"
 
+type EncryptedEnvironment struct {
+	// Base64EncryptedEnv corresponds to the JSON schema field "base64_encrypted_env".
+	Base64EncryptedEnv string `json:"base64_encrypted_env" yaml:"base64_encrypted_env" mapstructure:"base64_encrypted_env"`
+
+	// EncryptedBy corresponds to the JSON schema field "encrypted_by".
+	EncryptedBy string `json:"encrypted_by" yaml:"encrypted_by" mapstructure:"encrypted_by"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *EncryptedEnvironment) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["base64_encrypted_env"]; raw != nil && !ok {
+		return fmt.Errorf("field base64_encrypted_env in EncryptedEnvironment: required")
+	}
+	if _, ok := raw["encrypted_by"]; raw != nil && !ok {
+		return fmt.Errorf("field encrypted_by in EncryptedEnvironment: required")
+	}
+	type Plain EncryptedEnvironment
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = EncryptedEnvironment(plain)
+	return nil
+}
+
 type HostServicesConfig struct {
 	// NatsUrl corresponds to the JSON schema field "nats_url".
 	NatsUrl string `json:"nats_url" yaml:"nats_url" mapstructure:"nats_url"`
@@ -47,9 +76,9 @@ type StartWorkloadRequestJson struct {
 	// A description of the workload
 	Description string `json:"description" yaml:"description" mapstructure:"description"`
 
-	// The base64-encoded byte array of the environment in which the workload is
-	// provided at runtime
-	Environment string `json:"environment" yaml:"environment" mapstructure:"environment"`
+	// The base64-encoded byte array of the encrypted environment with public key of
+	// encryptor
+	EncEnvironment EncryptedEnvironment `json:"enc_environment" yaml:"enc_environment" mapstructure:"enc_environment"`
 
 	// Whether the workload is essential; essential workloads will be restarted if
 	// they fail
@@ -72,6 +101,9 @@ type StartWorkloadRequestJson struct {
 
 	// The public key of the sender
 	SenderPublicKey string `json:"sender_public_key" yaml:"sender_public_key" mapstructure:"sender_public_key"`
+
+	// The xkey of the target node
+	TargetPubXkey string `json:"target_pub_xkey" yaml:"target_pub_xkey" mapstructure:"target_pub_xkey"`
 
 	// The subjects that trigger the workload
 	TriggerSubjects []string `json:"trigger_subjects" yaml:"trigger_subjects" mapstructure:"trigger_subjects"`
@@ -101,8 +133,8 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	if _, ok := raw["description"]; raw != nil && !ok {
 		return fmt.Errorf("field description in StartWorkloadRequestJson: required")
 	}
-	if _, ok := raw["environment"]; raw != nil && !ok {
-		return fmt.Errorf("field environment in StartWorkloadRequestJson: required")
+	if _, ok := raw["enc_environment"]; raw != nil && !ok {
+		return fmt.Errorf("field enc_environment in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["essential"]; raw != nil && !ok {
 		return fmt.Errorf("field essential in StartWorkloadRequestJson: required")
@@ -124,6 +156,9 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["sender_public_key"]; raw != nil && !ok {
 		return fmt.Errorf("field sender_public_key in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["target_pub_xkey"]; raw != nil && !ok {
+		return fmt.Errorf("field target_pub_xkey in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["trigger_subjects"]; raw != nil && !ok {
 		return fmt.Errorf("field trigger_subjects in StartWorkloadRequestJson: required")

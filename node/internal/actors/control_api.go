@@ -189,7 +189,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	api.logger.Info("NATS execution engine awaiting commands", slog.String("id", api.publicKey)) //slog.String("version", VERSION)
+	api.logger.Info("NATS execution engine awaiting commands")
 	return nil
 }
 

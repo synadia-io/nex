@@ -32,13 +32,13 @@ func TestAuctionDeploy(t *testing.T) {
 	}
 	defer s.Shutdown()
 
-	nex1, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node1", "nexus")
+	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
 	nex1.SysProcAttr = sysProcAttr()
 
-	nex2, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node2", "nexus")
+	nex2, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}

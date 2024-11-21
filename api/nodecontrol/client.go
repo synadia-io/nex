@@ -3,7 +3,6 @@ package nodecontrol
 import (
 	"encoding/json"
 	"log/slog"
-	"math/rand/v2"
 	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
@@ -121,20 +120,7 @@ func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) AuctionDeployWorkload(namespace string, nodeTags map[string]string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
-	auctionResults, err := c.Auction(namespace, nodeTags)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(auctionResults) == 0 {
-		c.logger.Info("no nodes available for deployment")
-		return nil, nil
-	}
-
-	nodeX := rand.IntN(len(auctionResults))
-	bidderId := auctionResults[nodeX].BidderId
-
+func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err

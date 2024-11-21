@@ -40,3 +40,4 @@ config.json
 agents/javascript/cmd/javascript/javascript
 
 TESTCREDS/
+test/testdata/direct_start/direct_start

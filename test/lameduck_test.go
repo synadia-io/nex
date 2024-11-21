@@ -33,7 +33,7 @@ func TestLameDuckMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd, err := startNexNodeCmd(t, workingDir, string(seed), s.ClientURL(), "node", "nexus")
+	cmd, err := startNexNodeCmd(t, workingDir, string(seed), "", s.ClientURL(), "node", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}

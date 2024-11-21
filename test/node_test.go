@@ -70,7 +70,7 @@ func startNatsSever(t testing.TB, workingDir string) (*server.Server, error) {
 	return s, nil
 }
 
-func startNexNodeCmd(t testing.TB, workingDir, seed, natsServer, name, nexus string) (*exec.Cmd, error) {
+func startNexNodeCmd(t testing.TB, workingDir, nodeSeed, xkeySeed, natsServer, name, nexus string) (*exec.Cmd, error) {
 	t.Helper()
 
 	cli, err := buildNexCli(t, workingDir)
@@ -78,7 +78,7 @@ func startNexNodeCmd(t testing.TB, workingDir, seed, natsServer, name, nexus str
 		return nil, err
 	}
 
-	if seed == "" {
+	if nodeSeed == "" {
 		kp, err := nkeys.CreateServer()
 		if err != nil {
 			return nil, err
@@ -87,10 +87,22 @@ func startNexNodeCmd(t testing.TB, workingDir, seed, natsServer, name, nexus str
 		if err != nil {
 			return nil, err
 		}
-		seed = string(s)
+		nodeSeed = string(s)
 	}
 
-	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", natsServer, "--resource-directory", workingDir, "--node-name", name, "--nexus", nexus, "--node-seed", seed)
+	if xkeySeed == "" {
+		xkp, err := nkeys.CreateCurveKeys()
+		if err != nil {
+			return nil, err
+		}
+		xSeed, err := xkp.Seed()
+		if err != nil {
+			return nil, err
+		}
+		xkeySeed = string(xSeed)
+	}
+
+	cmd := exec.Command(cli, "node", "up", "--logger.level", "debug", "--logger.short", "-s", natsServer, "--resource-directory", workingDir, "--node-name", name, "--nexus", nexus, "--node-seed", nodeSeed, "--node-xkey-seed", xkeySeed)
 	return cmd, nil
 }
 
@@ -101,7 +113,7 @@ func TestStartNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node", "nexus")
+	cmd, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,17 +173,17 @@ func TestStartNexus(t *testing.T) {
 	}
 	defer s.Shutdown()
 
-	nex1, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node1", "nexus3node")
+	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}
 	nex1.SysProcAttr = sysProcAttr()
-	nex2, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node2", "nexus3node")
+	nex2, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}
 	nex2.SysProcAttr = sysProcAttr()
-	nex3, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node3", "nexus3node")
+	nex3, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node3", "nexus3node")
 	if err != nil {
 		t.Fatal(err)
 	}

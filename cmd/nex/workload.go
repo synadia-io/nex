@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/natscli/columns"
+	"github.com/nats-io/nkeys"
 	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	oras "oras.land/oras-go/v2"
@@ -55,8 +57,9 @@ type NatsCreds struct {
 
 // Workload subcommands
 type RunWorkload struct {
-	NodeId   string            `description:"Node ID to run the workload on"`
-	NodeTags map[string]string `description:"Node tags to run the workload on; --node-id will take precedence"`
+	NodeId      string            `description:"Node ID to run the workload on"`
+	NodeTags    map[string]string `description:"Node tags to run the workload on; --node-id will take precedence"`
+	NodePubXKey string            `name:"node-xkey-pub" description:"Node public key to run the workload on"`
 
 	WorkloadName             string            `name:"name" description:"Name of the workload"`
 	WorkloadArguments        []string          `name:"argv" description:"Arguments to pass to the workload"`
@@ -95,6 +98,12 @@ func (r RunWorkload) Validate() error {
 		errs = errors.Join(errs, errors.New("Workload URI must start with one of the following prefixes: "+strings.Join(validURIPrefix, ", ")))
 	}
 
+	if r.NodeId != "" {
+		if r.NodePubXKey == "" {
+			errs = errors.Join(errs, errors.New("If Node ID is provided, Node Public XKey is required"))
+		}
+	}
+
 	return errs
 }
 
@@ -117,19 +126,9 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		return err
 	}
 
-	var env string
-	if r.WorkloadEnvironment != nil {
-		env_b, err := json.Marshal(r.WorkloadEnvironment)
-		if err != nil {
-			return err
-		}
-		env = base64.StdEncoding.EncodeToString(env_b)
-	}
-
 	startRequest := gen.StartWorkloadRequestJson{
 		Argv:        r.WorkloadArguments,
 		Description: r.WorkloadDescription,
-		Environment: env,
 		Essential:   r.WorkloadEssential,
 		Hash:        r.WorkloadHash,
 		HostServiceConfig: gen.HostServicesConfig{
@@ -139,6 +138,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		},
 		Jsdomain:        r.WorkloadJsDomain,
 		Namespace:       globals.Namespace,
+		TargetPubXkey:   r.NodePubXKey,
 		RetryCount:      r.WorkloadRetryCount,
 		SenderPublicKey: r.WorkloadPublicKey,
 		TriggerSubjects: r.WorkloadTriggerSubjects,
@@ -147,14 +147,64 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		WorkloadType:    r.WorkloadType,
 	}
 
+	txk, err := nkeys.CreateCurveKeys()
+	if err != nil {
+		return err
+	}
+	txk_pub, err := txk.PublicKey()
+	if err != nil {
+		return err
+	}
+
+	var env_b []byte
+	if r.WorkloadEnvironment != nil {
+		env_b, err = json.Marshal(r.WorkloadEnvironment)
+		if err != nil {
+			return err
+		}
+	}
+
 	var resp *gen.StartWorkloadResponseJson
 	if r.NodeId != "" {
+		enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
+		if err != nil {
+			return err
+		}
+		b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
+		startRequest.EncEnvironment = gen.EncryptedEnvironment{
+			Base64EncryptedEnv: b64_enc_env,
+			EncryptedBy:        txk_pub,
+		}
 		resp, err = controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
 		if err != nil {
 			return err
 		}
 	} else {
-		resp, err = controller.AuctionDeployWorkload(globals.Namespace, r.NodeTags, startRequest)
+		auctionResults, err := controller.Auction(globals.Namespace, r.NodeTags)
+		if err != nil {
+			return err
+		}
+
+		if len(auctionResults) == 0 {
+			return errors.New("no nodes available for deployment")
+		}
+
+		nodeX := rand.IntN(len(auctionResults))
+		bidderId := auctionResults[nodeX].BidderId
+
+		// in an auction deploy, information about the target node is unknown, so we need to provide it in the auction
+		startRequest.TargetPubXkey = auctionResults[nodeX].TargetXkey
+
+		enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
+		if err != nil {
+			return err
+		}
+		b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
+		startRequest.EncEnvironment = gen.EncryptedEnvironment{
+			Base64EncryptedEnv: b64_enc_env,
+			EncryptedBy:        txk_pub,
+		}
+		resp, err = controller.AuctionDeployWorkload(globals.Namespace, bidderId, startRequest)
 		if err != nil {
 			return err
 		}
