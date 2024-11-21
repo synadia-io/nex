@@ -288,20 +288,24 @@ func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string
 		return nil, nil
 	}
 
-	xKeyPub, err := nn.options.Xkey.PublicKey()
+	xkp, err := nkeys.CreateCurveKeys()
 	if err != nil {
-		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
+		return nil, err
+	}
+
+	xkPub, err := xkp.PublicKey()
+	if err != nil {
 		return nil, err
 	}
 
 	// Gets new auction id & replace nodeid
 	bidderId := nuid.New().Next()
-	nn.auctionMap.Put(bidderId, auctionId)
+	nn.auctionMap.Put(bidderId, auctionId, xkp)
 
 	resp := &actorproto.AuctionResponse{
 		BidderId:   bidderId,
 		Version:    VERSION,
-		TargetXkey: xKeyPub,
+		TargetXkey: xkPub,
 		StartedAt:  timestamppb.New(nn.startedAt),
 		Tags:       nn.options.Tags,
 		Status:     make(map[string]int32),
@@ -444,19 +448,31 @@ func (nn nexNode) SetLameDuck(ctx context.Context) {
 	}()
 }
 
-func (nn nexNode) IsTargetNode(inId string) (bool, error) {
+func (nn nexNode) IsTargetNode(inId string) (bool, nkeys.KeyPair, error) {
 	pub, err := nn.publicKey.PublicKey()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if inId == pub {
-		return true, nil
+		return true, nn.options.Xkey, nil
 	}
 	if nn.auctionMap.Exists(inId) {
-		auctionId := nn.auctionMap.Get(inId)
+		auctionId, kp := nn.auctionMap.Get(inId)
 		nn.options.Logger.Debug("Accepting workload from auction", slog.String("auctionId", auctionId))
 		nn.auctionMap.Delete(inId)
-		return true, nil
+		return true, kp, nil
 	}
-	return false, nil
+	return false, nil, nil
+}
+
+func (nn nexNode) EncryptPayload(payload []byte) ([]byte, string, error) {
+	xPub, err := nn.options.Xkey.PublicKey()
+	if err != nil {
+		return nil, "", err
+	}
+	payloadEnc, err := nn.options.Xkey.Seal(payload, xPub)
+	if err != nil {
+		return nil, "", err
+	}
+	return payloadEnc, xPub, nil
 }
