@@ -38,54 +38,37 @@ tasks:
   gen-schema-nodecontrol:
     dir: api/nodecontrol
     cmds:
-      - "go-jsonschema \
-      --package=gen -o=./gen/auction_request.go \
-      --schema-package=io.nats.nex.v2.auction-request=github.com/synadia-io/nex/api/nodecontrol/gen \
-      auction-request.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/auction_response.go \
-      --schema-package=io.nats.nex.v2.auction-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      auction-response.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/node_ping_response.go \
-      --schema-package=io.nats.nex.v2.node-ping-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      node-ping-response.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/agent_ping_response.go \
-      --schema-package=io.nats.nex.v2.agent-ping-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      agent-ping-response.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/workload_ping_response.go \
-      --schema-package=io.nats.nex.v2.workload-ping-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      workload-ping-response.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/lameduck_request.go \
-      --schema-package=io.nats.nex.v2.lame-duck-request=github.com/synadia-io/nex/api/nodecontrol/gen \
-      lameduck-request.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/lameduck_response.go \
-      --schema-package=io.nats.nex.v2.lame-duck-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      lameduck-response.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/node_info_response.go \
-      --schema-package=io.nats.nex.v2.node-info-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      node-info-response.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/stop_workload_request.go \
-      --schema-package=io.nats.nex.v2.stop-workload-request=github.com/synadia-io/nex/api/nodecontrol/gen \
-      stop-workload-request.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/stop_workload_response.go \
-      --schema-package=io.nats.nex.v2.stop-workload-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      stop-workload-response.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/start_workload_request.go \
-      --schema-package=io.nats.nex.v2.start-workload-request=github.com/synadia-io/nex/api/nodecontrol/gen \
-      start-workload-request.json"
-      - "go-jsonschema \
-      --package=gen -o=./gen/start_workload_response.go \
-      --schema-package=io.nats.nex.v2.start-workload-response=github.com/synadia-io/nex/api/nodecontrol/gen \
-      start-workload-response.json"
+      - go-jsonschema
+        --package=gen
+        --schema-package=io.nats.nex.v2.start_workload_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.start_workload_response=gen/start_workload_response.go 
+        --schema-package=io.nats.nex.v2.stop_workload_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.stop_workload_response=gen/stop_workload_response.go 
+        --schema-package=io.nats.nex.v2.stop_workload_request=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.stop_workload_request=gen/stop_workload_request.go 
+        --schema-package=io.nats.nex.v2.node_info_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.node_info_response=gen/node_info_response.go 
+        --schema-package=io.nats.nex.v2.lameduck_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.lameduck_response=gen/lameduck_response.go 
+        --schema-package=io.nats.nex.v2.lameduck_request=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.lameduck_request=gen/lameduck_request.go 
+        --schema-package=io.nats.nex.v2.workload_ping_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.workload_ping_response=gen/workload_ping_response.go 
+        --schema-package=io.nats.nex.v2.agent_ping_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.agent_ping_response=gen/agent_ping_response.go 
+        --schema-package=io.nats.nex.v2.node_ping_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.node_ping_response=gen/node_ping_response.go 
+        --schema-package=io.nats.nex.v2.auction_request=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.auction_request=gen/auction_request.go 
+        --schema-package=io.nats.nex.v2.auction_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.auction_response=gen/auction_response.go 
+        --schema-package=io.nats.nex.v2.start_workload_request=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.start_workload_request=gen/start_workload_request.go 
+        --schema-package=io.nats.nex.v2.clone_workload_request=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.clone_workload_request=gen/clone_workload_request.go 
+        --schema-package=shared=github.com/synadia-io/nex/api/nodecontrol/gen
+        --schema-output=shared=gen/shared.go
+        *.json
   
   javascript:
     dir: agents/javascript/cmd/javascript

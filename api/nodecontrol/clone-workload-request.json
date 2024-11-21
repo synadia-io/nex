@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.clone_workload_request",
+  "title": "CloneWorkloadRequest",
+  "type": "object",
+  "properties": {
+    "start_workload_request": {
+      "$ref": "./start-workload-request.json"
+    }
+  },
+  "required": [
+    "start_workload_request"
+  ]
+}
