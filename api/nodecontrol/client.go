@@ -260,9 +260,9 @@ func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *cl
 	return ret, nil
 }
 
-func (c *ControlAPIClient) CopyWorkload(workloadId, namespace string, target *nodegen.AuctionResponseJson) (*nodegen.StartWorkloadRequestJson, error) {
+func (c *ControlAPIClient) CopyWorkload(workloadId, namespace string, targetXkey string) (*nodegen.StartWorkloadRequestJson, error) {
 	req := &nodegen.CloneWorkloadRequestJson{
-		NewTargetXkey: target.TargetXkey,
+		NewTargetXkey: targetXkey,
 	}
 
 	req_b, err := json.Marshal(req)

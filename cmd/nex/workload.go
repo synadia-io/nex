@@ -363,6 +363,7 @@ type CopyWorkload struct {
 	StopOriginal bool   `name:"stop" description:"Stop the original workload after copying" default:"false"`
 
 	NodeId   string            `description:"Node ID of target workload. If not provided, auction is preformed"`
+	NodeXkey string            `description:"Node public xkey used for encryption"`
 	NodeTags map[string]string `description:"Node tags to use during auction; --node-id will take precedence"`
 }
 
@@ -390,13 +391,32 @@ func (c CopyWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
+	if c.NodeId != "" && c.NodeXkey == "" {
+		return errors.New("Node public xkey is required if Node ID is provided")
+	}
+
+	if c.NodeId != "" {
+		resp, err := controller.CopyWorkload(c.WorkloadId, globals.Namespace, c.NodeXkey)
+		if err != nil {
+			return err
+		}
+
+		startResp, err := controller.DeployWorkload(globals.Namespace, c.NodeId, *resp)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Workload successfully copied! New workloadId: %s\n", startResp.Id)
+		return nil
+	}
+
 	auctionResults, err := controller.Auction(globals.Namespace, c.NodeTags)
 	if err != nil {
 		return err
 	}
 
 	nodeX := rand.IntN(len(auctionResults))
-	resp, err := controller.CopyWorkload(c.WorkloadId, globals.Namespace, auctionResults[nodeX])
+	resp, err := controller.CopyWorkload(c.WorkloadId, globals.Namespace, auctionResults[nodeX].TargetXkey)
 	if err != nil {
 		return err
 	}
