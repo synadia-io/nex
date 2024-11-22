@@ -66,6 +66,8 @@ tasks:
         --schema-output=io.nats.nex.v2.start_workload_request=gen/start_workload_request.go 
         --schema-package=io.nats.nex.v2.clone_workload_request=github.com/synadia-io/nex/api/nodecontrol/gen 
         --schema-output=io.nats.nex.v2.clone_workload_request=gen/clone_workload_request.go 
+        --schema-package=io.nats.nex.v2.clone_workload_response=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.clone_workload_response=gen/clone_workload_response.go 
         --schema-package=shared=github.com/synadia-io/nex/api/nodecontrol/gen
         --schema-output=shared=gen/shared.go
         *.json
