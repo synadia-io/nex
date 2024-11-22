@@ -135,7 +135,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			RunningWorkloads: runningWorkloads,
 		})
 	case *actorproto.GetRunRequest:
-		a.logger.Debug("QueryWorkloads received", slog.String("name", ctx.Self().Name()))
+		a.logger.Debug("GetRunRequest received", slog.String("name", ctx.Self().Name()))
 		rr, ok := a.runRequest[m.WorkloadId]
 		if !ok {
 			return
