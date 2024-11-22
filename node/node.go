@@ -57,6 +57,11 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 		nodeName = "nexnode"
 	}
 
+	xkey, err := nkeys.CreateCurveKeys()
+	if err != nil {
+		return nil, err
+	}
+
 	nn := &nexNode{
 		ctx:        context.Background(),
 		nc:         nc,
@@ -67,6 +72,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
 			ResourceDirectory:     "./resources",
+			Xkey:                  xkey,
 			Tags: map[string]string{
 				models.TagOS:       runtime.GOOS,
 				models.TagArch:     runtime.GOARCH,
@@ -160,6 +166,11 @@ func (nn nexNode) Validate() error {
 	_, err := nn.publicKey.PublicKey()
 	if err != nil {
 		errs = errors.Join(errs, errors.New("could not produce a public key for this node. This should never happen"))
+	}
+
+	err = nkeys.CompatibleKeyPair(nn.options.Xkey, nkeys.PrefixByteCurve)
+	if err != nil {
+		errs = errors.Join(errs, errors.New("node xkeypair is not a curve keypair"))
 	}
 
 	return errs
@@ -277,16 +288,27 @@ func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string
 		return nil, nil
 	}
 
+	xkp, err := nkeys.CreateCurveKeys()
+	if err != nil {
+		return nil, err
+	}
+
+	xkPub, err := xkp.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
 	// Gets new auction id & replace nodeid
 	bidderId := nuid.New().Next()
-	nn.auctionMap.Put(bidderId, auctionId)
+	nn.auctionMap.Put(bidderId, auctionId, xkp)
 
 	resp := &actorproto.AuctionResponse{
-		BidderId:  bidderId,
-		Version:   VERSION,
-		StartedAt: timestamppb.New(nn.startedAt),
-		Tags:      nn.options.Tags,
-		Status:    make(map[string]int32),
+		BidderId:   bidderId,
+		Version:    VERSION,
+		TargetXkey: xkPub,
+		StartedAt:  timestamppb.New(nn.startedAt),
+		Tags:       nn.options.Tags,
+		Status:     make(map[string]int32),
 	}
 
 	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
@@ -426,19 +448,31 @@ func (nn nexNode) SetLameDuck(ctx context.Context) {
 	}()
 }
 
-func (nn nexNode) IsTargetNode(inId string) (bool, error) {
+func (nn nexNode) IsTargetNode(inId string) (bool, nkeys.KeyPair, error) {
 	pub, err := nn.publicKey.PublicKey()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	if inId == pub {
-		return true, nil
+		return true, nn.options.Xkey, nil
 	}
 	if nn.auctionMap.Exists(inId) {
-		auctionId := nn.auctionMap.Get(inId)
+		auctionId, kp := nn.auctionMap.Get(inId)
 		nn.options.Logger.Debug("Accepting workload from auction", slog.String("auctionId", auctionId))
 		nn.auctionMap.Delete(inId)
-		return true, nil
+		return true, kp, nil
 	}
-	return false, nil
+	return false, nil, nil
+}
+
+func (nn nexNode) EncryptPayload(payload []byte) ([]byte, string, error) {
+	xPub, err := nn.options.Xkey.PublicKey()
+	if err != nil {
+		return nil, "", err
+	}
+	payloadEnc, err := nn.options.Xkey.Seal(payload, xPub)
+	if err != nil {
+		return nil, "", err
+	}
+	return payloadEnc, xPub, nil
 }

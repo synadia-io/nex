@@ -161,15 +161,21 @@ func (a DirectStartAgent) pingWorkload(namespace, workloadId string) (*actorprot
 }
 
 func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorproto.WorkloadStarted, error) {
-	env := make(map[string]string)
-	if m.Environment != "" {
-		env_b, err := base64.StdEncoding.DecodeString(m.Environment)
-		if err != nil {
-			a.logger.Error("Failed to decode environment", slog.String("name", a.self.Name()), slog.Any("err", err))
-			return nil, err
-		}
+	encEnv, err := base64.StdEncoding.DecodeString(m.Environment.Base64EncryptedEnv)
+	if err != nil {
+		a.logger.Error("Failed to decode environment", slog.String("name", a.self.Name()), slog.Any("err", err))
+		return nil, err
+	}
 
-		err = json.Unmarshal(env_b, &env)
+	clearEnv, err := a.options.Xkey.Open(encEnv, m.Environment.EncryptedBy)
+	if err != nil {
+		a.logger.Error("Failed to decrypt environment", slog.String("name", a.self.Name()), slog.Any("err", err))
+		return nil, err
+	}
+
+	env := make(map[string]string)
+	if len(clearEnv) != 0 {
+		err = json.Unmarshal(clearEnv, &env)
 		if err != nil {
 			a.logger.Error("Failed to unmarshal environment", slog.String("name", a.self.Name()), slog.Any("err", err))
 			return nil, err

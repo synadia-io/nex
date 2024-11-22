@@ -2,6 +2,7 @@ package actors
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,7 +51,8 @@ type ControlAPINodeCallback interface {
 	Ping() (*actorproto.PingNodeResponse, error)
 	GetInfo() (*actorproto.NodeInfo, error)
 	SetLameDuck(context.Context)
-	IsTargetNode(string) (bool, error)
+	IsTargetNode(string) (bool, nkeys.KeyPair, error)
+	EncryptPayload([]byte) ([]byte, string, error)
 }
 
 func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, callback ControlAPINodeCallback) *ControlAPI {
@@ -189,7 +191,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	api.logger.Info("NATS execution engine awaiting commands", slog.String("id", api.publicKey)) //slog.String("version", VERSION)
+	api.logger.Info("NATS execution engine awaiting commands")
 	return nil
 }
 
@@ -233,7 +235,7 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 	}
 
 	// splitSub[4] is the bidderId
-	target, err := api.nodeCallback.IsTargetNode(splitSub[4])
+	target, xkp, err := api.nodeCallback.IsTargetNode(splitSub[4])
 	if err != nil {
 		api.logger.Error("Failed to check if target node", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to check if target node: %s", err))
@@ -242,6 +244,33 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 
 	if !target {
 		return
+	}
+
+	// reencrypt env with node key
+	encEnv, err := base64.StdEncoding.DecodeString(req.EncEnvironment.Base64EncryptedEnv)
+	if err != nil {
+		api.logger.Error("Failed to decode base64 env", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to decode base64 env: %s", err))
+		return
+	}
+
+	env, err := xkp.Open(encEnv, req.EncEnvironment.EncryptedBy)
+	if err != nil {
+		api.logger.Error("Failed to decrypt env", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to decrypt env: %s", err))
+		return
+	}
+
+	newEncEnv, encTo, err := api.nodeCallback.EncryptPayload(env)
+	if err != nil {
+		api.logger.Error("Failed to encrypt env", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to encrypt env: %s", err))
+		return
+	}
+
+	req.EncEnvironment = nodecontrol.EncryptedEnvironment{
+		Base64EncryptedEnv: base64.StdEncoding.EncodeToString(newEncEnv),
+		EncryptedBy:        encTo,
 	}
 
 	ctx := context.Background()

@@ -336,6 +336,7 @@ type Up struct {
 	Agents                           AgentConfigs      `help:"Workload types configurations for nex node to initialize"`
 	DisableDirectStart               bool              `help:"Disable direct start (no sandbox) workloads" default:"false"`
 	NodeSeed                         string            `help:"Node Seed used for identifier.  Default is generated" placeholder:"NBTAFHAKW..."`
+	NodeXKeySeed                     string            `name:"node-xkey-seed" help:"Node XKey Seed used for encryption.  Default is generated" placeholder:"XAIHERHS..."`
 	HideWorkloadLogs                 bool              `name:"hide-workload-logs" help:"Hide logs from workloads" default:"false"`
 	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false" hidden:""`
 
@@ -357,6 +358,13 @@ func (u Up) Validate() error {
 		prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeSeed))
 		if err != nil || prefix != nkeys.PrefixByteServer {
 			errs = errors.Join(errs, errors.New("invalid node seed provided"))
+		}
+	}
+
+	if u.NodeXKeySeed != "" {
+		prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeXKeySeed))
+		if err != nil || prefix != nkeys.PrefixByteCurve {
+			errs = errors.Join(errs, errors.New("invalid node xkey seed provided"))
 		}
 	}
 
@@ -391,12 +399,26 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
+	var xkp nkeys.KeyPair
+	if u.NodeXKeySeed == "" {
+		xkp, err = nkeys.CreateCurveKeys()
+		if err != nil {
+			return err
+		}
+	} else {
+		xkp, err = nkeys.FromSeed([]byte(u.NodeXKeySeed))
+		if err != nil {
+			return err
+		}
+	}
+
 	logger := configureLogger(globals, nc, pubKey, u.ShowSystemLogs, u.HideWorkloadLogs)
 
 	nexNode, err := node.NewNexNode(kp, nc,
 		options.WithLogger(logger),
 		options.WithNodeName(u.NodeName),
 		options.WithNexus(u.NexusName),
+		options.WithXKeyKeyPair(xkp),
 		options.WithAgentHandshakeTimeout(u.AgentHandshakeTimeoutMillisecond),
 		options.WithResourceDirectory(u.DefaultResourceDir),
 		options.WithNodeTags(u.Tags),
@@ -443,13 +465,17 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		return err
 	}
 
-	logger.Info("Validating Nex Node")
+	logger.Debug("Validating Nex Node")
 	err = nexNode.Validate()
 	if err != nil {
 		return err
 	}
 
-	logger.Info("Starting Nex Node", slog.String("public_key", pubKey), slog.String("config", string(globals.Config)))
+	xkp_pub, err := xkp.PublicKey()
+	if err != nil {
+		return err
+	}
+	logger.Info("Starting Nex Node", slog.String("public_key", pubKey), slog.String("public_xkey", xkp_pub), slog.String("config", string(globals.Config)))
 	return nexNode.Start() // As this is a blocking call, it should return only when the node is shutting down
 }
 
