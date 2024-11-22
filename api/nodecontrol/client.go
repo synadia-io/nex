@@ -259,3 +259,27 @@ func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *cl
 
 	return ret, nil
 }
+
+func (c *ControlAPIClient) CopyWorkload(workloadId, namespace string, target *nodegen.AuctionResponseJson) (*nodegen.StartWorkloadRequestJson, error) {
+	req := &nodegen.CloneWorkloadRequestJson{
+		NewTargetXkey: target.TargetXkey,
+	}
+
+	req_b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := c.nc.Request(models.CloneWorkloadRequestSubject(namespace, workloadId), req_b, DefaultRequestTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	envelope := new(models.Envelope[nodegen.CloneWorkloadResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
+	if err != nil {
+		return nil, err
+	}
+
+	return envelope.Data.StartWorkloadRequest, nil
+}

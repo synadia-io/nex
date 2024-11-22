@@ -141,3 +141,12 @@ func (i InfoWorkload) Table() []table.Row {
 		{"Workload Type", i.WorkloadType, reflect.TypeOf(i.WorkloadType).String()},
 	}
 }
+
+func (c CopyWorkload) Table() []table.Row {
+	return []table.Row{
+		{"Workload ID", c.WorkloadId, reflect.TypeOf(c.WorkloadId).String()},
+		{"Workload Type", c.WorkloadType, reflect.TypeOf(c.WorkloadType).String()},
+		{"Node ID", c.NodeId, reflect.TypeOf(c.NodeId).String()},
+		{"Node Tags", c.NodeTags, reflect.TypeOf(c.NodeTags).String()},
+	}
+}

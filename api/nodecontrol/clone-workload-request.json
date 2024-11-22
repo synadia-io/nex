@@ -4,11 +4,11 @@
   "title": "CloneWorkloadRequest",
   "type": "object",
   "properties": {
-    "start_workload_request": {
-      "$ref": "./start-workload-request.json"
+    "new_target_xkey": {
+      "type": "string"
     }
   },
   "required": [
-    "start_workload_request"
+    "new_target_xkey"
   ]
 }

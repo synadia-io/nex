@@ -6,9 +6,8 @@ import "encoding/json"
 import "fmt"
 
 type CloneWorkloadRequestJson struct {
-	// StartWorkloadRequest corresponds to the JSON schema field
-	// "start_workload_request".
-	StartWorkloadRequest StartWorkloadRequestJson `json:"start_workload_request" yaml:"start_workload_request" mapstructure:"start_workload_request"`
+	// NewTargetXkey corresponds to the JSON schema field "new_target_xkey".
+	NewTargetXkey string `json:"new_target_xkey" yaml:"new_target_xkey" mapstructure:"new_target_xkey"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -17,8 +16,8 @@ func (j *CloneWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	if _, ok := raw["start_workload_request"]; raw != nil && !ok {
-		return fmt.Errorf("field start_workload_request in CloneWorkloadRequestJson: required")
+	if _, ok := raw["new_target_xkey"]; raw != nil && !ok {
+		return fmt.Errorf("field new_target_xkey in CloneWorkloadRequestJson: required")
 	}
 	type Plain CloneWorkloadRequestJson
 	var plain Plain
@@ -29,4 +28,8 @@ func (j *CloneWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type CloneWorkloadResponseJson map[string]interface{}
+type CloneWorkloadResponseJson struct {
+	// StartWorkloadRequest corresponds to the JSON schema field
+	// "start_workload_request".
+	StartWorkloadRequest *StartWorkloadRequestJson `json:"start_workload_request,omitempty" yaml:"start_workload_request,omitempty" mapstructure:"start_workload_request,omitempty"`
+}

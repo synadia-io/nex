@@ -3,5 +3,9 @@
   "$id": "io.nats.nex.v2.clone_workload_request",
   "title": "CloneWorkloadResponse",
   "type": "object",
-  "properties": {}
+  "properties": {
+    "start_workload_request": {
+      "$ref": "./start-workload-request.json"
+    }
+  }
 }

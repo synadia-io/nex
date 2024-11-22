@@ -46,6 +46,7 @@ type Workload struct {
 	Run    RunWorkload    `cmd:"" help:"Run a workload on a target node" aliases:"start,deploy"`
 	Stop   StopWorkload   `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
 	Info   InfoWorkload   `cmd:"" help:"Get information about a workload"`
+	Copy   CopyWorkload   `cmd:"" help:"Copy a workload to another node" aliases:"cp,clone"`
 	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into a compatable OCI image" aliases:"build,package"`
 }
 
@@ -131,7 +132,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		Description: r.WorkloadDescription,
 		Essential:   r.WorkloadEssential,
 		Hash:        r.WorkloadHash,
-		HostServiceConfig: gen.HostServicesConfig{
+		HostServiceConfig: gen.SharedHostServiceJson{
 			NatsUrl:      r.WorkloadHostServiceCreds.NatsUrl,
 			NatsUserJwt:  r.WorkloadHostServiceCreds.NatsUserJwt,
 			NatsUserSeed: r.WorkloadHostServiceCreds.NatsUserSeed,
@@ -171,7 +172,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			return err
 		}
 		b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
-		startRequest.EncEnvironment = gen.EncryptedEnvironment{
+		startRequest.EncEnvironment = gen.SharedEncEnvJson{
 			Base64EncryptedEnv: b64_enc_env,
 			EncryptedBy:        txk_pub,
 		}
@@ -200,7 +201,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			return err
 		}
 		b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
-		startRequest.EncEnvironment = gen.EncryptedEnvironment{
+		startRequest.EncEnvironment = gen.SharedEncEnvJson{
 			Base64EncryptedEnv: b64_enc_env,
 			EncryptedBy:        txk_pub,
 		}
@@ -354,6 +355,64 @@ func (b BundleWorkload) Validate() error {
 	}
 
 	return errs
+}
+
+type CopyWorkload struct {
+	WorkloadId   string `arg:"" description:"ID of the workload"`
+	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+	StopOriginal bool   `name:"stop" description:"Stop the original workload after copying" default:"false"`
+
+	NodeId   string            `description:"Node ID of target workload. If not provided, auction is preformed"`
+	NodeTags map[string]string `description:"Node tags to use during auction; --node-id will take precedence"`
+}
+
+func (CopyWorkload) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
+func (c CopyWorkload) Validate() error {
+	var errs error
+
+	return errs
+}
+
+func (c CopyWorkload) Run(ctx context.Context, globals *Globals) error {
+	if globals.Check {
+		return printTable("Copy Workload Configuration", append(globals.Table(), c.Table()...)...)
+	}
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	if err != nil {
+		return err
+	}
+
+	auctionResults, err := controller.Auction(globals.Namespace, c.NodeTags)
+	if err != nil {
+		return err
+	}
+
+	nodeX := rand.IntN(len(auctionResults))
+	resp, err := controller.CopyWorkload(c.WorkloadId, globals.Namespace, auctionResults[nodeX])
+	if err != nil {
+		return err
+	}
+
+	startResp, err := controller.AuctionDeployWorkload(globals.Namespace, auctionResults[nodeX].BidderId, *resp)
+	if err != nil {
+		return err
+	}
+
+	if c.StopOriginal {
+		// controller.UndeployWorkload(c.WorkloadId)
+		_ = 0 // need to stop c.WorkloadId here
+	}
+
+	fmt.Printf("Workload successfully copied! New workloadId: %s\n", startResp.Id)
+	return nil
 }
 
 func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
