@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+
+	"github.com/nats-io/nkeys"
 )
 
 const (
@@ -21,6 +23,7 @@ var ReservedTagPrefixes = []string{"nex."}
 
 type NodeOptions struct {
 	Logger                *slog.Logger
+	Xkey                  nkeys.KeyPair
 	AgentHandshakeTimeout int
 	ResourceDirectory     string
 	Tags                  map[string]string
@@ -40,6 +43,12 @@ func WithLogger(s *slog.Logger) NodeOption {
 		if s != nil {
 			n.Logger = s
 		}
+	}
+}
+
+func WithXKeyKeyPair(kp nkeys.KeyPair) NodeOption {
+	return func(n *NodeOptions) {
+		n.Xkey = kp
 	}
 }
 

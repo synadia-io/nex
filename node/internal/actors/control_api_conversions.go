@@ -12,9 +12,12 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 	return &actorproto.StartWorkload{
 		Argv:        request.Argv,
 		Description: request.Description,
-		Environment: request.Environment,
-		Essential:   request.Essential,
-		Hash:        request.Hash,
+		Environment: &actorproto.EncEnvironment{
+			EncryptedBy:        request.EncEnvironment.EncryptedBy,
+			Base64EncryptedEnv: request.EncEnvironment.Base64EncryptedEnv,
+		},
+		Essential: request.Essential,
+		Hash:      request.Hash,
 		HostServiceConfig: &actorproto.HostServicesConfig{
 			NatsUrl:      request.HostServiceConfig.NatsUrl,
 			NatsUserSeed: request.HostServiceConfig.NatsUserSeed,

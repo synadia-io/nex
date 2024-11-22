@@ -3,9 +3,12 @@ package node
 import (
 	"sync"
 	"time"
+
+	"github.com/nats-io/nkeys"
 )
 
 type item struct {
+	xkpair    nkeys.KeyPair
 	value     string
 	createdAt time.Time
 }
@@ -32,21 +35,22 @@ func NewTTLMap(lifetime time.Duration) (m *TTLMap) {
 	return
 }
 
-func (m *TTLMap) Put(k, v string) {
+func (m *TTLMap) Put(k, v string, kp nkeys.KeyPair) {
 	m.l.Lock()
 	it, ok := m.m[k]
 	if !ok {
-		it = &item{value: v}
+		it = &item{value: v, xkpair: kp}
 		m.m[k] = it
 	}
 	it.createdAt = time.Now()
 	m.l.Unlock()
 }
 
-func (m *TTLMap) Get(k string) (v string) {
+func (m *TTLMap) Get(k string) (v string, kp nkeys.KeyPair) {
 	m.l.Lock()
 	if it, ok := m.m[k]; ok {
 		v = it.value
+		kp = it.xkpair
 	}
 	m.l.Unlock()
 	return

@@ -72,7 +72,7 @@ message AuctionResponse {
 message StartWorkload {
   repeated string argv = 1;
   string description = 2;
-  string environment = 3;
+  EncEnvironment environment = 3;
   bool essential = 4;
   string hash = 5;
   HostServicesConfig host_service_config = 6;
@@ -85,6 +85,11 @@ message StartWorkload {
   string workload_name = 13;
   string workload_type = 14;
   string namespace = 15;
+}
+
+message EncEnvironment {
+  string encrypted_by = 1;
+  string base64_encrypted_env = 2;
 }
 
 message HostServicesConfig {
