@@ -32,13 +32,17 @@ func TestAuctionDeploy(t *testing.T) {
 	}
 	defer s.Shutdown()
 
-	nex1, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node1", "nexus")
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
+	nex1.Stdout = stdout
+	nex1.Stderr = stderr
 	nex1.SysProcAttr = sysProcAttr()
 
-	nex2, err := startNexNodeCmd(t, workingDir, "", s.ClientURL(), "node2", "nexus")
+	nex2, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +72,7 @@ func TestAuctionDeploy(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		auctionDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "--uri", "file://"+binPath, fmt.Sprintf("--argv=-port=%d", port))
+		auctionDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "--uri", "file://"+binPath, fmt.Sprintf("--argv=-port=%d", port), "--env=ENV_TEST=nexenvset")
 		auctionDeploy.Stdout = stdout
 		auctionDeploy.Stderr = stderr
 		err = auctionDeploy.Run()
@@ -124,5 +128,9 @@ func TestAuctionDeploy(t *testing.T) {
 	err = nex2.Wait()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if !bytes.Contains(stdout.Bytes(), []byte("ENV: nexenvset")) {
+		t.Error("Expected ENV Data missing | stdout:", stdout.String())
 	}
 }

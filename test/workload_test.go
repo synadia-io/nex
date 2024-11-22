@@ -77,17 +77,29 @@ func TestDirectStart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cmd, err := startNexNodeCmd(t, workingDir, string(seed), s.ClientURL(), "node", "nexus")
+	xkey, err := nkeys.CreateCurveKeys()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	xSeed, err := xkey.Seed()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	cmd, err := startNexNodeCmd(t, workingDir, string(seed), string(xSeed), s.ClientURL(), "node", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cmd.SysProcAttr = sysProcAttr()
-	// stdout := new(bytes.Buffer)
-	// stderr := new(bytes.Buffer)
-	// cmd.Stdout = stdout
-	// cmd.Stderr = stderr
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	// cmd.Stdout = os.Stdout
+	// cmd.Stderr = os.Stderr
 
 	err = cmd.Start()
 	if err != nil {
@@ -113,6 +125,12 @@ func TestDirectStart(t *testing.T) {
 			return
 		}
 
+		xkey_pub, err := xkey.PublicKey()
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
 		// find unused port
 		listener, err := net.Listen("tcp", ":0")
 		if err != nil {
@@ -122,13 +140,14 @@ func TestDirectStart(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, fmt.Sprintf("--argv=-port=%d", port))
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, fmt.Sprintf("--argv=-port=%d", port), fmt.Sprintf("--env=ENV_TEST=%s", "derp"))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
 		err = cmd.Run()
 		if err != nil {
+			t.Log(cmdstderr.String())
 			t.Error(err)
 			return
 		}
@@ -166,8 +185,6 @@ func TestDirectStart(t *testing.T) {
 			t.Error("expected passing, got", string(body))
 		}
 
-		t.Log(string(body))
-
 		// TODO: stop workload
 		cancel()
 	}()
@@ -175,5 +192,10 @@ func TestDirectStart(t *testing.T) {
 	err = cmd.Wait()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// This ensures that the environment was decrypted and injected into workload correctly
+	if !bytes.Contains(stdout.Bytes(), []byte("ENV: derp")) {
+		t.Error("Expected ENV Data missing | stdout:", stdout.String())
 	}
 }

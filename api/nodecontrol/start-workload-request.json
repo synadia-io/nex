@@ -27,9 +27,9 @@
       "type": "boolean",
       "description": "Whether the workload is essential; essential workloads will be restarted if they fail"
     },
-    "environment": {
-      "type": "string",
-      "description": "The base64-encoded byte array of the environment in which the workload is provided at runtime"
+    "enc_environment": {
+      "$ref": "#/definitions/encrypted_environment",
+      "description": "The base64-encoded byte array of the encrypted environment with public key of encryptor"
     },
     "jsdomain": {
       "type": "string",
@@ -38,6 +38,10 @@
     "namespace": {
       "type": "string",
       "description": "The namespace of the workload"
+    },
+    "target_pub_xkey": {
+      "type": "string",
+      "description": "The xkey of the target node"
     },
     "retry_count": {
       "type": "integer",
@@ -77,9 +81,10 @@
     "hash",
     "uri",
     "essential",
-    "environment",
+    "enc_environment",
     "jsdomain",
     "namespace",
+    "target_pub_xkey",
     "retry_count",
     "retried_at",
     "sender_public_key",
@@ -91,6 +96,21 @@
     "workload_type"
   ],
   "definitions": {
+    "encrypted_environment": {
+      "type": "object",
+      "properties": {
+        "encrypted_by": {
+          "type": "string"
+        },
+        "base64_encrypted_env": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "encrypted_by",
+        "base64_encrypted_env"
+      ]
+    },
     "HostServicesConfig": {
       "type": "object",
       "properties": {
@@ -110,6 +130,5 @@
         "nats_user_jwt"
       ]
     }
-  },
-  "additionalProperties": false
+  }
 }
