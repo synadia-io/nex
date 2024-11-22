@@ -374,6 +374,10 @@ func (CopyWorkload) AfterApply(globals *Globals) error {
 func (c CopyWorkload) Validate() error {
 	var errs error
 
+	if c.NodeId != "" && c.NodeXkey == "" {
+		errs = errors.Join(errs, errors.New("Node public xkey is required if Node ID is provided"))
+	}
+
 	return errs
 }
 
@@ -389,10 +393,6 @@ func (c CopyWorkload) Run(ctx context.Context, globals *Globals) error {
 	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
-	}
-
-	if c.NodeId != "" && c.NodeXkey == "" {
-		return errors.New("Node public xkey is required if Node ID is provided")
 	}
 
 	if c.NodeId != "" {
