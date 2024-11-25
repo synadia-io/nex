@@ -19,7 +19,7 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-func buildDirectStartBinary(t testing.TB, workingDir string) (string, error) {
+func buildDirectStartBinary(t testing.TB, binMain string, workingDir string) (string, error) {
 	t.Helper()
 	binName := func() string {
 		if runtime.GOOS == "windows" {
@@ -32,7 +32,7 @@ func buildDirectStartBinary(t testing.TB, workingDir string) (string, error) {
 		return filepath.Join(workingDir, binName()), nil
 	}
 
-	cmd := exec.Command("go", "build", "-o", filepath.Join(workingDir, binName()), "./testdata/direct_start/main.go")
+	cmd := exec.Command("go", "build", "-o", filepath.Join(workingDir, binName()), binMain)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -51,7 +51,7 @@ func buildDirectStartBinary(t testing.TB, workingDir string) (string, error) {
 func TestDirectStart(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildDirectStartBinary(t, workingDir)
+	binPath, err := buildDirectStartBinary(t, "./testdata/direct_start/main.go", workingDir)
 	if err != nil {
 		t.Fatal(err)
 	}
