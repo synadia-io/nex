@@ -326,37 +326,6 @@ func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
 	return nil
 }
 
-type BundleWorkload struct {
-	Binaries []string `description:"Binary to package"`
-	OS       string   `description:"Operating system of the binary" enum:"linux,darwin" default:"linux"`
-	Arch     string   `description:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
-	Output   string   `description:"Output file name" default:"./artifact.tar"`
-
-	Push                bool   `description:"Push the workload to the registry"`
-	Registry            string `description:"Registry to push the workload to" default:"ghcr.io"`
-	RegistryUser        string `description:"Registry username"`
-	RegistryPassword    string `description:"Registry password"`
-	WorkloadName        string `name:"name" description:"Name of the workload"`
-	WorkloadTag         string `name:"tag" description:"Tag of the workload" default:"latest"`
-	WorkloadDescription string `name:"description" description:"Description of the workload"`
-	WorkloadSigningKey  string `name:"public-key" description:"Public key of the workload. OCI layers will be signed with this key" default:"${defaultResourcePath}/issuer.nk"`
-	WorkloadType        string `name:"type" description:"Type of workload" default:"direct_start"`
-}
-
-func (BundleWorkload) AfterApply(globals *Globals) error {
-	return checkVer(globals)
-}
-
-func (b BundleWorkload) Validate() error {
-	var errs error
-
-	if i, err := os.Stat(b.WorkloadSigningKey); err != nil || i.IsDir() {
-		errs = errors.Join(errs, errors.New("Public key file does not exist"))
-	}
-
-	return errs
-}
-
 type CopyWorkload struct {
 	WorkloadId   string `arg:"" description:"ID of the workload"`
 	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
@@ -433,6 +402,38 @@ func (c CopyWorkload) Run(ctx context.Context, globals *Globals) error {
 
 	fmt.Printf("Workload successfully copied! New workloadId: %s\n", startResp.Id)
 	return nil
+}
+
+type BundleWorkload struct {
+	Binaries []string `description:"Binary to package"`
+	OS       string   `description:"Operating system of the binary" enum:"linux,darwin" default:"linux"`
+	Arch     string   `description:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
+	Output   string   `description:"Output file name" default:"./artifact.tar"`
+
+	Push                bool   `description:"Push the workload to the registry"`
+	Registry            string `description:"Registry to push the workload to" default:"ghcr.io"`
+	RegistryUser        string `description:"Registry username"`
+	RegistryPassword    string `description:"Registry password"`
+	RegistryHttp        bool   `name:"plain-http" description:"Use http instead of https for registry"`
+	WorkloadName        string `name:"name" description:"Name of the workload"`
+	WorkloadTag         string `name:"tag" description:"Tag of the workload" default:"latest"`
+	WorkloadDescription string `name:"description" description:"Description of the workload"`
+	WorkloadSigningKey  string `name:"public-key" description:"Public key of the workload. OCI layers will be signed with this key" default:"${defaultResourcePath}/issuer.nk"`
+	WorkloadType        string `name:"type" description:"Type of workload" default:"direct_start"`
+}
+
+func (BundleWorkload) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
+func (b BundleWorkload) Validate() error {
+	var errs error
+
+	if i, err := os.Stat(b.WorkloadSigningKey); err != nil || i.IsDir() {
+		errs = errors.Join(errs, errors.New("Public key file does not exist"))
+	}
+
+	return errs
 }
 
 func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
@@ -580,13 +581,25 @@ func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
 		if err != nil {
 			return err
 		}
-		repo.Client = &auth.Client{
-			Client: retry.DefaultClient,
-			Cache:  auth.NewCache(),
-			Credential: auth.StaticCredential(b.Registry, auth.Credential{
+
+		if b.RegistryHttp {
+			repo.PlainHTTP = true
+		}
+
+		var credFunc auth.CredentialFunc
+		if b.RegistryUser == "" && b.RegistryPassword == "" {
+			credFunc = auth.StaticCredential(b.Registry, auth.Credential{
 				Username: b.RegistryUser,
 				Password: b.RegistryPassword,
-			}),
+			})
+		} else {
+			credFunc = nil
+		}
+
+		repo.Client = &auth.Client{
+			Client:     retry.DefaultClient,
+			Cache:      auth.NewCache(),
+			Credential: credFunc,
 		}
 
 		_, err = oras.Copy(ctx, store, b.WorkloadTag, repo, b.WorkloadTag, oras.DefaultCopyOptions)
