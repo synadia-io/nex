@@ -5,70 +5,6 @@ package gen
 import "encoding/json"
 import "fmt"
 
-type EncryptedEnvironment struct {
-	// Base64EncryptedEnv corresponds to the JSON schema field "base64_encrypted_env".
-	Base64EncryptedEnv string `json:"base64_encrypted_env" yaml:"base64_encrypted_env" mapstructure:"base64_encrypted_env"`
-
-	// EncryptedBy corresponds to the JSON schema field "encrypted_by".
-	EncryptedBy string `json:"encrypted_by" yaml:"encrypted_by" mapstructure:"encrypted_by"`
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *EncryptedEnvironment) UnmarshalJSON(b []byte) error {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return err
-	}
-	if _, ok := raw["base64_encrypted_env"]; raw != nil && !ok {
-		return fmt.Errorf("field base64_encrypted_env in EncryptedEnvironment: required")
-	}
-	if _, ok := raw["encrypted_by"]; raw != nil && !ok {
-		return fmt.Errorf("field encrypted_by in EncryptedEnvironment: required")
-	}
-	type Plain EncryptedEnvironment
-	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
-		return err
-	}
-	*j = EncryptedEnvironment(plain)
-	return nil
-}
-
-type HostServicesConfig struct {
-	// NatsUrl corresponds to the JSON schema field "nats_url".
-	NatsUrl string `json:"nats_url" yaml:"nats_url" mapstructure:"nats_url"`
-
-	// NatsUserJwt corresponds to the JSON schema field "nats_user_jwt".
-	NatsUserJwt string `json:"nats_user_jwt" yaml:"nats_user_jwt" mapstructure:"nats_user_jwt"`
-
-	// NatsUserSeed corresponds to the JSON schema field "nats_user_seed".
-	NatsUserSeed string `json:"nats_user_seed" yaml:"nats_user_seed" mapstructure:"nats_user_seed"`
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *HostServicesConfig) UnmarshalJSON(b []byte) error {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return err
-	}
-	if _, ok := raw["nats_url"]; raw != nil && !ok {
-		return fmt.Errorf("field nats_url in HostServicesConfig: required")
-	}
-	if _, ok := raw["nats_user_jwt"]; raw != nil && !ok {
-		return fmt.Errorf("field nats_user_jwt in HostServicesConfig: required")
-	}
-	if _, ok := raw["nats_user_seed"]; raw != nil && !ok {
-		return fmt.Errorf("field nats_user_seed in HostServicesConfig: required")
-	}
-	type Plain HostServicesConfig
-	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
-		return err
-	}
-	*j = HostServicesConfig(plain)
-	return nil
-}
-
 type StartWorkloadRequestJson struct {
 	// Arguments to be passed to the binary
 	Argv []string `json:"argv" yaml:"argv" mapstructure:"argv"`
@@ -78,7 +14,7 @@ type StartWorkloadRequestJson struct {
 
 	// The base64-encoded byte array of the encrypted environment with public key of
 	// encryptor
-	EncEnvironment EncryptedEnvironment `json:"enc_environment" yaml:"enc_environment" mapstructure:"enc_environment"`
+	EncEnvironment SharedEncEnvJson `json:"enc_environment" yaml:"enc_environment" mapstructure:"enc_environment"`
 
 	// Whether the workload is essential; essential workloads will be restarted if
 	// they fail
@@ -88,7 +24,7 @@ type StartWorkloadRequestJson struct {
 	Hash string `json:"hash" yaml:"hash" mapstructure:"hash"`
 
 	// The NATS configuration for the host services
-	HostServiceConfig HostServicesConfig `json:"host_service_config" yaml:"host_service_config" mapstructure:"host_service_config"`
+	HostServiceConfig SharedHostServiceJson `json:"host_service_config" yaml:"host_service_config" mapstructure:"host_service_config"`
 
 	// The NATS JSDomain for the workload
 	Jsdomain string `json:"jsdomain" yaml:"jsdomain" mapstructure:"jsdomain"`

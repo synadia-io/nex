@@ -24,14 +24,15 @@ import (
 const ControlAPIActorName = "control_api"
 
 const (
-	AuctionResponseType      = "io.nats.nex.v2.auction_response"
-	InfoResponseType         = "io.nats.nex.v2.info_response"
-	PingResponseType         = "io.nats.nex.v2.ping_response"
-	AgentPingResponseType    = "io.nats.nex.v2.agent_ping_response"
-	WorkloadPingResponseType = "io.nats.nex.v2.workload_ping_response"
-	RunResponseType          = "io.nats.nex.v2.run_response"
-	StopResponseType         = "io.nats.nex.v2.stop_response"
-	LameDuckResponseType     = "io.nats.nex.v2.lameduck_response"
+	AuctionResponseType       = "io.nats.nex.v2.auction_response"
+	InfoResponseType          = "io.nats.nex.v2.info_response"
+	PingResponseType          = "io.nats.nex.v2.ping_response"
+	AgentPingResponseType     = "io.nats.nex.v2.agent_ping_response"
+	WorkloadPingResponseType  = "io.nats.nex.v2.workload_ping_response"
+	RunResponseType           = "io.nats.nex.v2.run_response"
+	StopResponseType          = "io.nats.nex.v2.stop_response"
+	LameDuckResponseType      = "io.nats.nex.v2.lameduck_response"
+	CloneWorkloadResponseType = "io.nats.nex.v2.clone_workload_response"
 )
 
 type ControlAPI struct {
@@ -52,7 +53,8 @@ type ControlAPINodeCallback interface {
 	GetInfo() (*actorproto.NodeInfo, error)
 	SetLameDuck(context.Context)
 	IsTargetNode(string) (bool, nkeys.KeyPair, error)
-	EncryptPayload([]byte) ([]byte, string, error)
+	EncryptPayload([]byte, string) ([]byte, string, error)
+	DecryptPayload([]byte) ([]byte, error)
 }
 
 func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, callback ControlAPINodeCallback) *ControlAPI {
@@ -191,8 +193,102 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
+	sub, err = api.nc.Subscribe(CloneWorkloadSubscribeSubject(), api.handleCloneWorkload)
+	if err != nil {
+		api.logger.Error("Failed to subscribe to clone workload subject", slog.Any("error", err), slog.String("id", api.publicKey))
+		return err
+	}
+	api.subsz = append(api.subsz, sub)
+
 	api.logger.Info("NATS execution engine awaiting commands")
 	return nil
+}
+
+func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
+	// $NEX.control.namespace.CLONE.workloadid
+	sSub := strings.SplitN(m.Subject, ".", 5)
+	namespace := sSub[2]
+	workloadId := sSub[4]
+
+	req := new(nodecontrol.CloneWorkloadRequestJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal clone workload request", slog.Any("error", err))
+		models.RespondEnvelope(m, CloneWorkloadResponseType, 500, "", fmt.Sprintf("failed to unmarshal clone workload request: %s", err))
+		return
+	}
+
+	ctx := context.Background()
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		models.RespondEnvelope(m, CloneWorkloadResponseType, 500, "", fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
+		return
+	}
+
+	var startRequest *actorproto.StartWorkload
+	for _, child := range agentSuper.Children() {
+		resp, err := child.Ask(ctx, child, &actorproto.PingWorkload{
+			Namespace:  namespace,
+			WorkloadId: workloadId,
+		})
+		if err != nil {
+			continue
+		}
+		_, ok := resp.(*actorproto.PingWorkloadResponse)
+		if ok {
+			rr, err := child.Ask(ctx, child, &actorproto.GetRunRequest{
+				Namespace:  namespace,
+				WorkloadId: workloadId,
+			})
+			if err != nil {
+				api.logger.Error("Failed to get original run request", slog.Any("error", err))
+				return
+			}
+			rwl, ok := rr.(*actorproto.StartWorkload)
+			if !ok {
+				api.logger.Error("Failed to cast run request to start workload")
+				return
+			}
+			startRequest = rwl
+			break
+		}
+	}
+
+	if startRequest == nil {
+		return
+	}
+
+	encEnv, err := base64.StdEncoding.DecodeString(startRequest.Environment.Base64EncryptedEnv)
+	if err != nil {
+		api.logger.Error("Failed to decode base64 env", slog.Any("error", err))
+		models.RespondEnvelope(m, CloneWorkloadResponseType, 500, "", fmt.Sprintf("failed to decode base64 env: %s", err))
+		return
+	}
+
+	clearEnv, err := api.nodeCallback.DecryptPayload(encEnv)
+	if err != nil {
+		api.logger.Error("Failed to decrypt env", slog.Any("error", err))
+		models.RespondEnvelope(m, CloneWorkloadResponseType, 500, "", fmt.Sprintf("failed to decrypt env: %s", err))
+		return
+	}
+
+	newEncEnv, encBy, err := api.nodeCallback.EncryptPayload(clearEnv, req.NewTargetXkey)
+	if err != nil {
+		api.logger.Error("Failed to encrypt env", slog.Any("error", err))
+		models.RespondEnvelope(m, CloneWorkloadResponseType, 500, "", fmt.Sprintf("failed to encrypt env: %s", err))
+		return
+	}
+
+	b64EncEnv := base64.StdEncoding.EncodeToString(newEncEnv)
+	startRequest.Environment = &actorproto.EncEnvironment{
+		Base64EncryptedEnv: b64EncEnv,
+		EncryptedBy:        encBy,
+	}
+
+	ret := new(nodecontrol.CloneWorkloadResponseJson)
+	ret.StartWorkloadRequest = startRequestFromProto(startRequest)
+	models.RespondEnvelope(m, AuctionResponseType, 200, ret, "")
 }
 
 func (api *ControlAPI) handleAuction(m *nats.Msg) {
@@ -200,6 +296,7 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Log(context.Background(), shandler.LevelTrace, "Failed to unmarshal auction request", slog.Any("error", err))
+		models.RespondEnvelope(m, AuctionResponseType, 500, "", fmt.Sprintf("failed to unmarshal auction request: %s", err))
 		return
 	}
 
@@ -261,14 +358,14 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
-	newEncEnv, encTo, err := api.nodeCallback.EncryptPayload(env)
+	newEncEnv, encTo, err := api.nodeCallback.EncryptPayload(env, "")
 	if err != nil {
 		api.logger.Error("Failed to encrypt env", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to encrypt env: %s", err))
 		return
 	}
 
-	req.EncEnvironment = nodecontrol.EncryptedEnvironment{
+	req.EncEnvironment = nodecontrol.SharedEncEnvJson{
 		Base64EncryptedEnv: base64.StdEncoding.EncodeToString(newEncEnv),
 		EncryptedBy:        encTo,
 	}

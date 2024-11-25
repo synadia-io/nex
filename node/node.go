@@ -465,14 +465,27 @@ func (nn nexNode) IsTargetNode(inId string) (bool, nkeys.KeyPair, error) {
 	return false, nil, nil
 }
 
-func (nn nexNode) EncryptPayload(payload []byte) ([]byte, string, error) {
+func (nn nexNode) EncryptPayload(payload []byte, to string) ([]byte, string, error) {
 	xPub, err := nn.options.Xkey.PublicKey()
 	if err != nil {
 		return nil, "", err
 	}
-	payloadEnc, err := nn.options.Xkey.Seal(payload, xPub)
+
+	if to == "" {
+		to = xPub
+	}
+
+	payloadEnc, err := nn.options.Xkey.Seal(payload, to)
 	if err != nil {
 		return nil, "", err
 	}
 	return payloadEnc, xPub, nil
+}
+
+func (nn nexNode) DecryptPayload(payload []byte) ([]byte, error) {
+	xPub, err := nn.options.Xkey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	return nn.options.Xkey.Open(payload, xPub)
 }

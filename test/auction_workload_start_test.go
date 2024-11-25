@@ -16,7 +16,7 @@ import (
 func TestAuctionDeploy(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildDirectStartBinary(t, workingDir)
+	binPath, err := buildDirectStartBinary(t, "./testdata/direct_start/main.go", workingDir)
 	if err != nil {
 		t.Fatal(err)
 	}

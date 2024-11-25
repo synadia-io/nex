@@ -28,11 +28,12 @@ const (
 )
 
 func CreateDirectStartAgent(nc *nats.Conn, nodeId string, options models.NodeOptions, logger *slog.Logger) *DirectStartAgent {
-	return &DirectStartAgent{nc: nc, nodeId: nodeId, options: options, logger: logger}
+	return &DirectStartAgent{nc: nc, nodeId: nodeId, options: options, logger: logger, runRequest: make(map[string]*actorproto.StartWorkload)}
 }
 
 type DirectStartAgent struct {
-	self *goakt.PID
+	self       *goakt.PID
+	runRequest map[string]*actorproto.StartWorkload
 
 	nodeId    string
 	startedAt time.Time
@@ -63,6 +64,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			ctx.Err(err)
 			return
 		}
+		a.runRequest[resp.Id] = m
 		ctx.Response(resp)
 	case *actorproto.StopWorkload:
 		a.logger.Debug("StopWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId))
@@ -71,6 +73,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			ctx.Err(err)
 			return
 		}
+		delete(a.runRequest, m.WorkloadId)
 		ctx.Response(resp)
 	case *actorproto.QueryWorkloads:
 		a.logger.Debug("QueryWorkloads received", slog.String("name", ctx.Self().Name()))
@@ -97,6 +100,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		resp, err := a.pingWorkload(m.Namespace, m.WorkloadId)
 		if err != nil {
 			// Pings dont respond negatively...they just dont respond
+			ctx.Unhandled()
 			return
 		}
 		ctx.Response(resp)
@@ -117,14 +121,26 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 				Name:      w.Name,
 			})
 		}
+		xkpub, err := a.options.Xkey.PublicKey()
+		if err != nil {
+			a.logger.Error("Failed to get xkey public key", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
+		}
+
 		ctx.Response(&actorproto.PingAgentResponse{
 			NodeId:           a.nodeId,
-			TargetXkey:       "",
+			TargetXkey:       xkpub,
 			Version:          VERSION,
 			Tags:             map[string]string{},
 			StartedAt:        timestamppb.New(a.startedAt),
 			RunningWorkloads: runningWorkloads,
 		})
+	case *actorproto.GetRunRequest:
+		a.logger.Debug("GetRunRequest received", slog.String("name", ctx.Self().Name()))
+		rr, ok := a.runRequest[m.WorkloadId]
+		if !ok {
+			return
+		}
+		ctx.Response(rr)
 	case *goaktpb.Terminated:
 		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:

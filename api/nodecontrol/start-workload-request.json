@@ -28,7 +28,7 @@
       "description": "Whether the workload is essential; essential workloads will be restarted if they fail"
     },
     "enc_environment": {
-      "$ref": "#/definitions/encrypted_environment",
+      "$ref": "./shared-enc-env.json",
       "description": "The base64-encoded byte array of the encrypted environment with public key of encryptor"
     },
     "jsdomain": {
@@ -59,7 +59,7 @@
       }
     },
     "host_service_config": {
-      "$ref": "#/definitions/HostServicesConfig",
+      "$ref": "./shared-host-service.json",
       "description": "The NATS configuration for the host services"
     },
     "workload_name": {
@@ -94,41 +94,5 @@
     "workload_name",
     "workload_jwt",
     "workload_type"
-  ],
-  "definitions": {
-    "encrypted_environment": {
-      "type": "object",
-      "properties": {
-        "encrypted_by": {
-          "type": "string"
-        },
-        "base64_encrypted_env": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "encrypted_by",
-        "base64_encrypted_env"
-      ]
-    },
-    "HostServicesConfig": {
-      "type": "object",
-      "properties": {
-        "nats_url": {
-          "type": "string"
-        },
-        "nats_user_seed": {
-          "type": "string"
-        },
-        "nats_user_jwt": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "nats_url",
-        "nats_user_seed",
-        "nats_user_jwt"
-      ]
-    }
-  }
+  ]
 }

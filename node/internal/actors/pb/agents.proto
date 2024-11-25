@@ -98,6 +98,16 @@ message HostServicesConfig {
   string nats_user_jwt = 3;
 }
 
+message GetRunRequest {
+  string namespace = 1;
+  string workload_id = 2;
+}
+
+message NoEnvRunRequest {
+  map<string, string> clear_env = 1;
+  StartWorkload run_request = 2;
+} 
+
 // Reply from the agent actor containing the results of the attempt to start a workload
 message WorkloadStarted {
   string id = 1;

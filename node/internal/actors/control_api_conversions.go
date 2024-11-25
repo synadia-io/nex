@@ -34,6 +34,32 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 	}
 }
 
+func startRequestFromProto(request *actorproto.StartWorkload) *api.StartWorkloadRequestJson {
+	return &api.StartWorkloadRequestJson{
+		Argv:        request.Argv,
+		Description: request.Description,
+		EncEnvironment: api.SharedEncEnvJson{
+			Base64EncryptedEnv: request.Environment.Base64EncryptedEnv,
+			EncryptedBy:        request.Environment.EncryptedBy,
+		},
+		Essential: request.Essential,
+		Hash:      request.Hash,
+		HostServiceConfig: api.SharedHostServiceJson{
+			NatsUrl:      request.HostServiceConfig.NatsUrl,
+			NatsUserJwt:  request.HostServiceConfig.NatsUserJwt,
+			NatsUserSeed: request.HostServiceConfig.NatsUserSeed,
+		},
+		Jsdomain:        request.Jsdomain,
+		Namespace:       request.Namespace,
+		RetryCount:      int(request.RetryCount),
+		TriggerSubjects: request.TriggerSubjects,
+		Uri:             request.Uri,
+		WorkloadJwt:     request.WorkloadJwt,
+		WorkloadName:    request.WorkloadName,
+		WorkloadType:    request.WorkloadType,
+	}
+}
+
 func startResponseFromProto(response *actorproto.WorkloadStarted) *api.StartWorkloadResponseJson {
 	return &api.StartWorkloadResponseJson{
 		Id:      response.Id,
