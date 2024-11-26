@@ -386,15 +386,28 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
-	protoResp, ok := askResp.(*actorproto.WorkloadStarted)
+	protoResp, ok := askResp.(*actorproto.Envelope)
 	if !ok {
 		api.logger.Error("Start workload response from agent was not the correct type")
 		models.RespondEnvelope(m, RunResponseType, 500, "", "Agent returned the wrong data type")
 		return
 	}
 
-	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(protoResp), "")
+	if protoResp.Error != nil {
+		api.logger.Error("Agent returned an error", slog.Any("error", protoResp.Error))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("agent returned an error: %s", protoResp.Error))
+		return
+	}
 
+	var workloadStarted actorproto.WorkloadStarted
+	err = protoResp.Payload.UnmarshalTo(&workloadStarted)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal workload started response", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
+		return
+	}
+
+	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(&workloadStarted), "")
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {
@@ -421,14 +434,28 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	protoResp, ok := askResp.(*actorproto.WorkloadStarted)
+	protoResp, ok := askResp.(*actorproto.Envelope)
 	if !ok {
 		api.logger.Error("Start workload response from agent was not the correct type")
 		models.RespondEnvelope(m, RunResponseType, 500, "", "Agent returned the wrong data type")
 		return
 	}
 
-	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(protoResp), "")
+	if protoResp.Error != nil {
+		api.logger.Error("Agent returned an error", slog.Any("error", protoResp.Error))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("agent returned an error: %s", protoResp.Error))
+		return
+	}
+
+	var workloadStarted actorproto.WorkloadStarted
+	err = protoResp.Payload.UnmarshalTo(&workloadStarted)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal workload started response", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
+		return
+	}
+
+	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(&workloadStarted), "")
 }
 
 func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
@@ -455,14 +482,28 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 		return
 	}
 
-	protoResp, ok := askResp.(*actorproto.WorkloadStopped)
+	protoResp, ok := askResp.(*actorproto.Envelope)
 	if !ok {
 		api.logger.Error("Workload stop response from agent was not the correct type")
 		models.RespondEnvelope(m, StopResponseType, 500, "", "Agent returned the wrong data type for workload stop")
 		return
 	}
 
-	models.RespondEnvelope(m, StopResponseType, 200, stopResponseFromProto(protoResp), "")
+	if protoResp.Error != nil {
+		api.logger.Error("Agent returned an error", slog.Any("error", protoResp.Error))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("agent returned an error: %s", protoResp.Error))
+		return
+	}
+
+	var workloadStopped actorproto.WorkloadStopped
+	err = protoResp.Payload.UnmarshalTo(&workloadStopped)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal workload started response", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
+		return
+	}
+
+	models.RespondEnvelope(m, StopResponseType, 200, stopResponseFromProto(&workloadStopped), "")
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
