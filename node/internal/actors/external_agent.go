@@ -116,8 +116,6 @@ func (a *ExternalAgent) RegisteredAgentReceive(ctx *goakt.ReceiveContext) {
 
 func (a *ExternalAgent) startWorkload(ctx *goakt.ReceiveContext, req *actorproto.StartWorkload) {
 	// TODO: send start workload request to agent
-
-	// TODO: handle result (ctx.Error, etc)
 }
 
 func (a *ExternalAgent) startBinary() error {

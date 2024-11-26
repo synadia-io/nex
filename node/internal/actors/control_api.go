@@ -101,6 +101,7 @@ func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 		if err != nil {
 			_ = a.shutdown()
 			ctx.Err(err)
+			return
 		}
 		a.logger.Info("Control API NATS server is running", slog.String("name", ctx.Self().Name()))
 	default:
