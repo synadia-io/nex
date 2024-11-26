@@ -16,10 +16,6 @@ type StartWorkloadRequestJson struct {
 	// encryptor
 	EncEnvironment SharedEncEnvJson `json:"enc_environment" yaml:"enc_environment" mapstructure:"enc_environment"`
 
-	// Whether the workload is essential; essential workloads will be restarted if
-	// they fail
-	Essential bool `json:"essential" yaml:"essential" mapstructure:"essential"`
-
 	// The hash of the workload
 	Hash string `json:"hash" yaml:"hash" mapstructure:"hash"`
 
@@ -53,6 +49,9 @@ type StartWorkloadRequestJson struct {
 	// The name of the workload
 	WorkloadName string `json:"workload_name" yaml:"workload_name" mapstructure:"workload_name"`
 
+	// The runtype of the workload
+	WorkloadRuntype string `json:"workload_runtype" yaml:"workload_runtype" mapstructure:"workload_runtype"`
+
 	// The type of the workload
 	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
 }
@@ -71,9 +70,6 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["enc_environment"]; raw != nil && !ok {
 		return fmt.Errorf("field enc_environment in StartWorkloadRequestJson: required")
-	}
-	if _, ok := raw["essential"]; raw != nil && !ok {
-		return fmt.Errorf("field essential in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["hash"]; raw != nil && !ok {
 		return fmt.Errorf("field hash in StartWorkloadRequestJson: required")
@@ -107,6 +103,9 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["workload_name"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_name in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["workload_runtype"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_runtype in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["workload_type"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_type in StartWorkloadRequestJson: required")

@@ -206,7 +206,20 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 	}
 
 	workloadId := nuid.New().Next()
-	pa, err := createNewProcessActor(a.logger.WithGroup("workload"), a.nc, workloadId, m, ref, env)
+	pa, err := createNewProcessActor(
+		a.logger.WithGroup("workload"),
+		a.nc,
+		workloadId,
+		m.Argv,
+		m.Namespace,
+		m.WorkloadType,
+		m.WorkloadName,
+		ref,
+		env,
+		m.WorkloadRuntype,
+		m.TriggerSubjects,
+		int(m.RetryCount),
+	)
 	if err != nil {
 		a.logger.Error("Failed to create process actor", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err
@@ -248,6 +261,8 @@ func (a *DirectStartAgent) queryWorkloads(m *actorproto.QueryWorkloads) (*actorp
 			return nil, err
 		}
 		workloadSummary, ok := askRet.(*actorproto.WorkloadSummary)
+		// cmd.Stdout = os.Stdout
+		// cmd.Stderr = os.Stderr
 		if !ok {
 			a.logger.Error("query workload unexpected response type", slog.String("name", a.self.Name()), slog.String("workload", c.Name()))
 			return nil, err

@@ -6,42 +6,74 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/synadia-io/nex/models"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+const (
+	DefaultJobRunTime = 5 * time.Minute
+)
+
 type processActor struct {
 	startedAt time.Time
+	runTime   time.Duration
 	id        string
-	namespace string
+	nc        *nats.Conn
 
-	startCommand *actorproto.StartWorkload
+	argv         []string
+	env          map[string]string
+	workloadType string
+	namespace    string
+	processName  string
+	runType      string
+	state        string
+	triggerSubs  []string
+	retryCount   int
+	ref          *ArtifactReference
 
+	cancel  context.CancelFunc
 	logger  *slog.Logger
 	self    *goakt.PID
 	process *OsProcess
 }
 
-func createNewProcessActor(logger *slog.Logger, ncLog *nats.Conn, workloadId string, m *actorproto.StartWorkload, ref *ArtifactReference, env map[string]string) (*processActor, error) {
-	ret := new(processActor)
-	var err error
+func createNewProcessActor(
+	logger *slog.Logger,
+	nc *nats.Conn,
+	processId string,
+	argv []string,
+	namespace string,
+	workloadType string,
+	processName string,
+	ref *ArtifactReference,
+	env map[string]string,
+	runType string,
+	triggerSub []string,
+	retryCount int,
+) (*processActor, error) {
 
-	stdout := logCapture{logger: logger, nc: ncLog, namespace: m.Namespace, name: workloadId, stderr: false}
-	stderr := logCapture{logger: logger, nc: ncLog, namespace: m.Namespace, name: workloadId, stderr: true}
-
-	ret.process, err = NewOsProcess(workloadId, ref.LocalCachePath, env, m.Argv, logger, stdout, stderr)
-	if err != nil {
-		return nil, err
+	ret := processActor{
+		startedAt:    time.Now(),
+		runTime:      0,
+		id:           processId,
+		nc:           nc,
+		workloadType: workloadType,
+		namespace:    namespace,
+		processName:  processName,
+		runType:      runType,
+		state:        models.WorkloadStateInitializing,
+		ref:          ref,
+		logger:       logger,
+		argv:         argv,
+		env:          env,
+		triggerSubs:  triggerSub,
+		retryCount:   retryCount,
 	}
 
-	ret.id = workloadId
-	ret.logger = logger
-	ret.startedAt = time.Now()
-	ret.startCommand = m
-	ret.namespace = m.Namespace
-	return ret, nil
+	return &ret, nil
 }
 
 func (a *processActor) PreStart(ctx context.Context) error {
@@ -61,19 +93,27 @@ func (a *processActor) Receive(ctx *goakt.ReceiveContext) {
 	case *actorproto.SpawnDirectStartProcess:
 		go a.SpawnOsProcess(ctx)
 	case *actorproto.KillDirectStartProcess:
+		a.state = models.WorkloadStateStopped
 		err := a.KillOsProcess()
 		if err != nil {
 			ctx.Err(err)
 			return
 		}
 
+		if a.cancel != nil {
+			a.cancel()
+		}
+
 		ctx.Shutdown()
 	case *actorproto.QueryWorkload:
 		ctx.Response(&actorproto.WorkloadSummary{
-			Name:         a.startCommand.WorkloadName,
-			StartedAt:    timestamppb.New(a.startedAt),
-			WorkloadType: a.startCommand.WorkloadType,
+			Id:           a.id,
+			Name:         a.processName,
 			Namespace:    a.namespace,
+			Runtime:      a.runTime.String(),
+			StartedAt:    timestamppb.New(a.startedAt),
+			WorkloadType: a.workloadType,
+			State:        a.state,
 		})
 	default:
 		a.logger.Warn("unknown message", slog.Any("msg", ctx.Message()))
@@ -82,15 +122,109 @@ func (a *processActor) Receive(ctx *goakt.ReceiveContext) {
 }
 
 func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
-	err := a.process.Run()
-	if err != nil {
-		a.logger.Error("failed to start process", slog.Any("err", err))
+	var err error
+
+	switch a.runType {
+	case models.WorkloadRunTypeService:
+		c := 0
+		for a.state != models.WorkloadStateStopped && c < a.retryCount {
+			a.state = models.WorkloadStateRunning
+
+			stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
+			stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
+
+			a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+			if err != nil {
+				a.logger.Error("failed to create process", slog.Any("err", err))
+				return
+			}
+
+			err = a.process.Run()
+			if err != nil {
+				a.logger.Error("failed to start process", slog.Any("err", err))
+			}
+			a.state = models.WorkloadStateError
+			c++
+		}
+
+		if c == a.retryCount {
+			a.logger.Error("failed to start process after retries", slog.Int("retryCount", a.retryCount))
+		}
 		ctx.Shutdown()
-		return
+	case models.WorkloadRunTypeJob:
+		a.state = models.WorkloadStateWarm
+
+		cctx, cancel := context.WithCancel(context.Background())
+		a.cancel = cancel
+
+		// TODO: subscribe to all triggers or change to only allow one
+		s, err := a.nc.Subscribe(a.triggerSubs[0], func(msg *nats.Msg) {
+			a.state = models.WorkloadStateRunning
+
+			ticker := time.NewTicker(DefaultJobRunTime)
+			go func() {
+				<-ticker.C
+				a.logger.Debug("Function run time exceeded", slog.String("id", a.id))
+				err := a.KillOsProcess()
+				if err != nil {
+					a.logger.Error("failed to kill process", slog.Any("err", err))
+				}
+				a.state = models.WorkloadStateError
+			}()
+
+			stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
+			stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
+
+			a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+			if err != nil {
+				a.logger.Error("failed to create process", slog.Any("err", err))
+				return
+			}
+
+			exeStart := time.Now()
+			err = a.process.Run()
+			if err != nil {
+				a.logger.Error("failed to start process", slog.Any("err", err))
+				ctx.Shutdown()
+				return
+			}
+			exeEnd := time.Now()
+
+			a.runTime = a.runTime + exeEnd.Sub(exeStart)
+			a.state = models.WorkloadStateWarm
+		})
+		if err != nil {
+			a.logger.Error("failed to subscribe to trigger", slog.Any("err", err))
+			ctx.Shutdown()
+			return
+		}
+		defer func() {
+			_ = s.Unsubscribe()
+		}()
+
+		<-cctx.Done()
+	case models.WorkloadRunTypeOnce:
+		a.state = models.WorkloadStateRunning
+
+		stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
+		stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
+
+		a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+		if err != nil {
+			a.logger.Error("failed to create process", slog.Any("err", err))
+			return
+		}
+
+		err = a.process.Run()
+		if err != nil {
+			a.logger.Error("failed to start process", slog.Any("err", err))
+		}
+		ctx.Shutdown()
 	}
 }
 
 func (a *processActor) KillOsProcess() error {
+	a.state = models.WorkloadStateStopped
 	err := a.process.Interrupt("commanded")
 	if err != nil {
 		a.logger.Error("failed to stop process", slog.Any("err", err))
