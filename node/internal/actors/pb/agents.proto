@@ -4,10 +4,21 @@
 
 syntax = "proto3";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
 
 package agents;
 
 option go_package = "github.com/synadia-io/nex/node/actors/pb;actorproto";
+
+message Envelope {
+  google.protobuf.Any payload = 1;
+  Error error = 2;
+}
+
+message Error {
+    string message = 1;
+    int32 code = 2;
+}
 
 message PingNode {}
 

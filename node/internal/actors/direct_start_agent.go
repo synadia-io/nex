@@ -15,6 +15,7 @@ import (
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
@@ -52,34 +53,58 @@ func (a *DirectStartAgent) PostStop(ctx context.Context) error {
 }
 
 func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
+	resp := new(actorproto.Envelope)
+
 	switch m := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		a.self = ctx.Self()
 		a.startedAt = time.Now()
 		a.logger.Info("Direct start agent is running", slog.String("name", ctx.Self().Name()))
 	case *actorproto.StartWorkload:
+		var err error
 		a.logger.Debug("StartWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadName))
-		resp, err := a.startWorkload(m)
+		ws, err := a.startWorkload(m)
 		if err != nil {
-			ctx.Err(err)
+			a.logger.Error("Failed to start workload", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadName), slog.Any("err", err))
+			resp.Error = &actorproto.Error{Message: err.Error()}
+			ctx.Response(resp)
 			return
 		}
-		a.runRequest[resp.Id] = m
+		resp.Payload, err = anypb.New(ws)
+		if err != nil {
+			a.logger.Error("Failed to marshal workload started", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadName), slog.Any("err", err))
+			resp.Error = &actorproto.Error{Message: err.Error()}
+			ctx.Response(resp)
+			return
+		}
+
+		a.runRequest[ws.Id] = m
 		ctx.Response(resp)
 	case *actorproto.StopWorkload:
 		a.logger.Debug("StopWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId))
-		resp, err := a.stopWorkload(m)
+		ws, err := a.stopWorkload(m)
 		if err != nil {
-			ctx.Err(err)
+			a.logger.Error("Failed to stop workload", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId), slog.Any("err", err))
+			resp.Error = &actorproto.Error{Message: err.Error()}
+			ctx.Response(resp)
 			return
 		}
+		resp.Payload, err = anypb.New(ws)
+		if err != nil {
+			a.logger.Error("Failed to marshal workload stopped", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId), slog.Any("err", err))
+			resp.Error = &actorproto.Error{Message: err.Error()}
+			ctx.Response(resp)
+			return
+		}
+
 		delete(a.runRequest, m.WorkloadId)
 		ctx.Response(resp)
 	case *actorproto.QueryWorkloads:
 		a.logger.Debug("QueryWorkloads received", slog.String("name", ctx.Self().Name()))
 		resp, err := a.queryWorkloads(m)
 		if err != nil {
-			ctx.Err(err)
+			a.logger.Error("Failed to query workloads", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
+			ctx.Unhandled()
 			return
 		}
 		ctx.Response(resp)
@@ -109,7 +134,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		workloads, err := a.queryWorkloads(&actorproto.QueryWorkloads{})
 		if err != nil {
 			a.logger.Error("Failed to query workloads", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
-			ctx.Err(err)
+			ctx.Unhandled()
 			return
 		}
 

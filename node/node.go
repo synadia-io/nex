@@ -204,6 +204,9 @@ func (nn *nexNode) Start() error {
 
 func (nn *nexNode) initializeSupervisionTree() error {
 	var err error
+	restartDirective := goakt.NewRestartDirective()
+	restartDirective.WithLimit(3, 30*time.Second)
+
 	nn.actorSystem, err = goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
 		goakt.WithPassivationDisabled(),
@@ -211,6 +214,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		// TODO: figure out why they're gone or how we can plug in our own impls
 		//goakt.WithTelemetry(telemetry),
 		//goakt.WithTracing(),
+		goakt.WithSupervisorDirective(restartDirective),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
 		return err
