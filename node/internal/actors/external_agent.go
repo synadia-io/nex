@@ -10,11 +10,13 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nuid"
 	agentcommon "github.com/synadia-io/nex/agents/common"
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 
+	agentapigen "github.com/synadia-io/nex/api/agent/go/gen"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
@@ -67,6 +69,7 @@ func (a *ExternalAgent) PostStop(ctx context.Context) error {
 	return nil
 }
 
+// Message handlers that apply to the pre-registration state
 func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 	case *goaktpb.PostStart:
@@ -103,25 +106,69 @@ func (a *ExternalAgent) Receive(ctx *goakt.ReceiveContext) {
 	}
 }
 
+// Message handlers that apply to the post-registration state
 func (a *ExternalAgent) RegisteredAgentReceive(ctx *goakt.ReceiveContext) {
 	switch msg := ctx.Message().(type) {
 	case *actorproto.QueryWorkloads:
 		a.queryWorkloads(ctx)
 	case *actorproto.StartWorkload:
 		a.startWorkload(ctx, msg)
+	case *actorproto.StopWorkload:
+		a.stopWorkload(ctx, msg)
+	// TODO: implement TriggerWorkload
 	default:
 		ctx.Unhandled()
 	}
 }
 
-func (a *ExternalAgent) startWorkload(ctx *goakt.ReceiveContext, req *actorproto.StartWorkload) {
-	// TODO: send start workload request to agent
+func (a *ExternalAgent) stopWorkload(ctx *goakt.ReceiveContext, req *actorproto.StopWorkload) {
+	err := a.agentClient.StopWorkload(req.WorkloadId)
+	if err != nil {
+		a.logger.Error("Failed to stop workload",
+			slog.String("agent_name", a.agentOptions.Name),
+			slog.Any("error", err))
+		return
+	}
+}
 
-	// TODO: handle result (ctx.Error, etc)
+func (a *ExternalAgent) startWorkload(ctx *goakt.ReceiveContext, req *actorproto.StartWorkload) {
+	artRef, err := GetArtifact(req.WorkloadName, req.Uri, a.controlConn)
+	if err != nil {
+		a.logger.Error("Failed to retrieve artifact for workload",
+			slog.String("agent_name", a.agentOptions.Name),
+			slog.String("uri", req.Uri),
+			slog.String("workload_name", req.WorkloadName),
+			slog.Any("error", err))
+		return
+	}
+	reqJson := &agentapigen.StartWorkloadRequestJson{
+		LocalFilePath:   artRef.LocalCachePath,
+		Argv:            req.Argv,
+		Env:             nil, // TODO: provide a means for the external agent to decrypt this, or decrypt it prior to sending the request
+		Hash:            req.Hash,
+		Name:            req.WorkloadName,
+		Namespace:       req.Namespace,
+		TotalBytes:      0, // TODO: see if we still need this?
+		TriggerSubjects: req.TriggerSubjects,
+		WorkloadId:      nuid.Next(),
+		WorkloadType:    req.WorkloadType,
+	}
+	// TODO: create a host services client for the new workload
+
+	// TODO: if there are trigger subjects, subscribe to them on the host services connection
+	// (creds come from the workload request)
+
+	err = a.agentClient.StartWorkload(reqJson)
+	if err != nil {
+		a.logger.Error("Failed to start workload",
+			slog.String("agent_name", a.agentOptions.Name),
+			slog.Any("error", err))
+		return
+	}
 }
 
 func (a *ExternalAgent) startBinary() error {
-	artRef, err := GetArtifact(a.agentOptions.Name, a.agentOptions.Uri, a.internalConn)
+	artRef, err := GetArtifact(a.agentOptions.Name, a.agentOptions.Uri, a.controlConn)
 	if err != nil {
 		a.logger.Error("Failed to retrieve artifact",
 			slog.String("agent_name", a.agentOptions.Name),

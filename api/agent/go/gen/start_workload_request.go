@@ -15,6 +15,9 @@ type StartWorkloadRequestJson struct {
 	// A hex encoded SHA-256 hash of the artifact file bytes
 	Hash string `json:"hash" yaml:"hash" mapstructure:"hash"`
 
+	// The path to the cached artifact to execute (e.g. wasm binary, .js file, etc)
+	LocalFilePath string `json:"localFilePath" yaml:"localFilePath" mapstructure:"localFilePath"`
+
 	// Name of the workload
 	Name string `json:"name" yaml:"name" mapstructure:"name"`
 
@@ -28,7 +31,7 @@ type StartWorkloadRequestJson struct {
 	// subscribed to by the agent, only used for information and validation
 	TriggerSubjects []string `json:"triggerSubjects,omitempty" yaml:"triggerSubjects,omitempty" mapstructure:"triggerSubjects,omitempty"`
 
-	// The unique identifier of the workload to start.
+	// The unique identifier (nuid) of the workload to start.
 	WorkloadId string `json:"workloadId" yaml:"workloadId" mapstructure:"workloadId"`
 
 	// Type of the workload
@@ -46,6 +49,9 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["hash"]; raw != nil && !ok {
 		return fmt.Errorf("field hash in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["localFilePath"]; raw != nil && !ok {
+		return fmt.Errorf("field localFilePath in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["name"]; raw != nil && !ok {
 		return fmt.Errorf("field name in StartWorkloadRequestJson: required")
