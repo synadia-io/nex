@@ -6,8 +6,7 @@
     "properties": {
       "workloadId": {
         "type": "string",
-        "format": "uuid",
-        "description": "The unique identifier of the workload to start."
+        "description": "The unique identifier (nuid) of the workload to start."
       },
       "name": {
         "type": "string",
@@ -33,6 +32,10 @@
           "type": "string"
         }        
       },
+      "localFilePath": {
+        "type": "string",
+        "description": "The path to the cached artifact to execute (e.g. wasm binary, .js file, etc)"
+      },
       "workloadType": {
         "type": "string",
         "description": "Type of the workload"
@@ -49,7 +52,7 @@
         "description": "A map containing environment variables, applicable for native workload types"
       }      
     },
-    "required": ["workloadId", "name", "namespace", "totalBytes", "hash", "workloadType"],
+    "required": ["workloadId", "name", "namespace", "totalBytes", "hash", "workloadType", "localFilePath"],
     "additionalProperties": false
   }
   

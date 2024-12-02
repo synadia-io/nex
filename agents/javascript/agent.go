@@ -46,8 +46,15 @@ func (a *JavaScriptAgent) Preflight() error {
 func (a *JavaScriptAgent) StartWorkload(req *agentapigen.StartWorkloadRequestJson) error {
 	a.workloads[req.WorkloadId] = req
 	// TODO: get script file
+	f, err := os.ReadFile(req.LocalFilePath)
+	if err != nil {
+		return err
+	}
 
-	// TODO: call AddScript on runner
+	err = a.runner.AddScript(req.WorkloadId, string(f))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -55,7 +62,10 @@ func (a *JavaScriptAgent) StartWorkload(req *agentapigen.StartWorkloadRequestJso
 func (a *JavaScriptAgent) StopWorkload(req *agentapigen.StopWorkloadRequestJson) error {
 	delete(a.workloads, req.WorkloadId)
 
-	// TODO: call RemoveScript on runner
+	err := a.runner.RemoveScript(req.WorkloadId)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -64,6 +74,11 @@ func (a *JavaScriptAgent) ListWorkloads() error {
 	return nil
 }
 
-func (a *JavaScriptAgent) Trigger(workloadId string, payload []byte) error {
-	return nil
+func (a *JavaScriptAgent) Trigger(workloadId string, payload []byte) ([]byte, error) {
+	payload, err := a.runner.TriggerScript(workloadId, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return payload, nil
 }

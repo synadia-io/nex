@@ -15,7 +15,17 @@ func StartWorkloadSubscribeSubject(workloadType string) string {
 	return fmt.Sprintf("agent.%s.workloads.start", workloadType)
 }
 
+func StartWorkloadSubject(workloadType string) string {
+	return fmt.Sprintf("agent.%s.workloads.start", workloadType)
+}
+
+// These _could_ be shared in a single function, but if we decide to change
+// the wildcards in the future, we're ok and don't need to refactor
 func StopWorkloadSubscribeSubject(workloadType string) string {
+	return fmt.Sprintf("agent.%s.workloads.stop", workloadType)
+}
+
+func StopWorkloadSubject(workloadType string) string {
 	return fmt.Sprintf("agent.%s.workloads.stop", workloadType)
 }
 

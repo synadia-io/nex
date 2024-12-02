@@ -30,7 +30,7 @@ type AgentCallback interface {
 	StartWorkload(request *agentapigen.StartWorkloadRequestJson) error
 	StopWorkload(request *agentapigen.StopWorkloadRequestJson) error
 	ListWorkloads() error
-	Trigger(workloadId string, data []byte) error
+	Trigger(workloadId string, data []byte) ([]byte, error)
 }
 
 func NewNexAgent(name, version, description string,
@@ -142,30 +142,41 @@ func (agent *NexAgent) createSubscriptions() error {
 
 func (agent *NexAgent) handleStartWorkload(m *nats.Msg) {
 	var req agentapigen.StartWorkloadRequestJson
+	response := agentapigen.StartWorkloadResponseJson{
+		Error:   nil,
+		Success: true,
+	}
 	err := json.Unmarshal(m.Data, &req)
 	if err != nil {
-		_ = 0 // for linter
-		// TODO: return error envelope
+		msg := "Failed to unmarshal workload start request"
+		response.Error = &msg
+		response.Success = false
+	} else {
+		response.WorkloadId = &req.WorkloadId
+		err = agent.callback.StartWorkload(&req)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to start workload: %s", err)
+			response.Error = &msg
+			response.Success = false
+		}
 	}
-	err = agent.callback.StartWorkload(&req)
-	if err != nil {
-		_ = 0 // for linter
-		// TODO: return error envelope
-	}
-	// TODO: return success envelope
+	outBytes, _ := json.Marshal(&response)
+	_ = m.Respond(outBytes)
 }
 
 func (agent *NexAgent) handleTrigger(m *nats.Msg) {
+
 	tokens := strings.Split(m.Subject, ".")
 	// agent.{workload type}.workloads.{workload id}.trigger
 	workloadId := tokens[3]
 
-	err := agent.callback.Trigger(workloadId, m.Data)
+	res, err := agent.callback.Trigger(workloadId, m.Data)
 	if err != nil {
 		_ = 0
-		// TODO: return error envelope
+		// TODO: look into using an error envelope here?
 	}
-	// TODO: return success envelope
+
+	_ = m.Respond(res)
 }
 
 func (agent *NexAgent) handleStopWorkload(m *nats.Msg) {
