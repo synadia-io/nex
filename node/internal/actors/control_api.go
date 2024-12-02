@@ -416,8 +416,6 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	// TODO: obtain host services credentials from workload (creds service call)
-
 	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to start workload", slog.Any("error", err))
