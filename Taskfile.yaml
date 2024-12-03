@@ -34,15 +34,7 @@ tasks:
       --schema-package=https://github.com/synadia-io/nex/api/agent/stop-workload-request=github.com/synadia-io/nex/agentapi/go/gen \
       --schema-output=https://github.com/synadia-io/nex/api/agent/stop-workload-request=gen/stop_workload_request.go \
        ../stop-workload-request.json"
-      - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/agent/start-workload-response=github.com/synadia-io/nex/agentapi/go/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/agent/start-workload-response=gen/start_workload_response.go \
-       ../start-workload-response.json"
-      - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/agent/stop-workload-response=github.com/synadia-io/nex/agentapi/go/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/agent/stop-workload-response=gen/stop_workload_response.go \
-       ../stop-workload-response.json"
-
+  
   gen-schema-nodecontrol:
     dir: api/nodecontrol
     cmds:
@@ -80,11 +72,6 @@ tasks:
         --schema-output=shared=gen/shared.go
         *.json
   
-  javascript:
-    dir: agents/javascript/cmd/javascript
-    cmds:
-      - go build .
-
   nex:
     deps: [proto]
     dir: cmd/nex
