@@ -17,6 +17,7 @@ import (
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 
+	agentapi "github.com/synadia-io/nex/api/agent/go"
 	agentapigen "github.com/synadia-io/nex/api/agent/go/gen"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
@@ -177,7 +178,9 @@ func (a *ExternalAgent) startWorkload(ctx *goakt.ReceiveContext, req *actorproto
 	a.workloadHostServicesConns[reqJson.WorkloadId] = hsConn
 
 	// TODO: remove magic string
-	if req.WorkloadType != "native" && len(req.TriggerSubjects) > 0 {
+	if req.WorkloadType != agentapi.WorkloadTypeDirect &&
+		req.WorkloadType != agentapi.WorkloadTypeMicroVM &&
+		len(req.TriggerSubjects) > 0 {
 		err := a.subscribeToTriggerSubjects(req, reqJson.WorkloadId, hsConn)
 		if err != nil {
 			a.logger.Error("Failed to subscribe to trigger subjects on host services connection",
