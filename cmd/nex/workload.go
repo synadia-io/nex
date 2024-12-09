@@ -75,7 +75,7 @@ type RunWorkload struct {
 	WorkloadUri              string            `name:"uri" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
 	WorkloadTriggerSubjects  []string          `name:"triggers" help:"Subjects to trigger the workload"`
 	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct_start"`
-	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, once, job" default:"service" enum:"service,once,job"`
+	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, once, job" default:"service" enum:"service,function,job"`
 }
 
 func (RunWorkload) AfterApply(globals *Globals) error {
@@ -106,7 +106,7 @@ func (r RunWorkload) Validate() error {
 		}
 	}
 
-	if r.WorkloadRuntype == models.WorkloadRunTypeJob && len(r.WorkloadTriggerSubjects) == 0 {
+	if r.WorkloadRuntype == models.WorkloadRunTypeFunction && len(r.WorkloadTriggerSubjects) == 0 {
 		errs = errors.Join(errs, errors.New("Job workloads require at least one trigger subject"))
 	}
 

@@ -1,9 +1,9 @@
 package models
 
 const (
-	WorkloadRunTypeService = "service"
-	WorkloadRunTypeJob     = "job"
-	WorkloadRunTypeOnce    = "once"
+	WorkloadRunTypeService  = "service"
+	WorkloadRunTypeFunction = "function"
+	WorkloadRunTypeJob      = "job"
 
 	WorkloadStateInitializing = "initializing"
 	WorkloadStateRunning      = "running"

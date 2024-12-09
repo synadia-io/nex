@@ -284,7 +284,7 @@ func TestDirectStartJob(t *testing.T) {
 			return
 		}
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, "--runtype", "job", "--triggers", "test")
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, "--runtype", "function", "--triggers", "test")
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout

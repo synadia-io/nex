@@ -151,7 +151,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 			a.logger.Error("failed to start process after retries", slog.Int("retryCount", a.retryCount))
 		}
 		ctx.Shutdown()
-	case models.WorkloadRunTypeJob:
+	case models.WorkloadRunTypeFunction:
 		a.state = models.WorkloadStateWarm
 
 		cctx, cancel := context.WithCancel(context.Background())
@@ -203,7 +203,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 		}()
 
 		<-cctx.Done()
-	case models.WorkloadRunTypeOnce:
+	case models.WorkloadRunTypeJob:
 		a.state = models.WorkloadStateRunning
 
 		stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
