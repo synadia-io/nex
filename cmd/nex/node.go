@@ -17,6 +17,7 @@ import (
 
 	"github.com/nats-io/natscli/columns"
 	"github.com/synadia-io/nex/api/nodecontrol"
+	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
 	options "github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node"
@@ -282,7 +283,11 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	resp, err := controller.GetInfo(i.NodeID, globals.Namespace)
+	infoRequest := gen.NodeInfoRequestJson{
+		Namespace: globals.Namespace,
+	}
+
+	resp, err := controller.GetInfo(i.NodeID, infoRequest)
 	if err != nil {
 		return err
 	}

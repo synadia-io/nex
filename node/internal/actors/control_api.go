@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"disorder.dev/shandler"
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	goakt "github.com/tochemey/goakt/v2/actors"
@@ -50,11 +51,12 @@ type ControlAPI struct {
 type ControlAPINodeCallback interface {
 	Auction(string, []string, map[string]string) (*actorproto.AuctionResponse, error)
 	Ping() (*actorproto.PingNodeResponse, error)
-	GetInfo() (*actorproto.NodeInfo, error)
+	GetInfo(string) (*actorproto.NodeInfo, error)
 	SetLameDuck(context.Context)
 	IsTargetNode(string) (bool, nkeys.KeyPair, error)
 	EncryptPayload([]byte, string) ([]byte, string, error)
 	DecryptPayload([]byte) ([]byte, error)
+	EmitEvent(string, cloudevents.Event) error
 }
 
 func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, callback ControlAPINodeCallback) *ControlAPI {
@@ -87,7 +89,10 @@ func (a *ControlAPI) PreStart(ctx context.Context) error {
 
 func (a *ControlAPI) PostStop(ctx context.Context) error {
 	for _, sub := range a.subsz {
-		_ = sub.Unsubscribe()
+		err := sub.Drain()
+		if err != nil {
+			a.logger.Error("Failed to drain API subscription", slog.String("subscription", sub.Subject))
+		}
 	}
 
 	return nil
@@ -151,7 +156,7 @@ func (api *ControlAPI) subscribe() error {
 	}
 	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(InfoSubscribeSubject(), api.handleInfo)
+	sub, err = api.nc.Subscribe(models.InfoSubject(api.publicKey), api.handleInfo)
 	if err != nil {
 		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
 		return err
@@ -467,7 +472,15 @@ func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-	info, err := api.nodeCallback.GetInfo()
+	req := new(nodecontrol.NodeInfoRequestJson)
+	err := json.Unmarshal(m.Data, req)
+	if err != nil {
+		api.logger.Error("Failed to unmarshal info request", slog.Any("error", err))
+		models.RespondEnvelope(m, InfoResponseType, 500, "", fmt.Sprintf("failed to unmarshal info request: %s", err))
+		return
+	}
+
+	info, err := api.nodeCallback.GetInfo(req.Namespace)
 	if err != nil {
 		api.logger.Error("Failed to get node info", slog.Any("error", err))
 		models.RespondEnvelope(m, InfoResponseType, 500, "", fmt.Sprintf("failed to get node info: %s", err))

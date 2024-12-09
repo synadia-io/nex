@@ -178,8 +178,13 @@ func (c *ControlAPIClient) UndeployWorkload(namespace, nodeId, workloadId string
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoResponseJson, error) {
-	msg, err := c.nc.Request(models.InfoRequestSubject(namespace, nodeId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) GetInfo(nodeId string, req nodegen.NodeInfoRequestJson) (*nodegen.NodeInfoResponseJson, error) {
+	req_b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := c.nc.Request(models.InfoSubject(nodeId), req_b, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

@@ -387,7 +387,7 @@ func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 	return resp, nil
 }
 
-func (nn nexNode) GetInfo() (*actorproto.NodeInfo, error) {
+func (nn nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
 		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
@@ -419,14 +419,16 @@ func (nn nexNode) GetInfo() (*actorproto.NodeInfo, error) {
 			return nil, errors.New("failed to convert agent response")
 		}
 		for _, w := range wL.Workloads {
-			resp.Workloads = append(resp.Workloads, &actorproto.WorkloadSummary{
-				Id:           w.Id,
-				Name:         w.Name,
-				Runtime:      w.Runtime,
-				StartedAt:    timestamppb.New(w.StartedAt.AsTime()),
-				WorkloadType: c.Name(),
-				State:        w.State,
-			})
+			if namespace == "system" || w.Namespace == namespace {
+				resp.Workloads = append(resp.Workloads, &actorproto.WorkloadSummary{
+					Id:           w.Id,
+					Name:         w.Name,
+					Runtime:      w.Runtime,
+					StartedAt:    timestamppb.New(w.StartedAt.AsTime()),
+					WorkloadType: c.Name(),
+					State:        w.State,
+				})
+			}
 		}
 	}
 

@@ -20,11 +20,6 @@ func AuctionDeploySubscribeSubject() string {
 	return models.ControlAPIPrefix + ".*.ADEPLOY.*"
 }
 
-func InfoSubscribeSubject() string {
-	// $NEX.control.namespace.INFO.nodeid
-	return models.ControlAPIPrefix + ".*.INFO.*"
-}
-
 func CloneWorkloadSubscribeSubject() string {
 	// $NEX.control.namespace.CLONE.workloadid
 	return models.ControlAPIPrefix + ".*.CLONE.*"
