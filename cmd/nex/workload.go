@@ -48,7 +48,7 @@ type Workload struct {
 	Stop   StopWorkload   `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
 	Info   InfoWorkload   `cmd:"" help:"Get information about a workload"`
 	Copy   CopyWorkload   `cmd:"" help:"Copy a workload to another node" aliases:"cp,clone"`
-	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into a compatable OCI image" aliases:"build,package"`
+	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into an OCI artifact" aliases:"build,package"`
 }
 
 type NatsCreds struct {
