@@ -231,9 +231,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 }
 
 type StopWorkload struct {
-	NodeId       string `description:"Node ID of the node the workload in running"`
-	WorkloadId   string `description:"ID of the workload to stop" required:"true"`
-	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+	WorkloadId string `arg:"" description:"ID of the workload to stop" required:"true"`
 }
 
 func (StopWorkload) AfterApply(globals *Globals) error {
@@ -260,21 +258,15 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 		return err
 	}
 
-	req := gen.StopWorkloadRequestJson{
-		NodeId:       s.NodeId,
-		WorkloadId:   s.WorkloadId,
-		WorkloadType: s.WorkloadType,
-	}
-
-	resp, err := controller.UndeployWorkload(globals.Namespace, s.NodeId, globals.Namespace, req)
+	resp, err := controller.UndeployWorkload(globals.Namespace, s.WorkloadId)
 	if err != nil {
 		return err
 	}
 
 	if resp.Stopped {
-		fmt.Printf("Workload %s stopped on node %s\n", s.WorkloadId, s.NodeId)
+		fmt.Printf("Workload %s stopped\n", s.WorkloadId)
 	} else {
-		fmt.Printf("Workload %s failed to stop on node %s\n", s.WorkloadId, s.NodeId)
+		fmt.Printf("Workload %s failed to stop\n", s.WorkloadId)
 	}
 
 	return nil

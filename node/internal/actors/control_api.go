@@ -16,6 +16,7 @@ import (
 	"github.com/nats-io/nkeys"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	nodecontrol "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
@@ -326,7 +327,7 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleADeploy(m *nats.Msg) {
-	// $NEX.control.default.ADEPLOY.OdXiuMFTfXp1njwcArUzD2
+	// $NEX.control.default.ADEPLOY.bidderId
 	splitSub := strings.SplitN(m.Subject, ".", 5)
 
 	req := new(nodecontrol.StartWorkloadRequestJson)
@@ -466,27 +467,37 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
-	req := new(nodecontrol.StopWorkloadRequestJson)
-	err := json.Unmarshal(m.Data, req)
+	// $NEX.control.namespace.UNDEPLOY.workloadid
+	splitSub := strings.SplitN(m.Subject, ".", 5)
+	namespace := splitSub[2]
+	workloadId := splitSub[4]
+
+	var err error
+	var askResp protoreflect.ProtoMessage
+
+	_, agentSuper, err := api.self.ActorSystem().ActorOf(context.Background(), AgentSupervisorActorName)
 	if err != nil {
-		api.logger.Error("Failed to unmarshal undeploy request", slog.Any("error", err))
-		models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to unmarshal undeploy request: %s", err))
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
 		return
 	}
 
-	ctx := context.Background()
-	_, agent, err := api.self.ActorSystem().ActorOf(ctx, req.WorkloadType)
-	if err != nil {
-		api.logger.Error("Failed to locate agent actor", slog.String("type", req.WorkloadType), slog.Any("error", err))
-		models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to locate agent [%s] actor: %s", req.WorkloadType, err))
-		return
+findWorkload:
+	for _, child := range agentSuper.Children() { // iterate over all agents
+		for _, grandchild := range child.Children() { // iterate over all workloads
+			if grandchild.Name() == workloadId {
+				askResp, err = api.self.Ask(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId})
+				if err != nil {
+					api.logger.Error("Failed to stop workload", slog.Any("error", err))
+					models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("Failed to stop workload: %s", err))
+					return
+				}
+				break findWorkload
+			}
+		}
 	}
 
-	askResp, err := api.self.Ask(ctx, agent, stopRequestToProto(req))
-	if err != nil {
-		api.logger.Error("Failed to stop workload on agent", slog.String("agent", agent.Name()), slog.Any("error", err))
-		models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to locate agent supervisor actor: %s", err))
-		return
+	if askResp == nil {
+		return // this node does not have the workload
 	}
 
 	protoResp, ok := askResp.(*actorproto.Envelope)

@@ -69,14 +69,6 @@ func startResponseFromProto(response *actorproto.WorkloadStarted) *api.StartWork
 	}
 }
 
-func stopRequestToProto(request *api.StopWorkloadRequestJson) *actorproto.StopWorkload {
-	return &actorproto.StopWorkload{
-		NodeId:      request.NodeId,
-		WorkloadId:  request.WorkloadId,
-		WorkloadJwt: request.WorkloadJwt,
-	}
-}
-
 func stopResponseFromProto(response *actorproto.WorkloadStopped) *api.StopWorkloadResponseJson {
 	return &api.StopWorkloadResponseJson{
 		Id:      response.Id,

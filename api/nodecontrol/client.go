@@ -158,13 +158,8 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) UndeployWorkload(namespace, nodeId, workloadId string, req nodegen.StopWorkloadRequestJson) (*nodegen.StopWorkloadResponseJson, error) {
-	req_b, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-
-	msg, err := c.nc.Request(models.UndeployRequestSubject(namespace, nodeId), req_b, DefaultRequestTimeout)
+func (c *ControlAPIClient) UndeployWorkload(namespace, workloadId string) (*nodegen.StopWorkloadResponseJson, error) {
+	msg, err := c.nc.Request(models.UndeployRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

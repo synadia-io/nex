@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	DefaultJobRunTime = 5 * time.Minute
+	DefaultFunctionRunTime = 5 * time.Minute
 )
 
 type processActor struct {
@@ -145,6 +145,9 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 			err = a.process.Run()
 			if err != nil {
 				a.logger.Error("failed to start process", slog.Any("err", err))
+				if a.state != models.WorkloadStateStopped {
+					a.state = models.WorkloadStateError
+				}
 			}
 			a.state = models.WorkloadStateError
 			a.retryCounter++
@@ -165,7 +168,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 		s, err := a.nc.QueueSubscribe(a.triggerSub, a.processName, func(msg *nats.Msg) {
 			a.state = models.WorkloadStateRunning
 
-			ticker := time.NewTicker(DefaultJobRunTime)
+			ticker := time.NewTicker(DefaultFunctionRunTime)
 			go func() {
 				<-ticker.C
 				a.logger.Debug("Function run time exceeded", slog.String("id", a.id))

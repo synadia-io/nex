@@ -130,9 +130,8 @@ message WorkloadStarted {
 
 // Request sent by the control API actor to an agent actor asking to stop a workload
 message StopWorkload {
-  string node_id = 1;
+  string namespace = 1;
   string workload_id = 2;
-  string workload_jwt = 3;
 }
 
 // Response from the agent actor indicating the results of the workload stop attempt
