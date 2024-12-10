@@ -262,7 +262,6 @@ func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
 			break
 		}
 	}
-
 	if startRequest == nil {
 		return
 	}

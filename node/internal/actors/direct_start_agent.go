@@ -15,6 +15,7 @@ import (
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -177,7 +178,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		if !ok {
 			return
 		}
-		ctx.Response(rr)
+		ctx.Response(proto.Clone(rr))
 	case *goaktpb.Terminated:
 		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
