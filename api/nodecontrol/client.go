@@ -217,9 +217,9 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nod
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, error) {
+func (c *ControlAPIClient) MonitorLogs(namespace, workloadId, level string) (chan []byte, error) {
 	subject := models.LOGS_SUBJECT
-	f_subject, err := subject.Filter(workloadId, level)
+	f_subject, err := subject.Filter(namespace, workloadId, level)
 	if err != nil {
 		return nil, err
 	}
@@ -235,9 +235,9 @@ func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, e
 	return ret, nil
 }
 
-func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *json.RawMessage, error) {
+func (c *ControlAPIClient) MonitorEvents(namespace, workloadId, eventType string) (chan *json.RawMessage, error) {
 	subject := models.EVENTS_SUBJECT
-	f_subject, err := subject.Filter(workloadId, eventType)
+	f_subject, err := subject.Filter(namespace, workloadId, eventType)
 	if err != nil {
 		return nil, err
 	}

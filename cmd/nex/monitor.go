@@ -47,7 +47,7 @@ func (e *Events) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	logs, err := controller.MonitorEvents(e.WorkloadID, e.EventType)
+	logs, err := controller.MonitorEvents(globals.Namespace, e.WorkloadID, e.EventType)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (l *Logs) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	logs, err := controller.MonitorLogs(l.WorkloadID, l.Level)
+	logs, err := controller.MonitorLogs(globals.Namespace, l.WorkloadID, l.Level)
 	if err != nil {
 		return err
 	}
