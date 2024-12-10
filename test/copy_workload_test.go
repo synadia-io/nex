@@ -80,7 +80,7 @@ func TestCopyWorkload(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 
 		origStdOut := new(bytes.Buffer)
-		origDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "--uri", "file://"+binPath, fmt.Sprintf("--env=NATS_URL=%s", s.ClientURL()))
+		origDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "file://"+binPath, fmt.Sprintf("--env=NATS_URL=%s", s.ClientURL()))
 		origDeploy.Stdout = origStdOut
 		err = origDeploy.Run()
 		if err != nil {

@@ -319,11 +319,19 @@ func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
 		}
-		aR, ok := agentResp.(*actorproto.PingAgentResponse)
+
+		aREnv, ok := agentResp.(*actorproto.Envelope)
 		if !ok {
-			nn.options.Logger.Error("Failed to convert agent response")
-			return nil, errors.New("failed to convert agent response")
+			nn.options.Logger.Error("Failed to convert envelope response")
+			return nil, errors.New("failed to convert envelope response")
 		}
+		var aR actorproto.PingAgentResponse
+		err = aREnv.Payload.UnmarshalTo(&aR)
+		if err != nil {
+			nn.options.Logger.Error("Failed to marshal agent response")
+			return nil, errors.New("failed to marshal agent response")
+		}
+
 		resp.Status[c.Name()] = int32(len(aR.RunningWorkloads))
 	}
 
@@ -380,10 +388,16 @@ func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
 		}
-		aR, ok := agentResp.(*actorproto.WorkloadList)
+		aREnv, ok := agentResp.(*actorproto.Envelope)
 		if !ok {
-			nn.options.Logger.Error("Failed to convert agent response")
-			return nil, errors.New("failed to convert agent response")
+			nn.options.Logger.Error("Failed to convert envelope")
+			return nil, errors.New("failed to convert envelope")
+		}
+		var aR actorproto.WorkloadList
+		err = aREnv.Payload.UnmarshalTo(&aR)
+		if err != nil {
+			nn.options.Logger.Error("Failed to unmarshal agent response")
+			return nil, errors.New("failed to unmarshal agent response")
 		}
 		resp.RunningAgents[c.Name()] = int32(len(aR.Workloads))
 	}
@@ -417,10 +431,16 @@ func (nn nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
 		}
-		wL, ok := agentResp.(*actorproto.WorkloadList)
+		wLEnv, ok := agentResp.(*actorproto.Envelope)
 		if !ok {
-			nn.options.Logger.Error("Failed to convert agent response")
-			return nil, errors.New("failed to convert agent response")
+			nn.options.Logger.Error("Failed to convert envelope response")
+			return nil, errors.New("failed to convert envelope response")
+		}
+		var wL actorproto.WorkloadList
+		err = wLEnv.Payload.UnmarshalTo(&wL)
+		if err != nil {
+			nn.options.Logger.Error("Failed to unmarshal agent response")
+			return nil, errors.New("failed to unmarshal agent response")
 		}
 		for _, w := range wL.Workloads {
 			if namespace == "system" || w.Namespace == namespace {

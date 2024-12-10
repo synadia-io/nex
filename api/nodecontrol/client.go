@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	DefaultRequestTimeout = 10 * time.Second
+	DefaultRequestTimeout = 5 * time.Second
 )
 
 type ControlAPIClient struct {

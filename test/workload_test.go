@@ -144,7 +144,7 @@ func TestDirectStartService(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, fmt.Sprintf("--argv=-port=%d", port), fmt.Sprintf("--env=ENV_TEST=%s", "derp"))
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, fmt.Sprintf("--argv=-port=%d", port), fmt.Sprintf("--env=ENV_TEST=%s", "derp"))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
@@ -285,7 +285,7 @@ func TestDirectStartFunction(t *testing.T) {
 			return
 		}
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, "--runtype", "function", "--trigger", "test")
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, "--runtype", "function", "--triggers", "test")
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
@@ -436,16 +436,16 @@ func TestDirectStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	nex1.SysProcAttr = sysProcAttr()
-	nex1.Stdout = os.Stdout
-	nex1.Stderr = os.Stderr
+	// nex1.Stdout = os.Stdout
+	// nex1.Stderr = os.Stderr
 
 	nex2, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
 	nex2.SysProcAttr = sysProcAttr()
-	nex2.Stdout = os.Stdout
-	nex2.Stderr = os.Stderr
+	// nex2.Stdout = os.Stdout
+	// nex2.Stderr = os.Stderr
 
 	err = nex1.Start()
 	if err != nil {
@@ -474,7 +474,7 @@ func TestDirectStop(t *testing.T) {
 
 	passed := false
 	go func() {
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "--uri", "file://"+binPath)
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath)
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
@@ -521,6 +521,8 @@ func TestDirectStop(t *testing.T) {
 				t.Error("stderr:", cmdstderr.String())
 			}
 		}
+
+		cancel()
 	}()
 
 	err = nex1.Wait()
@@ -534,5 +536,82 @@ func TestDirectStop(t *testing.T) {
 
 	if !passed {
 		t.Fatal("expected workload to stop")
+	}
+}
+
+func TestDirectStopNoWorkload(t *testing.T) {
+	workingDir := t.TempDir()
+
+	nexCli, err := buildNexCli(t, workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := startNatsServer(t, workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Shutdown()
+
+	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	nex1.SysProcAttr = sysProcAttr()
+	// nex1.Stdout = os.Stdout
+	// nex1.Stderr = os.Stderr
+
+	err = nex1.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	go func() {
+		<-ctx.Done()
+		err = stopProcess(nex1.Process)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+
+	passed := false
+	go func() {
+		cmd := exec.Command(nexCli, "workload", "stop", "-s", s.ClientURL(), "fakeid")
+		cmdstdout := new(bytes.Buffer)
+		cmdstderr := new(bytes.Buffer)
+		cmd.Stdout = cmdstdout
+		cmd.Stderr = cmdstderr
+		// cmd.Stdout = os.Stdout
+		// cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			t.Log(cmdstderr.String())
+			t.Error(err)
+			return
+		}
+
+		if bytes.Contains(cmdstdout.Bytes(), []byte("Workload not found")) {
+			passed = true
+		} else {
+			t.Log("cmdstdout:", cmdstdout.String())
+			if len(cmdstderr.Bytes()) > 0 {
+				t.Error("stderr:", cmdstderr.String())
+			}
+		}
+
+		cancel()
+	}()
+
+	err = nex1.Wait()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !passed {
+		t.Fatal("derp")
 	}
 }

@@ -259,6 +259,10 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 	}
 
 	resp, err := controller.UndeployWorkload(globals.Namespace, s.WorkloadId)
+	if errors.Is(err, nats.ErrTimeout) {
+		fmt.Println("Workload not found")
+		return nil
+	}
 	if err != nil {
 		return err
 	}

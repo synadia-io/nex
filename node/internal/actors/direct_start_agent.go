@@ -101,10 +101,17 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		ctx.Response(resp)
 	case *actorproto.QueryWorkloads:
 		a.logger.Debug("QueryWorkloads received", slog.String("name", ctx.Self().Name()))
-		resp, err := a.queryWorkloads(m)
+		qwl, err := a.queryWorkloads(m)
 		if err != nil {
 			a.logger.Error("Failed to query workloads", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
 			ctx.Unhandled()
+			return
+		}
+		resp.Payload, err = anypb.New(qwl)
+		if err != nil {
+			a.logger.Error("Failed to envelope workload list", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
+			resp.Error = &actorproto.Error{Message: err.Error()}
+			ctx.Response(resp)
 			return
 		}
 		ctx.Response(resp)
