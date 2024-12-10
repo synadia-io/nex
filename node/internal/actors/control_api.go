@@ -14,6 +14,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/splode/fname"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -338,6 +339,14 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
+	if req.WorkloadName == "" {
+		rng := fname.NewGenerator()
+		req.WorkloadName, err = rng.Generate()
+		if err != nil {
+			req.WorkloadName = "unnamed-workload"
+		}
+	}
+
 	// splitSub[4] is the bidderId
 	target, xkp, err := api.nodeCallback.IsTargetNode(splitSub[4])
 	if err != nil {
@@ -423,6 +432,14 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal deploy request: %s", err))
 		return
+	}
+
+	if req.WorkloadName == "" {
+		rng := fname.NewGenerator()
+		req.WorkloadName, err = rng.Generate()
+		if err != nil {
+			req.WorkloadName = "unnamed-workload"
+		}
 	}
 
 	ctx := context.Background()

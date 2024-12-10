@@ -65,6 +65,7 @@ type RunWorkload struct {
 	NodePubXKey string            `name:"node-xkey-pub" help:"Node public xkey used for encryption"`
 
 	WorkloadName             string            `name:"name" help:"Name of the workload"`
+	WorkloadReplicas         int               `name:"replicas" help:"Number of replicas to start" default:"1"`
 	WorkloadArguments        []string          `name:"argv" help:"Arguments to pass to the workload"`
 	WorkloadEnvironment      map[string]string `name:"env" help:"Environment variables to set for the workload"`
 	WorkloadDescription      string            `name:"description" help:"Description of the workload"`
@@ -171,7 +172,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		}
 	}
 
-	var resp *gen.StartWorkloadResponseJson
+	var allResp []*gen.StartWorkloadResponseJson
 	if r.NodeId != "" {
 		enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
 		if err != nil {
@@ -182,9 +183,13 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			Base64EncryptedEnv: b64_enc_env,
 			EncryptedBy:        txk_pub,
 		}
-		resp, err = controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
-		if err != nil {
-			return err
+		for i := 0; i < r.WorkloadReplicas; i++ {
+			resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
+			if err != nil {
+				return err
+			}
+			allResp = append(allResp, resp)
+			time.Sleep(500 * time.Millisecond)
 		}
 	} else {
 		auctionResults, err := controller.Auction(globals.Namespace, r.NodeTags)
@@ -196,35 +201,40 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			return errors.New("no nodes available for deployment")
 		}
 
-		nodeX := rand.IntN(len(auctionResults))
-		bidderId := auctionResults[nodeX].BidderId
+		for i := 0; i < r.WorkloadReplicas; i++ {
+			nodeX := rand.IntN(len(auctionResults))
+			bidderId := auctionResults[nodeX].BidderId
 
-		// in an auction deploy, information about the target node is unknown, so we need to provide it in the auction
-		startRequest.TargetPubXkey = auctionResults[nodeX].TargetXkey
+			// in an auction deploy, information about the target node is unknown, so we need to provide it in the auction
+			startRequest.TargetPubXkey = auctionResults[nodeX].TargetXkey
 
-		enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
-		if err != nil {
-			return err
-		}
-		b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
-		startRequest.EncEnvironment = gen.SharedEncEnvJson{
-			Base64EncryptedEnv: b64_enc_env,
-			EncryptedBy:        txk_pub,
-		}
-		resp, err = controller.AuctionDeployWorkload(globals.Namespace, bidderId, startRequest)
-		if err != nil {
-			return err
+			enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
+			if err != nil {
+				return err
+			}
+			b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
+			startRequest.EncEnvironment = gen.SharedEncEnvJson{
+				Base64EncryptedEnv: b64_enc_env,
+				EncryptedBy:        txk_pub,
+			}
+			resp, err := controller.AuctionDeployWorkload(globals.Namespace, bidderId, startRequest)
+			if err != nil {
+				return err
+			}
+			allResp = append(allResp, resp)
 		}
 	}
 
-	if resp.Started {
-		if r.NodeId != "" {
-			fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+	for _, resp := range allResp {
+		if resp.Started {
+			if r.NodeId != "" {
+				fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+			} else {
+				fmt.Printf("Workload %s [%s] started\n", r.WorkloadName, resp.Id)
+			}
 		} else {
-			fmt.Printf("Workload %s [%s] started\n", r.WorkloadName, resp.Id)
+			fmt.Printf("Workload %s failed to start\n", r.WorkloadName)
 		}
-	} else {
-		fmt.Printf("Workload %s failed to start\n", r.WorkloadName)
 	}
 
 	return nil
