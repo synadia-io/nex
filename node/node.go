@@ -314,7 +314,7 @@ func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string
 		return nil, err
 	}
 	for _, c := range agentSuper.Children() {
-		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{}, 5*time.Second)
 		if err != nil {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
@@ -383,7 +383,7 @@ func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 		return nil, err
 	}
 	for _, c := range agentSuper.Children() {
-		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{}, 5*time.Second)
 		if err != nil {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
@@ -426,7 +426,7 @@ func (nn nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 		return nil, err
 	}
 	for _, c := range agentSuper.Children() {
-		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{}, 5*time.Second)
 		if err != nil {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")

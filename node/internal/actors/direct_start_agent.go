@@ -44,7 +44,6 @@ type DirectStartAgent struct {
 }
 
 func (a *DirectStartAgent) PreStart(ctx context.Context) error {
-
 	return nil
 }
 
@@ -158,7 +157,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			a.logger.Error("Failed to get xkey public key", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
 		}
 
-		ctx.Response(&actorproto.PingAgentResponse{
+		resp.Payload, err = anypb.New(&actorproto.PingAgentResponse{
 			NodeId:           a.nodeId,
 			TargetXkey:       xkpub,
 			Version:          VERSION,
@@ -166,6 +165,12 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			StartedAt:        timestamppb.New(a.startedAt),
 			RunningWorkloads: runningWorkloads,
 		})
+		if err != nil {
+			a.logger.Error("Failed to marshal ping agent response", slog.String("name", ctx.Self().Name()), slog.Any("err", err))
+			return
+		}
+
+		ctx.Response(resp)
 	case *actorproto.GetRunRequest:
 		a.logger.Debug("GetRunRequest received", slog.String("name", ctx.Self().Name()))
 		rr, ok := a.runRequest[m.WorkloadId]
@@ -187,7 +192,7 @@ func (a DirectStartAgent) pingWorkload(namespace, workloadId string) (*actorprot
 		return nil, err
 	}
 
-	askResp, err := wl.Ask(context.Background(), wl, &actorproto.QueryWorkload{})
+	askResp, err := wl.Ask(context.Background(), wl, &actorproto.QueryWorkload{}, DefaultAskDuration)
 	if err != nil {
 		a.logger.Log(context.Background(), shandler.LevelTrace, "Failed to query workload", slog.String("name", a.self.Name()), slog.String("workload", workloadId))
 		return nil, err
@@ -304,7 +309,7 @@ func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto
 func (a *DirectStartAgent) queryWorkloads(m *actorproto.QueryWorkloads) (*actorproto.WorkloadList, error) {
 	ret := new(actorproto.WorkloadList)
 	for _, c := range a.self.Children() {
-		askRet, err := c.Ask(context.Background(), c, &actorproto.QueryWorkload{})
+		askRet, err := c.Ask(context.Background(), c, &actorproto.QueryWorkload{}, DefaultAskDuration)
 		if err != nil {
 			a.logger.Error("failed to query workload", slog.String("name", a.self.Name()), slog.Any("err", err))
 			return nil, err

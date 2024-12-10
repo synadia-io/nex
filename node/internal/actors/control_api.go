@@ -24,6 +24,7 @@ import (
 )
 
 const ControlAPIActorName = "control_api"
+const DefaultAskDuration = 5 * time.Second
 
 const (
 	AuctionResponseType       = "io.nats.nex.v2.auction_response"
@@ -238,7 +239,7 @@ func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
 		resp, err := child.Ask(ctx, child, &actorproto.PingWorkload{
 			Namespace:  namespace,
 			WorkloadId: workloadId,
-		})
+		}, DefaultAskDuration)
 		if err != nil {
 			continue
 		}
@@ -247,7 +248,7 @@ func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
 			rr, err := child.Ask(ctx, child, &actorproto.GetRunRequest{
 				Namespace:  namespace,
 				WorkloadId: workloadId,
-			})
+			}, DefaultAskDuration)
 			if err != nil {
 				api.logger.Error("Failed to get original run request", slog.Any("error", err))
 				return
@@ -385,7 +386,7 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
-	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req))
+	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req), DefaultAskDuration)
 	if err != nil {
 		api.logger.Error("Failed to start workload", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("Failed to start workload: %s", err))
@@ -433,9 +434,7 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	// TODO: obtain host services credentials from workload (creds service call)
-
-	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req))
+	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req), DefaultAskDuration)
 	if err != nil {
 		api.logger.Error("Failed to start workload", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("Failed to start workload: %s", err))
@@ -485,7 +484,7 @@ findWorkload:
 	for _, child := range agentSuper.Children() { // iterate over all agents
 		for _, grandchild := range child.Children() { // iterate over all workloads
 			if grandchild.Name() == workloadId {
-				askResp, err = api.self.Ask(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId})
+				askResp, err = api.self.Ask(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId}, DefaultAskDuration)
 				if err != nil {
 					api.logger.Error("Failed to stop workload", slog.Any("error", err))
 					models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("Failed to stop workload: %s", err))
@@ -623,7 +622,7 @@ func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 		Type:       workloadType,
 		Namespace:  namespace,
 		WorkloadId: workloadID,
-	})
+	}, DefaultAskDuration)
 	if err != nil {
 		return
 	}
