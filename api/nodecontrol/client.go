@@ -119,6 +119,32 @@ func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*
 	return &envelope.Data, nil
 }
 
+func (c *ControlAPIClient) ListWorkloads(namespace string) ([]nodegen.WorkloadSummary, error) {
+	workloadsInbox := nats.NewInbox()
+
+	var ret []nodegen.WorkloadSummary
+	_, err := c.nc.Subscribe(workloadsInbox, func(m *nats.Msg) {
+		envelope := new(models.Envelope[[]nodegen.WorkloadSummary])
+		err := json.Unmarshal(m.Data, envelope)
+		if err != nil {
+			c.logger.Error("failed to unmarshal workloads response", slog.Any("err", err), slog.String("data", string(m.Data)))
+			return
+		}
+		ret = append(ret, envelope.Data...)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.nc.PublishRequest(models.NamespacePingRequestSubject(namespace), workloadsInbox, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	time.Sleep(5 * time.Second)
+	return ret, nil
+}
+
 func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
 	req_b, err := json.Marshal(req)
 	if err != nil {

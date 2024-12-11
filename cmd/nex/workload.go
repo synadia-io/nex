@@ -21,6 +21,7 @@ import (
 
 	"strings"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/synadia-io/nex/api/nodecontrol"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
@@ -47,6 +48,7 @@ var validURIPrefix []string = []string{"nats://", "file://", "oci://"}
 type Workload struct {
 	Run    RunWorkload    `cmd:"" help:"Run a workload on a target node" aliases:"start,deploy"`
 	Stop   StopWorkload   `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
+	List   ListWorkload   `cmd:"" help:"List workloads" aliases:"ls"`
 	Info   InfoWorkload   `cmd:"" help:"Get information about a workload"`
 	Copy   CopyWorkload   `cmd:"" help:"Copy a workload to another node" aliases:"cp,clone"`
 	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into an OCI artifact" aliases:"build,package"`
@@ -360,6 +362,79 @@ func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 	fmt.Println(s)
+	return nil
+}
+
+type ListWorkload struct {
+	Json bool `name:"json" description:"Output in JSON format" default:"false"`
+}
+
+func (ListWorkload) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
+func (l ListWorkload) Validate() error {
+	var errs error
+
+	return errs
+}
+
+func (l ListWorkload) Run(ctx context.Context, globals *Globals) error {
+	if globals.Check {
+		return printTable("List Workload Configuration", append(globals.Table(), l.Table()...)...)
+	}
+
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	if err != nil {
+		return err
+	}
+
+	resp, err := controller.ListWorkloads(globals.Namespace)
+	if errors.Is(err, nats.ErrTimeout) {
+		if l.Json {
+			fmt.Print("[]")
+			return nil
+		}
+		fmt.Println("No workloads found for namespace " + globals.Namespace)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(resp) == 0 {
+		if l.Json {
+			fmt.Print("[]")
+			return nil
+		}
+		fmt.Println("No workloads found for namespace " + globals.Namespace)
+		return nil
+	} else {
+		if l.Json {
+			out, err := json.Marshal(resp)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(out))
+			return nil
+		}
+		tW := newTableWriter("Running Workloads for Namespace " + globals.Namespace)
+		tW.AppendHeader(table.Row{"Id", "Name", "Type", "Start Time", "Runtime", "State"})
+		for _, wl := range resp {
+			if wl.Runtime == "0s" {
+				wl.Runtime = "--"
+			}
+			tW.AppendRow(table.Row{wl.Id, wl.Name, wl.WorkloadType, wl.StartTime, wl.Runtime, wl.WorkloadState})
+		}
+
+		fmt.Println(tW.Render())
+	}
+
 	return nil
 }
 

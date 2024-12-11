@@ -31,6 +31,6 @@ func NamespacePingSubscribeSubject() string {
 }
 
 func WorkloadPingSubscribeSubject() string {
-	// $NEX.control.namespace.WPING.workloadtype.workloadid
-	return models.ControlAPIPrefix + ".*.WPING.*.*"
+	// $NEX.control.namespace.WPING.workloadid
+	return models.ControlAPIPrefix + ".*.WPING.*"
 }

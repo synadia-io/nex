@@ -25,7 +25,7 @@ import (
 )
 
 const ControlAPIActorName = "control_api"
-const DefaultAskDuration = 5 * time.Second
+const DefaultAskDuration = 10 * time.Second
 
 const (
 	AuctionResponseType       = "io.nats.nex.v2.auction_response"
@@ -33,6 +33,7 @@ const (
 	PingResponseType          = "io.nats.nex.v2.ping_response"
 	AgentPingResponseType     = "io.nats.nex.v2.agent_ping_response"
 	WorkloadPingResponseType  = "io.nats.nex.v2.workload_ping_response"
+	NamespacePingResponseType = "io.nats.nex.v2.namespace_ping_response"
 	RunResponseType           = "io.nats.nex.v2.run_response"
 	StopResponseType          = "io.nats.nex.v2.stop_response"
 	LameDuckResponseType      = "io.nats.nex.v2.lameduck_response"
@@ -139,75 +140,32 @@ func (api *ControlAPI) subscribe() error {
 	var sub *nats.Subscription
 	var err error
 
-	sub, err = api.nc.Subscribe(AuctionSubscribeSubject(), api.handleAuction)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to auction subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
+	subscriptions := []struct {
+		Subject string
+		Handler nats.MsgHandler
+	}{
+		{AuctionSubscribeSubject(), api.handleAuction},
+		{UndeploySubscribeSubject(), api.handleUndeploy},
+		{AuctionDeploySubscribeSubject(), api.handleADeploy},
+		{CloneWorkloadSubscribeSubject(), api.handleCloneWorkload},
+		{NamespacePingSubscribeSubject(), api.handleNamespacePing},
+		{WorkloadPingSubscribeSubject(), api.handleWorkloadPing},
+		// System only subscriptions
+		{models.PingSubject(), api.handlePing},
+		{models.DirectDeploySubject(api.publicKey), api.handleDeploy},
+		{models.LameduckSubject(api.publicKey), api.handleLameDuck},
+		{models.DirectPingSubject(api.publicKey), api.handlePing},
+		{models.InfoSubject(api.publicKey), api.handleInfo},
 	}
-	api.subsz = append(api.subsz, sub)
 
-	sub, err = api.nc.Subscribe(models.DirectDeploySubject(api.publicKey), api.handleDeploy)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
+	for _, s := range subscriptions {
+		sub, err = api.nc.Subscribe(s.Subject, s.Handler)
+		if err != nil {
+			api.logger.Error("Failed to subscribe to "+s.Subject, slog.Any("error", err), slog.String("id", api.publicKey))
+			return err
+		}
+		api.subsz = append(api.subsz, sub)
 	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(AuctionDeploySubscribeSubject(), api.handleADeploy)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to run subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(models.InfoSubject(api.publicKey), api.handleInfo)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to info subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(models.LameduckSubject(api.publicKey), api.handleLameDuck)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to lame duck subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(models.PingSubject(), api.handlePing)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(models.DirectPingSubject(api.publicKey), api.handlePing)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to node-specific ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(UndeploySubscribeSubject(), api.handleUndeploy)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to undeploy subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(WorkloadPingSubscribeSubject(), api.handleWorkloadPing)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to agent ping subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
-
-	sub, err = api.nc.Subscribe(CloneWorkloadSubscribeSubject(), api.handleCloneWorkload)
-	if err != nil {
-		api.logger.Error("Failed to subscribe to clone workload subject", slog.Any("error", err), slog.String("id", api.publicKey))
-		return err
-	}
-	api.subsz = append(api.subsz, sub)
 
 	api.logger.Info("NATS execution engine awaiting commands")
 	return nil
@@ -649,4 +607,54 @@ func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 	}
 
 	models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
+}
+
+func (api *ControlAPI) handleNamespacePing(m *nats.Msg) {
+	// #NEX.control.<NAMESPACE>.WPING
+	ctx := context.Background()
+
+	splitSub := strings.SplitN(m.Subject, ".", 4)
+
+	namespace := splitSub[2]
+
+	_, supervisor, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
+	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
+		return
+	}
+
+	var workloads []nodecontrol.WorkloadSummary
+	for _, agent := range supervisor.Children() {
+		respEnv, err := api.self.Ask(ctx, agent, &actorproto.QueryWorkloads{}, DefaultAskDuration)
+		if err != nil {
+			continue
+		}
+		resp, ok := respEnv.(*actorproto.Envelope)
+		if !ok {
+			api.logger.Error("Failed to cast response to envelope", slog.Any("error", err))
+			continue
+		}
+
+		var workloadResp actorproto.WorkloadList
+		err = resp.Payload.UnmarshalTo(&workloadResp)
+		if err != nil {
+			api.logger.Error("Failed to unmarshal workload list response", slog.Any("error", err))
+			continue
+		}
+
+		for _, workload := range workloadResp.Workloads {
+			if namespace == "system" || workload.Namespace == namespace {
+				workloads = append(workloads, nodecontrol.WorkloadSummary{
+					Id:            workload.Id,
+					Name:          workload.Name,
+					Runtime:       workload.Runtime,
+					StartTime:     workload.StartedAt.AsTime().Format(time.DateTime),
+					WorkloadState: workload.State,
+					WorkloadType:  workload.WorkloadType,
+				})
+			}
+		}
+	}
+
+	models.RespondEnvelope(m, NamespacePingResponseType, 200, workloads, "")
 }
