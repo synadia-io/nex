@@ -19,7 +19,7 @@ import (
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	nodecontrol "github.com/synadia-io/nex/api/nodecontrol/gen"
+	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
@@ -47,12 +47,12 @@ type ControlAPI struct {
 	publicXKey string
 	subsz      []*nats.Subscription
 
-	nodeCallback ControlAPINodeCallback
+	nodeCallback NodeCallback
 
 	self *goakt.PID
 }
 
-type ControlAPINodeCallback interface {
+type NodeCallback interface {
 	Auction(string, []string, map[string]string) (*actorproto.AuctionResponse, error)
 	Ping() (*actorproto.PingNodeResponse, error)
 	GetInfo(string) (*actorproto.NodeInfo, error)
@@ -63,13 +63,19 @@ type ControlAPINodeCallback interface {
 	EmitEvent(string, cloudevents.Event) error
 }
 
-func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, callback ControlAPINodeCallback) *ControlAPI {
+type StateCallback interface {
+	StoreRunRequest(string, string, *actorproto.StartWorkload) error
+	GetRunRequest(string, string) (*actorproto.StartWorkload, error)
+	DeleteRunRequest(string, string) error
+}
+
+func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, nodeCallback NodeCallback) *ControlAPI {
 	api := &ControlAPI{
 		nc:           nc,
 		logger:       logger,
 		publicKey:    publicKey,
 		subsz:        make([]*nats.Subscription, 0),
-		nodeCallback: callback,
+		nodeCallback: nodeCallback,
 	}
 
 	kp, err := nkeys.CreateCurveKeys()
@@ -113,6 +119,7 @@ func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 			return
 		}
 		a.logger.Info("Control API NATS server is running", slog.String("name", ctx.Self().Name()))
+
 	default:
 		ctx.Unhandled()
 	}
@@ -177,7 +184,7 @@ func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
 	namespace := sSub[2]
 	workloadId := sSub[4]
 
-	req := new(nodecontrol.CloneWorkloadRequestJson)
+	req := new(nodegen.CloneWorkloadRequestJson)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal clone workload request", slog.Any("error", err))
@@ -252,13 +259,13 @@ func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
 		EncryptedBy:        encBy,
 	}
 
-	ret := new(nodecontrol.CloneWorkloadResponseJson)
+	ret := new(nodegen.CloneWorkloadResponseJson)
 	ret.StartWorkloadRequest = startRequestFromProto(startRequest)
 	models.RespondEnvelope(m, AuctionResponseType, 200, ret, "")
 }
 
 func (api *ControlAPI) handleAuction(m *nats.Msg) {
-	req := new(nodecontrol.AuctionRequestJson)
+	req := new(nodegen.AuctionRequestJson)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Log(context.Background(), shandler.LevelTrace, "Failed to unmarshal auction request", slog.Any("error", err))
@@ -288,9 +295,20 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 	// $NEX.control.default.ADEPLOY.bidderId
 	splitSub := strings.SplitN(m.Subject, ".", 5)
+	// splitSub[4] is the bidderId
+	target, xkp, err := api.nodeCallback.IsTargetNode(splitSub[4])
+	if err != nil {
+		api.logger.Error("Failed to check if target node", slog.Any("error", err))
+		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to check if target node: %s", err))
+		return
+	}
 
-	req := new(nodecontrol.StartWorkloadRequestJson)
-	err := json.Unmarshal(m.Data, req)
+	if !target {
+		return
+	}
+
+	req := new(nodegen.StartWorkloadRequestJson)
+	err = json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal deploy request: %s", err))
@@ -303,18 +321,6 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		if err != nil {
 			req.WorkloadName = "unnamed-workload"
 		}
-	}
-
-	// splitSub[4] is the bidderId
-	target, xkp, err := api.nodeCallback.IsTargetNode(splitSub[4])
-	if err != nil {
-		api.logger.Error("Failed to check if target node", slog.Any("error", err))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to check if target node: %s", err))
-		return
-	}
-
-	if !target {
-		return
 	}
 
 	// reencrypt env with node key
@@ -339,7 +345,7 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
-	req.EncEnvironment = nodecontrol.SharedEncEnvJson{
+	req.EncEnvironment = nodegen.SharedEncEnvJson{
 		Base64EncryptedEnv: base64.StdEncoding.EncodeToString(newEncEnv),
 		EncryptedBy:        encTo,
 	}
@@ -384,7 +390,7 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {
-	req := new(nodecontrol.StartWorkloadRequestJson)
+	req := new(nodegen.StartWorkloadRequestJson)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
@@ -459,6 +465,7 @@ findWorkload:
 		for _, grandchild := range child.Children() { // iterate over all workloads
 			if grandchild.Name() == workloadId {
 				askResp, err = api.self.Ask(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId}, DefaultAskDuration)
+				//err = api.self.Tell(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId})
 				if err != nil {
 					api.logger.Error("Failed to stop workload", slog.Any("error", err))
 					models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("Failed to stop workload: %s", err))
@@ -472,33 +479,29 @@ findWorkload:
 	if askResp == nil {
 		return // this node does not have the workload
 	}
-
 	protoResp, ok := askResp.(*actorproto.Envelope)
 	if !ok {
 		api.logger.Error("Workload stop response from agent was not the correct type")
 		models.RespondEnvelope(m, StopResponseType, 500, "", "Agent returned the wrong data type for workload stop")
 		return
 	}
-
 	if protoResp.Error != nil {
 		api.logger.Error("Agent returned an error", slog.Any("error", protoResp.Error))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("agent returned an error: %s", protoResp.Error))
+		models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("agent returned an error: %s", protoResp.Error))
 		return
 	}
-
 	var workloadStopped actorproto.WorkloadStopped
 	err = protoResp.Payload.UnmarshalTo(&workloadStopped)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal workload started response", slog.Any("error", err))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
+		models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
 		return
 	}
-
 	models.RespondEnvelope(m, StopResponseType, 200, stopResponseFromProto(&workloadStopped), "")
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-	req := new(nodecontrol.NodeInfoRequestJson)
+	req := new(nodegen.NodeInfoRequestJson)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal info request", slog.Any("error", err))
@@ -519,7 +522,7 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 	api.logger.Debug("Received lame duck request")
 
-	req := new(nodecontrol.LameduckRequestJson)
+	req := new(nodegen.LameduckRequestJson)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal lame duck request", slog.Any("error", err))
@@ -562,7 +565,7 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		}
 	}()
 
-	models.RespondEnvelope(m, LameDuckResponseType, 200, &nodecontrol.LameduckResponseJson{Success: true}, "")
+	models.RespondEnvelope(m, LameDuckResponseType, 200, &nodegen.LameduckResponseJson{Success: true}, "")
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {
@@ -622,7 +625,6 @@ func (api *ControlAPI) handleNamespacePing(m *nats.Msg) {
 	ctx := context.Background()
 
 	splitSub := strings.SplitN(m.Subject, ".", 4)
-
 	namespace := splitSub[2]
 
 	_, supervisor, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
@@ -631,10 +633,11 @@ func (api *ControlAPI) handleNamespacePing(m *nats.Msg) {
 		return
 	}
 
-	var workloads []nodecontrol.WorkloadSummary
+	var workloads []nodegen.WorkloadSummary
 	for _, agent := range supervisor.Children() {
 		respEnv, err := api.self.Ask(ctx, agent, &actorproto.QueryWorkloads{}, DefaultAskDuration)
 		if err != nil {
+			api.logger.Error("Failed to query workloads", slog.Any("error", err))
 			continue
 		}
 		resp, ok := respEnv.(*actorproto.Envelope)
@@ -652,7 +655,7 @@ func (api *ControlAPI) handleNamespacePing(m *nats.Msg) {
 
 		for _, workload := range workloadResp.Workloads {
 			if namespace == "system" || workload.Namespace == namespace {
-				workloads = append(workloads, nodecontrol.WorkloadSummary{
+				workloads = append(workloads, nodegen.WorkloadSummary{
 					Id:            workload.Id,
 					Name:          workload.Name,
 					Runtime:       workload.Runtime,

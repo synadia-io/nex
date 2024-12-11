@@ -18,6 +18,7 @@ const (
 )
 
 type processActor struct {
+	ctx       context.Context
 	startedAt time.Time
 	runTime   time.Duration
 	id        string
@@ -43,6 +44,7 @@ type processActor struct {
 }
 
 func createNewProcessActor(
+	ctx context.Context,
 	logger *slog.Logger,
 	nc *nats.Conn,
 	processId string,
@@ -58,6 +60,7 @@ func createNewProcessActor(
 ) (*processActor, error) {
 
 	ret := processActor{
+		ctx:          ctx,
 		startedAt:    time.Now(),
 		runTime:      0,
 		id:           processId,
@@ -136,7 +139,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 			stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
 			stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
 
-			a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+			a.process, err = NewOsProcess(a.ctx, a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
 			if err != nil {
 				a.logger.Error("failed to create process", slog.Any("err", err))
 				return
@@ -186,7 +189,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 				a.env = make(map[string]string)
 			}
 			a.env["NEX_TRIGGER_DATA"] = string(msg.Data)
-			a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+			a.process, err = NewOsProcess(a.ctx, a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
 			if err != nil {
 				a.logger.Error("failed to create process", slog.Any("err", err))
 				return
@@ -221,7 +224,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 		stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
 		stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
 
-		a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+		a.process, err = NewOsProcess(a.ctx, a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
 		if err != nil {
 			a.logger.Error("failed to create process", slog.Any("err", err))
 			return

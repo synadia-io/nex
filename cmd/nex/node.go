@@ -434,6 +434,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		options.WithNodeTags(u.Tags),
 		options.WithValidIssuers(u.ValidIssuers),
 		options.WithOCICacheRegistry(u.OCICache),
+		options.WithDevMode(globals.DevMode),
 		options.WithOTelOptions(options.OTelOptions{
 			MetricsEnabled:   u.OtelConfig.OtelMetrics,
 			MetricsPort:      u.OtelConfig.OtelMetricsPort,

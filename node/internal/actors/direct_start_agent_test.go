@@ -3,6 +3,7 @@ package actors
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -56,7 +57,8 @@ func TestPingAgent(t *testing.T) {
 
 	ctx := context.Background()
 	tk := testkit.New(ctx, t, testkit.WithLogging(log.ErrorLevel))
-	tk.Spawn(ctx, DirectStartActorName, CreateDirectStartAgent(nc, "testnode", models.NodeOptions{Logger: logger, Xkey: xkey}, logger))
+	mock := MockState{state: make(map[string]*actorproto.StartWorkload)}
+	tk.Spawn(ctx, DirectStartActorName, CreateDirectStartAgent(context.TODO(), nc, "testnode", models.NodeOptions{Logger: logger, Xkey: xkey}, logger, mock))
 
 	probe := tk.NewProbe(ctx)
 
@@ -77,4 +79,23 @@ func TestPingAgent(t *testing.T) {
 	}
 
 	tk.Shutdown(ctx)
+}
+
+type MockState struct {
+	state map[string]*actorproto.StartWorkload
+}
+
+func (m MockState) StoreRunRequest(inType, inId string, req *actorproto.StartWorkload) error {
+	m.state[inId] = req
+	return nil
+}
+func (m MockState) GetRunRequest(inType, inId string) (*actorproto.StartWorkload, error) {
+	if req, ok := m.state[inId]; ok {
+		return req, nil
+	}
+	return nil, errors.New("not found")
+}
+func (m MockState) DeleteRunRequest(inType, inId string) error {
+	delete(m.state, inId)
+	return nil
 }

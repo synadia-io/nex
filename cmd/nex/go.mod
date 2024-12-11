@@ -5,7 +5,7 @@ go 1.23.0
 replace github.com/synadia-io/nex => ../..
 
 require (
-	disorder.dev/shandler v0.0.0-20241204172207-0daf8b229a32
+	disorder.dev/shandler v0.0.0-20241210223030-b024af991a50
 	github.com/alecthomas/kong v1.2.1
 	github.com/jedib0t/go-pretty/v6 v6.6.1
 	github.com/nats-io/jsm.go v0.1.2
@@ -30,7 +30,7 @@ require (
 	github.com/buraksezer/olric v0.5.6-0.20240925183822-6ca0e20256e0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
-	github.com/charmbracelet/x/ansi v0.5.2 // indirect
+	github.com/charmbracelet/x/ansi v0.6.0 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.15.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -68,8 +68,7 @@ require (
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/redcon v1.6.2 // indirect
-	github.com/tochemey/goakt v1.6.4-0.20240519124028-9819bbd012a3 // indirect
-	github.com/tochemey/goakt/v2 v2.9.2-0.20241211125959-8e30011d412e // indirect
+	github.com/tochemey/goakt/v2 v2.10.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect

@@ -1,6 +1,7 @@
 package actors
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 )
 
 type OsProcess struct {
+	ctx           context.Context
 	name          string
 	executionPath string
 	env           map[string]string
@@ -22,8 +24,9 @@ type OsProcess struct {
 // Creates a new OS process based in the parameters
 // NOTE:: if you want to ensure uniqueness in log eminations coming from this process, make sure you
 // use a unique process name
-func NewOsProcess(name string, executionPath string, env map[string]string, argv []string, logger *slog.Logger, stdout, stderr logCapture) (*OsProcess, error) {
+func NewOsProcess(ctx context.Context, name string, executionPath string, env map[string]string, argv []string, logger *slog.Logger, stdout, stderr logCapture) (*OsProcess, error) {
 	return &OsProcess{
+		ctx:           ctx,
 		name:          name,
 		executionPath: executionPath,
 		env:           env,
@@ -39,7 +42,7 @@ func NewOsProcess(name string, executionPath string, env map[string]string, argv
 // path, args, and environment variables.  The log capture struct will be used as the stdout/stderr
 // targets for the process
 func (proc *OsProcess) Run() error {
-	cmd := exec.Command(proc.executionPath, proc.argv...)
+	cmd := exec.CommandContext(context.TODO(), proc.executionPath, proc.argv...)
 
 	for k, v := range proc.env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))

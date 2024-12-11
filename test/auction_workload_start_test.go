@@ -105,11 +105,11 @@ func TestAuctionDeploy(t *testing.T) {
 		for _, n := range lsout {
 			switch n.Tags.Tags[models.TagNodeName] {
 			case "node1":
-				if n.RunningAgents.Status["direct_start"] != 1 {
+				if n.RunningAgents.Status["direct-start"] != 1 {
 					t.Error("node1 does not have expected workload running")
 				}
 			case "node2":
-				if n.RunningAgents.Status["direct_start"] != 0 {
+				if n.RunningAgents.Status["direct-start"] != 0 {
 					t.Error("node2 has unexpected workloads running")
 				}
 			default:

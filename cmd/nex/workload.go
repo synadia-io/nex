@@ -76,9 +76,9 @@ type RunWorkload struct {
 	WorkloadJsDomain         string            `name:"jsdomain" help:"JS Domain to run the workload under"`
 	WorkloadRetryCount       int               `name:"retry-count" help:"Number of times to retry the workload" default:"3"`
 	WorkloadPublicKey        string            `name:"public-key" help:"Public key of the workload"`
-	WorkloadUri              string            `name:"uri" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
+	WorkloadUri              string            `arg:"" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
 	WorkloadTriggerSubject   string            `name:"trigger" help:"Subject to trigger the workload"`
-	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct_start"`
+	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct-start"`
 	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, function, job" default:"service" enum:"service,function,job"`
 }
 
@@ -298,7 +298,7 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 
 type InfoWorkload struct {
 	WorkloadId   string `arg:"" description:"ID of the workload"`
-	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+	WorkloadType string `name:"type" description:"Type of workload" default:"direct-start"`
 
 	Json bool `name:"json" description:"Output in JSON format" default:"false"`
 }
@@ -448,7 +448,7 @@ func (l ListWorkload) Run(ctx context.Context, globals *Globals) error {
 
 type CopyWorkload struct {
 	WorkloadId   string `arg:"" description:"ID of the workload"`
-	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+	WorkloadType string `name:"type" description:"Type of workload" default:"direct-start"`
 	StopOriginal bool   `name:"stop" description:"Stop the original workload after copying" default:"false"`
 
 	NodeId   string            `description:"Node ID of target workload. If not provided, auction is preformed"`

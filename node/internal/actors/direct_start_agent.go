@@ -23,25 +23,26 @@ import (
 )
 
 const (
-	DirectStartActorName = "direct_start"
+	DirectStartActorName = "direct-start"
 	DirectStartActorDesc = "Direct start agent"
 
 	VERSION = "0.0.0"
 )
 
-func CreateDirectStartAgent(nc *nats.Conn, nodeId string, options models.NodeOptions, logger *slog.Logger) *DirectStartAgent {
-	return &DirectStartAgent{nc: nc, nodeId: nodeId, options: options, logger: logger, runRequest: make(map[string]*actorproto.StartWorkload)}
+func CreateDirectStartAgent(ctx context.Context, nc *nats.Conn, nodeId string, options models.NodeOptions, logger *slog.Logger, stateCallback StateCallback) *DirectStartAgent {
+	return &DirectStartAgent{ctx: ctx, nc: nc, nodeId: nodeId, options: options, logger: logger, stateCallback: stateCallback}
 }
 
 type DirectStartAgent struct {
-	self       *goakt.PID
-	runRequest map[string]*actorproto.StartWorkload
+	ctx  context.Context
+	self *goakt.PID
 
-	nodeId    string
-	startedAt time.Time
-	nc        *nats.Conn
-	options   models.NodeOptions
-	logger    *slog.Logger
+	nodeId        string
+	startedAt     time.Time
+	nc            *nats.Conn
+	options       models.NodeOptions
+	logger        *slog.Logger
+	stateCallback StateCallback
 }
 
 func (a *DirectStartAgent) PreStart(ctx context.Context) error {
@@ -49,12 +50,22 @@ func (a *DirectStartAgent) PreStart(ctx context.Context) error {
 }
 
 func (a *DirectStartAgent) PostStop(ctx context.Context) error {
+	start := time.Now()
+	ticker := time.NewTicker(time.Second)
+	for a.self.ChildrenCount() != 0 {
+		for _ = range ticker.C {
+			if time.Since(start) > time.Second*30 {
+				a.logger.Error("Failed to stop all workloads", slog.String("name", a.self.Name()))
+				return errors.New("failed to stop all workloads in timelimit")
+			}
+		}
+	}
+	ticker.Stop()
 	return nil
 }
 
 func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 	resp := new(actorproto.Envelope)
-
 	switch m := ctx.Message().(type) {
 	case *goaktpb.PostStart:
 		a.self = ctx.Self()
@@ -78,7 +89,10 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			return
 		}
 
-		a.runRequest[ws.Id] = m
+		err = a.stateCallback.StoreRunRequest(DirectStartActorName, ws.Id, m)
+		if err != nil {
+			a.logger.Error("Failed to store run request", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadName), slog.Any("err", err))
+		}
 		ctx.Response(resp)
 	case *actorproto.StopWorkload:
 		a.logger.Debug("StopWorkload received", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId))
@@ -96,8 +110,11 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			ctx.Response(resp)
 			return
 		}
-
-		delete(a.runRequest, m.WorkloadId)
+		err = a.stateCallback.DeleteRunRequest(DirectStartActorName, m.WorkloadId)
+		if err != nil {
+			a.logger.Error("Failed to delete run request", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId), slog.Any("err", err))
+			return
+		}
 		ctx.Response(resp)
 	case *actorproto.QueryWorkloads:
 		a.logger.Debug("QueryWorkloads received", slog.String("name", ctx.Self().Name()))
@@ -174,11 +191,12 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		ctx.Response(resp)
 	case *actorproto.GetRunRequest:
 		a.logger.Debug("GetRunRequest received", slog.String("name", ctx.Self().Name()))
-		rr, ok := a.runRequest[m.WorkloadId]
-		if !ok {
+		wl, err := a.stateCallback.GetRunRequest(DirectStartActorName, m.WorkloadId)
+		if err != nil {
+			a.logger.Debug("Failed to get run request", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId), slog.Any("err", err))
 			return
 		}
-		ctx.Response(proto.Clone(rr))
+		ctx.Response(proto.Clone(wl))
 	case *goaktpb.Terminated:
 		a.logger.Debug("Received terminated message", slog.String("actor", m.ActorId))
 	default:
@@ -243,11 +261,14 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 		return nil, err
 	}
 
-	workloadId := nuid.New().Next()
+	if m.WorkloadId == "" {
+		m.WorkloadId = nuid.New().Next()
+	}
 	pa, err := createNewProcessActor(
+		a.ctx,
 		a.logger.WithGroup("workload"),
 		a.nc,
-		workloadId,
+		m.WorkloadId,
 		m.Argv,
 		m.Namespace,
 		m.WorkloadType,
@@ -263,14 +284,14 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 		return nil, err
 	}
 
-	c, err := a.self.SpawnChild(context.Background(), workloadId, pa)
+	c, err := a.self.SpawnChild(context.Background(), m.WorkloadId, pa)
 	if err != nil {
 		a.logger.Error("Failed to spawn child", slog.String("name", a.self.Name()), slog.String("workload", m.WorkloadName), slog.Any("err", err))
 		return nil, err
 	}
 
 	a.logger.Info("Spawned direct start process", slog.String("name", c.Name()))
-	return &actorproto.WorkloadStarted{Id: workloadId, Name: m.WorkloadName, Started: true}, nil
+	return &actorproto.WorkloadStarted{Id: m.WorkloadId, Name: m.WorkloadName, Started: true}, nil
 }
 
 func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto.WorkloadStopped, error) {
@@ -280,7 +301,7 @@ func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto
 		return nil, errors.New("workload not found")
 	}
 
-	wlResp, err := c.Ask(context.Background(), c, &actorproto.QueryWorkload{})
+	wlResp, err := c.Ask(context.Background(), c, &actorproto.QueryWorkload{}, DefaultAskDuration)
 	if err != nil {
 		a.logger.Error("Failed to query workload", slog.Any("error", err))
 		return nil, err
@@ -299,10 +320,9 @@ func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto
 
 	err = c.Tell(context.Background(), c, &actorproto.KillDirectStartProcess{})
 	if err != nil {
-		a.logger.Error("failed to query workload", slog.String("name", a.self.Name()), slog.Any("err", err))
+		a.logger.Error("failed to stop workload", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err
 	}
-
 	a.logger.Info("Stopping direct start process", slog.String("name", c.Name()))
 	return &actorproto.WorkloadStopped{Id: m.WorkloadId, Stopped: true}, nil
 }

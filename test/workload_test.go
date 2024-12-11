@@ -251,7 +251,7 @@ func TestDirectStartFunction(t *testing.T) {
 	passed := false
 	triggerLogs := new(bytes.Buffer)
 	go func() {
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--runtype", "function", "--triggers", "test")
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--runtype", "function", "--trigger", "test")
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
