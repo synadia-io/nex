@@ -33,6 +33,7 @@ type NodeOptions struct {
 	AgentOptions          []AgentOptions
 	HostServiceOptions    HostServiceOptions
 	OCICacheRegistry      string
+	DevMode               bool
 
 	Errs error
 }
@@ -129,6 +130,12 @@ func WithHostServiceOptions(h HostServiceOptions) NodeOption {
 func WithOCICacheRegistry(r string) NodeOption {
 	return func(n *NodeOptions) {
 		n.OCICacheRegistry = r
+	}
+}
+
+func WithDevMode(b bool) NodeOption {
+	return func(n *NodeOptions) {
+		n.DevMode = b
 	}
 }
 

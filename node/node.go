@@ -97,6 +97,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 				Services: make(map[string]models.ServiceConfig),
 			},
 			OCICacheRegistry: "",
+			DevMode:          false,
 		},
 	}
 

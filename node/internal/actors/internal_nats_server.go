@@ -31,12 +31,17 @@ type InternalNatsServer struct {
 	creds         []AgentCredential
 	serverOptions *server.Options
 	logger        *slog.Logger
-
-	storeDir string
+	devMode       bool
+	storeDir      string
 }
 
 func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
 	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger}
+
+	ns.devMode = options.DevMode
+	if ns.devMode {
+		ns.logger.Warn("DO NOT USE IN PRODUCTION: Running in dev mode, using default credentials")
+	}
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {
@@ -116,6 +121,7 @@ type AgentCredential struct {
 }
 
 type configTemplateData struct {
+	DevMode           bool
 	Credentials       map[string]*credentials
 	Connections       map[string]*nats.Conn
 	NexHostUserPublic string
@@ -157,6 +163,7 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 	}
 
 	data := &configTemplateData{
+		DevMode:           ns.devMode,
 		Credentials:       make(map[string]*credentials),
 		Connections:       make(map[string]*nats.Conn),
 		NexHostUserPublic: hostPub,
@@ -236,6 +243,7 @@ accounts: {
 	nexhost: {
 		jetstream: true
 		users: [
+      {{ if .DevMode }} { user: admin, password: password } {{ end }}
 			{nkey: "{{ .NexHostUserPublic }}"}
 		]
 		exports: [

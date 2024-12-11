@@ -18,6 +18,7 @@ type Globals struct {
 	Check               bool             `help:"Print the current values of all options without running a command"`
 	DisableUpgradeCheck bool             `env:"NEX_DISABLE_UPGRADE_CHECK" name:"disable-upgrade-check" help:"Disable the upgrade check"`
 	AutoUpgrade         bool             `env:"NEX_AUTO_UPGRADE" name:"auto-upgrade" help:"Automatically upgrade the nex CLI when a new version is available"`
+	DevMode             string           `name:"dev" default:"false" help:"Enable development mode"`
 }
 
 type NexCLI struct {
