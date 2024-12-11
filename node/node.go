@@ -96,6 +96,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			HostServiceOptions: models.HostServiceOptions{
 				Services: make(map[string]models.ServiceConfig),
 			},
+			OCICacheRegistry: "",
 		},
 	}
 
@@ -204,8 +205,6 @@ func (nn *nexNode) Start() error {
 
 func (nn *nexNode) initializeSupervisionTree() error {
 	var err error
-	restartDirective := goakt.NewRestartDirective()
-	restartDirective.WithLimit(3, 30*time.Second)
 
 	nn.actorSystem, err = goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
@@ -214,7 +213,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		// TODO: figure out why they're gone or how we can plug in our own impls
 		//goakt.WithTelemetry(telemetry),
 		//goakt.WithTracing(),
-		goakt.WithSupervisorDirective(restartDirective),
+		//goakt.WithSupervisorDirective(restartDirective),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
 		return err
@@ -226,21 +225,27 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		return err
 	}
 
+	restartDirective := goakt.NewRestartDirective()
+	restartDirective.WithLimit(3, 30*time.Second)
+
 	// start the root actors
-	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options))
+	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options),
+		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)))
 	if err != nil {
 		return err
 	}
 
 	inats := actors.CreateInternalNatsServer(*nn.options)
-	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats,
+		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)))
 	if err != nil {
 		return err
 	}
 
 	allCreds := inats.CredentialsMap()
 
-	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions),
+		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)))
 	if err != nil {
 		return err
 	}
@@ -251,7 +256,8 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, pk, *nn.options, nn.options.Logger.WithGroup("direct_start")))
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, pk, *nn.options, nn.options.Logger.WithGroup("direct_start")),
+			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)))
 		if err != nil {
 			return err
 		}

@@ -9,7 +9,7 @@ require (
 	github.com/alecthomas/kong v1.2.1
 	github.com/jedib0t/go-pretty/v6 v6.6.1
 	github.com/nats-io/jsm.go v0.1.2
-	github.com/nats-io/nats-server/v2 v2.10.22
+	github.com/nats-io/nats-server/v2 v2.10.23
 	github.com/nats-io/nats.go v1.37.0
 	github.com/nats-io/natscli v0.1.5
 	github.com/nats-io/nkeys v0.4.8
@@ -68,7 +68,8 @@ require (
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/redcon v1.6.2 // indirect
-	github.com/tochemey/goakt/v2 v2.9.1 // indirect
+	github.com/tochemey/goakt v1.6.4-0.20240519124028-9819bbd012a3 // indirect
+	github.com/tochemey/goakt/v2 v2.9.2-0.20241211125959-8e30011d412e // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect

@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
@@ -55,11 +56,11 @@ func TestPingAgent(t *testing.T) {
 
 	ctx := context.Background()
 	tk := testkit.New(ctx, t, testkit.WithLogging(log.ErrorLevel))
-	dsa := tk.Spawn(ctx, DirectStartActorName,
-		CreateDirectStartAgent(nc, "testnode", models.NodeOptions{Logger: logger, Xkey: xkey}, logger))
+	tk.Spawn(ctx, DirectStartActorName, CreateDirectStartAgent(nc, "testnode", models.NodeOptions{Logger: logger, Xkey: xkey}, logger))
+
 	probe := tk.NewProbe(ctx)
 
-	probe.Send(dsa, &actorproto.PingAgent{Namespace: "system"})
+	probe.SendSync(DirectStartActorName, &actorproto.PingAgent{Namespace: "system"}, time.Second*3)
 	respEnv, ok := probe.ExpectAnyMessage().(*actorproto.Envelope)
 	if !ok {
 		t.Fatalf("unexpected message type: %T", respEnv)

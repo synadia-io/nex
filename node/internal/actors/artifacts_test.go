@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"io"
 	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,7 +160,7 @@ func TestNatsArtifact(t *testing.T) {
 		t.Fatalf("Failed to prep OCI artifact: %v", err)
 	}
 
-	ref, err := getArtifact("testnats", uri, nc)
+	ref, err := getArtifact(context.TODO(), slog.New(slog.NewTextHandler(io.Discard, nil)), "", "testnats", uri, nc)
 	if err != nil {
 		t.Fatalf("Failed to get artifact: %v", err)
 	}
@@ -196,7 +197,7 @@ func TestFileArtifact(t *testing.T) {
 	binPath, binHash, binLen := createTestBinary(t, workingDir)
 
 	uri := prepFileArtifact(t, workingDir, binPath)
-	ref, err := getArtifact("test", uri, nil)
+	ref, err := getArtifact(context.TODO(), slog.New(slog.NewTextHandler(io.Discard, nil)), "", "test", uri, nil)
 	if err != nil {
 		t.Errorf("Failed to get artifact: %v", err)
 	}

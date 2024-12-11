@@ -223,29 +223,7 @@ func TestDirectStartFunction(t *testing.T) {
 	}
 	defer s.Shutdown()
 
-	kp, err := nkeys.CreateServer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	seed, err := kp.Seed()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	xkey, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	xSeed, err := xkey.Seed()
-	if err != nil {
-		t.Error(err)
-		return
-	}
-
-	cmd, err := startNexNodeCmd(t, workingDir, string(seed), string(xSeed), s.ClientURL(), "node", "nexus")
+	cmd, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node", "nexus")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,19 +251,7 @@ func TestDirectStartFunction(t *testing.T) {
 	passed := false
 	triggerLogs := new(bytes.Buffer)
 	go func() {
-		pub, err := kp.PublicKey()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		xkey_pub, err := xkey.PublicKey()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, "--runtype", "function", "--triggers", "test")
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--runtype", "function", "--triggers", "test")
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
@@ -304,13 +270,14 @@ func TestDirectStartFunction(t *testing.T) {
 			return
 		}
 
-		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started on node (?P<node>[A-Z0-9]+)$`)
+		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(cmdstdout.String()))
-		if len(match) != 3 {
+		if len(match) != 2 {
 			t.Error("tester workload failed to start: ", cmdstdout.String())
 			return
 		}
 
+		time.Sleep(500 * time.Millisecond)
 		cmd = exec.Command(nexCli, "workload", "info", "-s", s.ClientURL(), match[1], "--json")
 		cmdstdout = new(bytes.Buffer)
 		cmdstderr = new(bytes.Buffer)
@@ -612,6 +579,6 @@ func TestDirectStopNoWorkload(t *testing.T) {
 	}
 
 	if !passed {
-		t.Fatal("derp")
+		t.Fatal("failed to properly detect no workloads")
 	}
 }

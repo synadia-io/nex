@@ -579,31 +579,39 @@ func (api *ControlAPI) handlePing(m *nats.Msg) {
 func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 	ctx := context.Background()
 
-	splitSub := strings.SplitN(m.Subject, ".", 6)
-	var workloadType, namespace, workloadID string
+	splitSub := strings.SplitN(m.Subject, ".", 5)
+	var namespace, workloadID string
 
-	// PREFIX.control.<NAMESPACE>.WPING.<WORKLOAD_TYPE>.<WORKLOAD_ID>
+	// PREFIX.control.<NAMESPACE>.WPING.<WORKLOAD_ID>
 	namespace = splitSub[2]
-	workloadType = splitSub[4]
-	workloadID = splitSub[5]
+	workloadID = splitSub[4]
 
-	_, agent, err := api.self.ActorSystem().ActorOf(ctx, workloadType)
+	_, supervisor, err := api.self.ActorSystem().ActorOf(ctx, AgentSupervisorActorName)
 	if err != nil {
+		api.logger.Error("Failed to locate agent supervisor actor", slog.Any("error", err))
 		return
 	}
 
-	response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
-		Type:       workloadType,
-		Namespace:  namespace,
-		WorkloadId: workloadID,
-	}, DefaultAskDuration)
-	if err != nil {
-		return
+	var aWorkloadPingResponse *actorproto.PingWorkloadResponse
+	for _, agent := range supervisor.Children() {
+		response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
+			Namespace:  namespace,
+			WorkloadId: workloadID,
+		}, DefaultAskDuration)
+		if err != nil {
+			continue
+		}
+		pingResponse, ok := response.(*actorproto.PingWorkloadResponse)
+		if !ok {
+			continue
+		} else {
+			aWorkloadPingResponse = pingResponse
+			break
+		}
 	}
 
-	aWorkloadPingResponse, ok := response.(*actorproto.PingWorkloadResponse)
-	if !ok {
-		return
+	if aWorkloadPingResponse == nil {
+		return // Pings do not respond negatively
 	}
 
 	models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")

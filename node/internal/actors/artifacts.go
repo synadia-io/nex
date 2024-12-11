@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -46,7 +48,7 @@ type ArtifactReference struct {
 // Obtains an artifact from the specified location. If the indicated location allows for
 // differentiation using tags (e.g. OCI, Object Store), then the supplied tag will be used,
 // otherwise it will be ignored
-func getArtifact(name string, inUri string, nc *nats.Conn) (*ArtifactReference, error) {
+func getArtifact(ctx context.Context, logger *slog.Logger, ociCache string, name string, inUri string, nc *nats.Conn) (*ArtifactReference, error) {
 	uri, err := parseUri(inUri)
 	if err != nil {
 		return nil, err
@@ -54,17 +56,17 @@ func getArtifact(name string, inUri string, nc *nats.Conn) (*ArtifactReference, 
 
 	switch uri.schema {
 	case SchemeFile:
-		return cacheFile(name, uri)
+		return cacheFile(logger, name, uri)
 	case SchemeNATS:
-		return cacheObjectStoreArtifact(name, uri, nc)
+		return cacheObjectStoreArtifact(logger, name, uri, nc)
 	case SchemeOCI:
-		return cacheOciArtifact(name, uri)
+		return cacheOciArtifact(logger, ociCache, name, uri)
 	default:
 		return nil, errors.New("unsupported artifact scheme")
 	}
 }
 
-func cacheFile(name string, uri *uri) (*ArtifactReference, error) {
+func cacheFile(logger *slog.Logger, name string, uri *uri) (*ArtifactReference, error) {
 	info, err := os.Stat(uri.path)
 	if err != nil {
 		return nil, err
@@ -119,7 +121,8 @@ func cacheFile(name string, uri *uri) (*ArtifactReference, error) {
 	}, nil
 }
 
-func cacheObjectStoreArtifact(name string, uri *uri, nc *nats.Conn) (*ArtifactReference, error) {
+func cacheObjectStoreArtifact(logger *slog.Logger, name string, uri *uri, nc *nats.Conn) (*ArtifactReference, error) {
+	var err error
 
 	binary := uri.path + "_" + uri.tag
 
@@ -141,6 +144,7 @@ func cacheObjectStoreArtifact(name string, uri *uri, nc *nats.Conn) (*ArtifactRe
 	if err != nil {
 		return nil, err
 	}
+
 	fCache, err := os.CreateTemp(os.TempDir(), getFileName())
 	if err != nil {
 		return nil, err
@@ -188,9 +192,10 @@ func cacheObjectStoreArtifact(name string, uri *uri, nc *nats.Conn) (*ArtifactRe
 	}, nil
 }
 
-func cacheOciArtifact(name string, uri *uri) (*ArtifactReference, error) {
+func cacheOciArtifact(logger *slog.Logger, ociCache string, name string, uri *uri) (*ArtifactReference, error) {
 	// TODO/NOTE: for now let's assume that if the target registry requires auth, it will be supplied in the location.User field
 
+	// TODO both repo types need to be much for configurable
 	repo, err := remote.NewRepository(uri.location + "/" + uri.path)
 	if err != nil {
 		return nil, err
@@ -201,11 +206,26 @@ func cacheOciArtifact(name string, uri *uri) (*ArtifactReference, error) {
 		Cache:  auth.NewCache(),
 	}
 
-	store := memory.New()
+	// Memory is the default store
+	var store oras.Target
+	store = memory.New()
+
+	if ociCache != "" {
+		cache, err := remote.NewRepository(ociCache + "/" + uri.path)
+		if err != nil {
+			logger.Warn("Failed to create cache repository", slog.Any("err", err), slog.String("configured_cache", ociCache))
+		}
+		cache.PlainHTTP = true
+		store = cache
+	}
+
+	logger.Debug("Downloading artifact", slog.String("uri", uri.String()))
+	startTime := time.Now()
 	descriptor, err := oras.Copy(context.TODO(), repo, uri.tag, store, "", oras.DefaultCopyOptions)
 	if err != nil {
 		return nil, err
 	}
+	logger.Debug("Downloaded artifact", slog.String("uri", uri.String()), slog.Duration("duration", time.Since(startTime)))
 
 	if found, err := store.Exists(context.TODO(), descriptor); err != nil || !found {
 		return nil, errors.New("artifact not found")

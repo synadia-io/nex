@@ -187,11 +187,14 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		}
 		for i := 0; i < r.WorkloadReplicas; i++ {
 			resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
-			if err != nil {
+			if errors.Is(err, nats.ErrTimeout) {
+				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadReplicas)
+			} else if err != nil {
 				return err
+			} else {
+				allResp = append(allResp, resp)
+				time.Sleep(500 * time.Millisecond)
 			}
-			allResp = append(allResp, resp)
-			time.Sleep(500 * time.Millisecond)
 		}
 	} else {
 		auctionResults, err := controller.Auction(globals.Namespace, r.NodeTags)
@@ -219,11 +222,16 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 				Base64EncryptedEnv: b64_enc_env,
 				EncryptedBy:        txk_pub,
 			}
+
 			resp, err := controller.AuctionDeployWorkload(globals.Namespace, bidderId, startRequest)
-			if err != nil {
+			if errors.Is(err, nats.ErrTimeout) {
+				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadReplicas)
+			} else if err != nil {
 				return err
+			} else {
+				allResp = append(allResp, resp)
+				time.Sleep(500 * time.Millisecond)
 			}
-			allResp = append(allResp, resp)
 		}
 	}
 

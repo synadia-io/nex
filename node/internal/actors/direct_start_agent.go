@@ -237,7 +237,7 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 	}
 
 	// TODO: figure out which nats connection to use here
-	ref, err := getArtifact(m.WorkloadName, m.Uri, nil)
+	ref, err := getArtifact(context.TODO(), a.logger, a.options.OCICacheRegistry, m.WorkloadName, m.Uri, nil)
 	if err != nil {
 		a.logger.Error("Failed to get artifact", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err

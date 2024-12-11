@@ -298,7 +298,7 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 			tags = append(tags, fmt.Sprintf("%s=%s", k, v))
 		}
 
-		w := columns.New(fmt.Sprintf("Information about Node %s", resp.NodeId))
+		w := columns.New("Information about Node %s", resp.NodeId)
 		w.AddRow("Nexus", resp.Tags.Tags[models.TagNexus])
 		w.AddRow("Node Name", resp.Tags.Tags[models.TagNodeName])
 		w.AddRow("Tags", tags)
@@ -347,6 +347,7 @@ type Up struct {
 	NodeXKeySeed                     string            `name:"node-xkey-seed" help:"Node XKey Seed used for encryption.  Default is generated" placeholder:"XAIHERHS..."`
 	HideWorkloadLogs                 bool              `name:"hide-workload-logs" help:"Hide logs from workloads" default:"false"`
 	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false" hidden:""`
+	OCICache                         string            `name:"oci-cache" help:"Path to OCI cache registry" placeholder:"localhost:5000"`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
 	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
@@ -432,6 +433,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		options.WithResourceDirectory(u.DefaultResourceDir),
 		options.WithNodeTags(u.Tags),
 		options.WithValidIssuers(u.ValidIssuers),
+		options.WithOCICacheRegistry(u.OCICache),
 		options.WithOTelOptions(options.OTelOptions{
 			MetricsEnabled:   u.OtelConfig.OtelMetrics,
 			MetricsPort:      u.OtelConfig.OtelMetricsPort,
