@@ -61,7 +61,7 @@ func TestCLIWithConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _ = f.WriteString(config)
+	f.WriteString(config)
 	defer f.Close()
 
 	nex := NexCLI{}
@@ -70,7 +70,7 @@ func TestCLIWithConfig(t *testing.T) {
 		kong.Configuration(kong.JSON, f.Name()),
 		kong.Bind(&nex.Globals),
 	)
-	_, _ = parser.LoadConfig(f.Name())
+	parser.LoadConfig(f.Name())
 
 	_, err = parser.Parse([]string{"node", "up", "--config", f.Name()})
 	if err != nil {

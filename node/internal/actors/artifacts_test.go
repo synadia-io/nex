@@ -159,7 +159,7 @@ func TestNatsArtifact(t *testing.T) {
 		t.Fatalf("Failed to prep OCI artifact: %v", err)
 	}
 
-	ref, err := GetArtifact("testnats", uri, nc)
+	ref, err := getArtifact("testnats", uri, nc)
 	if err != nil {
 		t.Fatalf("Failed to get artifact: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestFileArtifact(t *testing.T) {
 	binPath, binHash, binLen := createTestBinary(t, workingDir)
 
 	uri := prepFileArtifact(t, workingDir, binPath)
-	ref, err := GetArtifact("test", uri, nil)
+	ref, err := getArtifact("test", uri, nil)
 	if err != nil {
 		t.Errorf("Failed to get artifact: %v", err)
 	}
