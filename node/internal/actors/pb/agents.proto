@@ -140,7 +140,6 @@ message WorkloadList {
 
 message SpawnDirectStartProcess {}
 message KillDirectStartProcess {}
-message SpawnAgentBinary {}
 
 message GetNodeInfo {}
 message NodeInfo {
@@ -166,23 +165,6 @@ message SetLameDuck {}
 message LameDuckResponse {
   bool success = 1;
 }
-
-message AgentRegistered {
-  string workload_type = 1;
-  // The public nkey used by the external agent binary to connect to the internal NATS server
-  string agentbin_public_nkey = 2;
-  // The seed nkey used by the external agent binary to connect to the internal NATS server
-  string agentbin_nkey_seed = 3;
-
-  string internal_nats_url = 4;
-  // The nkey used by the external agent _actor_ to connect to the internal NATS server
-  string internal_nkey = 5;
-  // The nkey seed used by the external agent _actor_ to connect to the internal NATS server
-  string internal_nkey_seed = 6;
-
-}
-
-message CheckRegistered {}
 
 // Request made by the actor system and/or control API asking the agent to stop. Note
 // that the direct start agent will ignore this

@@ -199,23 +199,14 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 	}
 
 	// TODO: figure out which nats connection to use here
-	ref, err := GetArtifact(m.WorkloadName, m.Uri, nil)
+	ref, err := getArtifact(m.WorkloadName, m.Uri, nil)
 	if err != nil {
 		a.logger.Error("Failed to get artifact", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err
 	}
 
 	workloadId := nuid.New().Next()
-	pa, err := createNewProcessActor(
-		a.logger.WithGroup("workload"),
-		a.nc,
-		workloadId,
-		m.Argv,
-		m.Namespace,
-		m.WorkloadType,
-		m.WorkloadName,
-		ref,
-		env)
+	pa, err := createNewProcessActor(a.logger.WithGroup("workload"), a.nc, workloadId, m, ref, env)
 	if err != nil {
 		a.logger.Error("Failed to create process actor", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err
@@ -240,7 +231,7 @@ func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto
 
 	err = c.Tell(context.Background(), c, &actorproto.KillDirectStartProcess{})
 	if err != nil {
-		a.logger.Error("failed to stop workload", slog.String("name", a.self.Name()), slog.Any("err", err))
+		a.logger.Error("failed to query workload", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err
 	}
 

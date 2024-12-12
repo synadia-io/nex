@@ -378,7 +378,6 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		return
 	}
 
-	// TODO: obtain host services credentials for workload (creds service)
 	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req))
 	if err != nil {
 		api.logger.Error("Failed to start workload", slog.Any("error", err))
@@ -392,11 +391,9 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 		models.RespondEnvelope(m, RunResponseType, 500, "", "Agent returned the wrong data type")
 		return
 	}
-	if !protoResp.Started {
-		api.logger.Warn("Workload not started (agent returned started=false)")
-	}
 
 	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(protoResp), "")
+
 }
 
 func (api *ControlAPI) handleDeploy(m *nats.Msg) {
@@ -415,6 +412,8 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to locate [%s] agent actor: %s", req.WorkloadType, err))
 		return
 	}
+
+	// TODO: obtain host services credentials from workload (creds service call)
 
 	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req))
 	if err != nil {
