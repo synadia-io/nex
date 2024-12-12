@@ -75,7 +75,7 @@ type RunWorkload struct {
 	WorkloadUri              string            `name:"uri" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
 	WorkloadTriggerSubjects  []string          `name:"triggers" help:"Subjects to trigger the workload"`
 	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct_start"`
-	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, once, job" default:"service" enum:"service,function,job"`
+	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, function, job" default:"service" enum:"service,function,job"`
 }
 
 func (RunWorkload) AfterApply(globals *Globals) error {
