@@ -204,7 +204,7 @@ func TestDirectStartService(t *testing.T) {
 	}
 }
 
-func TestDirectStartJob(t *testing.T) {
+func TestDirectStartFunction(t *testing.T) {
 	workingDir := t.TempDir()
 
 	binPath, err := buildTestBinary(t, "./testdata/function/main.go", workingDir)
