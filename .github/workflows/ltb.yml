@@ -4,7 +4,7 @@ name: Lint | Test | Build
 
 on:
   pull_request:
-    branches: [ "v3" ]
+    branches: [ "main" ]
 
 env:
   GO_VER: '1.23.0'
