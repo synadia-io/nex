@@ -34,6 +34,8 @@ type processActor struct {
 	retryCount   int
 	ref          *ArtifactReference
 
+	retryCounter int
+
 	cancel  context.CancelFunc
 	logger  *slog.Logger
 	self    *goakt.PID
@@ -71,6 +73,7 @@ func createNewProcessActor(
 		env:          env,
 		triggerSub:   triggerSub,
 		retryCount:   retryCount,
+		retryCounter: 0,
 	}
 
 	return &ret, nil
@@ -127,8 +130,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 
 	switch a.runType {
 	case models.WorkloadRunTypeService:
-		c := 0
-		for a.state != models.WorkloadStateStopped && c < a.retryCount {
+		for a.state != models.WorkloadStateStopped && a.retryCounter < a.retryCount {
 			a.state = models.WorkloadStateRunning
 
 			stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
@@ -145,10 +147,10 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 				a.logger.Error("failed to start process", slog.Any("err", err))
 			}
 			a.state = models.WorkloadStateError
-			c++
+			a.retryCounter++
 		}
 
-		if c == a.retryCount {
+		if a.retryCounter == a.retryCount {
 			a.logger.Error("failed to start process after retries", slog.Int("retryCount", a.retryCount))
 		}
 		ctx.Shutdown()
