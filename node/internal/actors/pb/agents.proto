@@ -159,8 +159,9 @@ message WorkloadSummary {
     string runtime = 3;
     google.protobuf.Timestamp started_at = 4;
     string workload_type = 5;
-    string namespace = 6;
-    string state = 7;
+    string workload_runtype = 6;
+    string namespace = 7;
+    string state = 8;
 }
 
 message SetLameDuck {}

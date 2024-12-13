@@ -271,6 +271,7 @@ func TestDirectStartFunction(t *testing.T) {
 	}()
 
 	passed := false
+	triggerLogs := new(bytes.Buffer)
 	go func() {
 		pub, err := kp.PublicKey()
 		if err != nil {
@@ -341,8 +342,21 @@ func TestDirectStartFunction(t *testing.T) {
 			t.Error(err)
 			return
 		}
+		defer nc.Close()
 
-		err = nc.Publish("test", []byte("test"))
+		workloadId := match[1]
+		sub, err := nc.Subscribe("$NEX.logs.system."+workloadId+".stdout", func(msg *nats.Msg) {
+			triggerLogs.Write(msg.Data)
+		})
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer func() {
+			_ = sub.Drain()
+		}()
+
+		err = nc.Publish("test", []byte("test data 123"))
 		if err != nil {
 			t.Error(err)
 			return
@@ -391,5 +405,9 @@ func TestDirectStartFunction(t *testing.T) {
 
 	if !passed {
 		t.Fatal("expected workload to run for 500ms - 1s")
+	}
+
+	if !bytes.Contains(triggerLogs.Bytes(), []byte("test data 123")) {
+		t.Error("expected 'test data 123' to be consumed by workload")
 	}
 }

@@ -96,12 +96,13 @@ func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJ
 
 	for _, workload := range response.Workloads {
 		ret.WorkloadSummaries = append(ret.WorkloadSummaries, api.WorkloadSummary{
-			Id:            workload.Id,
-			Name:          workload.Name,
-			Runtime:       workload.Runtime,
-			StartTime:     workload.StartedAt.AsTime().Format(time.DateTime),
-			WorkloadType:  workload.WorkloadType,
-			WorkloadState: workload.State,
+			Id:              workload.Id,
+			Name:            workload.Name,
+			Runtime:         workload.Runtime,
+			StartTime:       workload.StartedAt.AsTime().Format(time.DateTime),
+			WorkloadType:    workload.WorkloadType,
+			WorkloadRuntype: workload.WorkloadRuntype,
+			WorkloadState:   workload.State,
 		})
 	}
 	return ret
@@ -147,12 +148,13 @@ func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingR
 func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponseJson {
 	return &api.WorkloadPingResponseJson{
 		WorkloadSummary: &api.Workload{
-			Id:            response.Workload.Id,
-			Name:          response.Workload.Name,
-			Runtime:       response.Workload.Runtime,
-			StartTime:     response.Workload.StartedAt.AsTime().Format(time.DateTime),
-			WorkloadType:  response.Workload.WorkloadType,
-			WorkloadState: response.Workload.State,
+			Id:              response.Workload.Id,
+			Name:            response.Workload.Name,
+			Runtime:         response.Workload.Runtime,
+			StartTime:       response.Workload.StartedAt.AsTime().Format(time.DateTime),
+			WorkloadType:    response.Workload.WorkloadType,
+			WorkloadRuntype: response.Workload.WorkloadRuntype,
+			WorkloadState:   response.Workload.State,
 		},
 	}
 }

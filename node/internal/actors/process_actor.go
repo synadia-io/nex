@@ -2,6 +2,7 @@ package actors
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -107,13 +108,14 @@ func (a *processActor) Receive(ctx *goakt.ReceiveContext) {
 		ctx.Shutdown()
 	case *actorproto.QueryWorkload:
 		ctx.Response(&actorproto.WorkloadSummary{
-			Id:           a.id,
-			Name:         a.processName,
-			Namespace:    a.namespace,
-			Runtime:      a.runTime.String(),
-			StartedAt:    timestamppb.New(a.startedAt),
-			WorkloadType: a.workloadType,
-			State:        a.state,
+			Id:              a.id,
+			Name:            a.processName,
+			Namespace:       a.namespace,
+			Runtime:         a.runTime.String(),
+			StartedAt:       timestamppb.New(a.startedAt),
+			WorkloadType:    a.workloadType,
+			WorkloadRuntype: a.runType,
+			State:           a.state,
 		})
 	default:
 		a.logger.Warn("unknown message", slog.Any("msg", ctx.Message()))
@@ -158,7 +160,8 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 		a.cancel = cancel
 
 		// TODO: subscribe to all triggers or change to only allow one
-		s, err := a.nc.Subscribe(a.triggerSubs[0], func(msg *nats.Msg) {
+		// TODO: need to have a better quere group. possibly an ID at start time
+		s, err := a.nc.QueueSubscribe(a.triggerSubs[0], a.processName, func(msg *nats.Msg) {
 			a.state = models.WorkloadStateRunning
 
 			ticker := time.NewTicker(DefaultJobRunTime)
@@ -175,6 +178,10 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 			stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
 			stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
 
+			if a.env == nil {
+				a.env = make(map[string]string)
+			}
+			a.env["NEX_TRIGGER_DATA"] = string(msg.Data)
 			a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
 			if err != nil {
 				a.logger.Error("failed to create process", slog.Any("err", err))
@@ -192,6 +199,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 
 			a.runTime = a.runTime + exeEnd.Sub(exeStart)
 			a.state = models.WorkloadStateWarm
+			ticker.Stop()
 		})
 		if err != nil {
 			a.logger.Error("failed to subscribe to trigger", slog.Any("err", err))

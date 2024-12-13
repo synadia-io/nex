@@ -75,6 +75,10 @@
           "type": "string",
           "description": "The type of the workload"
         },
+        "workload_runtype": {
+          "type": "string",
+          "description": "The runtype/lifecycle of the workload"
+        },
         "workload_state": {
           "type": "string",
           "description": "The state of the workload"
@@ -86,6 +90,7 @@
         "start_time",
         "runtime",
         "workload_type",
+        "workload_runtype",
         "workload_state"
       ]
     }

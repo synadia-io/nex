@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"strings"
 
@@ -332,8 +333,21 @@ func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
 	w := columns.New("Information about Workload %s", i.WorkloadId)
 	w.AddRow("Name", resp.WorkloadSummary.Name)
 	w.AddRow("Start Time", resp.WorkloadSummary.StartTime)
-	w.AddRowIf("Run Time", resp.WorkloadSummary.Runtime, resp.WorkloadSummary.Runtime != "")
+	w.AddRow("Run Time", func() string {
+		if resp.WorkloadSummary.Runtime == "" {
+			return "--"
+		}
+		if resp.WorkloadSummary.Runtime == "0s" {
+			t, err := time.Parse(time.DateTime, resp.WorkloadSummary.StartTime)
+			if err != nil {
+				return "--"
+			}
+			return time.Since(t).String()
+		}
+		return resp.WorkloadSummary.Runtime
+	}())
 	w.AddRow("Workload Type", resp.WorkloadSummary.WorkloadType)
+	w.AddRow("Workload Runtype", resp.WorkloadSummary.WorkloadRuntype)
 	w.AddRow("Workload State", resp.WorkloadSummary.WorkloadState)
 	s, err := w.Render()
 	if err != nil {

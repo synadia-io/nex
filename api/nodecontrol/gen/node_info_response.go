@@ -84,6 +84,9 @@ type WorkloadSummary struct {
 	// The start time of the workload
 	StartTime string `json:"start_time" yaml:"start_time" mapstructure:"start_time"`
 
+	// The runtype/lifecycle of the workload
+	WorkloadRuntype string `json:"workload_runtype" yaml:"workload_runtype" mapstructure:"workload_runtype"`
+
 	// The state of the workload
 	WorkloadState string `json:"workload_state" yaml:"workload_state" mapstructure:"workload_state"`
 
@@ -108,6 +111,9 @@ func (j *WorkloadSummary) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["start_time"]; raw != nil && !ok {
 		return fmt.Errorf("field start_time in WorkloadSummary: required")
+	}
+	if _, ok := raw["workload_runtype"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_runtype in WorkloadSummary: required")
 	}
 	if _, ok := raw["workload_state"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_state in WorkloadSummary: required")
