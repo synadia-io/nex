@@ -74,7 +74,7 @@ type RunWorkload struct {
 	WorkloadRetryCount       int               `name:"retry-count" help:"Number of times to retry the workload" default:"3"`
 	WorkloadPublicKey        string            `name:"public-key" help:"Public key of the workload"`
 	WorkloadUri              string            `name:"uri" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
-	WorkloadTriggerSubjects  []string          `name:"triggers" help:"Subjects to trigger the workload"`
+	WorkloadTriggerSubject   string            `name:"trigger" help:"Subject to trigger the workload"`
 	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct_start"`
 	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, function, job" default:"service" enum:"service,function,job"`
 }
@@ -107,7 +107,7 @@ func (r RunWorkload) Validate() error {
 		}
 	}
 
-	if r.WorkloadRuntype == models.WorkloadRunTypeFunction && len(r.WorkloadTriggerSubjects) == 0 {
+	if r.WorkloadRuntype == models.WorkloadRunTypeFunction && r.WorkloadTriggerSubject == "" {
 		errs = errors.Join(errs, errors.New("Job workloads require at least one trigger subject"))
 	}
 
@@ -147,7 +147,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		TargetPubXkey:   r.NodePubXKey,
 		RetryCount:      r.WorkloadRetryCount,
 		SenderPublicKey: r.WorkloadPublicKey,
-		TriggerSubjects: r.WorkloadTriggerSubjects,
+		TriggerSubject:  r.WorkloadTriggerSubject,
 		Uri:             r.WorkloadUri,
 		WorkloadName:    r.WorkloadName,
 		WorkloadType:    r.WorkloadType,

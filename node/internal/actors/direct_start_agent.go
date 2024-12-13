@@ -217,7 +217,7 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 		ref,
 		env,
 		m.WorkloadRuntype,
-		m.TriggerSubjects,
+		m.TriggerSubject,
 		int(m.RetryCount),
 	)
 	if err != nil {

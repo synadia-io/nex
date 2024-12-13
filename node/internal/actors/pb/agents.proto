@@ -79,7 +79,7 @@ message StartWorkload {
   string jsdomain = 6;
   string retried_at = 7;
   int32 retry_count = 8;
-  repeated string trigger_subjects = 9;
+  string trigger_subject = 9;
   string uri = 10;
   string workload_jwt = 11;
   string workload_name = 12;

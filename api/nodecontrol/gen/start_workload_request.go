@@ -37,8 +37,8 @@ type StartWorkloadRequestJson struct {
 	// The xkey of the target node
 	TargetPubXkey string `json:"target_pub_xkey" yaml:"target_pub_xkey" mapstructure:"target_pub_xkey"`
 
-	// The subjects that trigger the workload
-	TriggerSubjects []string `json:"trigger_subjects" yaml:"trigger_subjects" mapstructure:"trigger_subjects"`
+	// The subject that triggers the workload
+	TriggerSubject string `json:"trigger_subject" yaml:"trigger_subject" mapstructure:"trigger_subject"`
 
 	// The URI of the workload
 	Uri string `json:"uri" yaml:"uri" mapstructure:"uri"`
@@ -92,8 +92,8 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	if _, ok := raw["target_pub_xkey"]; raw != nil && !ok {
 		return fmt.Errorf("field target_pub_xkey in StartWorkloadRequestJson: required")
 	}
-	if _, ok := raw["trigger_subjects"]; raw != nil && !ok {
-		return fmt.Errorf("field trigger_subjects in StartWorkloadRequestJson: required")
+	if _, ok := raw["trigger_subject"]; raw != nil && !ok {
+		return fmt.Errorf("field trigger_subject in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["uri"]; raw != nil && !ok {
 		return fmt.Errorf("field uri in StartWorkloadRequestJson: required")

@@ -47,12 +47,9 @@
       "type": "string",
       "description": "The public key of the sender"
     },
-    "trigger_subjects": {
-      "type": "array",
-      "description": "The subjects that trigger the workload",
-      "items": {
-        "type": "string"
-      }
+    "trigger_subject": {
+      "type": "string",
+      "description": "The subject that triggers the workload"
     },
     "host_service_config": {
       "$ref": "./shared-host-service.json",
@@ -88,7 +85,7 @@
     "retried_at",
     "sender_public_key",
     "target_node",
-    "trigger_subjects",
+    "trigger_subject",
     "host_service_config",
     "workload_name",
     "workload_jwt",

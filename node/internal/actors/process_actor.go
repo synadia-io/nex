@@ -30,7 +30,7 @@ type processActor struct {
 	processName  string
 	runType      string
 	state        string
-	triggerSubs  []string
+	triggerSub   string
 	retryCount   int
 	ref          *ArtifactReference
 
@@ -51,7 +51,7 @@ func createNewProcessActor(
 	ref *ArtifactReference,
 	env map[string]string,
 	runType string,
-	triggerSub []string,
+	triggerSub string,
 	retryCount int,
 ) (*processActor, error) {
 
@@ -69,7 +69,7 @@ func createNewProcessActor(
 		logger:       logger,
 		argv:         argv,
 		env:          env,
-		triggerSubs:  triggerSub,
+		triggerSub:   triggerSub,
 		retryCount:   retryCount,
 	}
 
@@ -160,7 +160,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 
 		// TODO: subscribe to all triggers or change to only allow one
 		// TODO: need to have a better quere group. possibly an ID at start time
-		s, err := a.nc.QueueSubscribe(a.triggerSubs[0], a.processName, func(msg *nats.Msg) {
+		s, err := a.nc.QueueSubscribe(a.triggerSub, a.processName, func(msg *nats.Msg) {
 			a.state = models.WorkloadStateRunning
 
 			ticker := time.NewTicker(DefaultJobRunTime)
