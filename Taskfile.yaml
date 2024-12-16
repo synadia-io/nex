@@ -76,4 +76,4 @@ tasks:
     deps: [proto]
     dir: cmd/nex
     cmds:
-      - go build .
+      - go build -o ../../target/nex .
