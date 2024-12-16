@@ -13,11 +13,11 @@ Leverage and extend your investment in NATS infrastructure to deploy functions a
 
 ## Prerequisites
 ### Taskfile
-NEX uses [Task](https://taskfile.dev) for building, testing, and releasing. You can install Task by following the
+Nex uses [Task](https://taskfile.dev) for building, testing, and releasing. You can install Task by following the
 instructions [here](https://taskfile.dev/installation)
 
 ### Protobuf
-NEX relies on Protobuf for defining the API and messages. While many linux distros have Protobuf available in their 
+Nex relies on Protobuf for defining the API and messages. While many linux distros have Protobuf available in their 
 package repositories, it is recommended to install the latest version from the official releases. You can find the 
 latest release [here](https://github.com/protocolbuffers/protobuf/releases)
 
@@ -34,7 +34,7 @@ go install google.golang.org/protobuf/cmd/protoc-gen-go
 ```
 
 ### Go-jsonschema
-NEX uses go-jsonschema for validating the configuration files. You can install it by [following the installation instructions](https://github.com/omissis/go-jsonschema?tab=readme-ov-file#installing)
+Nex uses go-jsonschema for validating the configuration files. You can install it by [following the installation instructions](https://github.com/omissis/go-jsonschema?tab=readme-ov-file#installing)
 
 ## Getting Started
 Currently, there are no pre-built binaries available. To build from source, make sure the prerequisites are installed.
