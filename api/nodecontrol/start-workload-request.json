@@ -23,10 +23,6 @@
       "type": "string",
       "description": "The URI of the workload"
     },
-    "essential": {
-      "type": "boolean",
-      "description": "Whether the workload is essential; essential workloads will be restarted if they fail"
-    },
     "enc_environment": {
       "$ref": "./shared-enc-env.json",
       "description": "The base64-encoded byte array of the encrypted environment with public key of encryptor"
@@ -51,12 +47,9 @@
       "type": "string",
       "description": "The public key of the sender"
     },
-    "trigger_subjects": {
-      "type": "array",
-      "description": "The subjects that trigger the workload",
-      "items": {
-        "type": "string"
-      }
+    "trigger_subject": {
+      "type": "string",
+      "description": "The subject that triggers the workload"
     },
     "host_service_config": {
       "$ref": "./shared-host-service.json",
@@ -73,6 +66,10 @@
     "workload_type": {
       "type": "string",
       "description": "The type of the workload"
+    },
+    "workload_runtype": {
+      "type": "string",
+      "description": "The runtype of the workload"
     }
   },
   "required": [
@@ -80,7 +77,6 @@
     "description",
     "hash",
     "uri",
-    "essential",
     "enc_environment",
     "jsdomain",
     "namespace",
@@ -89,10 +85,11 @@
     "retried_at",
     "sender_public_key",
     "target_node",
-    "trigger_subjects",
+    "trigger_subject",
     "host_service_config",
     "workload_name",
     "workload_jwt",
-    "workload_type"
+    "workload_type",
+    "workload_runtype"
   ]
 }
