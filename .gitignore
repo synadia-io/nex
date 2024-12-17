@@ -29,6 +29,9 @@ go.work.sum
 *.log
 *.err
 
+# Idea
+.idea
+
 cmd/nex/nex
 dist/
 
@@ -36,6 +39,7 @@ config.json
 .resources/
 
 .task
+target
 
 agents/javascript/cmd/javascript/javascript
 

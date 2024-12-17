@@ -413,6 +413,7 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 	}
 
 	logger := configureLogger(globals, nc, pubKey, u.ShowSystemLogs, u.HideWorkloadLogs)
+	go pprof(logger)
 
 	nexNode, err := node.NewNexNode(kp, nc,
 		options.WithLogger(logger),
