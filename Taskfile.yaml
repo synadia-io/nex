@@ -37,11 +37,11 @@ tasks:
       - go-jsonschema 
         --package=gen
         --schema-package=https://github.com/synadia-io/nex/api/agent/register-agent-request=github.com/synadia-io/nex/agentapi/go/gen 
-        --schema-output=https://github.com/synadia-io/nex/api/agent/register-agent-request=gen/register_agent_request.go 
+        --schema-output=https://github.com/synadia-io/nex/api/agent/register-agent-request=go/gen/register_agent_request.go 
         --schema-package=https://github.com/synadia-io/nex/api/agent/start-workload-request=github.com/synadia-io/nex/api/agent/go/gen 
-        --schema-output=https://github.com/synadia-io/nex/api/agent/start-workload-request=gen/start_workload_request.go 
+        --schema-output=https://github.com/synadia-io/nex/api/agent/start-workload-request=go/gen/start_workload_request.go 
         --schema-package=https://github.com/synadia-io/nex/api/agent/stop-workload-request=github.com/synadia-io/nex/agentapi/go/gen 
-        --schema-output=https://github.com/synadia-io/nex/api/agent/stop-workload-request=gen/stop_workload_request.go 
+        --schema-output=https://github.com/synadia-io/nex/api/agent/stop-workload-request=go/gen/stop_workload_request.go 
         *.json
   
   gen-schema-nodecontrol:
