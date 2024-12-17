@@ -3,7 +3,6 @@ version: '3'
 tasks:
   install-godeps:
     cmds:
-      - go install github.com/go-task/task/v3/cmd/task@latest
       - go install github.com/atombender/go-jsonschema@latest
       - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.35.2
 
