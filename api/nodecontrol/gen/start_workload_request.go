@@ -16,10 +16,6 @@ type StartWorkloadRequestJson struct {
 	// encryptor
 	EncEnvironment SharedEncEnvJson `json:"enc_environment" yaml:"enc_environment" mapstructure:"enc_environment"`
 
-	// Whether the workload is essential; essential workloads will be restarted if
-	// they fail
-	Essential bool `json:"essential" yaml:"essential" mapstructure:"essential"`
-
 	// The hash of the workload
 	Hash string `json:"hash" yaml:"hash" mapstructure:"hash"`
 
@@ -41,8 +37,8 @@ type StartWorkloadRequestJson struct {
 	// The xkey of the target node
 	TargetPubXkey string `json:"target_pub_xkey" yaml:"target_pub_xkey" mapstructure:"target_pub_xkey"`
 
-	// The subjects that trigger the workload
-	TriggerSubjects []string `json:"trigger_subjects" yaml:"trigger_subjects" mapstructure:"trigger_subjects"`
+	// The subject that triggers the workload
+	TriggerSubject string `json:"trigger_subject" yaml:"trigger_subject" mapstructure:"trigger_subject"`
 
 	// The URI of the workload
 	Uri string `json:"uri" yaml:"uri" mapstructure:"uri"`
@@ -52,6 +48,9 @@ type StartWorkloadRequestJson struct {
 
 	// The name of the workload
 	WorkloadName string `json:"workload_name" yaml:"workload_name" mapstructure:"workload_name"`
+
+	// The runtype of the workload
+	WorkloadRuntype string `json:"workload_runtype" yaml:"workload_runtype" mapstructure:"workload_runtype"`
 
 	// The type of the workload
 	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
@@ -71,9 +70,6 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["enc_environment"]; raw != nil && !ok {
 		return fmt.Errorf("field enc_environment in StartWorkloadRequestJson: required")
-	}
-	if _, ok := raw["essential"]; raw != nil && !ok {
-		return fmt.Errorf("field essential in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["hash"]; raw != nil && !ok {
 		return fmt.Errorf("field hash in StartWorkloadRequestJson: required")
@@ -96,8 +92,8 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	if _, ok := raw["target_pub_xkey"]; raw != nil && !ok {
 		return fmt.Errorf("field target_pub_xkey in StartWorkloadRequestJson: required")
 	}
-	if _, ok := raw["trigger_subjects"]; raw != nil && !ok {
-		return fmt.Errorf("field trigger_subjects in StartWorkloadRequestJson: required")
+	if _, ok := raw["trigger_subject"]; raw != nil && !ok {
+		return fmt.Errorf("field trigger_subject in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["uri"]; raw != nil && !ok {
 		return fmt.Errorf("field uri in StartWorkloadRequestJson: required")
@@ -107,6 +103,9 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["workload_name"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_name in StartWorkloadRequestJson: required")
+	}
+	if _, ok := raw["workload_runtype"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_runtype in StartWorkloadRequestJson: required")
 	}
 	if _, ok := raw["workload_type"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_type in StartWorkloadRequestJson: required")

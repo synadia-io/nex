@@ -19,7 +19,7 @@ import (
 func TestCopyWorkload(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildDirectStartBinary(t, "./testdata/nats_micro/main.go", workingDir)
+	binPath, err := buildTestBinary(t, "./testdata/nats_micro/main.go", workingDir)
 	if err != nil {
 		t.Fatal(err)
 	}

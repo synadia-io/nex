@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
@@ -424,6 +425,7 @@ func (nn nexNode) GetInfo() (*actorproto.NodeInfo, error) {
 				Runtime:      w.Runtime,
 				StartedAt:    timestamppb.New(w.StartedAt.AsTime()),
 				WorkloadType: c.Name(),
+				State:        w.State,
 			})
 		}
 	}
@@ -480,4 +482,12 @@ func (nn nexNode) DecryptPayload(payload []byte) ([]byte, error) {
 		return nil, err
 	}
 	return nn.options.Xkey.Open(payload, xPub)
+}
+
+func (nn nexNode) EmitEvent(inNamespace string, inEvent cloudevents.Event) error {
+	event, err := inEvent.MarshalJSON()
+	if err != nil {
+		return err
+	}
+	return nn.nc.Publish(models.EventAPIPrefix+"."+inNamespace, event)
 }

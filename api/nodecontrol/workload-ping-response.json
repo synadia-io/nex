@@ -38,6 +38,14 @@
         "workload_type": {
           "type": "string",
           "description": "The type of the workload"
+        },
+        "workload_runtype": {
+          "type": "string",
+          "description": "The runtype/lifecycle of the workload"
+        },
+        "workload_state": {
+          "type": "string",
+          "description": "The state of the workload"
         }
       },
       "required": [
@@ -45,7 +53,9 @@
         "name",
         "start_time",
         "runtime",
-        "workload_type"
+        "workload_type",
+        "workload_runtype",
+        "workload_state"
       ]
     }
   },
