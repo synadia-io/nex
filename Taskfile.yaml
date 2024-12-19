@@ -1,8 +1,19 @@
 version: '3'
 
 tasks:
-  # requires the protoc binary in the path, and the `protoc-gen-go` plugin
-  # 'go install google.golang.org/protobuf/cmd/protoc-gen-go@latest'
+  install-godeps:
+    cmds:
+      - go install github.com/atombender/go-jsonschema@latest
+      - go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.35.2
+
+  install-protoc:
+    cmds:
+      - curl -LO https://github.com/protocolbuffers/protobuf/releases/download/v28.3/protoc-28.3-linux-x86_64.zip
+      - sudo unzip protoc-28.3-linux-x86_64.zip -d /usr/local
+      - rm protoc-28.3-linux-x86_64.zip
+
+  install-deps: 
+    deps: [install-godeps, install-protoc]
 
   proto:
     dir: node/internal/actors/pb
@@ -20,20 +31,17 @@ tasks:
     deps: [gen-schema-nodecontrol, gen-schema-agent]
 
   gen-schema-agent:
-    dir: api/agent/go
+    dir: api/agent
     cmds:
-      - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/agent/register-agent-request=github.com/synadia-io/nex/agentapi/go/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/agent/register-agent-request=gen/register_agent_request.go \
-       ../register-agent-request.json"
-      - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/agent/start-workload-request=github.com/synadia-io/nex/api/agent/go/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/agent/start-workload-request=gen/start_workload_request.go \
-       ../start-workload-request.json"
-      - "go-jsonschema \
-      --schema-package=https://github.com/synadia-io/nex/api/agent/stop-workload-request=github.com/synadia-io/nex/agentapi/go/gen \
-      --schema-output=https://github.com/synadia-io/nex/api/agent/stop-workload-request=gen/stop_workload_request.go \
-       ../stop-workload-request.json"
+      - go-jsonschema 
+        --package=gen
+        --schema-package=https://github.com/synadia-io/nex/api/agent/register-agent-request=github.com/synadia-io/nex/agentapi/go/gen 
+        --schema-output=https://github.com/synadia-io/nex/api/agent/register-agent-request=go/gen/register_agent_request.go 
+        --schema-package=https://github.com/synadia-io/nex/api/agent/start-workload-request=github.com/synadia-io/nex/api/agent/go/gen 
+        --schema-output=https://github.com/synadia-io/nex/api/agent/start-workload-request=go/gen/start_workload_request.go 
+        --schema-package=https://github.com/synadia-io/nex/api/agent/stop-workload-request=github.com/synadia-io/nex/agentapi/go/gen 
+        --schema-output=https://github.com/synadia-io/nex/api/agent/stop-workload-request=go/gen/stop_workload_request.go 
+        *.json
   
   gen-schema-nodecontrol:
     dir: api/nodecontrol
@@ -73,7 +81,7 @@ tasks:
         *.json
   
   nex:
-    deps: [proto]
+    deps: [all-code-gen]
     dir: cmd/nex
     cmds:
       - go build -o ../../target/nex .
