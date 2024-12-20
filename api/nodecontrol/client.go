@@ -105,7 +105,7 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 }
 
 func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
-	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(inType, namespace, workloadId), nil, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -119,12 +119,38 @@ func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*
 	return &envelope.Data, nil
 }
 
+func (c *ControlAPIClient) ListWorkloads(namespace string) ([]nodegen.WorkloadSummary, error) {
+	workloadsInbox := nats.NewInbox()
+
+	var ret []nodegen.WorkloadSummary
+	_, err := c.nc.Subscribe(workloadsInbox, func(m *nats.Msg) {
+		envelope := new(models.Envelope[[]nodegen.WorkloadSummary])
+		err := json.Unmarshal(m.Data, envelope)
+		if err != nil {
+			c.logger.Error("failed to unmarshal workloads response", slog.Any("err", err), slog.String("data", string(m.Data)))
+			return
+		}
+		ret = append(ret, envelope.Data...)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = c.nc.PublishRequest(models.NamespacePingRequestSubject(namespace), workloadsInbox, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	time.Sleep(5 * time.Second)
+	return ret, nil
+}
+
 func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
 	req_b, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
-	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, bidderId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, bidderId), req_b, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +170,7 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.DirectDeploySubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.DirectDeploySubject(nodeId), req_b, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -217,9 +243,9 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nod
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, error) {
+func (c *ControlAPIClient) MonitorLogs(namespace, workloadId, level string) (chan []byte, error) {
 	subject := models.LOGS_SUBJECT
-	f_subject, err := subject.Filter(workloadId, level)
+	f_subject, err := subject.Filter(namespace, workloadId, level)
 	if err != nil {
 		return nil, err
 	}
@@ -235,9 +261,9 @@ func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, e
 	return ret, nil
 }
 
-func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *json.RawMessage, error) {
+func (c *ControlAPIClient) MonitorEvents(namespace, workloadId, eventType string) (chan *json.RawMessage, error) {
 	subject := models.EVENTS_SUBJECT
-	f_subject, err := subject.Filter(workloadId, eventType)
+	f_subject, err := subject.Filter(namespace, workloadId, eventType)
 	if err != nil {
 		return nil, err
 	}

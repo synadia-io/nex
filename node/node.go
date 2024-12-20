@@ -10,9 +10,11 @@ import (
 	"os"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
 	"github.com/splode/fname"
@@ -43,6 +45,9 @@ type nexNode struct {
 	publicKey   nkeys.KeyPair
 	startedAt   time.Time
 	actorSystem goakt.ActorSystem
+
+	iNatsNkey nkeys.KeyPair
+	iNatsURL  string
 
 	auctionMap *TTLMap
 }
@@ -96,6 +101,8 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			HostServiceOptions: models.HostServiceOptions{
 				Services: make(map[string]models.ServiceConfig),
 			},
+			OCICacheRegistry: "",
+			DevMode:          false,
 		},
 	}
 
@@ -196,7 +203,6 @@ func (nn *nexNode) Start() error {
 	if err != nil {
 		return err
 	}
-
 	<-nn.ctx.Done()
 	nn.options.Logger.Info("Shutting down nexnode")
 	return nn.actorSystem.Stop(nn.ctx)
@@ -204,8 +210,6 @@ func (nn *nexNode) Start() error {
 
 func (nn *nexNode) initializeSupervisionTree() error {
 	var err error
-	restartDirective := goakt.NewRestartDirective()
-	restartDirective.WithLimit(3, 30*time.Second)
 
 	nn.actorSystem, err = goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
@@ -214,7 +218,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		// TODO: figure out why they're gone or how we can plug in our own impls
 		//goakt.WithTelemetry(telemetry),
 		//goakt.WithTracing(),
-		goakt.WithSupervisorDirective(restartDirective),
+		//goakt.WithSupervisorDirective(restartDirective),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
 		return err
@@ -226,21 +230,44 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		return err
 	}
 
+	restartDirective := goakt.NewRestartDirective()
+	restartDirective.WithLimit(3, 30*time.Second)
+
 	// start the root actors
-	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options))
+	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options),
+		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+	)
+
 	if err != nil {
 		return err
 	}
 
-	inats := actors.CreateInternalNatsServer(*nn.options)
-	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats)
+	serverPubKey, err := nn.publicKey.PublicKey()
 	if err != nil {
 		return err
 	}
 
+	inats, err := actors.CreateInternalNatsServer(serverPubKey, *nn.options)
+	if err != nil {
+		return err
+	}
+
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats,
+		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+	)
+
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(250 * time.Millisecond)
 	allCreds := inats.CredentialsMap()
+	nn.iNatsNkey = inats.GetHostKeyPair()
+	nn.iNatsURL = inats.GetServerURL()
 
-	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions))
+	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions),
+		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+	)
 	if err != nil {
 		return err
 	}
@@ -251,21 +278,28 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.nc, pk, *nn.options, nn.options.Logger.WithGroup("direct_start")))
+		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.ctx, nn.nc, pk, *nn.options, nn.options.Logger.WithGroup("direct-start"), nn),
+			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+		)
+
 		if err != nil {
 			return err
 		}
 	}
 	for _, agent := range nn.options.AgentOptions {
 		// This map lookup works because the agent name is identical to the workload type
-		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(nn.options.Logger.WithGroup(agent.Name), allCreds[agent.Name], agent))
+		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(nn.options.Logger.WithGroup(agent.Name), allCreds[agent.Name], agent),
+			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+		)
 		if err != nil {
 			return err
 		}
 	}
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
-		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn))
+		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn),
+		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+	)
 	if err != nil {
 		return err
 	}
@@ -275,6 +309,43 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		running[i] = actor.Name()
 	}
 	nn.options.Logger.Debug("Actors started", slog.Any("running", running))
+
+	time.Sleep(250 * time.Millisecond)
+	wl, err := nn.getState()
+	if err != nil {
+		return err
+	}
+
+	getWorkloads := func(inType string) map[string]*actorproto.StartWorkload {
+		ret := make(map[string]*actorproto.StartWorkload)
+		for k, v := range wl {
+			if strings.HasPrefix(k, inType) {
+				ret[k] = v
+			}
+		}
+		return ret
+	}
+
+	if len(wl) > 0 {
+		//direct-start_wdhGT117n7TOHpsasG2lRP
+		nn.options.Logger.Info("Existing state detected, Restoring now")
+		for _, c := range agentSuper.Children() {
+			wl := getWorkloads(c.Name())
+			if len(wl) > 0 {
+				for k, v := range wl {
+					kSplit := strings.SplitN(k, "_", 2)
+					nn.options.Logger.Info("Restoring workload", slog.String("id", kSplit[1]), slog.Any("name", v.WorkloadName), slog.String("namespace", v.Namespace))
+					v.WorkloadId = kSplit[1]
+					// NOTE: would prefer Tell/Async here, but seems to have bug
+					_, err := agentSuper.Ask(nn.ctx, c, v, 5*time.Second)
+					if err != nil {
+						nn.options.Logger.Error("Failed to restore workload", slog.String("id", kSplit[1]), slog.Any("err", err))
+					}
+				}
+			}
+		}
+
+	}
 
 	return nil
 }
@@ -314,7 +385,7 @@ func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string
 		return nil, err
 	}
 	for _, c := range agentSuper.Children() {
-		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{})
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.PingAgent{}, 5*time.Second)
 		if err != nil {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
@@ -383,7 +454,7 @@ func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 		return nil, err
 	}
 	for _, c := range agentSuper.Children() {
-		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{}, 5*time.Second)
 		if err != nil {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
@@ -426,7 +497,7 @@ func (nn nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 		return nil, err
 	}
 	for _, c := range agentSuper.Children() {
-		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{})
+		agentResp, err := agentSuper.Ask(nn.ctx, c, &actorproto.QueryWorkloads{}, 5*time.Second)
 		if err != nil {
 			nn.options.Logger.Error("Failed to ping agent", slog.Any("err", err))
 			return nil, errors.New("failed to ping agent")
@@ -479,7 +550,6 @@ func (nn nexNode) IsTargetNode(inId string) (bool, nkeys.KeyPair, error) {
 	if nn.auctionMap.Exists(inId) {
 		auctionId, kp := nn.auctionMap.Get(inId)
 		nn.options.Logger.Debug("Accepting workload from auction", slog.String("auctionId", auctionId))
-		nn.auctionMap.Delete(inId)
 		return true, kp, nil
 	}
 	return false, nil, nil
@@ -516,4 +586,153 @@ func (nn nexNode) EmitEvent(inNamespace string, inEvent json.RawMessage) error {
 		return err
 	}
 	return nn.nc.Publish(models.EventAPIPrefix+"."+inNamespace, event)
+}
+
+func (nn nexNode) StoreRunRequest(workloadType, inId string, inRequest *actorproto.StartWorkload) error {
+	pub, err := nn.iNatsNkey.PublicKey()
+	if err != nil {
+		return err
+	}
+
+	nc, err := nats.Connect(nn.iNatsURL, nats.Nkey(pub, func(nonce []byte) ([]byte, error) {
+		return nn.iNatsNkey.Sign(nonce)
+	}))
+	if err != nil {
+		return err
+	}
+	defer nc.Close()
+
+	jsCtx, err := jetstream.New(nc)
+	if err != nil {
+		return err
+	}
+
+	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	if err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(inRequest)
+	if err != nil {
+		return err
+	}
+
+	_, err = bucket.Put(context.TODO(), workloadType+"_"+inId, data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (nn nexNode) GetRunRequest(workloadType, inId string) (*actorproto.StartWorkload, error) {
+	pub, err := nn.iNatsNkey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	nc, err := nats.Connect(nn.iNatsURL, nats.Nkey(pub, func(nonce []byte) ([]byte, error) {
+		return nn.iNatsNkey.Sign(nonce)
+	}))
+	if err != nil {
+		return nil, err
+	}
+	defer nc.Close()
+
+	jsCtx, err := jetstream.New(nc)
+	if err != nil {
+		return nil, err
+	}
+
+	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := bucket.Get(context.TODO(), workloadType+"_"+inId)
+	if err != nil {
+		return nil, err
+	}
+
+	var req actorproto.StartWorkload
+	err = json.Unmarshal(entry.Value(), &req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &req, nil
+}
+
+func (nn nexNode) DeleteRunRequest(workloadType, inId string) error {
+	pub, err := nn.iNatsNkey.PublicKey()
+	if err != nil {
+		return err
+	}
+	nc, err := nats.Connect(nn.iNatsURL, nats.Nkey(pub, func(nonce []byte) ([]byte, error) {
+		return nn.iNatsNkey.Sign(nonce)
+	}))
+	if err != nil {
+		return err
+	}
+	defer nc.Close()
+	jsCtx, err := jetstream.New(nc)
+	if err != nil {
+		return err
+	}
+	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	if err != nil {
+		return err
+	}
+	err = bucket.Delete(context.TODO(), workloadType+"_"+inId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (nn nexNode) getState() (map[string]*actorproto.StartWorkload, error) {
+	pub, err := nn.iNatsNkey.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	nc, err := nats.Connect(nn.iNatsURL, nats.Nkey(pub, func(nonce []byte) ([]byte, error) {
+		return nn.iNatsNkey.Sign(nonce)
+	}))
+	if err != nil {
+		return nil, err
+	}
+	defer nc.Close()
+
+	jsCtx, err := jetstream.New(nc)
+	if err != nil {
+		return nil, err
+	}
+
+	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	if err != nil {
+		return nil, err
+	}
+
+	kl, err := bucket.ListKeys(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+
+	reqs := make(map[string]*actorproto.StartWorkload)
+	for k := range kl.Keys() {
+		entry, err := bucket.Get(context.TODO(), k)
+		if err != nil {
+			return nil, err
+		}
+
+		var swl actorproto.StartWorkload
+		err = json.Unmarshal(entry.Value(), &swl)
+		if err != nil {
+			return nil, err
+		}
+		reqs[k] = &swl
+	}
+
+	return reqs, nil
 }

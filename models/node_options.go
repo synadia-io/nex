@@ -32,6 +32,8 @@ type NodeOptions struct {
 	DisableDirectStart    bool
 	AgentOptions          []AgentOptions
 	HostServiceOptions    HostServiceOptions
+	OCICacheRegistry      string
+	DevMode               bool
 
 	Errs error
 }
@@ -122,6 +124,18 @@ func WithExternalAgents(w []AgentOptions) NodeOption {
 func WithHostServiceOptions(h HostServiceOptions) NodeOption {
 	return func(n *NodeOptions) {
 		n.HostServiceOptions = h
+	}
+}
+
+func WithOCICacheRegistry(r string) NodeOption {
+	return func(n *NodeOptions) {
+		n.OCICacheRegistry = r
+	}
+}
+
+func WithDevMode(b bool) NodeOption {
+	return func(n *NodeOptions) {
+		n.DevMode = b
 	}
 }
 

@@ -150,3 +150,9 @@ func (c CopyWorkload) Table() []table.Row {
 		{"Node Tags", c.NodeTags, reflect.TypeOf(c.NodeTags).String()},
 	}
 }
+
+func (l ListWorkload) Table() []table.Row {
+	return []table.Row{
+		{"JSON Output", l.Json, reflect.TypeOf(l.Json).String()},
+	}
+}

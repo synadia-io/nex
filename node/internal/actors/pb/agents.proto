@@ -92,7 +92,7 @@ message StartWorkload {
   int32 retry_count = 8;
   string trigger_subject = 9;
   string uri = 10;
-  string workload_jwt = 11;
+  string workload_id = 11;
   string workload_name = 12;
   string workload_type = 13;
   string namespace = 14;

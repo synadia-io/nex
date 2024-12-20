@@ -34,8 +34,8 @@ func NamespacePingRequestSubject(inNS string) string {
 	return fmt.Sprintf(ControlAPIPrefix+".%s.WPING", inNS)
 }
 
-func WorkloadPingRequestSubject(inType, inNS, inWorkload string) string {
-	return fmt.Sprintf(ControlAPIPrefix+".%s.WPING.%s.%s", inNS, inType, inWorkload)
+func WorkloadPingRequestSubject(inNS, inWorkload string) string {
+	return fmt.Sprintf(ControlAPIPrefix+".%s.WPING.%s", inNS, inWorkload)
 }
 
 // Request subjects

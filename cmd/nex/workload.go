@@ -21,6 +21,7 @@ import (
 
 	"strings"
 
+	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/synadia-io/nex/api/nodecontrol"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
@@ -47,6 +48,7 @@ var validURIPrefix []string = []string{"nats://", "file://", "oci://"}
 type Workload struct {
 	Run    RunWorkload    `cmd:"" help:"Run a workload on a target node" aliases:"start,deploy"`
 	Stop   StopWorkload   `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
+	List   ListWorkload   `cmd:"" help:"List workloads" aliases:"ls"`
 	Info   InfoWorkload   `cmd:"" help:"Get information about a workload"`
 	Copy   CopyWorkload   `cmd:"" help:"Copy a workload to another node" aliases:"cp,clone"`
 	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into an OCI artifact" aliases:"build,package"`
@@ -65,6 +67,7 @@ type RunWorkload struct {
 	NodePubXKey string            `name:"node-xkey-pub" help:"Node public xkey used for encryption"`
 
 	WorkloadName             string            `name:"name" help:"Name of the workload"`
+	WorkloadReplicas         int               `name:"replicas" help:"Number of replicas to start" default:"1"`
 	WorkloadArguments        []string          `name:"argv" help:"Arguments to pass to the workload"`
 	WorkloadEnvironment      map[string]string `name:"env" help:"Environment variables to set for the workload"`
 	WorkloadDescription      string            `name:"description" help:"Description of the workload"`
@@ -73,9 +76,9 @@ type RunWorkload struct {
 	WorkloadJsDomain         string            `name:"jsdomain" help:"JS Domain to run the workload under"`
 	WorkloadRetryCount       int               `name:"retry-count" help:"Number of times to retry the workload" default:"3"`
 	WorkloadPublicKey        string            `name:"public-key" help:"Public key of the workload"`
-	WorkloadUri              string            `name:"uri" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
+	WorkloadUri              string            `arg:"" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
 	WorkloadTriggerSubject   string            `name:"trigger" help:"Subject to trigger the workload"`
-	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct_start"`
+	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct-start"`
 	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, function, job" default:"service" enum:"service,function,job"`
 }
 
@@ -171,7 +174,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		}
 	}
 
-	var resp *gen.StartWorkloadResponseJson
+	var allResp []*gen.StartWorkloadResponseJson
 	if r.NodeId != "" {
 		enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
 		if err != nil {
@@ -182,9 +185,16 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			Base64EncryptedEnv: b64_enc_env,
 			EncryptedBy:        txk_pub,
 		}
-		resp, err = controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
-		if err != nil {
-			return err
+		for i := 0; i < r.WorkloadReplicas; i++ {
+			resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
+			if errors.Is(err, nats.ErrTimeout) {
+				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadReplicas)
+			} else if err != nil {
+				return err
+			} else {
+				allResp = append(allResp, resp)
+				time.Sleep(500 * time.Millisecond)
+			}
 		}
 	} else {
 		auctionResults, err := controller.Auction(globals.Namespace, r.NodeTags)
@@ -196,35 +206,45 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			return errors.New("no nodes available for deployment")
 		}
 
-		nodeX := rand.IntN(len(auctionResults))
-		bidderId := auctionResults[nodeX].BidderId
+		for i := 0; i < r.WorkloadReplicas; i++ {
+			nodeX := rand.IntN(len(auctionResults))
+			bidderId := auctionResults[nodeX].BidderId
 
-		// in an auction deploy, information about the target node is unknown, so we need to provide it in the auction
-		startRequest.TargetPubXkey = auctionResults[nodeX].TargetXkey
+			// in an auction deploy, information about the target node is unknown, so we need to provide it in the auction
+			startRequest.TargetPubXkey = auctionResults[nodeX].TargetXkey
 
-		enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
-		if err != nil {
-			return err
-		}
-		b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
-		startRequest.EncEnvironment = gen.SharedEncEnvJson{
-			Base64EncryptedEnv: b64_enc_env,
-			EncryptedBy:        txk_pub,
-		}
-		resp, err = controller.AuctionDeployWorkload(globals.Namespace, bidderId, startRequest)
-		if err != nil {
-			return err
+			enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
+			if err != nil {
+				return err
+			}
+			b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
+			startRequest.EncEnvironment = gen.SharedEncEnvJson{
+				Base64EncryptedEnv: b64_enc_env,
+				EncryptedBy:        txk_pub,
+			}
+
+			resp, err := controller.AuctionDeployWorkload(globals.Namespace, bidderId, startRequest)
+			if errors.Is(err, nats.ErrTimeout) {
+				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadReplicas)
+			} else if err != nil {
+				return err
+			} else {
+				allResp = append(allResp, resp)
+				time.Sleep(500 * time.Millisecond)
+			}
 		}
 	}
 
-	if resp.Started {
-		if r.NodeId != "" {
-			fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+	for _, resp := range allResp {
+		if resp.Started {
+			if r.NodeId != "" {
+				fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+			} else {
+				fmt.Printf("Workload %s [%s] started\n", r.WorkloadName, resp.Id)
+			}
 		} else {
-			fmt.Printf("Workload %s [%s] started\n", r.WorkloadName, resp.Id)
+			fmt.Printf("Workload %s failed to start\n", r.WorkloadName)
 		}
-	} else {
-		fmt.Printf("Workload %s failed to start\n", r.WorkloadName)
 	}
 
 	return nil
@@ -278,7 +298,7 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 
 type InfoWorkload struct {
 	WorkloadId   string `arg:"" description:"ID of the workload"`
-	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+	WorkloadType string `name:"type" description:"Type of workload" default:"direct-start"`
 
 	Json bool `name:"json" description:"Output in JSON format" default:"false"`
 }
@@ -353,9 +373,82 @@ func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
 	return nil
 }
 
+type ListWorkload struct {
+	Json bool `name:"json" description:"Output in JSON format" default:"false"`
+}
+
+func (ListWorkload) AfterApply(globals *Globals) error {
+	return checkVer(globals)
+}
+
+func (l ListWorkload) Validate() error {
+	var errs error
+
+	return errs
+}
+
+func (l ListWorkload) Run(ctx context.Context, globals *Globals) error {
+	if globals.Check {
+		return printTable("List Workload Configuration", append(globals.Table(), l.Table()...)...)
+	}
+
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	if err != nil {
+		return err
+	}
+
+	resp, err := controller.ListWorkloads(globals.Namespace)
+	if errors.Is(err, nats.ErrTimeout) {
+		if l.Json {
+			fmt.Print("[]")
+			return nil
+		}
+		fmt.Println("No workloads found for namespace " + globals.Namespace)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(resp) == 0 {
+		if l.Json {
+			fmt.Print("[]")
+			return nil
+		}
+		fmt.Println("No workloads found for namespace " + globals.Namespace)
+		return nil
+	} else {
+		if l.Json {
+			out, err := json.Marshal(resp)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(out))
+			return nil
+		}
+		tW := newTableWriter("Running Workloads for Namespace " + globals.Namespace)
+		tW.AppendHeader(table.Row{"Id", "Name", "Type", "Start Time", "Runtime", "State"})
+		for _, wl := range resp {
+			if wl.Runtime == "0s" {
+				wl.Runtime = "--"
+			}
+			tW.AppendRow(table.Row{wl.Id, wl.Name, wl.WorkloadType, wl.StartTime, wl.Runtime, wl.WorkloadState})
+		}
+
+		fmt.Println(tW.Render())
+	}
+
+	return nil
+}
+
 type CopyWorkload struct {
 	WorkloadId   string `arg:"" description:"ID of the workload"`
-	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+	WorkloadType string `name:"type" description:"Type of workload" default:"direct-start"`
 	StopOriginal bool   `name:"stop" description:"Stop the original workload after copying" default:"false"`
 
 	NodeId   string            `description:"Node ID of target workload. If not provided, auction is preformed"`
