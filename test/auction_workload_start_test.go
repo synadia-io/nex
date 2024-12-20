@@ -26,7 +26,7 @@ func TestAuctionDeploy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := startNatsSever(t, workingDir)
+	s, err := startNatsServer(t, workingDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,6 +40,8 @@ func TestAuctionDeploy(t *testing.T) {
 	}
 	nex1.Stdout = stdout
 	nex1.Stderr = stderr
+	// nex1.Stdout = os.Stdout
+	// nex1.Stderr = os.Stderr
 	nex1.SysProcAttr = sysProcAttr()
 
 	nex2, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
@@ -47,6 +49,8 @@ func TestAuctionDeploy(t *testing.T) {
 		t.Fatal(err)
 	}
 	nex2.SysProcAttr = sysProcAttr()
+	// nex2.Stdout = os.Stdout
+	// nex2.Stderr = os.Stderr
 
 	err = nex1.Start()
 	if err != nil {
@@ -72,7 +76,7 @@ func TestAuctionDeploy(t *testing.T) {
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		auctionDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "--uri", "file://"+binPath, fmt.Sprintf("--argv=-port=%d", port), "--env=ENV_TEST=nexenvset")
+		auctionDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "file://"+binPath, fmt.Sprintf("--argv=-port=%d", port), "--env=ENV_TEST=nexenvset")
 		auctionDeploy.Stdout = stdout
 		auctionDeploy.Stderr = stderr
 		err = auctionDeploy.Run()
@@ -93,20 +97,23 @@ func TestAuctionDeploy(t *testing.T) {
 		lsout := []*gen.NodePingResponseJson{}
 		err = json.Unmarshal(stdout.Bytes(), &lsout)
 		if err != nil {
+			t.Log(stdout.String())
+			t.Log(stderr.String())
 			t.Error(err)
 		}
 
 		for _, n := range lsout {
 			switch n.Tags.Tags[models.TagNodeName] {
 			case "node1":
-				if n.RunningAgents.Status["direct_start"] != 1 {
+				if n.RunningAgents.Status["direct-start"] != 1 {
 					t.Error("node1 does not have expected workload running")
 				}
 			case "node2":
-				if n.RunningAgents.Status["direct_start"] != 0 {
+				if n.RunningAgents.Status["direct-start"] != 0 {
 					t.Error("node2 has unexpected workloads running")
 				}
 			default:
+				t.Log(stdout.String())
 				t.Error("this should never happen")
 			}
 		}

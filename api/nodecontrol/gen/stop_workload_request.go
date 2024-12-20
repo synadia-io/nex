@@ -6,17 +6,11 @@ import "encoding/json"
 import "fmt"
 
 type StopWorkloadRequestJson struct {
-	// NodeId corresponds to the JSON schema field "node_id".
-	NodeId string `json:"node_id"`
+	// Namespace corresponds to the JSON schema field "namespace".
+	Namespace string `json:"namespace"`
 
 	// WorkloadId corresponds to the JSON schema field "workload_id".
 	WorkloadId string `json:"workload_id"`
-
-	// WorkloadJwt corresponds to the JSON schema field "workload_jwt".
-	WorkloadJwt string `json:"workload_jwt"`
-
-	// WorkloadType corresponds to the JSON schema field "workload_type".
-	WorkloadType string `json:"workload_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -25,17 +19,11 @@ func (j *StopWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	if _, ok := raw["node_id"]; raw != nil && !ok {
-		return fmt.Errorf("field node_id in StopWorkloadRequestJson: required")
+	if _, ok := raw["namespace"]; raw != nil && !ok {
+		return fmt.Errorf("field namespace in StopWorkloadRequestJson: required")
 	}
 	if _, ok := raw["workload_id"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_id in StopWorkloadRequestJson: required")
-	}
-	if _, ok := raw["workload_jwt"]; raw != nil && !ok {
-		return fmt.Errorf("field workload_jwt in StopWorkloadRequestJson: required")
-	}
-	if _, ok := raw["workload_type"]; raw != nil && !ok {
-		return fmt.Errorf("field workload_type in StopWorkloadRequestJson: required")
 	}
 	type Plain StopWorkloadRequestJson
 	var plain Plain

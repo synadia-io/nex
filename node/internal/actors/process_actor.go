@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	DefaultJobRunTime = 5 * time.Minute
+	DefaultFunctionRunTime = 5 * time.Minute
 )
 
 type processActor struct {
+	ctx       context.Context
 	startedAt time.Time
 	runTime   time.Duration
 	id        string
@@ -43,6 +44,7 @@ type processActor struct {
 }
 
 func createNewProcessActor(
+	ctx context.Context,
 	logger *slog.Logger,
 	nc *nats.Conn,
 	processId string,
@@ -58,6 +60,7 @@ func createNewProcessActor(
 ) (*processActor, error) {
 
 	ret := processActor{
+		ctx:          ctx,
 		startedAt:    time.Now(),
 		runTime:      0,
 		id:           processId,
@@ -136,7 +139,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 			stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
 			stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
 
-			a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+			a.process, err = NewOsProcess(a.ctx, a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
 			if err != nil {
 				a.logger.Error("failed to create process", slog.Any("err", err))
 				return
@@ -145,6 +148,9 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 			err = a.process.Run()
 			if err != nil {
 				a.logger.Error("failed to start process", slog.Any("err", err))
+				if a.state != models.WorkloadStateStopped {
+					a.state = models.WorkloadStateError
+				}
 			}
 			a.state = models.WorkloadStateError
 			a.retryCounter++
@@ -165,7 +171,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 		s, err := a.nc.QueueSubscribe(a.triggerSub, a.processName, func(msg *nats.Msg) {
 			a.state = models.WorkloadStateRunning
 
-			ticker := time.NewTicker(DefaultJobRunTime)
+			ticker := time.NewTicker(DefaultFunctionRunTime)
 			go func() {
 				<-ticker.C
 				a.logger.Debug("Function run time exceeded", slog.String("id", a.id))
@@ -183,7 +189,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 				a.env = make(map[string]string)
 			}
 			a.env["NEX_TRIGGER_DATA"] = string(msg.Data)
-			a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+			a.process, err = NewOsProcess(a.ctx, a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
 			if err != nil {
 				a.logger.Error("failed to create process", slog.Any("err", err))
 				return
@@ -218,7 +224,7 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 		stdout := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: false}
 		stderr := logCapture{logger: a.logger, nc: a.nc, namespace: a.namespace, name: a.id, stderr: true}
 
-		a.process, err = NewOsProcess(a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
+		a.process, err = NewOsProcess(a.ctx, a.id, a.ref.LocalCachePath, a.env, a.argv, a.logger, stdout, stderr)
 		if err != nil {
 			a.logger.Error("failed to create process", slog.Any("err", err))
 			return

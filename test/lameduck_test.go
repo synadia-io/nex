@@ -17,7 +17,7 @@ func TestLameDuckMode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := startNatsSever(t, workingDir)
+	s, err := startNatsServer(t, workingDir)
 	if err != nil {
 		t.Fatal(err)
 	}

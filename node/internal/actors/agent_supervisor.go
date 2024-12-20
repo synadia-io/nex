@@ -63,7 +63,7 @@ func (s *AgentSupervisor) queryWorkloads(ctx *goakt.ReceiveContext) {
 	workloads := make([]*actorproto.WorkloadSummary, 0)
 
 	for _, pid := range ctx.Self().Children() {
-		res, err := ctx.Self().Ask(ctxx, pid, &actorproto.QueryWorkloads{})
+		res, err := ctx.Self().Ask(ctxx, pid, &actorproto.QueryWorkloads{}, DefaultAskDuration)
 		if err != nil {
 			// TODO: todo
 			continue
@@ -75,7 +75,7 @@ func (s *AgentSupervisor) queryWorkloads(ctx *goakt.ReceiveContext) {
 
 func (s *AgentSupervisor) setLameDuck(ctx *goakt.ReceiveContext) {
 	for _, pid := range ctx.Self().Children() {
-		r, err := ctx.Self().Ask(context.Background(), pid, &actorproto.SetLameDuck{})
+		r, err := ctx.Self().Ask(context.Background(), pid, &actorproto.SetLameDuck{}, DefaultAskDuration)
 		if err != nil {
 			s.logger.Error("Child actor failed to set lame duck", slog.Any("err", err), slog.String("parent", ctx.Self().ID()), slog.String("child", pid.ID()))
 			return

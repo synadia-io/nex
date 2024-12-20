@@ -12,6 +12,10 @@ type uri struct {
 	tag      string
 }
 
+func (u uri) String() string {
+	return fmt.Sprintf("%s://%s/%s:%s", u.schema, u.location, u.path, u.tag)
+}
+
 func parseUri(inUri string) (*uri, error) {
 	u := new(uri)
 

@@ -79,15 +79,18 @@ func TestLogSubject(t *testing.T) {
 
 	globals := &Globals{}
 	globals.NatsServers = []string{natsServer.ClientURL()}
+	globals.Namespace = "system"
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		err = m.Logs.Run(ctx, globals)
 		if err != nil {
+			t.Log(stdout.String())
 			t.Errorf("failed to run logs: %v", err)
 		}
 	}()
-	time.Sleep(time.Second)
+
+	time.Sleep(1 * time.Second)
 
 	err = nc.Publish("$NEX.logs.a.b", []byte("derp"))
 	if err != nil {

@@ -12,6 +12,7 @@ type Globals struct {
 	Version   kong.VersionFlag `help:"Print version information"`
 	Namespace string           `env:"NEX_NAMESPACE" default:"system" help:"Specifies namespace when running nex commands"`
 	Check     bool             `help:"Print the current values of all options without running a command"`
+	DevMode   bool             `name:"dev" default:"false" help:"Enable development mode"`
 }
 
 type NexCLI struct {
