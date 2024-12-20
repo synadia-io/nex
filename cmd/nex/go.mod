@@ -16,7 +16,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/synadia-io/nex v0.0.0-00010101000000-000000000000
-	golang.org/x/net v0.32.0
+	golang.org/x/net v0.33.0
 	oras.land/oras-go/v2 v2.5.0
 )
 
