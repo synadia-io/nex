@@ -274,6 +274,23 @@ func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto
 		return nil, errors.New("workload not found")
 	}
 
+	wlResp, err := c.Ask(context.Background(), c, &actorproto.QueryWorkload{})
+	if err != nil {
+		a.logger.Error("Failed to query workload", slog.Any("error", err))
+		return nil, err
+	}
+
+	wl, ok := wlResp.(*actorproto.WorkloadSummary)
+	if !ok {
+		a.logger.Error("Failed to cast workload summary")
+		return nil, err
+	}
+
+	if m.Namespace != "system" || m.Namespace != wl.Namespace {
+		a.logger.Warn("stop workload namespace mismatch", slog.String("name", a.self.Name()), slog.String("workload", m.WorkloadId), slog.String("request_namespace", m.Namespace), slog.String("actual_namespace", wl.Namespace))
+		return nil, errors.New("namespace mismatch")
+	}
+
 	err = c.Tell(context.Background(), c, &actorproto.KillDirectStartProcess{})
 	if err != nil {
 		a.logger.Error("failed to query workload", slog.String("name", a.self.Name()), slog.Any("err", err))
