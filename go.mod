@@ -4,25 +4,26 @@ go 1.23.0
 
 require (
 	disorder.dev/shandler v0.0.0-20241210223030-b024af991a50
-	github.com/nats-io/nats-server/v2 v2.10.23
-	github.com/nats-io/nats.go v1.37.0
-	github.com/nats-io/nkeys v0.4.8
+	github.com/nats-io/nats-server/v2 v2.10.24
+	github.com/nats-io/nats.go v1.38.0
+	github.com/nats-io/nkeys v0.4.9
 	github.com/nats-io/nuid v1.0.1
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/splode/fname v0.4.1
 	github.com/stretchr/testify v1.10.0
-	github.com/tochemey/goakt/v2 v2.10.0
+	github.com/tochemey/goakt/v2 v2.10.2
 	golang.org/x/sys v0.28.0
-	google.golang.org/protobuf v1.35.2
+	google.golang.org/protobuf v1.36.0
 	oras.land/oras-go/v2 v2.5.0
 )
 
 require (
 	connectrpc.com/connect v1.17.0 // indirect
 	github.com/RoaringBitmap/roaring v1.9.4 // indirect
+	github.com/Workiva/go-datastructures v1.1.5 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/bits-and-blooms/bitset v1.19.1 // indirect
+	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/buraksezer/consistent v0.10.0 // indirect
 	github.com/buraksezer/olric v0.5.6-0.20240925183822-6ca0e20256e0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -50,7 +51,7 @@ require (
 	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
-	github.com/nats-io/jwt/v2 v2.7.2 // indirect
+	github.com/nats-io/jwt/v2 v2.7.3 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
@@ -73,7 +74,7 @@ require (
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
-	golang.org/x/tools v0.27.0 // indirect
+	golang.org/x/tools v0.28.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
