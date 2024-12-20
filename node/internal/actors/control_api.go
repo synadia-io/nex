@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"disorder.dev/shandler"
-	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/splode/fname"
@@ -60,7 +59,7 @@ type NodeCallback interface {
 	IsTargetNode(string) (bool, nkeys.KeyPair, error)
 	EncryptPayload([]byte, string) ([]byte, string, error)
 	DecryptPayload([]byte) ([]byte, error)
-	EmitEvent(string, cloudevents.Event) error
+	EmitEvent(string, json.RawMessage) error
 }
 
 type StateCallback interface {
