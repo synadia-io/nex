@@ -7,7 +7,7 @@ import "fmt"
 
 type NodeInfoRequestJson struct {
 	// Namespace of the node
-	Namespace string `json:"namespace" yaml:"namespace" mapstructure:"namespace"`
+	Namespace string `json:"namespace"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
