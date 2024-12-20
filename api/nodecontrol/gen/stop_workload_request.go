@@ -7,16 +7,16 @@ import "fmt"
 
 type StopWorkloadRequestJson struct {
 	// NodeId corresponds to the JSON schema field "node_id".
-	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
+	NodeId string `json:"node_id"`
 
 	// WorkloadId corresponds to the JSON schema field "workload_id".
-	WorkloadId string `json:"workload_id" yaml:"workload_id" mapstructure:"workload_id"`
+	WorkloadId string `json:"workload_id"`
 
 	// WorkloadJwt corresponds to the JSON schema field "workload_jwt".
-	WorkloadJwt string `json:"workload_jwt" yaml:"workload_jwt" mapstructure:"workload_jwt"`
+	WorkloadJwt string `json:"workload_jwt"`
 
 	// WorkloadType corresponds to the JSON schema field "workload_type".
-	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
+	WorkloadType string `json:"workload_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

@@ -7,7 +7,7 @@ import "fmt"
 
 type CloneWorkloadRequestJson struct {
 	// NewTargetXkey corresponds to the JSON schema field "new_target_xkey".
-	NewTargetXkey string `json:"new_target_xkey" yaml:"new_target_xkey" mapstructure:"new_target_xkey"`
+	NewTargetXkey string `json:"new_target_xkey"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

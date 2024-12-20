@@ -7,7 +7,7 @@ import "fmt"
 
 type LameduckRequestJson struct {
 	// Time delay before lameduck mode is set
-	Delay string `json:"delay" yaml:"delay" mapstructure:"delay"`
+	Delay string `json:"delay"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

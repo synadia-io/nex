@@ -7,53 +7,53 @@ import "fmt"
 
 type StartWorkloadRequestJson struct {
 	// Arguments to be passed to the binary
-	Argv []string `json:"argv" yaml:"argv" mapstructure:"argv"`
+	Argv []string `json:"argv"`
 
 	// A description of the workload
-	Description string `json:"description" yaml:"description" mapstructure:"description"`
+	Description string `json:"description"`
 
 	// The base64-encoded byte array of the encrypted environment with public key of
 	// encryptor
-	EncEnvironment SharedEncEnvJson `json:"enc_environment" yaml:"enc_environment" mapstructure:"enc_environment"`
+	EncEnvironment SharedEncEnvJson `json:"enc_environment"`
 
 	// The hash of the workload
-	Hash string `json:"hash" yaml:"hash" mapstructure:"hash"`
+	Hash string `json:"hash"`
 
 	// The NATS configuration for the host services
-	HostServiceConfig SharedHostServiceJson `json:"host_service_config" yaml:"host_service_config" mapstructure:"host_service_config"`
+	HostServiceConfig SharedHostServiceJson `json:"host_service_config"`
 
 	// The NATS JSDomain for the workload
-	Jsdomain string `json:"jsdomain" yaml:"jsdomain" mapstructure:"jsdomain"`
+	Jsdomain string `json:"jsdomain"`
 
 	// The namespace of the workload
-	Namespace string `json:"namespace" yaml:"namespace" mapstructure:"namespace"`
+	Namespace string `json:"namespace"`
 
 	// The number of times the workload has been retried
-	RetryCount int `json:"retry_count" yaml:"retry_count" mapstructure:"retry_count"`
+	RetryCount int `json:"retry_count"`
 
 	// The public key of the sender
-	SenderPublicKey string `json:"sender_public_key" yaml:"sender_public_key" mapstructure:"sender_public_key"`
+	SenderPublicKey string `json:"sender_public_key"`
 
 	// The xkey of the target node
-	TargetPubXkey string `json:"target_pub_xkey" yaml:"target_pub_xkey" mapstructure:"target_pub_xkey"`
+	TargetPubXkey string `json:"target_pub_xkey"`
 
 	// The subject that triggers the workload
-	TriggerSubject string `json:"trigger_subject" yaml:"trigger_subject" mapstructure:"trigger_subject"`
+	TriggerSubject string `json:"trigger_subject"`
 
 	// The URI of the workload
-	Uri string `json:"uri" yaml:"uri" mapstructure:"uri"`
+	Uri string `json:"uri"`
 
 	// The JWT for the workload
-	WorkloadJwt string `json:"workload_jwt" yaml:"workload_jwt" mapstructure:"workload_jwt"`
+	WorkloadJwt string `json:"workload_jwt"`
 
 	// The name of the workload
-	WorkloadName string `json:"workload_name" yaml:"workload_name" mapstructure:"workload_name"`
+	WorkloadName string `json:"workload_name"`
 
 	// The runtype of the workload
-	WorkloadRuntype string `json:"workload_runtype" yaml:"workload_runtype" mapstructure:"workload_runtype"`
+	WorkloadRuntype string `json:"workload_runtype"`
 
 	// The type of the workload
-	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
+	WorkloadType string `json:"workload_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

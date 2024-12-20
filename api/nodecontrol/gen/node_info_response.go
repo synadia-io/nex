@@ -7,30 +7,30 @@ import "fmt"
 
 type NodeInfoResponseJson struct {
 	// The name of the nexus - if assigned
-	Nexus string `json:"nexus" yaml:"nexus" mapstructure:"nexus"`
+	Nexus string `json:"nexus"`
 
 	// The unique identifier of the node
-	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
+	NodeId string `json:"node_id"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodeInfoResponseJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
+	Tags NodeInfoResponseJsonTags `json:"tags"`
 
 	// The target nodes xkey
-	TargetXkey string `json:"target_xkey" yaml:"target_xkey" mapstructure:"target_xkey"`
+	TargetXkey string `json:"target_xkey"`
 
 	// The uptime of the node
-	Uptime string `json:"uptime" yaml:"uptime" mapstructure:"uptime"`
+	Uptime string `json:"uptime"`
 
 	// The version of the node
-	Version string `json:"version" yaml:"version" mapstructure:"version"`
+	Version string `json:"version"`
 
 	// WorkloadSummaries corresponds to the JSON schema field "workload_summaries".
-	WorkloadSummaries []WorkloadSummary `json:"workload_summaries" yaml:"workload_summaries" mapstructure:"workload_summaries"`
+	WorkloadSummaries []WorkloadSummary `json:"workload_summaries"`
 }
 
 type NodeInfoResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodeInfoResponseJsonTagsTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags NodeInfoResponseJsonTagsTags `json:"tags,omitempty"`
 }
 
 type NodeInfoResponseJsonTagsTags map[string]string
@@ -73,25 +73,25 @@ func (j *NodeInfoResponseJson) UnmarshalJSON(b []byte) error {
 
 type WorkloadSummary struct {
 	// The unique identifier of the workload
-	Id string `json:"id" yaml:"id" mapstructure:"id"`
+	Id string `json:"id"`
 
 	// The name of the workload
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
+	Name string `json:"name"`
 
 	// The runtime of the workload
-	Runtime string `json:"runtime" yaml:"runtime" mapstructure:"runtime"`
+	Runtime string `json:"runtime"`
 
 	// The start time of the workload
-	StartTime string `json:"start_time" yaml:"start_time" mapstructure:"start_time"`
+	StartTime string `json:"start_time"`
 
 	// The runtype/lifecycle of the workload
-	WorkloadRuntype string `json:"workload_runtype" yaml:"workload_runtype" mapstructure:"workload_runtype"`
+	WorkloadRuntype string `json:"workload_runtype"`
 
 	// The state of the workload
-	WorkloadState string `json:"workload_state" yaml:"workload_state" mapstructure:"workload_state"`
+	WorkloadState string `json:"workload_state"`
 
 	// The type of the workload
-	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
+	WorkloadType string `json:"workload_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

@@ -7,38 +7,38 @@ import "fmt"
 
 type NodePingResponseJson struct {
 	// The name of the nexus - if assigned
-	Nexus string `json:"nexus" yaml:"nexus" mapstructure:"nexus"`
+	Nexus string `json:"nexus"`
 
 	// The unique identifier of the node
-	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
+	NodeId string `json:"node_id"`
 
 	// The number of agents running with workload count
-	RunningAgents NodePingResponseJsonRunningAgents `json:"running_agents" yaml:"running_agents" mapstructure:"running_agents"`
+	RunningAgents NodePingResponseJsonRunningAgents `json:"running_agents"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodePingResponseJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
+	Tags NodePingResponseJsonTags `json:"tags"`
 
 	// The target nodes xkey
-	TargetXkey string `json:"target_xkey" yaml:"target_xkey" mapstructure:"target_xkey"`
+	TargetXkey string `json:"target_xkey"`
 
 	// The uptime of the node
-	Uptime string `json:"uptime" yaml:"uptime" mapstructure:"uptime"`
+	Uptime string `json:"uptime"`
 
 	// The version of the node
-	Version string `json:"version" yaml:"version" mapstructure:"version"`
+	Version string `json:"version"`
 }
 
 // The number of agents running with workload count
 type NodePingResponseJsonRunningAgents struct {
 	// Status corresponds to the JSON schema field "status".
-	Status NodePingResponseJsonRunningAgentsStatus `json:"status,omitempty" yaml:"status,omitempty" mapstructure:"status,omitempty"`
+	Status NodePingResponseJsonRunningAgentsStatus `json:"status,omitempty"`
 }
 
 type NodePingResponseJsonRunningAgentsStatus map[string]int
 
 type NodePingResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodePingResponseJsonTagsTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags NodePingResponseJsonTagsTags `json:"tags,omitempty"`
 }
 
 type NodePingResponseJsonTagsTags map[string]string

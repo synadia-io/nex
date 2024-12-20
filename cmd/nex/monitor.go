@@ -64,7 +64,11 @@ logloop:
 		case <-ctx.Done():
 			break logloop
 		case ll := <-logs:
-			fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), string(ll.Data()))
+			data, err := ll.MarshalJSON()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("[%s] -> %s\n", time.Now().Format(time.TimeOnly), string(data))
 		}
 	}
 

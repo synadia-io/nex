@@ -7,16 +7,16 @@ import "fmt"
 
 type RegisterAgentRequestJson struct {
 	// A user friendly description of the agent
-	Description *string `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// The maximum number of workloads this agent can hold. 0 indicates unlimited
-	MaxWorkloads *float64 `json:"max_workloads,omitempty" yaml:"max_workloads,omitempty" mapstructure:"max_workloads,omitempty"`
+	MaxWorkloads *float64 `json:"max_workloads,omitempty"`
 
 	// Name of the agent
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
+	Name string `json:"name"`
 
 	// Version of the agent
-	Version string `json:"version" yaml:"version" mapstructure:"version"`
+	Version string `json:"version"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
