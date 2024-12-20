@@ -45,3 +45,5 @@ agents/javascript/cmd/javascript/javascript
 
 TESTCREDS/
 test/testdata/direct_start/direct_start
+test/testdata/counter
+test/testdata/function/function

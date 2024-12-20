@@ -17,11 +17,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"strings"
 
 	"github.com/synadia-io/nex/api/nodecontrol"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/natscli/columns"
@@ -47,7 +49,7 @@ type Workload struct {
 	Stop   StopWorkload   `cmd:"" help:"Stop a running workload" aliases:"undeploy"`
 	Info   InfoWorkload   `cmd:"" help:"Get information about a workload"`
 	Copy   CopyWorkload   `cmd:"" help:"Copy a workload to another node" aliases:"cp,clone"`
-	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into a compatable OCI image" aliases:"build,package"`
+	Bundle BundleWorkload `cmd:"" help:"Bundles a workload into an OCI artifact" aliases:"build,package"`
 }
 
 type NatsCreds struct {
@@ -58,23 +60,23 @@ type NatsCreds struct {
 
 // Workload subcommands
 type RunWorkload struct {
-	NodeId      string            `description:"Node ID to run the workload on"`
-	NodeTags    map[string]string `description:"Node tags to run the workload on; --node-id will take precedence"`
-	NodePubXKey string            `name:"node-xkey-pub" description:"Node public xkey used for encryption"`
+	NodeId      string            `help:"Node ID to run the workload on"`
+	NodeTags    map[string]string `help:"Node tags to run the workload on; --node-id will take precedence"`
+	NodePubXKey string            `name:"node-xkey-pub" help:"Node public xkey used for encryption"`
 
-	WorkloadName             string            `name:"name" description:"Name of the workload"`
-	WorkloadArguments        []string          `name:"argv" description:"Arguments to pass to the workload"`
-	WorkloadEnvironment      map[string]string `name:"env" description:"Environment variables to set for the workload"`
-	WorkloadDescription      string            `name:"description" description:"Description of the workload"`
-	WorkloadEssential        bool              `name:"essential" description:"Is the workload essential" default:"false"`
-	WorkloadHash             string            `name:"hash" description:"Hash of the workload. If provided, will use for validation, if not provided, will calculate"`
-	WorkloadHostServiceCreds NatsCreds         `embed:"" prefix:"hostservices." description:"Host service configuration"`
-	WorkloadJsDomain         string            `name:"jsdomain" description:"JS Domain to run the workload under"`
-	WorkloadRetryCount       int               `name:"retry-count" description:"Number of times to retry the workload" default:"3"`
-	WorkloadPublicKey        string            `name:"public-key" description:"Public key of the workload"`
-	WorkloadUri              string            `name:"uri" description:"URI of the workload.  file:// oci:// nats://" placeholder:"file://./workload"`
-	WorkloadTriggerSubjects  []string          `name:"triggers" description:"Subjects to trigger the workload"`
-	WorkloadType             string            `name:"type" description:"Type of workload" default:"direct_start"`
+	WorkloadName             string            `name:"name" help:"Name of the workload"`
+	WorkloadArguments        []string          `name:"argv" help:"Arguments to pass to the workload"`
+	WorkloadEnvironment      map[string]string `name:"env" help:"Environment variables to set for the workload"`
+	WorkloadDescription      string            `name:"description" help:"Description of the workload"`
+	WorkloadHash             string            `name:"hash" help:"Hash of the workload. If provided, will use for validation, if not provided, will calculate"`
+	WorkloadHostServiceCreds NatsCreds         `embed:"" prefix:"hostservices." help:"Host service configuration"`
+	WorkloadJsDomain         string            `name:"jsdomain" help:"JS Domain to run the workload under"`
+	WorkloadRetryCount       int               `name:"retry-count" help:"Number of times to retry the workload" default:"3"`
+	WorkloadPublicKey        string            `name:"public-key" help:"Public key of the workload"`
+	WorkloadUri              string            `name:"uri" help:"URI of the workload.  file:// oci:// nats://" placeholder:"oci://localhost:5000/workload:latest"`
+	WorkloadTriggerSubject   string            `name:"trigger" help:"Subject to trigger the workload"`
+	WorkloadType             string            `name:"type" help:"Type of workload" default:"direct_start"`
+	WorkloadRuntype          string            `name:"runtype" help:"Runtype of the workload: service, function, job" default:"service" enum:"service,function,job"`
 }
 
 func (RunWorkload) AfterApply(globals *Globals) error {
@@ -105,6 +107,10 @@ func (r RunWorkload) Validate() error {
 		}
 	}
 
+	if r.WorkloadRuntype == models.WorkloadRunTypeFunction && r.WorkloadTriggerSubject == "" {
+		errs = errors.Join(errs, errors.New("Job workloads require at least one trigger subject"))
+	}
+
 	return errs
 }
 
@@ -130,7 +136,6 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 	startRequest := gen.StartWorkloadRequestJson{
 		Argv:        r.WorkloadArguments,
 		Description: r.WorkloadDescription,
-		Essential:   r.WorkloadEssential,
 		Hash:        r.WorkloadHash,
 		HostServiceConfig: gen.SharedHostServiceJson{
 			NatsUrl:      r.WorkloadHostServiceCreds.NatsUrl,
@@ -142,10 +147,11 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		TargetPubXkey:   r.NodePubXKey,
 		RetryCount:      r.WorkloadRetryCount,
 		SenderPublicKey: r.WorkloadPublicKey,
-		TriggerSubjects: r.WorkloadTriggerSubjects,
+		TriggerSubject:  r.WorkloadTriggerSubject,
 		Uri:             r.WorkloadUri,
 		WorkloadName:    r.WorkloadName,
 		WorkloadType:    r.WorkloadType,
+		WorkloadRuntype: r.WorkloadRuntype,
 	}
 
 	txk, err := nkeys.CreateCurveKeys()
@@ -277,6 +283,8 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 type InfoWorkload struct {
 	WorkloadId   string `arg:"" description:"ID of the workload"`
 	WorkloadType string `name:"type" description:"Type of workload" default:"direct_start"`
+
+	Json bool `name:"json" description:"Output in JSON format" default:"false"`
 }
 
 func (InfoWorkload) AfterApply(globals *Globals) error {
@@ -313,11 +321,34 @@ func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
+	if i.Json {
+		out, err := json.Marshal(resp)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(out))
+		return nil
+	}
+
 	w := columns.New("Information about Workload %s", i.WorkloadId)
 	w.AddRow("Name", resp.WorkloadSummary.Name)
 	w.AddRow("Start Time", resp.WorkloadSummary.StartTime)
-	w.AddRowIf("Run Time", resp.WorkloadSummary.Runtime, resp.WorkloadSummary.Runtime != "")
+	w.AddRow("Run Time", func() string {
+		if resp.WorkloadSummary.Runtime == "" {
+			return "--"
+		}
+		if resp.WorkloadSummary.Runtime == "0s" {
+			t, err := time.Parse(time.DateTime, resp.WorkloadSummary.StartTime)
+			if err != nil {
+				return "--"
+			}
+			return time.Since(t).String()
+		}
+		return resp.WorkloadSummary.Runtime
+	}())
 	w.AddRow("Workload Type", resp.WorkloadSummary.WorkloadType)
+	w.AddRow("Workload Runtype", resp.WorkloadSummary.WorkloadRuntype)
+	w.AddRow("Workload State", resp.WorkloadSummary.WorkloadState)
 	s, err := w.Render()
 	if err != nil {
 		return err
@@ -405,21 +436,21 @@ func (c CopyWorkload) Run(ctx context.Context, globals *Globals) error {
 }
 
 type BundleWorkload struct {
-	Binaries []string `description:"Binary to package"`
-	OS       string   `description:"Operating system of the binary" enum:"linux,darwin" default:"linux"`
-	Arch     string   `description:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
-	Output   string   `description:"Output file name" default:"./artifact.tar"`
+	Binaries []string `help:"Binary to package"`
+	OS       string   `help:"Operating system of the binary" enum:"linux,darwin" default:"linux"`
+	Arch     string   `help:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
+	Output   string   `help:"Output file name" default:"./artifact.tar"`
 
-	Push                bool   `description:"Push the workload to the registry"`
-	Registry            string `description:"Registry to push the workload to" default:"ghcr.io"`
-	RegistryUser        string `description:"Registry username"`
-	RegistryPassword    string `description:"Registry password"`
-	RegistryHttp        bool   `name:"plain-http" description:"Use http instead of https for registry"`
-	WorkloadName        string `name:"name" description:"Name of the workload"`
-	WorkloadTag         string `name:"tag" description:"Tag of the workload" default:"latest"`
-	WorkloadDescription string `name:"description" description:"Description of the workload"`
-	WorkloadSigningKey  string `name:"public-key" description:"Public key of the workload. OCI layers will be signed with this key" default:"${defaultResourcePath}/issuer.nk"`
-	WorkloadType        string `name:"type" description:"Type of workload" default:"direct_start"`
+	Push                 bool   `help:"Push the workload to the registry"`
+	Registry             string `help:"Registry to push the workload to" default:"ghcr.io"`
+	RegistryUser         string `help:"Registry username"`
+	RegistryPassword     string `help:"Registry password"`
+	RegistryHttpInsecure bool   `help:"Use http instead of https for registry"`
+	WorkloadName         string `name:"name" help:"Name of the workload"`
+	WorkloadTag          string `name:"tag" help:"Tag of the workload" default:"latest"`
+	WorkloadDescription  string `name:"description" help:"Description of the workload"`
+	WorkloadSigningKey   string `name:"public-key" help:"Public key of the workload. OCI layers will be signed with this key" default:"${defaultResourcePath}/issuer.nk"`
+	WorkloadType         string `name:"type" help:"Type of workload" default:"direct_start"`
 }
 
 func (BundleWorkload) AfterApply(globals *Globals) error {
@@ -582,7 +613,7 @@ func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
 			return err
 		}
 
-		if b.RegistryHttp {
+		if b.RegistryHttpInsecure {
 			repo.PlainHTTP = true
 		}
 

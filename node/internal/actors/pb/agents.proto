@@ -30,6 +30,7 @@ message PingWorkload {
   string namespace = 1;
   string type = 2;
   string workload_id = 3;
+  string state = 4;
 }
 
 message PingAgentResponse {
@@ -73,18 +74,18 @@ message StartWorkload {
   repeated string argv = 1;
   string description = 2;
   EncEnvironment environment = 3;
-  bool essential = 4;
-  string hash = 5;
-  HostServicesConfig host_service_config = 6;
-  string jsdomain = 7;
-  string retried_at = 8;
-  int32 retry_count = 9;
-  repeated string trigger_subjects = 10;
-  string uri = 11;
-  string workload_jwt = 12;
-  string workload_name = 13;
-  string workload_type = 14;
-  string namespace = 15;
+  string hash = 4;
+  HostServicesConfig host_service_config = 5;
+  string jsdomain = 6;
+  string retried_at = 7;
+  int32 retry_count = 8;
+  string trigger_subject = 9;
+  string uri = 10;
+  string workload_jwt = 11;
+  string workload_name = 12;
+  string workload_type = 13;
+  string namespace = 14;
+  string workload_runtype = 15;
 }
 
 message EncEnvironment {
@@ -158,7 +159,9 @@ message WorkloadSummary {
     string runtime = 3;
     google.protobuf.Timestamp started_at = 4;
     string workload_type = 5;
-    string namespace = 6;
+    string workload_runtype = 6;
+    string namespace = 7;
+    string state = 8;
 }
 
 message SetLameDuck {}

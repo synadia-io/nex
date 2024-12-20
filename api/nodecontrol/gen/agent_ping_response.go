@@ -7,27 +7,27 @@ import "fmt"
 
 type AgentPingResponseJson struct {
 	// The unique identifier of the node on which the agent is running
-	NodeId string `json:"node_id" yaml:"node_id" mapstructure:"node_id"`
+	NodeId string `json:"node_id"`
 
 	// RunningWorkloads corresponds to the JSON schema field "running_workloads".
-	RunningWorkloads []WorkloadPingMachineSummary `json:"running_workloads" yaml:"running_workloads" mapstructure:"running_workloads"`
+	RunningWorkloads []WorkloadPingMachineSummary `json:"running_workloads"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AgentPingResponseJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
+	Tags AgentPingResponseJsonTags `json:"tags"`
 
 	// The target agents xkey
-	TargetXkey string `json:"target_xkey" yaml:"target_xkey" mapstructure:"target_xkey"`
+	TargetXkey string `json:"target_xkey"`
 
 	// The uptime of the node
-	Uptime string `json:"uptime" yaml:"uptime" mapstructure:"uptime"`
+	Uptime string `json:"uptime"`
 
 	// The target agents version
-	Version string `json:"version" yaml:"version" mapstructure:"version"`
+	Version string `json:"version"`
 }
 
 type AgentPingResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AgentPingResponseJsonTagsTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags AgentPingResponseJsonTagsTags `json:"tags,omitempty"`
 }
 
 type AgentPingResponseJsonTagsTags map[string]string
@@ -67,13 +67,13 @@ func (j *AgentPingResponseJson) UnmarshalJSON(b []byte) error {
 
 type WorkloadPingMachineSummary struct {
 	// Id corresponds to the JSON schema field "id".
-	Id string `json:"id" yaml:"id" mapstructure:"id"`
+	Id string `json:"id"`
 
 	// Name corresponds to the JSON schema field "name".
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
+	Name string `json:"name"`
 
 	// Namespace corresponds to the JSON schema field "namespace".
-	Namespace string `json:"namespace" yaml:"namespace" mapstructure:"namespace"`
+	Namespace string `json:"namespace"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

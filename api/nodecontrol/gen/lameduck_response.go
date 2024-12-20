@@ -7,7 +7,7 @@ import "fmt"
 
 type LameduckResponseJson struct {
 	// Indicates lameduck mode successfully set
-	Success bool `json:"success" yaml:"success" mapstructure:"success"`
+	Success bool `json:"success"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

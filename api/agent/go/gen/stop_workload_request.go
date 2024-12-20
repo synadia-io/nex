@@ -7,13 +7,13 @@ import "fmt"
 
 type StopWorkloadRequestJson struct {
 	// Indicates whether the stoppage should be immediate or graceful
-	Immediate *bool `json:"immediate,omitempty" yaml:"immediate,omitempty" mapstructure:"immediate,omitempty"`
+	Immediate *bool `json:"immediate,omitempty"`
 
 	// Optional reason for stopping the workload
-	Reason *string `json:"reason,omitempty" yaml:"reason,omitempty" mapstructure:"reason,omitempty"`
+	Reason *string `json:"reason,omitempty"`
 
 	// The unique identifier of the workload to stop.
-	WorkloadId string `json:"workloadId" yaml:"workloadId" mapstructure:"workloadId"`
+	WorkloadId string `json:"workloadId"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

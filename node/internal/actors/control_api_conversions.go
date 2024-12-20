@@ -16,8 +16,7 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 			EncryptedBy:        request.EncEnvironment.EncryptedBy,
 			Base64EncryptedEnv: request.EncEnvironment.Base64EncryptedEnv,
 		},
-		Essential: request.Essential,
-		Hash:      request.Hash,
+		Hash: request.Hash,
 		HostServiceConfig: &actorproto.HostServicesConfig{
 			NatsUrl:      request.HostServiceConfig.NatsUrl,
 			NatsUserSeed: request.HostServiceConfig.NatsUserSeed,
@@ -26,11 +25,12 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 		Jsdomain:        request.Jsdomain,
 		Namespace:       request.Namespace,
 		RetryCount:      int32(request.RetryCount),
-		TriggerSubjects: request.TriggerSubjects,
+		TriggerSubject:  request.TriggerSubject,
 		Uri:             request.Uri,
 		WorkloadJwt:     request.WorkloadJwt,
 		WorkloadName:    request.WorkloadName,
 		WorkloadType:    request.WorkloadType,
+		WorkloadRuntype: request.WorkloadRuntype,
 	}
 }
 
@@ -42,8 +42,7 @@ func startRequestFromProto(request *actorproto.StartWorkload) *api.StartWorkload
 			Base64EncryptedEnv: request.Environment.Base64EncryptedEnv,
 			EncryptedBy:        request.Environment.EncryptedBy,
 		},
-		Essential: request.Essential,
-		Hash:      request.Hash,
+		Hash: request.Hash,
 		HostServiceConfig: api.SharedHostServiceJson{
 			NatsUrl:      request.HostServiceConfig.NatsUrl,
 			NatsUserJwt:  request.HostServiceConfig.NatsUserJwt,
@@ -52,11 +51,12 @@ func startRequestFromProto(request *actorproto.StartWorkload) *api.StartWorkload
 		Jsdomain:        request.Jsdomain,
 		Namespace:       request.Namespace,
 		RetryCount:      int(request.RetryCount),
-		TriggerSubjects: request.TriggerSubjects,
+		TriggerSubject:  request.TriggerSubject,
 		Uri:             request.Uri,
 		WorkloadJwt:     request.WorkloadJwt,
 		WorkloadName:    request.WorkloadName,
 		WorkloadType:    request.WorkloadType,
+		WorkloadRuntype: request.WorkloadRuntype,
 	}
 }
 
@@ -96,11 +96,13 @@ func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJ
 
 	for _, workload := range response.Workloads {
 		ret.WorkloadSummaries = append(ret.WorkloadSummaries, api.WorkloadSummary{
-			Id:           workload.Id,
-			Name:         workload.Name,
-			Runtime:      workload.Runtime,
-			StartTime:    workload.StartedAt.AsTime().Format(time.DateTime),
-			WorkloadType: workload.WorkloadType,
+			Id:              workload.Id,
+			Name:            workload.Name,
+			Runtime:         workload.Runtime,
+			StartTime:       workload.StartedAt.AsTime().Format(time.DateTime),
+			WorkloadType:    workload.WorkloadType,
+			WorkloadRuntype: workload.WorkloadRuntype,
+			WorkloadState:   workload.State,
 		})
 	}
 	return ret
@@ -146,11 +148,13 @@ func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingR
 func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponseJson {
 	return &api.WorkloadPingResponseJson{
 		WorkloadSummary: &api.Workload{
-			Id:           response.Workload.Id,
-			Name:         response.Workload.Name,
-			Runtime:      response.Workload.Runtime,
-			StartTime:    response.Workload.StartedAt.AsTime().Format(time.DateTime),
-			WorkloadType: response.Workload.WorkloadType,
+			Id:              response.Workload.Id,
+			Name:            response.Workload.Name,
+			Runtime:         response.Workload.Runtime,
+			StartTime:       response.Workload.StartedAt.AsTime().Format(time.DateTime),
+			WorkloadType:    response.Workload.WorkloadType,
+			WorkloadRuntype: response.Workload.WorkloadRuntype,
+			WorkloadState:   response.Workload.State,
 		},
 	}
 }

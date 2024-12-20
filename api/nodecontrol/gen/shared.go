@@ -7,10 +7,10 @@ import "fmt"
 
 type SharedEncEnvJson struct {
 	// Base64EncryptedEnv corresponds to the JSON schema field "base64_encrypted_env".
-	Base64EncryptedEnv string `json:"base64_encrypted_env" yaml:"base64_encrypted_env" mapstructure:"base64_encrypted_env"`
+	Base64EncryptedEnv string `json:"base64_encrypted_env"`
 
 	// EncryptedBy corresponds to the JSON schema field "encrypted_by".
-	EncryptedBy string `json:"encrypted_by" yaml:"encrypted_by" mapstructure:"encrypted_by"`
+	EncryptedBy string `json:"encrypted_by"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -36,13 +36,13 @@ func (j *SharedEncEnvJson) UnmarshalJSON(b []byte) error {
 
 type SharedHostServiceJson struct {
 	// NatsUrl corresponds to the JSON schema field "nats_url".
-	NatsUrl string `json:"nats_url" yaml:"nats_url" mapstructure:"nats_url"`
+	NatsUrl string `json:"nats_url"`
 
 	// NatsUserJwt corresponds to the JSON schema field "nats_user_jwt".
-	NatsUserJwt string `json:"nats_user_jwt" yaml:"nats_user_jwt" mapstructure:"nats_user_jwt"`
+	NatsUserJwt string `json:"nats_user_jwt"`
 
 	// NatsUserSeed corresponds to the JSON schema field "nats_user_seed".
-	NatsUserSeed string `json:"nats_user_seed" yaml:"nats_user_seed" mapstructure:"nats_user_seed"`
+	NatsUserSeed string `json:"nats_user_seed"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

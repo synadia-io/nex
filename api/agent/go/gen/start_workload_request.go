@@ -7,32 +7,32 @@ import "fmt"
 
 type StartWorkloadRequestJson struct {
 	// Command line arguments to be passed when the workload is a native/service type
-	Argv []string `json:"argv,omitempty" yaml:"argv,omitempty" mapstructure:"argv,omitempty"`
+	Argv []string `json:"argv,omitempty"`
 
 	// A map containing environment variables, applicable for native workload types
-	Env StartWorkloadRequestJsonEnv `json:"env,omitempty" yaml:"env,omitempty" mapstructure:"env,omitempty"`
+	Env StartWorkloadRequestJsonEnv `json:"env,omitempty"`
 
 	// A hex encoded SHA-256 hash of the artifact file bytes
-	Hash string `json:"hash" yaml:"hash" mapstructure:"hash"`
+	Hash string `json:"hash"`
 
 	// Name of the workload
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
+	Name string `json:"name"`
 
 	// Namespace of the workload
-	Namespace string `json:"namespace" yaml:"namespace" mapstructure:"namespace"`
+	Namespace string `json:"namespace"`
 
 	// Byte size of the workload artifact
-	TotalBytes int `json:"totalBytes" yaml:"totalBytes" mapstructure:"totalBytes"`
+	TotalBytes int `json:"totalBytes"`
 
 	// A list of trigger subjects for the workload, if applicable. Note these are NOT
 	// subscribed to by the agent, only used for information and validation
-	TriggerSubjects []string `json:"triggerSubjects,omitempty" yaml:"triggerSubjects,omitempty" mapstructure:"triggerSubjects,omitempty"`
+	TriggerSubjects []string `json:"triggerSubjects,omitempty"`
 
 	// The unique identifier of the workload to start.
-	WorkloadId string `json:"workloadId" yaml:"workloadId" mapstructure:"workloadId"`
+	WorkloadId string `json:"workloadId"`
 
 	// Type of the workload
-	WorkloadType string `json:"workloadType" yaml:"workloadType" mapstructure:"workloadType"`
+	WorkloadType string `json:"workloadType"`
 }
 
 // A map containing environment variables, applicable for native workload types

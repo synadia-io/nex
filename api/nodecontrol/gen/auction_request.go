@@ -7,21 +7,21 @@ import "fmt"
 
 type AuctionRequestJson struct {
 	// The type of agent to auction for
-	AgentType []NexWorkload `json:"agent_type,omitempty" yaml:"agent_type,omitempty" mapstructure:"agent_type,omitempty"`
+	AgentType []NexWorkload `json:"agent_type,omitempty"`
 
 	// A unique identifier for the auction
-	AuctionId string `json:"auction_id" yaml:"auction_id" mapstructure:"auction_id"`
+	AuctionId string `json:"auction_id"`
 
 	// A list of tags to associate with the node during auction. To be returned, node
 	// must satisfy ALL tags
-	Tags AuctionRequestJsonTags `json:"tags" yaml:"tags" mapstructure:"tags"`
+	Tags AuctionRequestJsonTags `json:"tags"`
 }
 
 // A list of tags to associate with the node during auction. To be returned, node
 // must satisfy ALL tags
 type AuctionRequestJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AuctionRequestJsonTagsTags `json:"tags,omitempty" yaml:"tags,omitempty" mapstructure:"tags,omitempty"`
+	Tags AuctionRequestJsonTagsTags `json:"tags,omitempty"`
 }
 
 type AuctionRequestJsonTagsTags map[string]string

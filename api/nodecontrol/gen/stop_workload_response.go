@@ -7,13 +7,13 @@ import "fmt"
 
 type StopWorkloadResponseJson struct {
 	// Id corresponds to the JSON schema field "id".
-	Id string `json:"id" yaml:"id" mapstructure:"id"`
+	Id string `json:"id"`
 
 	// Issuer corresponds to the JSON schema field "issuer".
-	Issuer string `json:"issuer" yaml:"issuer" mapstructure:"issuer"`
+	Issuer string `json:"issuer"`
 
 	// Stopped corresponds to the JSON schema field "stopped".
-	Stopped bool `json:"stopped" yaml:"stopped" mapstructure:"stopped"`
+	Stopped bool `json:"stopped"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

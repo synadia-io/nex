@@ -7,16 +7,16 @@ import "fmt"
 
 type StartWorkloadResponseJson struct {
 	// Id corresponds to the JSON schema field "id".
-	Id string `json:"id" yaml:"id" mapstructure:"id"`
+	Id string `json:"id"`
 
 	// Issuer corresponds to the JSON schema field "issuer".
-	Issuer string `json:"issuer" yaml:"issuer" mapstructure:"issuer"`
+	Issuer string `json:"issuer"`
 
 	// Name corresponds to the JSON schema field "name".
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
+	Name string `json:"name"`
 
 	// Started corresponds to the JSON schema field "started".
-	Started bool `json:"started" yaml:"started" mapstructure:"started"`
+	Started bool `json:"started"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

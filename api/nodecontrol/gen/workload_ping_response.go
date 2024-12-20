@@ -7,24 +7,30 @@ import "fmt"
 
 type Workload struct {
 	// The unique identifier of the workload
-	Id string `json:"id" yaml:"id" mapstructure:"id"`
+	Id string `json:"id"`
 
 	// The name of the workload
-	Name string `json:"name" yaml:"name" mapstructure:"name"`
+	Name string `json:"name"`
 
 	// The runtime of the workload
-	Runtime string `json:"runtime" yaml:"runtime" mapstructure:"runtime"`
+	Runtime string `json:"runtime"`
 
 	// The start time of the workload
-	StartTime string `json:"start_time" yaml:"start_time" mapstructure:"start_time"`
+	StartTime string `json:"start_time"`
+
+	// The runtype/lifecycle of the workload
+	WorkloadRuntype string `json:"workload_runtype"`
+
+	// The state of the workload
+	WorkloadState string `json:"workload_state"`
 
 	// The type of the workload
-	WorkloadType string `json:"workload_type" yaml:"workload_type" mapstructure:"workload_type"`
+	WorkloadType string `json:"workload_type"`
 }
 
 type WorkloadPingResponseJson struct {
 	// WorkloadSummary corresponds to the JSON schema field "workload_summary".
-	WorkloadSummary *Workload `json:"workload_summary,omitempty" yaml:"workload_summary,omitempty" mapstructure:"workload_summary,omitempty"`
+	WorkloadSummary *Workload `json:"workload_summary,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -44,6 +50,12 @@ func (j *Workload) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["start_time"]; raw != nil && !ok {
 		return fmt.Errorf("field start_time in Workload: required")
+	}
+	if _, ok := raw["workload_runtype"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_runtype in Workload: required")
+	}
+	if _, ok := raw["workload_state"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_state in Workload: required")
 	}
 	if _, ok := raw["workload_type"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_type in Workload: required")
