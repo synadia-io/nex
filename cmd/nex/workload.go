@@ -441,16 +441,16 @@ type BundleWorkload struct {
 	Arch     string   `help:"Architecture of the binary" enum:"amd64,arm64" default:"amd64"`
 	Output   string   `help:"Output file name" default:"./artifact.tar"`
 
-	Push                bool   `help:"Push the workload to the registry"`
-	Registry            string `help:"Registry to push the workload to" default:"ghcr.io"`
-	RegistryUser        string `help:"Registry username"`
-	RegistryPassword    string `help:"Registry password"`
-	RegistryHttp        bool   `name:"plain-http" help:"Use http instead of https for registry"`
-	WorkloadName        string `name:"name" help:"Name of the workload"`
-	WorkloadTag         string `name:"tag" help:"Tag of the workload" default:"latest"`
-	WorkloadDescription string `name:"description" help:"Description of the workload"`
-	WorkloadSigningKey  string `name:"public-key" help:"Public key of the workload. OCI layers will be signed with this key" default:"${defaultResourcePath}/issuer.nk"`
-	WorkloadType        string `name:"type" help:"Type of workload" default:"direct_start"`
+	Push                 bool   `help:"Push the workload to the registry"`
+	Registry             string `help:"Registry to push the workload to" default:"ghcr.io"`
+	RegistryUser         string `help:"Registry username"`
+	RegistryPassword     string `help:"Registry password"`
+	RegistryHttpInsecure bool   `help:"Use http instead of https for registry"`
+	WorkloadName         string `name:"name" help:"Name of the workload"`
+	WorkloadTag          string `name:"tag" help:"Tag of the workload" default:"latest"`
+	WorkloadDescription  string `name:"description" help:"Description of the workload"`
+	WorkloadSigningKey   string `name:"public-key" help:"Public key of the workload. OCI layers will be signed with this key" default:"${defaultResourcePath}/issuer.nk"`
+	WorkloadType         string `name:"type" help:"Type of workload" default:"direct_start"`
 }
 
 func (BundleWorkload) AfterApply(globals *Globals) error {
@@ -613,7 +613,7 @@ func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
 			return err
 		}
 
-		if b.RegistryHttp {
+		if b.RegistryHttpInsecure {
 			repo.PlainHTTP = true
 		}
 

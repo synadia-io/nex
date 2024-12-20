@@ -261,8 +261,6 @@ func (a *DirectStartAgent) queryWorkloads(m *actorproto.QueryWorkloads) (*actorp
 			return nil, err
 		}
 		workloadSummary, ok := askRet.(*actorproto.WorkloadSummary)
-		// cmd.Stdout = os.Stdout
-		// cmd.Stderr = os.Stderr
 		if !ok {
 			a.logger.Error("query workload unexpected response type", slog.String("name", a.self.Name()), slog.String("workload", c.Name()))
 			return nil, err

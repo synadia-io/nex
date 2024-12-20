@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,7 +12,6 @@ import (
 	"slices"
 	"time"
 
-	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
@@ -484,7 +484,7 @@ func (nn nexNode) DecryptPayload(payload []byte) ([]byte, error) {
 	return nn.options.Xkey.Open(payload, xPub)
 }
 
-func (nn nexNode) EmitEvent(inNamespace string, inEvent cloudevents.Event) error {
+func (nn nexNode) EmitEvent(inNamespace string, inEvent json.RawMessage) error {
 	event, err := inEvent.MarshalJSON()
 	if err != nil {
 		return err

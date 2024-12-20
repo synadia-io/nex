@@ -66,7 +66,7 @@ func createNewProcessActor(
 		namespace:    namespace,
 		processName:  processName,
 		runType:      runType,
-		state:        models.WorkloadStateInitializing,
+		state:        models.WorkloadStateStarting,
 		ref:          ref,
 		logger:       logger,
 		argv:         argv,

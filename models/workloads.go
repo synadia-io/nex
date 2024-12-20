@@ -5,9 +5,9 @@ const (
 	WorkloadRunTypeFunction = "function"
 	WorkloadRunTypeJob      = "job"
 
-	WorkloadStateInitializing = "initializing"
-	WorkloadStateRunning      = "running"
-	WorkloadStateStopped      = "stopped"
-	WorkloadStateError        = "error"
-	WorkloadStateWarm         = "warm"
+	WorkloadStateStarting = "starting"
+	WorkloadStateRunning  = "running"
+	WorkloadStateStopped  = "stopped"
+	WorkloadStateError    = "error"
+	WorkloadStateWarm     = "warm"
 )
