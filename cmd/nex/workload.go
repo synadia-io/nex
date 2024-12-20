@@ -67,7 +67,7 @@ type RunWorkload struct {
 	NodePubXKey string            `name:"node-xkey-pub" help:"Node public xkey used for encryption"`
 
 	WorkloadName             string            `name:"name" help:"Name of the workload"`
-	WorkloadReplicas         int               `name:"replicas" help:"Number of replicas to start" default:"1"`
+	WorkloadCount            int               `name:"count" help:"Number of copies to start" default:"1"`
 	WorkloadArguments        []string          `name:"argv" help:"Arguments to pass to the workload"`
 	WorkloadEnvironment      map[string]string `name:"env" help:"Environment variables to set for the workload"`
 	WorkloadDescription      string            `name:"description" help:"Description of the workload"`
@@ -185,10 +185,10 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			Base64EncryptedEnv: b64_enc_env,
 			EncryptedBy:        txk_pub,
 		}
-		for i := 0; i < r.WorkloadReplicas; i++ {
+		for i := 0; i < r.WorkloadCount; i++ {
 			resp, err := controller.DeployWorkload(globals.Namespace, r.NodeId, startRequest)
 			if errors.Is(err, nats.ErrTimeout) {
-				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadReplicas)
+				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadCount)
 			} else if err != nil {
 				return err
 			} else {
@@ -206,7 +206,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 			return errors.New("no nodes available for deployment")
 		}
 
-		for i := 0; i < r.WorkloadReplicas; i++ {
+		for i := 0; i < r.WorkloadCount; i++ {
 			nodeX := rand.IntN(len(auctionResults))
 			bidderId := auctionResults[nodeX].BidderId
 
@@ -225,7 +225,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 
 			resp, err := controller.AuctionDeployWorkload(globals.Namespace, bidderId, startRequest)
 			if errors.Is(err, nats.ErrTimeout) {
-				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadReplicas)
+				fmt.Printf("Workload %d of %d did not come up in time. Check events/logs for status\n", i+1, r.WorkloadCount)
 			} else if err != nil {
 				return err
 			} else {
