@@ -58,11 +58,11 @@ func TestPingAgent(t *testing.T) {
 	ctx := context.Background()
 	tk := testkit.New(ctx, t, testkit.WithLogging(log.ErrorLevel))
 	mock := MockState{state: make(map[string]*actorproto.StartWorkload)}
-	tk.Spawn(ctx, DirectStartActorName, CreateDirectStartAgent(context.TODO(), nc, "testnode", models.NodeOptions{Logger: logger, Xkey: xkey}, logger, mock))
+	tk.Spawn(ctx, models.DirectStartActorName, CreateDirectStartAgent(context.TODO(), nc, "testnode", models.NodeOptions{Logger: logger, Xkey: xkey}, logger, mock))
 
 	probe := tk.NewProbe(ctx)
 
-	probe.SendSync(DirectStartActorName, &actorproto.PingAgent{Namespace: "system"}, time.Second*3)
+	probe.SendSync(models.DirectStartActorName, &actorproto.PingAgent{Namespace: "system"}, time.Second*3)
 	respEnv, ok := probe.ExpectAnyMessage().(*actorproto.Envelope)
 	if !ok {
 		t.Fatalf("unexpected message type: %T", respEnv)

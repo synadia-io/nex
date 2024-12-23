@@ -17,7 +17,6 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
-	"github.com/splode/fname"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -57,12 +56,6 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 		return nil, fmt.Errorf("no nats connection provided")
 	}
 
-	rng := fname.NewGenerator()
-	nodeName, err := rng.Generate()
-	if err != nil {
-		nodeName = "nexnode"
-	}
-
 	xkey, err := nkeys.CreateCurveKeys()
 	if err != nil {
 		return nil, err
@@ -85,7 +78,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 				models.TagCPUs:     fmt.Sprintf("%d", runtime.GOMAXPROCS(0)),
 				models.TagLameDuck: "false",
 				models.TagNexus:    "nexus",
-				models.TagNodeName: nodeName,
+				models.TagNodeName: "nexnode",
 			},
 			ValidIssuers: []string{},
 			OtelOptions: models.OTelOptions{
@@ -124,7 +117,7 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	return nn, nil
 }
 
-func (nn nexNode) Validate() error {
+func (nn *nexNode) Validate() error {
 	var errs error
 
 	if nn.options.Logger == nil {
@@ -278,7 +271,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	if !nn.options.DisableDirectStart {
-		_, err = agentSuper.SpawnChild(nn.ctx, actors.DirectStartActorName, actors.CreateDirectStartAgent(nn.ctx, nn.nc, pk, *nn.options, nn.options.Logger.WithGroup("direct-start"), nn),
+		_, err = agentSuper.SpawnChild(nn.ctx, models.DirectStartActorName, actors.CreateDirectStartAgent(nn.ctx, nn.nc, pk, *nn.options, nn.options.Logger.WithGroup(models.DirectStartActorName), nn),
 			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 		)
 
@@ -425,7 +418,7 @@ func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string
 	return resp, nil
 }
 
-func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
+func (nn *nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 	st := timestamppb.New(nn.startedAt)
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
@@ -476,7 +469,7 @@ func (nn nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 	return resp, nil
 }
 
-func (nn nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
+func (nn *nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 	pk, err := nn.publicKey.PublicKey()
 	if err != nil {
 		nn.options.Logger.Error("Failed to get public key", slog.Any("err", err))
@@ -530,7 +523,7 @@ func (nn nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 	return resp, nil
 }
 
-func (nn nexNode) SetLameDuck(ctx context.Context) {
+func (nn *nexNode) SetLameDuck(ctx context.Context) {
 	nn.options.Tags[models.TagLameDuck] = "true"
 
 	go func() {
@@ -555,7 +548,7 @@ func (nn nexNode) IsTargetNode(inId string) (bool, nkeys.KeyPair, error) {
 	return false, nil, nil
 }
 
-func (nn nexNode) EncryptPayload(payload []byte, to string) ([]byte, string, error) {
+func (nn *nexNode) EncryptPayload(payload []byte, to string) ([]byte, string, error) {
 	xPub, err := nn.options.Xkey.PublicKey()
 	if err != nil {
 		return nil, "", err
@@ -572,7 +565,7 @@ func (nn nexNode) EncryptPayload(payload []byte, to string) ([]byte, string, err
 	return payloadEnc, xPub, nil
 }
 
-func (nn nexNode) DecryptPayload(payload []byte) ([]byte, error) {
+func (nn *nexNode) DecryptPayload(payload []byte) ([]byte, error) {
 	xPub, err := nn.options.Xkey.PublicKey()
 	if err != nil {
 		return nil, err
@@ -580,7 +573,7 @@ func (nn nexNode) DecryptPayload(payload []byte) ([]byte, error) {
 	return nn.options.Xkey.Open(payload, xPub)
 }
 
-func (nn nexNode) EmitEvent(inNamespace string, inEvent json.RawMessage) error {
+func (nn *nexNode) EmitEvent(inNamespace string, inEvent json.RawMessage) error {
 	event, err := inEvent.MarshalJSON()
 	if err != nil {
 		return err
@@ -588,7 +581,7 @@ func (nn nexNode) EmitEvent(inNamespace string, inEvent json.RawMessage) error {
 	return nn.nc.Publish(models.EventAPIPrefix+"."+inNamespace, event)
 }
 
-func (nn nexNode) StoreRunRequest(workloadType, inId string, inRequest *actorproto.StartWorkload) error {
+func (nn *nexNode) StoreRunRequest(workloadType, inId string, inRequest *actorproto.StartWorkload) error {
 	pub, err := nn.iNatsNkey.PublicKey()
 	if err != nil {
 		return err
@@ -625,7 +618,7 @@ func (nn nexNode) StoreRunRequest(workloadType, inId string, inRequest *actorpro
 	return nil
 }
 
-func (nn nexNode) GetRunRequest(workloadType, inId string) (*actorproto.StartWorkload, error) {
+func (nn *nexNode) GetRunRequest(workloadType, inId string) (*actorproto.StartWorkload, error) {
 	pub, err := nn.iNatsNkey.PublicKey()
 	if err != nil {
 		return nil, err
@@ -663,7 +656,7 @@ func (nn nexNode) GetRunRequest(workloadType, inId string) (*actorproto.StartWor
 	return &req, nil
 }
 
-func (nn nexNode) DeleteRunRequest(workloadType, inId string) error {
+func (nn *nexNode) DeleteRunRequest(workloadType, inId string) error {
 	pub, err := nn.iNatsNkey.PublicKey()
 	if err != nil {
 		return err
@@ -690,7 +683,7 @@ func (nn nexNode) DeleteRunRequest(workloadType, inId string) error {
 	return nil
 }
 
-func (nn nexNode) getState() (map[string]*actorproto.StartWorkload, error) {
+func (nn *nexNode) getState() (map[string]*actorproto.StartWorkload, error) {
 	pub, err := nn.iNatsNkey.PublicKey()
 	if err != nil {
 		return nil, err

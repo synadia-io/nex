@@ -9,7 +9,6 @@ require (
 	github.com/nats-io/nkeys v0.4.9
 	github.com/nats-io/nuid v1.0.1
 	github.com/opencontainers/image-spec v1.1.0
-	github.com/splode/fname v0.4.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tochemey/goakt/v2 v2.10.2
 	golang.org/x/sys v0.28.0

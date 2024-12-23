@@ -23,7 +23,6 @@ import (
 )
 
 const (
-	DirectStartActorName = "direct-start"
 	DirectStartActorDesc = "Direct start agent"
 
 	VERSION = "0.0.0"
@@ -89,7 +88,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			return
 		}
 
-		err = a.stateCallback.StoreRunRequest(DirectStartActorName, ws.Id, m)
+		err = a.stateCallback.StoreRunRequest(models.DirectStartActorName, ws.Id, m)
 		if err != nil {
 			a.logger.Error("Failed to store run request", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadName), slog.Any("err", err))
 		}
@@ -110,7 +109,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 			ctx.Response(resp)
 			return
 		}
-		err = a.stateCallback.DeleteRunRequest(DirectStartActorName, m.WorkloadId)
+		err = a.stateCallback.DeleteRunRequest(models.DirectStartActorName, m.WorkloadId)
 		if err != nil {
 			a.logger.Error("Failed to delete run request", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId), slog.Any("err", err))
 			return
@@ -191,7 +190,7 @@ func (a *DirectStartAgent) Receive(ctx *goakt.ReceiveContext) {
 		ctx.Response(resp)
 	case *actorproto.GetRunRequest:
 		a.logger.Debug("GetRunRequest received", slog.String("name", ctx.Self().Name()))
-		wl, err := a.stateCallback.GetRunRequest(DirectStartActorName, m.WorkloadId)
+		wl, err := a.stateCallback.GetRunRequest(models.DirectStartActorName, m.WorkloadId)
 		if err != nil {
 			a.logger.Debug("Failed to get run request", slog.String("name", ctx.Self().Name()), slog.String("workload", m.WorkloadId), slog.Any("err", err))
 			return

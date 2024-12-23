@@ -297,8 +297,7 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 }
 
 type InfoWorkload struct {
-	WorkloadId   string `arg:"" description:"ID of the workload"`
-	WorkloadType string `name:"type" description:"Type of workload" default:"direct-start"`
+	WorkloadId string `arg:"" description:"ID of the workload"`
 
 	Json bool `name:"json" description:"Output in JSON format" default:"false"`
 }
@@ -328,7 +327,7 @@ func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	resp, err := controller.FindWorkload(i.WorkloadType, globals.Namespace, i.WorkloadId)
+	resp, err := controller.FindWorkload(globals.Namespace, i.WorkloadId)
 	if errors.Is(err, nats.ErrTimeout) {
 		fmt.Println("Workload not found")
 		return nil
@@ -448,7 +447,6 @@ func (l ListWorkload) Run(ctx context.Context, globals *Globals) error {
 
 type CopyWorkload struct {
 	WorkloadId   string `arg:"" description:"ID of the workload"`
-	WorkloadType string `name:"type" description:"Type of workload" default:"direct-start"`
 	StopOriginal bool   `name:"stop" description:"Stop the original workload after copying" default:"false"`
 
 	NodeId   string            `description:"Node ID of target workload. If not provided, auction is preformed"`

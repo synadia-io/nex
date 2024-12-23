@@ -13,7 +13,7 @@ import (
 	"disorder.dev/shandler"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/splode/fname"
+	"github.com/nats-io/nuid"
 	goakt "github.com/tochemey/goakt/v2/actors"
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -315,11 +315,7 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 	}
 
 	if req.WorkloadName == "" {
-		rng := fname.NewGenerator()
-		req.WorkloadName, err = rng.Generate()
-		if err != nil {
-			req.WorkloadName = "unnamed-workload"
-		}
+		req.WorkloadName = nuid.New().Next()
 	}
 
 	// reencrypt env with node key
@@ -398,11 +394,7 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 	}
 
 	if req.WorkloadName == "" {
-		rng := fname.NewGenerator()
-		req.WorkloadName, err = rng.Generate()
-		if err != nil {
-			req.WorkloadName = "unnamed-workload"
-		}
+		req.WorkloadName = nuid.New().Next()
 	}
 
 	ctx := context.Background()
@@ -594,7 +586,7 @@ func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 		return
 	}
 
-	var aWorkloadPingResponse *actorproto.PingWorkloadResponse
+	var pingWorkloadResponse *actorproto.PingWorkloadResponse
 	for _, agent := range supervisor.Children() {
 		response, err := api.self.Ask(ctx, agent, &actorproto.PingWorkload{
 			Namespace:  namespace,
@@ -607,16 +599,16 @@ func (api *ControlAPI) handleWorkloadPing(m *nats.Msg) {
 		if !ok {
 			continue
 		} else {
-			aWorkloadPingResponse = pingResponse
+			pingWorkloadResponse = pingResponse
 			break
 		}
 	}
 
-	if aWorkloadPingResponse == nil {
+	if pingWorkloadResponse == nil {
 		return // Pings do not respond negatively
 	}
 
-	models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(aWorkloadPingResponse), "")
+	models.RespondEnvelope(m, WorkloadPingResponseType, 200, workloadPingResponseFromProto(pingWorkloadResponse), "")
 }
 
 func (api *ControlAPI) handleNamespacePing(m *nats.Msg) {
