@@ -532,7 +532,7 @@ func (nn *nexNode) SetLameDuck(ctx context.Context) {
 	}()
 }
 
-func (nn nexNode) IsTargetNode(inId string) (bool, nkeys.KeyPair, error) {
+func (nn *nexNode) IsTargetNode(inId string) (bool, nkeys.KeyPair, error) {
 	pub, err := nn.publicKey.PublicKey()
 	if err != nil {
 		return false, nil, err
