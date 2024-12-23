@@ -44,7 +44,6 @@ type ControlAPI struct {
 	logger     *slog.Logger
 	publicKey  string
 	publicXKey string
-	subsz      []*nats.Subscription
 
 	nodeCallback NodeCallback
 
@@ -73,7 +72,6 @@ func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, node
 		nc:           nc,
 		logger:       logger,
 		publicKey:    publicKey,
-		subsz:        make([]*nats.Subscription, 0),
 		nodeCallback: nodeCallback,
 	}
 
@@ -97,12 +95,6 @@ func (a *ControlAPI) PreStart(ctx context.Context) error {
 }
 
 func (a *ControlAPI) PostStop(ctx context.Context) error {
-	for _, sub := range a.subsz {
-		err := sub.Drain()
-		if err != nil {
-			a.logger.Error("Failed to drain API subscription", slog.String("subscription", sub.Subject))
-		}
-	}
 
 	return nil
 }
@@ -125,25 +117,14 @@ func (a *ControlAPI) Receive(ctx *goakt.ReceiveContext) {
 }
 
 func (api *ControlAPI) shutdown() error {
-	var err error
+	var errs error
 
-	for _, sub := range api.subsz {
-		if !sub.IsValid() {
-			continue
-		}
+	errs = errors.Join(errs, api.nc.Drain())
 
-		_err := sub.Drain()
-		if _err != nil {
-			api.logger.Warn("Failed to drain API subscription", slog.String("subscription", sub.Subject))
-			err = errors.Join(_err, fmt.Errorf("failed to drain API subscription: %s", sub.Subject))
-		}
-	}
-
-	return err
+	return errs
 }
 
 func (api *ControlAPI) subscribe() error {
-	var sub *nats.Subscription
 	var err error
 
 	subscriptions := []struct {
@@ -165,12 +146,12 @@ func (api *ControlAPI) subscribe() error {
 	}
 
 	for _, s := range subscriptions {
-		sub, err = api.nc.Subscribe(s.Subject, s.Handler)
+		_, err = api.nc.Subscribe(s.Subject, s.Handler)
 		if err != nil {
 			api.logger.Error("Failed to subscribe to "+s.Subject, slog.Any("error", err), slog.String("id", api.publicKey))
 			return err
 		}
-		api.subsz = append(api.subsz, sub)
+		api.logger.Debug("Node subscribed to NATs subject", slog.String("subject", s.Subject))
 	}
 
 	api.logger.Info("NATS execution engine awaiting commands")
