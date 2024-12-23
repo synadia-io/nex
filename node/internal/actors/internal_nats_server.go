@@ -176,8 +176,9 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 	}
 
 	_, err = jsCtx.CreateOrUpdateKeyValue(context.TODO(), jetstream.KeyValueConfig{
-		Bucket:   "run_requests",
-		MaxBytes: 10000, // 10KB
+		Bucket:       models.RunRequestKVBucket,
+		MaxBytes:     50000000, // 50MB
+		MaxValueSize: 10000,    // 10KB
 	})
 
 	if err != nil {

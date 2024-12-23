@@ -600,7 +600,7 @@ func (nn *nexNode) StoreRunRequest(workloadType, inId string, inRequest *actorpr
 		return err
 	}
 
-	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	bucket, err := jsCtx.KeyValue(context.TODO(), models.RunRequestKVBucket)
 	if err != nil {
 		return err
 	}
@@ -637,7 +637,7 @@ func (nn *nexNode) GetRunRequest(workloadType, inId string) (*actorproto.StartWo
 		return nil, err
 	}
 
-	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	bucket, err := jsCtx.KeyValue(context.TODO(), models.RunRequestKVBucket)
 	if err != nil {
 		return nil, err
 	}
@@ -672,7 +672,7 @@ func (nn *nexNode) DeleteRunRequest(workloadType, inId string) error {
 	if err != nil {
 		return err
 	}
-	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	bucket, err := jsCtx.KeyValue(context.TODO(), models.RunRequestKVBucket)
 	if err != nil {
 		return err
 	}
@@ -702,7 +702,7 @@ func (nn *nexNode) getState() (map[string]*actorproto.StartWorkload, error) {
 		return nil, err
 	}
 
-	bucket, err := jsCtx.KeyValue(context.TODO(), "run_requests")
+	bucket, err := jsCtx.KeyValue(context.TODO(), models.RunRequestKVBucket)
 	if err != nil {
 		return nil, err
 	}
