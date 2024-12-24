@@ -54,7 +54,7 @@ func buildNexCli(t testing.TB, workingDir string) (string, error) {
 	return filepath.Join(workingDir, "nex"), nil
 }
 
-func startNatsSever(t testing.TB, workingDir string) (*server.Server, error) {
+func startNatsServer(t testing.TB, workingDir string) (*server.Server, error) {
 	t.Helper()
 
 	s := server.New(&server.Options{
@@ -108,7 +108,7 @@ func startNexNodeCmd(t testing.TB, workingDir, nodeSeed, xkeySeed, natsServer, n
 
 func TestStartNode(t *testing.T) {
 	workingDir := t.TempDir()
-	s, err := startNatsSever(t, workingDir)
+	s, err := startNatsServer(t, workingDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestStartNode(t *testing.T) {
 
 func TestStartNexus(t *testing.T) {
 	workingDir := t.TempDir()
-	s, err := startNatsSever(t, workingDir)
+	s, err := startNatsServer(t, workingDir)
 	if err != nil {
 		t.Fatal(err)
 	}

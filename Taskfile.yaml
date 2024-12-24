@@ -54,6 +54,8 @@ tasks:
         --schema-output=io.nats.nex.v2.stop_workload_response=gen/stop_workload_response.go 
         --schema-package=io.nats.nex.v2.stop_workload_request=github.com/synadia-io/nex/api/nodecontrol/gen 
         --schema-output=io.nats.nex.v2.stop_workload_request=gen/stop_workload_request.go 
+        --schema-package=io.nats.nex.v2.node_info_request=github.com/synadia-io/nex/api/nodecontrol/gen 
+        --schema-output=io.nats.nex.v2.node_info_request=gen/node_info_request.go 
         --schema-package=io.nats.nex.v2.node_info_response=github.com/synadia-io/nex/api/nodecontrol/gen 
         --schema-output=io.nats.nex.v2.node_info_response=gen/node_info_response.go 
         --schema-package=io.nats.nex.v2.lameduck_response=github.com/synadia-io/nex/api/nodecontrol/gen 

@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	DefaultRequestTimeout = 10 * time.Second
+	DefaultRequestTimeout = 5 * time.Second
 )
 
 type ControlAPIClient struct {
@@ -31,7 +31,7 @@ func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]
 	resp := []*nodegen.AuctionResponseJson{}
 	auctionRespInbox := nats.NewInbox()
 
-	_, err := c.nc.Subscribe(auctionRespInbox, func(m *nats.Msg) {
+	s, err := c.nc.Subscribe(auctionRespInbox, func(m *nats.Msg) {
 		envelope := new(models.Envelope[nodegen.AuctionResponseJson])
 		err := json.Unmarshal(m.Data, envelope)
 		if err != nil {
@@ -43,6 +43,12 @@ func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		err = s.Drain()
+		if err != nil {
+			c.logger.Error("failed to drain subscription", slog.Any("err", err))
+		}
+	}()
 
 	req := nodegen.AuctionRequestJson{
 		AuctionId: nuid.New().Next(),
@@ -50,12 +56,12 @@ func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]
 			Tags: tags,
 		},
 	}
-	req_b, err := json.Marshal(req)
+	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	err = c.nc.PublishRequest(models.AuctionRequestSubject(namespace), auctionRespInbox, req_b)
+	err = c.nc.PublishRequest(models.AuctionRequestSubject(namespace), auctionRespInbox, reqB)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +74,7 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 	resp := []*nodegen.NodePingResponseJson{}
 	pingRespInbox := nats.NewInbox()
 
-	_, err := c.nc.Subscribe(pingRespInbox, func(m *nats.Msg) {
+	s, err := c.nc.Subscribe(pingRespInbox, func(m *nats.Msg) {
 		envelope := new(models.Envelope[nodegen.NodePingResponseJson])
 		err := json.Unmarshal(m.Data, envelope)
 		if err != nil {
@@ -80,6 +86,12 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		err = s.Drain()
+		if err != nil {
+			c.logger.Error("failed to drain subscription", slog.Any("err", err))
+		}
+	}()
 
 	err = c.nc.PublishRequest(models.PingSubject(), pingRespInbox, nil)
 	if err != nil {
@@ -104,8 +116,8 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	return resp, nil
 }
 
-func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
-	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(inType, namespace, workloadId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) FindWorkload(namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
+	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -119,12 +131,44 @@ func (c *ControlAPIClient) FindWorkload(inType, namespace, workloadId string) (*
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
-	req_b, err := json.Marshal(req)
+func (c *ControlAPIClient) ListWorkloads(namespace string) ([]nodegen.WorkloadSummary, error) {
+	workloadsInbox := nats.NewInbox()
+
+	var ret []nodegen.WorkloadSummary
+	s, err := c.nc.Subscribe(workloadsInbox, func(m *nats.Msg) {
+		envelope := new(models.Envelope[[]nodegen.WorkloadSummary])
+		err := json.Unmarshal(m.Data, envelope)
+		if err != nil {
+			c.logger.Error("failed to unmarshal workloads response", slog.Any("err", err), slog.String("data", string(m.Data)))
+			return
+		}
+		ret = append(ret, envelope.Data...)
+	})
 	if err != nil {
 		return nil, err
 	}
-	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, bidderId), req_b, DefaultRequestTimeout)
+	defer func() {
+		err = s.Drain()
+		if err != nil {
+			c.logger.Error("failed to drain subscription", slog.Any("err", err))
+		}
+	}()
+
+	err = c.nc.PublishRequest(models.NamespacePingRequestSubject(namespace), workloadsInbox, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	time.Sleep(5 * time.Second)
+	return ret, nil
+}
+
+func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
+	reqB, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	msg, err := c.nc.Request(models.AuctionDeployRequestSubject(namespace, bidderId), reqB, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -139,12 +183,12 @@ func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req
 }
 
 func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
-	req_b, err := json.Marshal(req)
+	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.DirectDeploySubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.DirectDeploySubject(nodeId), reqB, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -158,13 +202,8 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) UndeployWorkload(namespace, nodeId, workloadId string, req nodegen.StopWorkloadRequestJson) (*nodegen.StopWorkloadResponseJson, error) {
-	req_b, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-
-	msg, err := c.nc.Request(models.UndeployRequestSubject(namespace, nodeId), req_b, DefaultRequestTimeout)
+func (c *ControlAPIClient) UndeployWorkload(namespace, workloadId string) (*nodegen.StopWorkloadResponseJson, error) {
+	msg, err := c.nc.Request(models.UndeployRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +217,13 @@ func (c *ControlAPIClient) UndeployWorkload(namespace, nodeId, workloadId string
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) GetInfo(nodeId, namespace string) (*nodegen.NodeInfoResponseJson, error) {
-	msg, err := c.nc.Request(models.InfoRequestSubject(namespace, nodeId), nil, DefaultRequestTimeout)
+func (c *ControlAPIClient) GetInfo(nodeId string, req nodegen.NodeInfoRequestJson) (*nodegen.NodeInfoResponseJson, error) {
+	reqB, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	msg, err := c.nc.Request(models.InfoSubject(nodeId), reqB, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -198,12 +242,12 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nod
 		Delay: delay.String(),
 	}
 
-	req_b, err := json.Marshal(req)
+	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.LameduckSubject(nodeId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.LameduckSubject(nodeId), reqB, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -217,9 +261,9 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nod
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, error) {
+func (c *ControlAPIClient) MonitorLogs(namespace, workloadId, level string) (chan []byte, error) {
 	subject := models.LOGS_SUBJECT
-	f_subject, err := subject.Filter(workloadId, level)
+	f_subject, err := subject.Filter(namespace, workloadId, level)
 	if err != nil {
 		return nil, err
 	}
@@ -235,9 +279,9 @@ func (c *ControlAPIClient) MonitorLogs(workloadId, level string) (chan []byte, e
 	return ret, nil
 }
 
-func (c *ControlAPIClient) MonitorEvents(workloadId, eventType string) (chan *json.RawMessage, error) {
+func (c *ControlAPIClient) MonitorEvents(namespace, workloadId, eventType string) (chan *json.RawMessage, error) {
 	subject := models.EVENTS_SUBJECT
-	f_subject, err := subject.Filter(workloadId, eventType)
+	f_subject, err := subject.Filter(namespace, workloadId, eventType)
 	if err != nil {
 		return nil, err
 	}
@@ -264,12 +308,12 @@ func (c *ControlAPIClient) CopyWorkload(workloadId, namespace string, targetXkey
 		NewTargetXkey: targetXkey,
 	}
 
-	req_b, err := json.Marshal(req)
+	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := c.nc.Request(models.CloneWorkloadRequestSubject(namespace, workloadId), req_b, DefaultRequestTimeout)
+	msg, err := c.nc.Request(models.CloneWorkloadRequestSubject(namespace, workloadId), reqB, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

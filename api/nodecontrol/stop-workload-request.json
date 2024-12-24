@@ -4,24 +4,16 @@
   "title": "StopWorkloadRequest",
   "type": "object",
   "properties": {
-    "node_id": {
-      "type": "string"
-    },
-    "workload_type": {
+    "namespace": {
       "type": "string"
     },
     "workload_id": {
       "type": "string"
-    },
-    "workload_jwt": {
-      "type": "string"
     }
   },
   "required": [
-    "node_id",
-    "workload_type",
-    "workload_id",
-    "workload_jwt"
+    "namespace",
+    "workload_id"
   ],
   "definitions": {},
   "additionalProperties": false

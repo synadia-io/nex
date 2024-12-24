@@ -4,10 +4,21 @@
 
 syntax = "proto3";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/any.proto";
 
 package agents;
 
 option go_package = "github.com/synadia-io/nex/node/actors/pb;actorproto";
+
+message Envelope {
+  google.protobuf.Any payload = 1;
+  Error error = 2;
+}
+
+message Error {
+    string message = 1;
+    int32 code = 2;
+}
 
 message PingNode {}
 
@@ -81,7 +92,7 @@ message StartWorkload {
   int32 retry_count = 8;
   string trigger_subject = 9;
   string uri = 10;
-  string workload_jwt = 11;
+  string workload_id = 11;
   string workload_name = 12;
   string workload_type = 13;
   string namespace = 14;
@@ -119,9 +130,8 @@ message WorkloadStarted {
 
 // Request sent by the control API actor to an agent actor asking to stop a workload
 message StopWorkload {
-  string node_id = 1;
+  string namespace = 1;
   string workload_id = 2;
-  string workload_jwt = 3;
 }
 
 // Response from the agent actor indicating the results of the workload stop attempt

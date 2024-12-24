@@ -27,7 +27,6 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 		RetryCount:      int32(request.RetryCount),
 		TriggerSubject:  request.TriggerSubject,
 		Uri:             request.Uri,
-		WorkloadJwt:     request.WorkloadJwt,
 		WorkloadName:    request.WorkloadName,
 		WorkloadType:    request.WorkloadType,
 		WorkloadRuntype: request.WorkloadRuntype,
@@ -53,7 +52,6 @@ func startRequestFromProto(request *actorproto.StartWorkload) *api.StartWorkload
 		RetryCount:      int(request.RetryCount),
 		TriggerSubject:  request.TriggerSubject,
 		Uri:             request.Uri,
-		WorkloadJwt:     request.WorkloadJwt,
 		WorkloadName:    request.WorkloadName,
 		WorkloadType:    request.WorkloadType,
 		WorkloadRuntype: request.WorkloadRuntype,
@@ -66,14 +64,6 @@ func startResponseFromProto(response *actorproto.WorkloadStarted) *api.StartWork
 		Issuer:  response.Issuer,
 		Name:    response.Name,
 		Started: response.Started,
-	}
-}
-
-func stopRequestToProto(request *api.StopWorkloadRequestJson) *actorproto.StopWorkload {
-	return &actorproto.StopWorkload{
-		NodeId:      request.NodeId,
-		WorkloadId:  request.WorkloadId,
-		WorkloadJwt: request.WorkloadJwt,
 	}
 }
 

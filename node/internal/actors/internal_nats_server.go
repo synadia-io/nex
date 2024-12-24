@@ -5,12 +5,14 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"text/template"
 	"time"
 
 	"disorder.dev/shandler"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v2/actors"
@@ -31,41 +33,56 @@ type InternalNatsServer struct {
 	creds         []AgentCredential
 	serverOptions *server.Options
 	logger        *slog.Logger
-
-	storeDir string
+	devMode       bool
+	storeDir      string
 }
 
-func CreateInternalNatsServer(options models.NodeOptions) *InternalNatsServer {
+func (ns *InternalNatsServer) GetHostKeyPair() nkeys.KeyPair {
+	return ns.hostUser
+}
+
+func (ns *InternalNatsServer) GetServerURL() string {
+	return ns.server.ClientURL()
+}
+
+func CreateInternalNatsServer(serverPubKey string, options models.NodeOptions) (*InternalNatsServer, error) {
 	ns := &InternalNatsServer{nodeOptions: options, logger: options.Logger}
+
+	ns.devMode = options.DevMode
+	if ns.devMode {
+		ns.logger.Warn("DO NOT USE IN PRODUCTION: Running in dev mode, using default credentials")
+	}
 
 	hostUser, err := nkeys.CreateUser()
 	if err != nil {
 		options.Logger.Error("Failed to create host user", slog.Any("error", err))
-		return nil
+		return nil, err
 	}
 	ns.hostUser = hostUser
 
 	creds, err := ns.buildAgentCredentials()
 	if err != nil {
 		options.Logger.Error("Failed to build agent credentials", slog.Any("error", err))
-		return nil
+		return nil, err
 	}
 	ns.creds = creds
+
+	err = os.Mkdir(filepath.Join(os.TempDir(), "inex-"+serverPubKey), 0700)
+	if err != nil && !os.IsExist(err) {
+		options.Logger.Error("Failed to create store temp directory", slog.Any("error", err))
+		return nil, err
+	}
+
+	ns.storeDir = filepath.Join(os.TempDir(), "inex-"+serverPubKey)
 
 	opts, err := ns.generateConfig()
 	if err != nil {
 		options.Logger.Error("Failed to generate NATS server config", slog.Any("error", err))
-		return nil
+		return nil, err
 	}
+
 	ns.serverOptions = opts
-
-	ns.storeDir, err = os.MkdirTemp(os.TempDir(), "pnats_*")
-	if err != nil {
-		options.Logger.Error("Failed to create store temp directory", slog.Any("error", err))
-		return nil
-	}
-
-	return ns
+	return ns, nil
 }
 
 func (ns *InternalNatsServer) CredentialsMap() map[string]AgentCredential {
@@ -88,7 +105,6 @@ func (s *InternalNatsServer) PostStop(ctx context.Context) error {
 func (s *InternalNatsServer) Receive(ctx *goakt.ReceiveContext) {
 	switch ctx.Message().(type) {
 	case *goaktpb.PostStart:
-		s.logger.Debug("Internal NATS server actor is running", slog.String("name", ctx.Self().Name()))
 		err := s.startNatsServer(s.serverOptions)
 		if err != nil {
 			ctx.Err(err)
@@ -116,6 +132,7 @@ type AgentCredential struct {
 }
 
 type configTemplateData struct {
+	DevMode           bool
 	Credentials       map[string]*credentials
 	Connections       map[string]*nats.Conn
 	NexHostUserPublic string
@@ -129,19 +146,46 @@ type credentials struct {
 }
 
 func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
-	ns.logger.Debug("Starting internal NATS server")
 	var err error
 	ns.server, err = server.NewServer(opts)
 	if err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
 		return err
 	}
+	// ns.server.ConfigureLogger()
 
 	if err := server.Run(ns.server); err != nil {
 		server.PrintAndDie("nats-server: " + err.Error())
 		return err
 	}
 
+	hostPub, err := ns.hostUser.PublicKey()
+	if err != nil {
+		return err
+	}
+
+	nc, err := nats.Connect(ns.server.ClientURL(), nats.Nkey(hostPub, func(nonce []byte) ([]byte, error) { return ns.hostUser.Sign(nonce) }))
+	if err != nil {
+		return err
+	}
+	defer nc.Close()
+
+	jsCtx, err := jetstream.New(nc)
+	if err != nil {
+		return err
+	}
+
+	_, err = jsCtx.CreateOrUpdateKeyValue(context.TODO(), jetstream.KeyValueConfig{
+		Bucket:       models.RunRequestKVBucket,
+		MaxBytes:     50000000, // 50MB
+		MaxValueSize: 10000,    // 10KB
+	})
+
+	if err != nil {
+		return err
+	}
+
+	ns.logger.Debug("Internal NATS server running", slog.String("url", ns.server.ClientURL()))
 	return nil
 }
 
@@ -157,6 +201,7 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 	}
 
 	data := &configTemplateData{
+		DevMode:           ns.devMode,
 		Credentials:       make(map[string]*credentials),
 		Connections:       make(map[string]*nats.Conn),
 		NexHostUserPublic: hostPub,
@@ -192,9 +237,10 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 		StoreDir:  ns.storeDir,
 		Port:      -1,
 		NoSigs:    true,
-		// Debug:     debug, FIXME-- make configurable
-		// Trace:     trace,
 	}
+
+	opts.Debug = true
+	opts.Trace = true
 
 	f, err := os.CreateTemp(os.TempDir(), defaultInternalNatsConfigFile)
 	if err != nil {
@@ -236,6 +282,7 @@ accounts: {
 	nexhost: {
 		jetstream: true
 		users: [
+      {{ if .DevMode }} { user: admin, password: password } {{ end }}
 			{nkey: "{{ .NexHostUserPublic }}"}
 		]
 		exports: [
