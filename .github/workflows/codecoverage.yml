@@ -22,16 +22,15 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VER }}
-          cache: false
 
       - name: Test
-        run: go test $(go list ./... | grep -v "github.com/synadia-io/nex/test" | grep -v gen | grep -v pb) -coverprofile=coverage.txt
+        run: go test $(go list ./... | grep -v "github.com/synadia-io/nex/test" | grep -v gen | grep -v pb) -coverprofile=coverage-${{ github.event.number }}.txt
 
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:
           name: code-coverage
-          path: coverage.txt
+          path: coverage-${{ github.event.number }}.txt
 
   code_coverage:
     name: "Code coverage report"
@@ -46,4 +45,4 @@ jobs:
       - uses: fgrosse/go-coverage-report@v1.2.0
         with:
           coverage-artifact-name: "code-coverage"
-          coverage-file-name: "coverage.txt"
+          coverage-file-name: "coverage-${{ github.event.number }}.txt"
