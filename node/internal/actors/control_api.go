@@ -626,7 +626,7 @@ func (api *ControlAPI) handleNamespacePing(m *nats.Msg) {
 		}
 
 		for _, workload := range workloadResp.Workloads {
-			if namespace == "system" || workload.Namespace == namespace {
+			if namespace == models.NodeSystemNamespace || workload.Namespace == namespace {
 				workloads = append(workloads, nodegen.WorkloadSummary{
 					Id:            workload.Id,
 					Name:          workload.Name,

@@ -10,23 +10,23 @@ const (
 
 // System only subjects
 func PingSubject() string {
-	return ControlAPIPrefix + ".system.PING"
+	return fmt.Sprintf(ControlAPIPrefix+".%s.PING", NodeSystemNamespace)
 }
 
 func DirectDeploySubject(inNodeId string) string {
-	return fmt.Sprintf(ControlAPIPrefix+".system.DDEPLOY.%s", inNodeId)
+	return fmt.Sprintf(ControlAPIPrefix+".%s.DDEPLOY.%s", NodeSystemNamespace, inNodeId)
 }
 
 func LameduckSubject(inNodeId string) string {
-	return fmt.Sprintf(ControlAPIPrefix+".system.LAMEDUCK.%s", inNodeId)
+	return fmt.Sprintf(ControlAPIPrefix+".%s.LAMEDUCK.%s", NodeSystemNamespace, inNodeId)
 }
 
 func DirectPingSubject(inNodeId string) string {
-	return fmt.Sprintf(ControlAPIPrefix+".system.PING.%s", inNodeId)
+	return fmt.Sprintf(ControlAPIPrefix+".%s.PING.%s", NodeSystemNamespace, inNodeId)
 }
 
 func InfoSubject(inNodeId string) string {
-	return fmt.Sprintf(ControlAPIPrefix+".system.INFO.%s", inNodeId)
+	return fmt.Sprintf(ControlAPIPrefix+".%s.INFO.%s", NodeSystemNamespace, inNodeId)
 }
 
 // WPING subjects

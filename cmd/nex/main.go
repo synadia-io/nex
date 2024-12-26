@@ -44,6 +44,7 @@ func main() {
 			"version":             fmt.Sprintf("%s [%s] | Built: %s", VERSION, COMMIT, BUILDDATE),
 			"versionOnly":         VERSION,
 			"defaultResourcePath": userResourcePath,
+			"adminNamespace":      "system",
 		},
 		kong.BindTo(context.Background(), (*context.Context)(nil)),
 		kong.Bind(&nex.Globals),
