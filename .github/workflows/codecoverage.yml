@@ -8,7 +8,7 @@ on:
       - 'main'
 
 env:
-  GO_VER: '1.23.0'
+  GO_VER: '1.23.*'
 
 jobs:
   unit_tests:
@@ -22,6 +22,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VER }}
+          cache: false
 
       - name: Test
         run: go test $(go list ./... | grep -v "github.com/synadia-io/nex/test" | grep -v gen | grep -v pb) -coverprofile=coverage-${{ github.event.number }}.txt

@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 env:
-  GO_VER: '1.23.0'
+  GO_VER: '1.23.*'
 
 
 jobs:
