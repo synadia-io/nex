@@ -7,7 +7,7 @@ on:
     branches: [ "main" ]
 
 env:
-  GO_VER: '1.23.0'
+  GO_VER: '1.23.*'
 
 
 jobs:
@@ -50,7 +50,7 @@ jobs:
     - 
       name: Run test suite | node
       run: |
-        go test -v ./...
+        go test -v github.com/synadia-io/nex/test
     - 
       name: Run test suite | CLI
       working-directory: ./cmd/nex

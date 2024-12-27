@@ -62,7 +62,7 @@ func TestPingAgent(t *testing.T) {
 
 	probe := tk.NewProbe(ctx)
 
-	probe.SendSync(models.DirectStartActorName, &actorproto.PingAgent{Namespace: "system"}, time.Second*3)
+	probe.SendSync(models.DirectStartActorName, &actorproto.PingAgent{Namespace: models.NodeSystemNamespace}, time.Second*3)
 	respEnv, ok := probe.ExpectAnyMessage().(*actorproto.Envelope)
 	if !ok {
 		t.Fatalf("unexpected message type: %T", respEnv)

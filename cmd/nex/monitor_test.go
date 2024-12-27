@@ -12,6 +12,7 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+	"github.com/synadia-io/nex/models"
 )
 
 func startNatsServer(t testing.TB) (*server.Server, error) {
@@ -79,7 +80,7 @@ func TestLogSubject(t *testing.T) {
 
 	globals := &Globals{}
 	globals.NatsServers = []string{natsServer.ClientURL()}
-	globals.Namespace = "system"
+	globals.Namespace = models.NodeSystemNamespace
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {

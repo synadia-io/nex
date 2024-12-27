@@ -13,7 +13,7 @@ func TestCLISimple(t *testing.T) {
 	nex := NexCLI{}
 
 	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": ".", "adminNamespace": "system"}),
 		kong.Bind(&nex.Globals),
 	)
 	kp, err := nkeys.CreatePair(nkeys.PrefixByteServer)
@@ -66,7 +66,7 @@ func TestCLIWithConfig(t *testing.T) {
 
 	nex := NexCLI{}
 	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": ".", "adminNamespace": "system"}),
 		kong.Configuration(kong.JSON, f.Name()),
 		kong.Bind(&nex.Globals),
 	)
