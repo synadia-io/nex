@@ -346,6 +346,7 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 	}
 
 	if !resp.Started {
+		t.Log(*resp)
 		t.Fatalf("expected workload to be started")
 	}
 
@@ -447,6 +448,7 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 	}
 
 	if !resp.Started {
+		t.Log(*resp)
 		t.Fatalf("expected workload to be started")
 	}
 
