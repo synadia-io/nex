@@ -68,8 +68,8 @@ func NewProcessActor(ctx context.Context, logger *slog.Logger, nc *nats.Conn, m 
 		triggerSub:   m.TriggerSubject,
 		retryCount:   int(m.RetryCount),
 		retryCounter: 0,
-		stdout:       logCapture{logger: logger, nc: nc, namespace: m.Namespace, name: m.WorkloadId, stderr: false},
-		stderr:       logCapture{logger: logger, nc: nc, namespace: m.Namespace, name: m.WorkloadId, stderr: true},
+		stdout:       logCapture{logger: logger.With(slog.String("id", m.WorkloadId)), nc: nc, namespace: m.Namespace, id: m.WorkloadId, stderr: false},
+		stderr:       logCapture{logger: logger.With(slog.String("id", m.WorkloadId)), nc: nc, namespace: m.Namespace, id: m.WorkloadId, stderr: true},
 	}
 	return ret, nil
 }
