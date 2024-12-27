@@ -74,7 +74,7 @@ func TestDisableAutoUpgradeFlags(t *testing.T) {
 	nex := NexCLI{}
 
 	parser := kong.Must(&nex,
-		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": "."}),
+		kong.Vars(map[string]string{"versionOnly": "testing", "defaultResourcePath": ".", "adminNamespace": "system"}),
 		kong.Bind(&nex.Globals),
 	)
 
