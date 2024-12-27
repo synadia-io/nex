@@ -62,12 +62,12 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 	}
 
 	nn := &nexNode{
-		ctx:        context.Background(),
 		nc:         nc,
 		publicKey:  serverKey,
 		auctionMap: NewTTLMap(time.Second * 10),
 
 		options: &models.NodeOptions{
+			Context:               context.Background(),
 			Logger:                slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{})),
 			AgentHandshakeTimeout: 5000,
 			ResourceDirectory:     "./resources",
@@ -181,7 +181,7 @@ func (nn *nexNode) Validate() error {
 // Can be stopped by canceling the provided context
 func (nn *nexNode) Start() error {
 	var cancel context.CancelFunc
-	nn.ctx, cancel = context.WithCancel(nn.ctx)
+	nn.ctx, cancel = context.WithCancel(nn.options.Context)
 	defer cancel()
 
 	nn.interrupt = make(chan os.Signal, 1)

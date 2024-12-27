@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -22,6 +23,7 @@ const (
 var ReservedTagPrefixes = []string{"nex."}
 
 type NodeOptions struct {
+	Context               context.Context
 	Logger                *slog.Logger
 	Xkey                  nkeys.KeyPair
 	AgentHandshakeTimeout int
@@ -39,6 +41,14 @@ type NodeOptions struct {
 }
 
 type NodeOption func(*NodeOptions)
+
+func WithContext(ctx context.Context) NodeOption {
+	return func(n *NodeOptions) {
+		if ctx != nil {
+			n.Context = ctx
+		}
+	}
+}
 
 func WithLogger(s *slog.Logger) NodeOption {
 	return func(n *NodeOptions) {

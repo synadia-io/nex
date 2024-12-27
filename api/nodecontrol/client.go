@@ -107,13 +107,14 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	if err != nil {
 		return nil, err
 	}
-	resp := new(nodegen.NodePingResponseJson)
-	err = json.Unmarshal(msg.Data, resp)
+
+	envelope := new(models.Envelope[nodegen.NodePingResponseJson])
+	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	return &envelope.Data, nil
 }
 
 func (c *ControlAPIClient) FindWorkload(namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
