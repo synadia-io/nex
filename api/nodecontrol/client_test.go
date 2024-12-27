@@ -277,13 +277,13 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 		natsServer.Shutdown()
 	})
 
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
+	// stdout := new(bytes.Buffer)
+	// stderr := new(bytes.Buffer)
 	logger := slog.New(shandler.NewHandler(
 		shandler.WithLogLevel(slog.LevelDebug),
 		shandler.WithGroupFilter([]string{"actor_system"}),
-		shandler.WithStdOut(stdout),
-		shandler.WithStdErr(stderr),
+		// shandler.WithStdOut(stdout),
+		// shandler.WithStdErr(stderr),
 	))
 
 	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
@@ -384,13 +384,13 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 		natsServer.Shutdown()
 	})
 
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
+	// stdout := new(bytes.Buffer)
+	// stderr := new(bytes.Buffer)
 	logger := slog.New(shandler.NewHandler(
 		shandler.WithLogLevel(slog.LevelDebug),
 		shandler.WithGroupFilter([]string{"actor_system"}),
-		shandler.WithStdOut(stdout),
-		shandler.WithStdErr(stderr),
+		// shandler.WithStdOut(stdout),
+		// shandler.WithStdErr(stderr),
 	))
 
 	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
