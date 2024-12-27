@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -28,6 +30,35 @@ const (
 	// XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY - pub xkey
 	Node1XKeySeed string = "SXAOUP7RZFW5QPE2GDWTPABUDM5UIAK6BPULJPWZQAFFL2RZ5K3UYWHYY4"
 )
+
+func buildTestBinary(t testing.TB, binMain string, workingDir string) (string, error) {
+	t.Helper()
+	binName := func() string {
+		if runtime.GOOS == "windows" {
+			return "test.exe"
+		}
+		return "test"
+	}
+
+	if _, err := os.Stat(filepath.Join(workingDir, binName())); err == nil {
+		return filepath.Join(workingDir, binName()), nil
+	}
+
+	cmd := exec.Command("go", "build", "-o", filepath.Join(workingDir, binName()), binMain)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := os.Stat(filepath.Join(workingDir, binName())); err != nil {
+		return "", err
+	}
+
+	return filepath.Join(workingDir, binName()), nil
+}
 
 func startNatsServer(t testing.TB, workingDir string) (*server.Server, error) {
 	t.Helper()
@@ -328,11 +359,16 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	binPath, err := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	resp, err := control.AuctionDeployWorkload("system", auctionResp[0].BidderId, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
 		Namespace:       "system",
 		RetryCount:      3,
-		Uri:             "file://../../test/testdata/forever/forever",
+		Uri:             "file://" + binPath,
 		WorkloadName:    "testworkload",
 		WorkloadRuntype: "service",
 		WorkloadType:    "direct-start",
@@ -430,11 +466,16 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	binPath, err := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	resp, err := control.DeployWorkload("system", "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
 		Namespace:       "system",
 		RetryCount:      3,
-		Uri:             "file://../../test/testdata/forever/forever",
+		Uri:             "file://" + binPath,
 		WorkloadName:    "testworkload",
 		WorkloadRuntype: "service",
 		WorkloadType:    "direct-start",
