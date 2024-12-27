@@ -17,7 +17,7 @@ func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string, showSy
 
 	filter := []string{}
 	if !showSystemLogs {
-		filter = append(filter, "system")
+		filter = append(filter, "actor_system")
 	}
 	if hideWorkloadLogs {
 		filter = append(filter, "workload")

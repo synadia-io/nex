@@ -205,7 +205,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	var err error
 
 	nn.actorSystem, err = goakt.NewActorSystem("nexnode",
-		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("system"))),
+		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("actor_system"))),
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
 		// TODO: figure out why they're gone or how we can plug in our own impls
@@ -507,7 +507,7 @@ func (nn *nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 			return nil, errors.New("failed to unmarshal agent response")
 		}
 		for _, w := range wL.Workloads {
-			if namespace == "system" || w.Namespace == namespace {
+			if namespace == models.NodeSystemNamespace || w.Namespace == namespace {
 				resp.Workloads = append(resp.Workloads, &actorproto.WorkloadSummary{
 					Id:           w.Id,
 					Name:         w.Name,

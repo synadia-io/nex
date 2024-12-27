@@ -312,7 +312,7 @@ func (a *DirectStartAgent) stopWorkload(m *actorproto.StopWorkload) (*actorproto
 		return nil, err
 	}
 
-	if m.Namespace != "system" || m.Namespace != wl.Namespace {
+	if m.Namespace != models.NodeSystemNamespace || m.Namespace != wl.Namespace {
 		a.logger.Warn("stop workload namespace mismatch", slog.String("name", a.self.Name()), slog.String("workload", m.WorkloadId), slog.String("request_namespace", m.Namespace), slog.String("actual_namespace", wl.Namespace))
 		return nil, errors.New("namespace mismatch")
 	}
