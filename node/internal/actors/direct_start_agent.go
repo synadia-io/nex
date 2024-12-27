@@ -263,7 +263,7 @@ func (a *DirectStartAgent) startWorkload(m *actorproto.StartWorkload) (*actorpro
 	if m.WorkloadId == "" {
 		m.WorkloadId = nuid.New().Next()
 	}
-	pa, err := NewProcessActor(a.ctx, a.logger.WithGroup("workload"), a.nc, m, ref, env)
+	pa, err := newProcessActor(a.ctx, a.logger.WithGroup("workload"), a.nc, m, ref, env)
 	if err != nil {
 		a.logger.Error("Failed to create process actor", slog.String("name", a.self.Name()), slog.Any("err", err))
 		return nil, err

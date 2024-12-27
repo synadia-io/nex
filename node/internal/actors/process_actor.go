@@ -47,7 +47,7 @@ type processActor struct {
 	stderr  logCapture
 }
 
-func NewProcessActor(ctx context.Context, logger *slog.Logger, nc *nats.Conn, m *actorproto.StartWorkload, ref *ArtifactReference, clearEnv map[string]string) (*processActor, error) {
+func newProcessActor(ctx context.Context, logger *slog.Logger, nc *nats.Conn, m *actorproto.StartWorkload, ref *ArtifactReference, clearEnv map[string]string) (*processActor, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	ret := &processActor{
 		ctx:          ctx,
