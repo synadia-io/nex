@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"strings"
 
 	"github.com/nats-io/nats.go"
 )
@@ -111,17 +112,17 @@ type logCapture struct {
 	nc        *nats.Conn
 	namespace string
 	stderr    bool
-	name      string
+	id        string
 }
 
 // Log capture implementation of io.Writer for stdout and stderr
 func (cap logCapture) Write(p []byte) (n int, err error) {
 	if !cap.stderr {
-		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.%s.stdout", cap.namespace, cap.name), p)
-		cap.logger.Debug(string(p), slog.String("process_name", cap.name))
+		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.%s.stdout", cap.namespace, cap.id), p)
+		cap.logger.Debug(strings.ReplaceAll(string(p), "\n", "\\n"))
 	} else {
-		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.%s.stderr", cap.namespace, cap.name), p)
-		cap.logger.Error(string(p), slog.String("process_name", cap.name))
+		_ = cap.nc.Publish(fmt.Sprintf("$NEX.logs.%s.%s.stderr", cap.namespace, cap.id), p)
+		cap.logger.Error(strings.ReplaceAll(string(p), "\n", "\\n"))
 	}
 	return len(p), nil
 }
