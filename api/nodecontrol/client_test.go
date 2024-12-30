@@ -841,3 +841,103 @@ func TestCopyWorkload(t *testing.T) {
 	}
 	t.Log(*cResp)
 }
+
+func TestMonitorEndpoints(t *testing.T) {
+	workingDir := t.TempDir()
+	natsServer, err := startNatsServer(t, workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+	t.Cleanup(func() {
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		cancel()
+		natsServer.Shutdown()
+	})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	logger := slog.New(shandler.NewHandler(
+		shandler.WithLogLevel(slog.LevelDebug),
+		shandler.WithGroupFilter([]string{"actor_system"}),
+		shandler.WithStdOut(stdout),
+		shandler.WithStdErr(stderr),
+	))
+
+	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1000 * time.Millisecond)
+	nc, err := nats.Connect(natsServer.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	control, err := NewControlApiClient(nc, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	logs, err := control.MonitorLogs("system", "*", "*")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	logBuf := new(bytes.Buffer)
+	go func() {
+		for m := range logs {
+			_, err := logBuf.Write(m)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+
+	time.Sleep(250 * time.Millisecond)
+	err = nc.Publish("$NEX.logs.system.b.c", []byte("log test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(250 * time.Millisecond)
+	close(logs)
+
+	// ----
+	events, err := control.MonitorEvents("system", "*", "*")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	eventBuf := new(bytes.Buffer)
+	go func() {
+		for m := range events {
+			mB, err := json.Marshal(m)
+			if err != nil {
+				t.Error(err)
+			}
+			_, err = eventBuf.Write(mB)
+			if err != nil {
+				t.Error(err)
+			}
+		}
+	}()
+
+	time.Sleep(250 * time.Millisecond)
+	err = nc.Publish("$NEX.events.system.b.c", []byte("{\"test\": \"event\"}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(250 * time.Millisecond)
+	close(events)
+
+	if logBuf.String() != "log test" {
+		t.Fatalf("expected log test, got %s", string(logBuf.String()))
+	}
+
+	if eventBuf.String() != "{\"test\":\"event\"}" {
+		t.Fatalf("expected event {\"test\":\"event\"}, got %s", eventBuf.String())
+	}
+}
