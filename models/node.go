@@ -8,3 +8,16 @@ const (
 	// the third position.  These are considered privledged endpoints
 	NodeSystemNamespace string = "system"
 )
+
+// Tags that are automatically set
+const (
+	TagOS       = "nex.os"
+	TagArch     = "nex.arch"
+	TagCPUs     = "nex.cpucount"
+	TagLameDuck = "nex.lameduck"
+	TagNexus    = "nex.nexus"
+	TagNodeName = "nex.node"
+)
+
+// Tag Prefixes are prefixes that are reserved for internal use
+var ReservedTagPrefixes = []string{"nex."}

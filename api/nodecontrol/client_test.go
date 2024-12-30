@@ -606,3 +606,238 @@ func TestUndeployWorkload(t *testing.T) {
 		t.Fatal("expected workload to be stopped")
 	}
 }
+
+func TestGetNodeInfo(t *testing.T) {
+	workingDir := t.TempDir()
+	natsServer, err := startNatsServer(t, workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+	t.Cleanup(func() {
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		cancel()
+		natsServer.Shutdown()
+	})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	logger := slog.New(shandler.NewHandler(
+		shandler.WithLogLevel(slog.LevelDebug),
+		shandler.WithGroupFilter([]string{"actor_system"}),
+		shandler.WithStdOut(stdout),
+		shandler.WithStdErr(stderr),
+	))
+
+	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1000 * time.Millisecond)
+	nc, err := nats.Connect(natsServer.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	control, err := NewControlApiClient(nc, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := control.GetInfo("NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.NodeInfoRequestJson{
+		Namespace: "system",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.NodeId != "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT" {
+		t.Fatalf("expected node id NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT, got %s", resp.Tags.Tags["nex.node"])
+	}
+
+	if resp.Tags.Tags[models.TagNodeName] != "node-1" {
+		t.Fatalf("expected node name node-1, got %s", resp.Tags.Tags[models.TagNodeName])
+	}
+
+	if resp.Tags.Tags[models.TagNexus] != "testnexus" {
+		t.Fatalf("expected nexus testnexus, got %s", resp.Tags.Tags[models.TagNexus])
+	}
+
+	if len(resp.WorkloadSummaries) != 0 {
+		t.Fatalf("expected 0 workloads, got %d", len(resp.WorkloadSummaries))
+	}
+}
+
+func TestSetLameduck(t *testing.T) {
+	workingDir := t.TempDir()
+	natsServer, err := startNatsServer(t, workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+	t.Cleanup(func() {
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		cancel()
+		natsServer.Shutdown()
+	})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	logger := slog.New(shandler.NewHandler(
+		shandler.WithLogLevel(slog.LevelDebug),
+		shandler.WithGroupFilter([]string{"actor_system"}),
+		shandler.WithStdOut(stdout),
+		shandler.WithStdErr(stderr),
+	))
+
+	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1000 * time.Millisecond)
+	nc, err := nats.Connect(natsServer.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	control, err := NewControlApiClient(nc, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = control.SetLameDuck("NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", time.Second*3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := control.GetInfo("NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.NodeInfoRequestJson{
+		Namespace: "system",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Tags.Tags[models.TagLameDuck] != "true" {
+		t.Fatalf("expected lameduck true, got %s", resp.Tags.Tags[models.TagLameDuck])
+	}
+}
+
+func TestCopyWorkload(t *testing.T) {
+	workingDir := t.TempDir()
+	natsServer, err := startNatsServer(t, workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+	t.Cleanup(func() {
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		cancel()
+		natsServer.Shutdown()
+	})
+
+	stdout := new(bytes.Buffer)
+	stderr := new(bytes.Buffer)
+	logger := slog.New(shandler.NewHandler(
+		shandler.WithLogLevel(slog.LevelDebug),
+		shandler.WithGroupFilter([]string{"actor_system"}),
+		shandler.WithStdOut(stdout),
+		shandler.WithStdErr(stderr),
+	))
+
+	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1000 * time.Millisecond)
+	nc, err := nats.Connect(natsServer.ClientURL())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	control, err := NewControlApiClient(nc, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env := make(map[string]string)
+	envB, err := json.Marshal(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tAKey, err := nkeys.CreateCurveKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tAPub, err := tAKey.PublicKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	encEnv, err := tAKey.Seal(envB, "XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	binPath, err := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := control.DeployWorkload("system", "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.StartWorkloadRequestJson{
+		Description:     "Test Workload",
+		Argv:            []string{"--arg1", "value1"},
+		Namespace:       "system",
+		RetryCount:      3,
+		Uri:             "file://" + binPath,
+		WorkloadName:    "testworkload",
+		WorkloadRuntype: "service",
+		WorkloadType:    "direct-start",
+		EncEnvironment: gen.SharedEncEnvJson{
+			Base64EncryptedEnv: base64.StdEncoding.EncodeToString(encEnv),
+			EncryptedBy:        tAPub,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !resp.Started {
+		t.Fatalf("expected workload to be started")
+	}
+
+	aResp, err := control.Auction("system", map[string]string{
+		models.TagNodeName: "node-3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cResp, err := control.CopyWorkload(resp.Id, "system", aResp[0].TargetXkey)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if cResp.WorkloadName != "testworkload" {
+		t.Fatalf("expected workload name testworkload, got %s", cResp.WorkloadName)
+	}
+
+	if len(cResp.Argv) != 2 && cResp.Argv[0] != "--arg1" && cResp.Argv[1] != "value1" {
+		t.Fatalf("expected arg1 value --arg1, got %s", cResp.Argv[0])
+	}
+
+	if cResp.EncEnvironment.EncryptedBy != "XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY" {
+		t.Fatalf("expected workload encrypted by XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY, got %s", cResp.EncEnvironment.EncryptedBy)
+	}
+	t.Log(*cResp)
+}

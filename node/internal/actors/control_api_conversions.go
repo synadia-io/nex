@@ -77,7 +77,6 @@ func stopResponseFromProto(response *actorproto.WorkloadStopped) *api.StopWorklo
 
 func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJson {
 	ret := new(api.NodeInfoResponseJson)
-	ret.Nexus = response.Nexus
 	ret.NodeId = response.Id
 	ret.Tags = gen.NodeInfoResponseJsonTags{Tags: response.Tags}
 	ret.TargetXkey = response.TargetXkey
@@ -125,7 +124,6 @@ func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingR
 		}
 	}
 	return &api.NodePingResponseJson{
-		Nexus:         response.Nexus,
 		NodeId:        response.NodeId,
 		RunningAgents: api.NodePingResponseJsonRunningAgents{Status: convertedStatus},
 		Tags:          api.NodePingResponseJsonTags{Tags: response.Tags},

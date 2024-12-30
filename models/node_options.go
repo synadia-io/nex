@@ -11,17 +11,6 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-const (
-	TagOS       = "nex.os"
-	TagArch     = "nex.arch"
-	TagCPUs     = "nex.cpucount"
-	TagLameDuck = "nex.lameduck"
-	TagNexus    = "nex.nexus"
-	TagNodeName = "nex.node"
-)
-
-var ReservedTagPrefixes = []string{"nex."}
-
 type NodeOptions struct {
 	Context               context.Context
 	Logger                *slog.Logger
