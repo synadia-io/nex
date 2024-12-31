@@ -39,6 +39,8 @@ github.com/buraksezer/consistent v0.10.0 h1:hqBgz1PvNLC5rkWcEBVAL9dFMBWz6I0VgUCW
 github.com/buraksezer/consistent v0.10.0/go.mod h1:6BrVajWq7wbKZlTOUPs/XVfR8c0maujuPowduSpZqmw=
 github.com/buraksezer/olric v0.5.6-0.20240925183822-6ca0e20256e0 h1:0oLGcEeK3ew44mabFJ3nrAkg8G83RGM0FaXAIDrKSEQ=
 github.com/buraksezer/olric v0.5.6-0.20240925183822-6ca0e20256e0/go.mod h1:g9fss7jy1l9W7pPezICBxRAPWDwCiImcPi0ABF1o1R0=
+github.com/carlmjohnson/be v0.23.2 h1:1QjPnPJhwGUjsD9+7h98EQlKsxnG5TV+nnEvk0wnkls=
+github.com/carlmjohnson/be v0.23.2/go.mod h1:KAgPUh0HpzWYZZI+IABdo80wTgY43YhbdsiLYAaSI/Q=
 github.com/cespare/xxhash/v2 v2.1.1/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cespare/xxhash/v2 v2.2.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

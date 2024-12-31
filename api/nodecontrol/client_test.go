@@ -5,20 +5,22 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
 	"disorder.dev/shandler"
+	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node"
@@ -49,14 +51,10 @@ func buildTestBinary(t testing.TB, binMain string, workingDir string) string {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	err := cmd.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, cmd.Run())
 
-	if _, err := os.Stat(binPath); err != nil {
-		t.Fatal(err)
-	}
+	_, err := os.Stat(binPath)
+	be.NilErr(t, err)
 
 	return binPath
 }
@@ -81,30 +79,20 @@ func startNexus(t testing.TB, ctx context.Context, logger *slog.Logger, workingD
 	t.Helper()
 
 	nc, err := nats.Connect(natsUrl)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	for i := 0; i < numNodes; i++ {
 		var kp, xkp nkeys.KeyPair
 		if i == 0 {
 			kp, err = nkeys.FromSeed([]byte(Node1ServerSeed))
-			if err != nil {
-				t.Fatal(err)
-			}
+			be.NilErr(t, err)
 			xkp, err = nkeys.FromSeed([]byte(Node1XKeySeed))
-			if err != nil {
-				t.Fatal(err)
-			}
+			be.NilErr(t, err)
 		} else {
 			kp, err = nkeys.CreateServer()
-			if err != nil {
-				t.Fatal(err)
-			}
+			be.NilErr(t, err)
 			xkp, err = nkeys.CreateCurveKeys()
-			if err != nil {
-				t.Fatal(err)
-			}
+			be.NilErr(t, err)
 		}
 		nn, err := node.NewNexNode(kp, nc,
 			models.WithContext(ctx),
@@ -114,21 +102,14 @@ func startNexus(t testing.TB, ctx context.Context, logger *slog.Logger, workingD
 			models.WithNexus("testnexus"),
 			models.WithResourceDirectory(workingDir),
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		be.NilErr(t, err)
 
 		err = nn.Validate()
-		if err != nil {
-			t.Fatal(err)
-		}
+		be.NilErr(t, err)
 
 		go func() {
 			err = nn.Start()
-			if err != nil {
-				t.Error(err)
-				t.FailNow()
-			}
+			be.NilErr(t, err)
 		}()
 	}
 }
@@ -155,35 +136,23 @@ func TestAuction(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	resp, err := control.Auction(models.NodeSystemNamespace, map[string]string{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if len(resp) != 1 {
-		t.Fatalf("expected 1 response, got %d", len(resp))
-	}
+	be.Equal(t, 1, len(resp))
 
 	resp, err = control.Auction(models.NodeSystemNamespace, map[string]string{models.TagNodeName: "notreal"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if len(resp) != 0 {
-		t.Fatalf("expected 0 response, got %d", len(resp))
-	}
+	be.Equal(t, 0, len(resp))
 }
 
 func TestPing(t *testing.T) {
@@ -208,26 +177,18 @@ func TestPing(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 5)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	resp, err := control.Ping()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if len(resp) != 5 {
-		t.Fatalf("expected 5 responses, got %d", len(resp))
-	}
+	be.Equal(t, 5, len(resp))
 }
 
 func TestDirectPing(t *testing.T) {
@@ -252,26 +213,18 @@ func TestDirectPing(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	resp, err := control.DirectPing(Node1ServerPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if resp.NodeId != Node1ServerPublicKey {
-		t.Fatalf("expected node id %s, got %s", Node1ServerPublicKey, resp.NodeId)
-	}
+	be.Equal(t, Node1ServerPublicKey, resp.NodeId)
 }
 
 func TestAuctionDeployAndFindWorkload(t *testing.T) {
@@ -296,43 +249,29 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	auctionResp, err := control.Auction(models.NodeSystemNamespace, map[string]string{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	env := make(map[string]string)
 	envB, err := json.Marshal(env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAKey, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAPub, err := tAKey.PublicKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	encEnv, err := tAKey.Seal(envB, auctionResp[0].TargetXkey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
@@ -349,31 +288,18 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 			EncryptedBy:        tAPub,
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if !resp.Started {
-		t.Fatalf("expected workload to be started")
-	}
+	be.True(t, resp.Started)
 
 	pingResp, err := control.FindWorkload(models.NodeSystemNamespace, resp.Id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if pingResp.WorkloadSummary.Id != resp.Id {
-		t.Fatalf("expected workload id %s, got %s", resp.Id, pingResp.WorkloadSummary.Id)
-	}
-
-	if pingResp.WorkloadSummary.WorkloadState != models.WorkloadStateRunning {
-		t.Fatalf("expected workload status running, got %s", pingResp.WorkloadSummary.WorkloadState)
-	}
+	be.Equal(t, resp.Id, pingResp.WorkloadSummary.Id)
+	be.Equal(t, models.WorkloadStateRunning, pingResp.WorkloadSummary.WorkloadState)
 
 	_, err = control.FindWorkload("badnamespace", resp.Id)
-	if !errors.Is(err, nats.ErrTimeout) {
-		t.Fatalf("expected timeout error, got %v", err)
-	}
+	be.Equal(t, nats.ErrTimeout, err)
 }
 
 func TestDirectDeployAndListWorkloads(t *testing.T) {
@@ -398,38 +324,26 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	env := make(map[string]string)
 	envB, err := json.Marshal(env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAKey, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAPub, err := tAKey.PublicKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	encEnv, err := tAKey.Seal(envB, Node1XkeyPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
@@ -446,31 +360,19 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 			EncryptedBy:        tAPub,
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if !resp.Started {
-		t.Fatalf("expected workload to be started")
-	}
+	be.True(t, resp.Started)
 
 	wl, err := control.ListWorkloads(models.NodeSystemNamespace)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if len(wl) != 1 {
-		t.Fatalf("expected 1 workload, got %d", len(wl))
-	}
+	be.Equal(t, 1, len(wl))
 
 	wl, err = control.ListWorkloads("badnamespace")
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if len(wl) != 0 {
-		t.Fatalf("expected 0 workloads, got %d", len(wl))
-	}
+	be.Equal(t, 0, len(wl))
 }
 
 func TestUndeployWorkload(t *testing.T) {
@@ -495,38 +397,26 @@ func TestUndeployWorkload(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	env := make(map[string]string)
 	envB, err := json.Marshal(env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAKey, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAPub, err := tAKey.PublicKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	encEnv, err := tAKey.Seal(envB, Node1XkeyPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
@@ -543,22 +433,19 @@ func TestUndeployWorkload(t *testing.T) {
 			EncryptedBy:        tAPub,
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if !resp.Started {
-		t.Fatalf("expected workload to be started")
-	}
+	be.True(t, resp.Started)
 
 	stopResp, err := control.UndeployWorkload(models.NodeSystemNamespace, resp.Id)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if !stopResp.Stopped {
-		t.Fatal("expected workload to be stopped")
-	}
+	be.True(t, stopResp.Stopped)
+
+	wl, err := control.ListWorkloads(models.NodeSystemNamespace)
+	be.NilErr(t, err)
+
+	be.Equal(t, 0, len(wl))
 }
 
 func TestGetNodeInfo(t *testing.T) {
@@ -583,12 +470,10 @@ func TestGetNodeInfo(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
 	if err != nil {
@@ -598,25 +483,12 @@ func TestGetNodeInfo(t *testing.T) {
 	resp, err := control.GetInfo(Node1ServerPublicKey, gen.NodeInfoRequestJson{
 		Namespace: models.NodeSystemNamespace,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if resp.NodeId != Node1ServerPublicKey {
-		t.Fatalf("expected node id %s, got %s", Node1ServerPublicKey, resp.NodeId)
-	}
-
-	if resp.Tags.Tags[models.TagNodeName] != "node-1" {
-		t.Fatalf("expected node name node-1, got %s", resp.Tags.Tags[models.TagNodeName])
-	}
-
-	if resp.Tags.Tags[models.TagNexus] != "testnexus" {
-		t.Fatalf("expected nexus testnexus, got %s", resp.Tags.Tags[models.TagNexus])
-	}
-
-	if len(resp.WorkloadSummaries) != 0 {
-		t.Fatalf("expected 0 workloads, got %d", len(resp.WorkloadSummaries))
-	}
+	be.Equal(t, Node1ServerPublicKey, resp.NodeId)
+	be.Equal(t, "node-1", resp.Tags.Tags[models.TagNodeName])
+	be.Equal(t, "testnexus", resp.Tags.Tags[models.TagNexus])
+	be.Equal(t, 0, len(resp.WorkloadSummaries))
 }
 
 func TestSetLameduck(t *testing.T) {
@@ -641,33 +513,25 @@ func TestSetLameduck(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	_, err = control.SetLameDuck(Node1ServerPublicKey, time.Second*3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	resp, err := control.GetInfo(Node1ServerPublicKey, gen.NodeInfoRequestJson{
 		Namespace: models.NodeSystemNamespace,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if resp.Tags.Tags[models.TagLameDuck] != "true" {
-		t.Fatalf("expected lameduck true, got %s", resp.Tags.Tags[models.TagLameDuck])
-	}
+	ld, err := strconv.ParseBool(resp.Tags.Tags[models.TagLameDuck])
+	be.NilErr(t, err)
+	be.True(t, ld)
 }
 
 func TestCopyWorkload(t *testing.T) {
@@ -692,38 +556,26 @@ func TestCopyWorkload(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 5)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	env := make(map[string]string)
 	envB, err := json.Marshal(env)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAKey, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	tAPub, err := tAKey.PublicKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	encEnv, err := tAKey.Seal(envB, Node1XkeyPublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
@@ -741,37 +593,21 @@ func TestCopyWorkload(t *testing.T) {
 			EncryptedBy:        tAPub,
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if !resp.Started {
-		t.Fatalf("expected workload to be started")
-	}
+	be.True(t, resp.Started)
 
 	aResp, err := control.Auction(models.NodeSystemNamespace, map[string]string{
 		models.TagNodeName: "node-3",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	cResp, err := control.CopyWorkload(resp.Id, models.NodeSystemNamespace, aResp[0].TargetXkey)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if cResp.WorkloadName != "testworkload" {
-		t.Fatalf("expected workload name testworkload, got %s", cResp.WorkloadName)
-	}
-
-	if len(cResp.Argv) != 2 && cResp.Argv[0] != "--arg1" && cResp.Argv[1] != "value1" {
-		t.Fatalf("expected arg1 value --arg1, got %s", cResp.Argv[0])
-	}
-
-	if cResp.EncEnvironment.EncryptedBy != Node1XkeyPublicKey {
-		t.Fatalf("expected workload encrypted by %s, got %s", Node1XkeyPublicKey, cResp.EncEnvironment.EncryptedBy)
-	}
+	be.Equal(t, "testworkload", cResp.WorkloadName)
+	be.AllEqual(t, []string{"--arg1", "value1"}, cResp.Argv)
+	be.Equal(t, Node1XkeyPublicKey, cResp.EncEnvironment.EncryptedBy)
 }
 
 func TestMonitorEndpoints(t *testing.T) {
@@ -796,74 +632,50 @@ func TestMonitorEndpoints(t *testing.T) {
 	))
 
 	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-
 	time.Sleep(1000 * time.Millisecond)
+
 	nc, err := nats.Connect(natsServer.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	control, err := NewControlApiClient(nc, logger)
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	logs, err := control.MonitorLogs(models.NodeSystemNamespace, "*", "*")
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	logBuf := new(bytes.Buffer)
 	go func() {
 		for m := range logs {
 			_, err := logBuf.Write(m)
-			if err != nil {
-				t.Error(err)
-			}
+			be.NilErr(t, err)
 		}
 	}()
-
 	time.Sleep(250 * time.Millisecond)
+
 	err = nc.Publish("$NEX.logs."+models.NodeSystemNamespace+".b.c", []byte("log test"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 	time.Sleep(250 * time.Millisecond)
 	close(logs)
 
-	// ----
 	events, err := control.MonitorEvents(models.NodeSystemNamespace, "*", "*")
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	eventBuf := new(bytes.Buffer)
 	go func() {
 		for m := range events {
 			mB, err := json.Marshal(m)
-			if err != nil {
-				t.Error(err)
-			}
+			be.NilErr(t, err)
 			_, err = eventBuf.Write(mB)
-			if err != nil {
-				t.Error(err)
-			}
+			be.NilErr(t, err)
 		}
 	}()
-
 	time.Sleep(250 * time.Millisecond)
+
 	err = nc.Publish("$NEX.events."+models.NodeSystemNamespace+".b.c", []byte("{\"test\": \"event\"}"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 	time.Sleep(250 * time.Millisecond)
 	close(events)
 
-	if logBuf.String() != "log test" {
-		t.Fatalf("expected log test, got %s", string(logBuf.String()))
-	}
-
-	if eventBuf.String() != "{\"test\":\"event\"}" {
-		t.Fatalf("expected event {\"test\":\"event\"}, got %s", eventBuf.String())
-	}
+	be.Equal(t, "log test", logBuf.String())
+	be.Equal(t, "{\"test\":\"event\"}", eventBuf.String())
 }
