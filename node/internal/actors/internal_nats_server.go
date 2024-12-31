@@ -67,13 +67,12 @@ func CreateInternalNatsServer(serverPubKey string, options models.NodeOptions) (
 	}
 	ns.creds = creds
 
-	err = os.Mkdir(filepath.Join(os.TempDir(), "inex-"+serverPubKey), 0700)
+	ns.storeDir = filepath.Join(options.ResourceDirectory, "inex-"+serverPubKey)
+	err = os.Mkdir(ns.storeDir, 0700)
 	if err != nil && !os.IsExist(err) {
 		options.Logger.Error("Failed to create store temp directory", slog.Any("error", err))
 		return nil, err
 	}
-
-	ns.storeDir = filepath.Join(os.TempDir(), "inex-"+serverPubKey)
 
 	opts, err := ns.generateConfig()
 	if err != nil {
