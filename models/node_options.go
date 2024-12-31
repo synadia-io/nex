@@ -33,9 +33,7 @@ type NodeOption func(*NodeOptions)
 
 func WithContext(ctx context.Context) NodeOption {
 	return func(n *NodeOptions) {
-		if ctx != nil {
-			n.Context = ctx
-		}
+		n.Context = ctx
 	}
 }
 

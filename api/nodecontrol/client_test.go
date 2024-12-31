@@ -25,42 +25,43 @@ import (
 )
 
 const (
-	// NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT - pub key
-	Node1ServerSeed string = "SNAB2T3VG2363NDA2JK7NT5O3FN5VCXI2MYJHOPFO2NIDXQU6DIWQTBQC4"
-	// XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY - pub xkey
-	Node1XKeySeed string = "SXAOUP7RZFW5QPE2GDWTPABUDM5UIAK6BPULJPWZQAFFL2RZ5K3UYWHYY4"
+	Node1ServerSeed      string = "SNAB2T3VG2363NDA2JK7NT5O3FN5VCXI2MYJHOPFO2NIDXQU6DIWQTBQC4"
+	Node1ServerPublicKey string = "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"
+	Node1XKeySeed        string = "SXAOUP7RZFW5QPE2GDWTPABUDM5UIAK6BPULJPWZQAFFL2RZ5K3UYWHYY4"
+	Node1XkeyPublicKey   string = "XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY"
 )
 
-func buildTestBinary(t testing.TB, binMain string, workingDir string) (string, error) {
+func buildTestBinary(t testing.TB, binMain string, workingDir string) string {
 	t.Helper()
-	binName := func() string {
+	binPath := func() string {
+		binName := "test"
 		if runtime.GOOS == "windows" {
-			return "test.exe"
+			binName = "test.exe"
 		}
-		return "test"
+		return filepath.Join(workingDir, binName)
+	}()
+
+	if _, err := os.Stat(binPath); err == nil {
+		return binPath
 	}
 
-	if _, err := os.Stat(filepath.Join(workingDir, binName())); err == nil {
-		return filepath.Join(workingDir, binName()), nil
-	}
-
-	cmd := exec.Command("go", "build", "-o", filepath.Join(workingDir, binName()), binMain)
+	cmd := exec.Command("go", "build", "-o", binPath, binMain)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
 	if err != nil {
-		return "", err
+		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(filepath.Join(workingDir, binName())); err != nil {
-		return "", err
+	if _, err := os.Stat(binPath); err != nil {
+		t.Fatal(err)
 	}
 
-	return filepath.Join(workingDir, binName()), nil
+	return binPath
 }
 
-func startNatsServer(t testing.TB, workingDir string) (*server.Server, error) {
+func startNatsServer(t testing.TB, workingDir string) *server.Server {
 	t.Helper()
 
 	s := server.New(&server.Options{
@@ -73,15 +74,15 @@ func startNatsServer(t testing.TB, workingDir string) (*server.Server, error) {
 
 	go s.WaitForShutdown()
 
-	return s, nil
+	return s
 }
 
-func startNexus(t testing.TB, ctx context.Context, logger *slog.Logger, workingDir, natsUrl string, numNodes int) error {
+func startNexus(t testing.TB, ctx context.Context, logger *slog.Logger, workingDir, natsUrl string, numNodes int) {
 	t.Helper()
 
 	nc, err := nats.Connect(natsUrl)
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
 
 	for i := 0; i < numNodes; i++ {
@@ -89,20 +90,20 @@ func startNexus(t testing.TB, ctx context.Context, logger *slog.Logger, workingD
 		if i == 0 {
 			kp, err = nkeys.FromSeed([]byte(Node1ServerSeed))
 			if err != nil {
-				return err
+				t.Fatal(err)
 			}
 			xkp, err = nkeys.FromSeed([]byte(Node1XKeySeed))
 			if err != nil {
-				return err
+				t.Fatal(err)
 			}
 		} else {
 			kp, err = nkeys.CreateServer()
 			if err != nil {
-				return err
+				t.Fatal(err)
 			}
 			xkp, err = nkeys.CreateCurveKeys()
 			if err != nil {
-				return err
+				t.Fatal(err)
 			}
 		}
 		nn, err := node.NewNexNode(kp, nc,
@@ -114,12 +115,12 @@ func startNexus(t testing.TB, ctx context.Context, logger *slog.Logger, workingD
 			models.WithResourceDirectory(workingDir),
 		)
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
 
 		err = nn.Validate()
 		if err != nil {
-			return err
+			t.Fatal(err)
 		}
 
 		go func() {
@@ -130,21 +131,16 @@ func startNexus(t testing.TB, ctx context.Context, logger *slog.Logger, workingD
 			}
 		}()
 	}
-
-	return nil
 }
 
 func TestAuction(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -158,10 +154,7 @@ func TestAuction(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -174,7 +167,7 @@ func TestAuction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := control.Auction("system", map[string]string{})
+	resp, err := control.Auction(models.NodeSystemNamespace, map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +176,7 @@ func TestAuction(t *testing.T) {
 		t.Fatalf("expected 1 response, got %d", len(resp))
 	}
 
-	resp, err = control.Auction("system", map[string]string{"nex.node": "notreal"})
+	resp, err = control.Auction(models.NodeSystemNamespace, map[string]string{models.TagNodeName: "notreal"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,15 +188,12 @@ func TestAuction(t *testing.T) {
 
 func TestPing(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -217,10 +207,7 @@ func TestPing(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 5)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 5)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -245,15 +232,12 @@ func TestPing(t *testing.T) {
 
 func TestDirectPing(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -267,10 +251,7 @@ func TestDirectPing(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -283,27 +264,24 @@ func TestDirectPing(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := control.DirectPing("NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT")
+	resp, err := control.DirectPing(Node1ServerPublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if resp.NodeId != "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT" {
-		t.Fatalf("expected node id NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT, got %s", resp.NodeId)
+	if resp.NodeId != Node1ServerPublicKey {
+		t.Fatalf("expected node id %s, got %s", Node1ServerPublicKey, resp.NodeId)
 	}
 }
 
 func TestAuctionDeployAndFindWorkload(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -317,10 +295,7 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -333,7 +308,7 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	auctionResp, err := control.Auction("system", map[string]string{})
+	auctionResp, err := control.Auction(models.NodeSystemNamespace, map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,14 +334,11 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	binPath, err := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.AuctionDeployWorkload("system", auctionResp[0].BidderId, gen.StartWorkloadRequestJson{
+	resp, err := control.AuctionDeployWorkload(models.NodeSystemNamespace, auctionResp[0].BidderId, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
-		Namespace:       "system",
+		Namespace:       models.NodeSystemNamespace,
 		RetryCount:      3,
 		Uri:             "file://" + binPath,
 		WorkloadName:    "testworkload",
@@ -385,7 +357,7 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 		t.Fatalf("expected workload to be started")
 	}
 
-	pingResp, err := control.FindWorkload("system", resp.Id)
+	pingResp, err := control.FindWorkload(models.NodeSystemNamespace, resp.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -406,15 +378,12 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 
 func TestDirectDeployAndListWorkloads(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -428,10 +397,7 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -460,19 +426,16 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encEnv, err := tAKey.Seal(envB, "XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY")
+	encEnv, err := tAKey.Seal(envB, Node1XkeyPublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	binPath, err := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.DeployWorkload("system", "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.StartWorkloadRequestJson{
+	resp, err := control.DeployWorkload(models.NodeSystemNamespace, Node1ServerPublicKey, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
-		Namespace:       "system",
+		Namespace:       models.NodeSystemNamespace,
 		RetryCount:      3,
 		Uri:             "file://" + binPath,
 		WorkloadName:    "testworkload",
@@ -491,7 +454,7 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 		t.Fatalf("expected workload to be started")
 	}
 
-	wl, err := control.ListWorkloads("system")
+	wl, err := control.ListWorkloads(models.NodeSystemNamespace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -512,15 +475,12 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 
 func TestUndeployWorkload(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -534,10 +494,7 @@ func TestUndeployWorkload(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -566,19 +523,16 @@ func TestUndeployWorkload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encEnv, err := tAKey.Seal(envB, "XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY")
+	encEnv, err := tAKey.Seal(envB, Node1XkeyPublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	binPath, err := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.DeployWorkload("system", "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.StartWorkloadRequestJson{
+	resp, err := control.DeployWorkload(models.NodeSystemNamespace, Node1ServerPublicKey, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
-		Namespace:       "system",
+		Namespace:       models.NodeSystemNamespace,
 		RetryCount:      3,
 		Uri:             "file://" + binPath,
 		WorkloadName:    "testworkload",
@@ -597,7 +551,7 @@ func TestUndeployWorkload(t *testing.T) {
 		t.Fatalf("expected workload to be started")
 	}
 
-	stopResp, err := control.UndeployWorkload("system", resp.Id)
+	stopResp, err := control.UndeployWorkload(models.NodeSystemNamespace, resp.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -609,15 +563,12 @@ func TestUndeployWorkload(t *testing.T) {
 
 func TestGetNodeInfo(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -631,10 +582,7 @@ func TestGetNodeInfo(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -647,15 +595,15 @@ func TestGetNodeInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := control.GetInfo("NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.NodeInfoRequestJson{
-		Namespace: "system",
+	resp, err := control.GetInfo(Node1ServerPublicKey, gen.NodeInfoRequestJson{
+		Namespace: models.NodeSystemNamespace,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if resp.NodeId != "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT" {
-		t.Fatalf("expected node id NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT, got %s", resp.Tags.Tags["nex.node"])
+	if resp.NodeId != Node1ServerPublicKey {
+		t.Fatalf("expected node id %s, got %s", Node1ServerPublicKey, resp.NodeId)
 	}
 
 	if resp.Tags.Tags[models.TagNodeName] != "node-1" {
@@ -673,15 +621,12 @@ func TestGetNodeInfo(t *testing.T) {
 
 func TestSetLameduck(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -695,10 +640,7 @@ func TestSetLameduck(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -711,13 +653,13 @@ func TestSetLameduck(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = control.SetLameDuck("NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", time.Second*3)
+	_, err = control.SetLameDuck(Node1ServerPublicKey, time.Second*3)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	resp, err := control.GetInfo("NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.NodeInfoRequestJson{
-		Namespace: "system",
+	resp, err := control.GetInfo(Node1ServerPublicKey, gen.NodeInfoRequestJson{
+		Namespace: models.NodeSystemNamespace,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -730,15 +672,12 @@ func TestSetLameduck(t *testing.T) {
 
 func TestCopyWorkload(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -752,10 +691,7 @@ func TestCopyWorkload(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 5)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 5)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -784,20 +720,17 @@ func TestCopyWorkload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encEnv, err := tAKey.Seal(envB, "XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY")
+	encEnv, err := tAKey.Seal(envB, Node1XkeyPublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	binPath, err := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := buildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.DeployWorkload("system", "NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT", gen.StartWorkloadRequestJson{
+	resp, err := control.DeployWorkload(models.NodeSystemNamespace, Node1ServerPublicKey, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
 		Argv:            []string{"--arg1", "value1"},
-		Namespace:       "system",
+		Namespace:       models.NodeSystemNamespace,
 		RetryCount:      3,
 		Uri:             "file://" + binPath,
 		WorkloadName:    "testworkload",
@@ -816,14 +749,14 @@ func TestCopyWorkload(t *testing.T) {
 		t.Fatalf("expected workload to be started")
 	}
 
-	aResp, err := control.Auction("system", map[string]string{
+	aResp, err := control.Auction(models.NodeSystemNamespace, map[string]string{
 		models.TagNodeName: "node-3",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cResp, err := control.CopyWorkload(resp.Id, "system", aResp[0].TargetXkey)
+	cResp, err := control.CopyWorkload(resp.Id, models.NodeSystemNamespace, aResp[0].TargetXkey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -836,23 +769,19 @@ func TestCopyWorkload(t *testing.T) {
 		t.Fatalf("expected arg1 value --arg1, got %s", cResp.Argv[0])
 	}
 
-	if cResp.EncEnvironment.EncryptedBy != "XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY" {
-		t.Fatalf("expected workload encrypted by XAL54S5FE6SRPONXRNVE4ZDAOHOT44GFIY2ZW33DHLR2U3H2HJSXXRKY, got %s", cResp.EncEnvironment.EncryptedBy)
+	if cResp.EncEnvironment.EncryptedBy != Node1XkeyPublicKey {
+		t.Fatalf("expected workload encrypted by %s, got %s", Node1XkeyPublicKey, cResp.EncEnvironment.EncryptedBy)
 	}
-	t.Log(*cResp)
 }
 
 func TestMonitorEndpoints(t *testing.T) {
 	workingDir := t.TempDir()
-	natsServer, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	natsServer := startNatsServer(t, workingDir)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
 	t.Cleanup(func() {
-		os.RemoveAll(filepath.Join(os.TempDir(), "inex-NCUU2YIYXEPGTCDXDKQR7LL5PXDHIDG7SDFLWKE3WY63ZGCZL2HKIAJT"))
+		os.RemoveAll(filepath.Join(os.TempDir(), "inex-"+Node1ServerPublicKey))
 		cancel()
 		natsServer.Shutdown()
 	})
@@ -866,10 +795,7 @@ func TestMonitorEndpoints(t *testing.T) {
 		shandler.WithStdErr(stderr),
 	))
 
-	err = startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	startNexus(t, ctx, logger, workingDir, natsServer.ClientURL(), 1)
 
 	time.Sleep(1000 * time.Millisecond)
 	nc, err := nats.Connect(natsServer.ClientURL())
@@ -882,7 +808,7 @@ func TestMonitorEndpoints(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	logs, err := control.MonitorLogs("system", "*", "*")
+	logs, err := control.MonitorLogs(models.NodeSystemNamespace, "*", "*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -898,7 +824,7 @@ func TestMonitorEndpoints(t *testing.T) {
 	}()
 
 	time.Sleep(250 * time.Millisecond)
-	err = nc.Publish("$NEX.logs.system.b.c", []byte("log test"))
+	err = nc.Publish("$NEX.logs."+models.NodeSystemNamespace+".b.c", []byte("log test"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -906,7 +832,7 @@ func TestMonitorEndpoints(t *testing.T) {
 	close(logs)
 
 	// ----
-	events, err := control.MonitorEvents("system", "*", "*")
+	events, err := control.MonitorEvents(models.NodeSystemNamespace, "*", "*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -926,7 +852,7 @@ func TestMonitorEndpoints(t *testing.T) {
 	}()
 
 	time.Sleep(250 * time.Millisecond)
-	err = nc.Publish("$NEX.events.system.b.c", []byte("{\"test\": \"event\"}"))
+	err = nc.Publish("$NEX.events."+models.NodeSystemNamespace+".b.c", []byte("{\"test\": \"event\"}"))
 	if err != nil {
 		t.Fatal(err)
 	}
