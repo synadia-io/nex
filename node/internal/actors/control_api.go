@@ -133,7 +133,7 @@ func (api *ControlAPI) subscribe() error {
 	}{
 		{AuctionSubscribeSubject(), api.handleAuction},
 		{UndeploySubscribeSubject(), api.handleUndeploy},
-		{AuctionDeploySubscribeSubject(), api.handleADeploy},
+		{AuctionDeploySubscribeSubject(), api.handleDeploy},
 		{CloneWorkloadSubscribeSubject(), api.handleCloneWorkload},
 		{NamespacePingSubscribeSubject(), api.handleNamespacePing},
 		{WorkloadPingSubscribeSubject(), api.handleWorkloadPing},
@@ -272,10 +272,11 @@ func (api *ControlAPI) handleAuction(m *nats.Msg) {
 	models.RespondEnvelope(m, AuctionResponseType, 200, auctionResponseFromProto(auctResp), "")
 }
 
-func (api *ControlAPI) handleADeploy(m *nats.Msg) {
-	// $NEX.control.default.ADEPLOY.bidderId
+func (api *ControlAPI) handleDeploy(m *nats.Msg) {
+	// $NEX.control.default.ADEPLOY.bidderId  <- Auction Deploy
+	// $NEX.control.system.DDEPLOY.NNODEID... <- Direct Deploy
 	splitSub := strings.SplitN(m.Subject, ".", 5)
-	// splitSub[4] is the bidderId
+	// splitSub[4] is the bidderId or the Node ID
 	target, xkp, err := api.nodeCallback.IsTargetNode(splitSub[4])
 	if err != nil {
 		api.logger.Error("Failed to check if target node", slog.Any("error", err))
@@ -324,58 +325,6 @@ func (api *ControlAPI) handleADeploy(m *nats.Msg) {
 	req.EncEnvironment = nodegen.SharedEncEnvJson{
 		Base64EncryptedEnv: base64.StdEncoding.EncodeToString(newEncEnv),
 		EncryptedBy:        encTo,
-	}
-
-	ctx := context.Background()
-	_, agent, err := api.self.ActorSystem().ActorOf(ctx, req.WorkloadType)
-	if err != nil {
-		api.logger.Error("Failed to locate agent actor", slog.String("type", req.WorkloadType), slog.Any("error", err))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to locate [%s] agent actor: %s", req.WorkloadType, err))
-		return
-	}
-
-	askResp, err := api.self.Ask(ctx, agent, startRequestToProto(req), DefaultAskDuration)
-	if err != nil {
-		api.logger.Error("Failed to start workload", slog.Any("error", err))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("Failed to start workload: %s", err))
-		return
-	}
-
-	protoResp, ok := askResp.(*actorproto.Envelope)
-	if !ok {
-		api.logger.Error("Start workload response from agent was not the correct type")
-		models.RespondEnvelope(m, RunResponseType, 500, "", "Agent returned the wrong data type")
-		return
-	}
-
-	if protoResp.Error != nil {
-		api.logger.Error("Agent returned an error", slog.Any("error", protoResp.Error))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("agent returned an error: %s", protoResp.Error))
-		return
-	}
-
-	var workloadStarted actorproto.WorkloadStarted
-	err = protoResp.Payload.UnmarshalTo(&workloadStarted)
-	if err != nil {
-		api.logger.Error("Failed to unmarshal workload started response", slog.Any("error", err))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
-		return
-	}
-
-	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(&workloadStarted), "")
-}
-
-func (api *ControlAPI) handleDeploy(m *nats.Msg) {
-	req := new(nodegen.StartWorkloadRequestJson)
-	err := json.Unmarshal(m.Data, req)
-	if err != nil {
-		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
-		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal deploy request: %s", err))
-		return
-	}
-
-	if req.WorkloadName == "" {
-		req.WorkloadName = nuid.New().Next()
 	}
 
 	ctx := context.Background()

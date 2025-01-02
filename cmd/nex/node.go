@@ -215,7 +215,7 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 			}
 
 			tW.AppendRow(table.Row{
-				n.Nexus,
+				n.Tags.Tags[models.TagNexus],
 				func() string {
 					if lameduck == "true" {
 						return n.NodeId + "*"

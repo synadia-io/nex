@@ -6,9 +6,6 @@ import "encoding/json"
 import "fmt"
 
 type NodeInfoResponseJson struct {
-	// The name of the nexus - if assigned
-	Nexus string `json:"nexus"`
-
 	// The unique identifier of the node
 	NodeId string `json:"node_id"`
 
@@ -40,9 +37,6 @@ func (j *NodeInfoResponseJson) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
-	}
-	if _, ok := raw["nexus"]; raw != nil && !ok {
-		return fmt.Errorf("field nexus in NodeInfoResponseJson: required")
 	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
 		return fmt.Errorf("field node_id in NodeInfoResponseJson: required")

@@ -4,6 +4,7 @@ go 1.23.0
 
 require (
 	disorder.dev/shandler v0.0.0-20241210223030-b024af991a50
+	github.com/carlmjohnson/be v0.23.2
 	github.com/nats-io/nats-server/v2 v2.10.24
 	github.com/nats-io/nats.go v1.38.0
 	github.com/nats-io/nkeys v0.4.9

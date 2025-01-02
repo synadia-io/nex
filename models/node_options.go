@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -10,18 +11,8 @@ import (
 	"github.com/nats-io/nkeys"
 )
 
-const (
-	TagOS       = "nex.os"
-	TagArch     = "nex.arch"
-	TagCPUs     = "nex.cpucount"
-	TagLameDuck = "nex.lameduck"
-	TagNexus    = "nex.nexus"
-	TagNodeName = "nex.node"
-)
-
-var ReservedTagPrefixes = []string{"nex."}
-
 type NodeOptions struct {
+	Context               context.Context
 	Logger                *slog.Logger
 	Xkey                  nkeys.KeyPair
 	AgentHandshakeTimeout int
@@ -39,6 +30,12 @@ type NodeOptions struct {
 }
 
 type NodeOption func(*NodeOptions)
+
+func WithContext(ctx context.Context) NodeOption {
+	return func(n *NodeOptions) {
+		n.Context = ctx
+	}
+}
 
 func WithLogger(s *slog.Logger) NodeOption {
 	return func(n *NodeOptions) {
