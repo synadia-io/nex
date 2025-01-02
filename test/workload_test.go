@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
@@ -55,60 +56,33 @@ func buildTestBinary(t testing.TB, binMain string, workingDir string) (string, e
 func TestDirectStartService(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildTestBinary(t, "./testdata/direct_start/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := BuildTestBinary(t, "./testdata/direct_start/main.go", workingDir)
 
-	nexCli, err := buildNexCli(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nexCli := buildNexCli(t, workingDir)
 
-	s, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := StartNatsServer(t, workingDir)
 	defer s.Shutdown()
 
 	kp, err := nkeys.CreateServer()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	seed, err := kp.Seed()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	xkey, err := nkeys.CreateCurveKeys()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	be.NilErr(t, err)
 
 	xSeed, err := xkey.Seed()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	be.NilErr(t, err)
 
-	cmd, err := startNexNodeCmd(t, workingDir, string(seed), string(xSeed), s.ClientURL(), "node", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd.SysProcAttr = sysProcAttr()
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
+	cmd := startNexNodeCmd(t, workingDir, string(seed), string(xSeed), s.ClientURL(), "node", "nexus")
+	cmd.SysProcAttr = sysProcAttr()
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	// cmd.Stdout = os.Stdout
-	// cmd.Stderr = os.Stderr
 
-	err = cmd.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, cmd.Start())
 	time.Sleep(500 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -116,125 +90,68 @@ func TestDirectStartService(t *testing.T) {
 
 	go func() {
 		<-ctx.Done()
-		err = stopProcess(cmd.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, stopProcess(cmd.Process))
 	}()
 
 	go func() {
 		pub, err := kp.PublicKey()
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 
 		xkey_pub, err := xkey.PublicKey()
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 
 		// find unused port
 		listener, err := net.Listen("tcp", ":0")
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
-		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, fmt.Sprintf("--argv=-port=%d", port), fmt.Sprintf("--env=ENV_TEST=%s", "derp"))
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
+		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath, "--node-id", pub, "--node-xkey-pub", xkey_pub, fmt.Sprintf("--argv=-port=%d", port), fmt.Sprintf("--env=ENV_TEST=%s", "derp"))
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
-		err = cmd.Run()
-		if err != nil {
-			t.Log(cmdstderr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, cmd.Run())
 
-		if len(cmdstderr.Bytes()) > 0 {
-			t.Error("stderr:", cmdstderr.String())
-			return
-		}
+		be.Equal(t, 0, len(cmdstderr.Bytes()))
 
 		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started on node (?P<node>[A-Z0-9]+)$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(cmdstdout.String()))
-		if len(match) != 3 {
-			t.Error("tester workload failed to start: ", cmdstdout.String())
-			return
-		}
+		be.Equal(t, 3, len(match))
+		be.Equal(t, pub, match[2])
 
-		if pub != match[2] {
-			t.Error("expected node id", pub, "got", match[2])
-		}
-
-		time.Sleep(5000 * time.Millisecond)
+		time.Sleep(500 * time.Millisecond)
 		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d", port))
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 		defer resp.Body.Close()
 		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 
-		if string(body) != "passing" {
-			t.Error("expected passing, got", string(body))
-		}
+		be.True(t, strings.Contains(string(body), "passing"))
 
-		// TODO: stop workload
 		cancel()
 	}()
 
-	err = cmd.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, cmd.Wait())
 
 	// This ensures that the environment was decrypted and injected into workload correctly
-	if !bytes.Contains(stdout.Bytes(), []byte("ENV: derp")) {
-		t.Error("Expected ENV Data missing | stdout:", stdout.String())
-	}
+	be.In(t, "ENV: derp", stdout.String())
 }
 
 func TestDirectStartFunction(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildTestBinary(t, "./testdata/function/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := BuildTestBinary(t, "./testdata/function/main.go", workingDir)
 
-	nexCli, err := buildNexCli(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nexCli := buildNexCli(t, workingDir)
 
-	s, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := StartNatsServer(t, workingDir)
 	defer s.Shutdown()
 
-	cmd, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	cmd := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node", "nexus")
 	cmd.SysProcAttr = sysProcAttr()
-	// cmd.Stdout = os.Stdout
-	// cmd.Stderr = os.Stderr
 
-	err = cmd.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, cmd.Start())
 	time.Sleep(500 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -242,10 +159,7 @@ func TestDirectStartFunction(t *testing.T) {
 
 	go func() {
 		<-ctx.Done()
-		err = stopProcess(cmd.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, stopProcess(cmd.Process))
 	}()
 
 	passed := false
@@ -256,78 +170,44 @@ func TestDirectStartFunction(t *testing.T) {
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
-		err = cmd.Run()
-		if err != nil {
-			t.Log(cmdstderr.String())
-			t.Error(err)
-			return
-		}
-
+		be.NilErr(t, cmd.Run())
 		time.Sleep(500 * time.Millisecond)
 
-		if len(cmdstderr.Bytes()) > 0 {
-			t.Error("stderr:", cmdstderr.String())
-			return
-		}
+		be.Equal(t, 0, len(cmdstderr.Bytes()))
 
 		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(cmdstdout.String()))
-		if len(match) != 2 {
-			t.Error("tester workload failed to start: ", cmdstdout.String())
-			return
-		}
-
+		be.Equal(t, 2, len(match))
 		time.Sleep(500 * time.Millisecond)
+
 		cmd = exec.Command(nexCli, "workload", "info", "-s", s.ClientURL(), match[1], "--json")
 		cmdstdout = new(bytes.Buffer)
 		cmdstderr = new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
-		err = cmd.Run()
-		if err != nil {
-			t.Log(cmdstderr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, cmd.Run())
 
 		time.Sleep(500 * time.Millisecond)
 		var resp gen.WorkloadPingResponseJson
-		err = json.Unmarshal(cmdstdout.Bytes(), &resp)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, json.Unmarshal(cmdstdout.Bytes(), &resp))
 
-		if resp.WorkloadSummary.WorkloadState != models.WorkloadStateWarm {
-			t.Logf("ERROR: workload state: %s; expected %s", resp.WorkloadSummary.WorkloadState, models.WorkloadStateWarm)
-			t.Error(err)
-			return
-		}
+		be.Equal(t, models.WorkloadStateWarm, resp.WorkloadSummary.WorkloadState)
 
 		nc, err := nats.Connect(s.ClientURL())
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 		defer nc.Close()
 
 		workloadId := match[1]
 		sub, err := nc.Subscribe("$NEX.logs.system."+workloadId+".stdout", func(msg *nats.Msg) {
 			triggerLogs.Write(msg.Data)
 		})
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 		defer func() {
 			_ = sub.Drain()
 		}()
 
 		err = nc.Publish("test", []byte("test data 123"))
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 		time.Sleep(time.Second)
 
 		cmd = exec.Command(nexCli, "workload", "info", "-s", s.ClientURL(), match[1], "--json")
@@ -335,25 +215,13 @@ func TestDirectStartFunction(t *testing.T) {
 		cmdstderr = new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
-		err = cmd.Run()
-		if err != nil {
-			t.Log(cmdstderr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, cmd.Run())
 
 		time.Sleep(500 * time.Millisecond)
-		err = json.Unmarshal(cmdstdout.Bytes(), &resp)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, json.Unmarshal(cmdstdout.Bytes(), &resp))
 
 		dur, err := time.ParseDuration(resp.WorkloadSummary.Runtime)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 
 		if dur > 500*time.Millisecond && dur < 1*time.Second {
 			passed = true
@@ -361,67 +229,32 @@ func TestDirectStartFunction(t *testing.T) {
 			t.Log("Job runtime: ", resp.WorkloadSummary.Runtime)
 		}
 
-		// TODO: stop workload
 		cancel()
 	}()
 
-	err = cmd.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !passed {
-		t.Fatal("expected workload to run for 500ms - 1s")
-	}
-
-	if !bytes.Contains(triggerLogs.Bytes(), []byte("test data 123")) {
-		t.Error("expected 'test data 123' to be consumed by workload")
-	}
+	be.NilErr(t, cmd.Wait())
+	be.True(t, passed)
+	be.In(t, "test data 123", triggerLogs.String())
 }
 
 func TestDirectStop(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildTestBinary(t, "./testdata/forever/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := BuildTestBinary(t, "./testdata/forever/main.go", workingDir)
 
-	nexCli, err := buildNexCli(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nexCli := buildNexCli(t, workingDir)
 
-	s, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := StartNatsServer(t, workingDir)
 	defer s.Shutdown()
 
-	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex1 := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
 	nex1.SysProcAttr = sysProcAttr()
-	// nex1.Stdout = os.Stdout
-	// nex1.Stderr = os.Stderr
 
-	nex2, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex2 := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
 	nex2.SysProcAttr = sysProcAttr()
-	// nex2.Stdout = os.Stdout
-	// nex2.Stderr = os.Stderr
 
-	err = nex1.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = nex2.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, nex1.Start())
+	be.NilErr(t, nex2.Start())
 	time.Sleep(500 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -429,41 +262,23 @@ func TestDirectStop(t *testing.T) {
 
 	go func() {
 		<-ctx.Done()
-		err = stopProcess(nex1.Process)
-		if err != nil {
-			t.Error(err)
-		}
-		err = stopProcess(nex2.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, stopProcess(nex1.Process))
+		be.NilErr(t, stopProcess(nex2.Process))
 	}()
 
-	passed := false
 	go func() {
 		cmd := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath)
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
-		err = cmd.Run()
-		if err != nil {
-			t.Log(cmdstderr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, cmd.Run())
 
-		if len(cmdstderr.Bytes()) > 0 {
-			t.Error("stderr:", cmdstderr.String())
-			return
-		}
+		be.Equal(t, 0, len(cmdstderr.Bytes()))
 
 		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(cmdstdout.String()))
-		if len(match) != 2 {
-			t.Error("tester workload failed to start: ", cmdstdout.String())
-			return
-		}
+		be.Equal(t, 2, len(match))
 
 		time.Sleep(500 * time.Millisecond)
 		workloadID := match[1]
@@ -473,65 +288,28 @@ func TestDirectStop(t *testing.T) {
 		cmdstderr = new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
-		err = cmd.Run()
-		if err != nil {
-			t.Log(cmdstderr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, cmd.Run())
 
-		if bytes.Contains(cmdstdout.Bytes(), []byte("Workload "+workloadID+" stopped")) {
-			passed = true
-		} else {
-			t.Log("cmdstdout:", cmdstdout.String())
-			if len(cmdstderr.Bytes()) > 0 {
-				t.Error("stderr:", cmdstderr.String())
-			}
-		}
-
+		be.In(t, "Workload "+workloadID+" stopped", cmdstdout.String())
 		cancel()
 	}()
 
-	err = nex1.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = nex2.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !passed {
-		t.Fatal("expected workload to stop")
-	}
+	be.NilErr(t, nex1.Wait())
+	be.NilErr(t, nex2.Wait())
 }
 
 func TestDirectStopNoWorkload(t *testing.T) {
 	workingDir := t.TempDir()
 
-	nexCli, err := buildNexCli(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nexCli := buildNexCli(t, workingDir)
 
-	s, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := StartNatsServer(t, workingDir)
 	defer s.Shutdown()
 
-	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex1 := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
 	nex1.SysProcAttr = sysProcAttr()
-	// nex1.Stdout = os.Stdout
-	// nex1.Stderr = os.Stderr
 
-	err = nex1.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, nex1.Start())
 	time.Sleep(500 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -539,46 +317,20 @@ func TestDirectStopNoWorkload(t *testing.T) {
 
 	go func() {
 		<-ctx.Done()
-		err = stopProcess(nex1.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, stopProcess(nex1.Process))
 	}()
 
-	passed := false
 	go func() {
 		cmd := exec.Command(nexCli, "workload", "stop", "-s", s.ClientURL(), "fakeid")
 		cmdstdout := new(bytes.Buffer)
 		cmdstderr := new(bytes.Buffer)
 		cmd.Stdout = cmdstdout
 		cmd.Stderr = cmdstderr
-		// cmd.Stdout = os.Stdout
-		// cmd.Stderr = os.Stderr
-		err = cmd.Run()
-		if err != nil {
-			t.Log(cmdstderr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, cmd.Run())
 
-		if bytes.Contains(cmdstdout.Bytes(), []byte("Workload not found")) {
-			passed = true
-		} else {
-			t.Log("cmdstdout:", cmdstdout.String())
-			if len(cmdstderr.Bytes()) > 0 {
-				t.Error("stderr:", cmdstderr.String())
-			}
-		}
-
+		be.In(t, "Workload not found", cmdstdout.String())
 		cancel()
 	}()
 
-	err = nex1.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !passed {
-		t.Fatal("failed to properly detect no workloads")
-	}
+	be.NilErr(t, nex1.Wait())
 }

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/carlmjohnson/be"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
 )
@@ -16,50 +17,27 @@ import (
 func TestAuctionDeploy(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildTestBinary(t, "./testdata/direct_start/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := BuildTestBinary(t, "./testdata/direct_start/main.go", workingDir)
 
-	nexCli, err := buildNexCli(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nexCli := buildNexCli(t, workingDir)
 
-	s, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := StartNatsServer(t, workingDir)
 	defer s.Shutdown()
 
 	stdout := new(bytes.Buffer)
 	stderr := new(bytes.Buffer)
-	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex1 := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
 	nex1.Stdout = stdout
 	nex1.Stderr = stderr
-	// nex1.Stdout = os.Stdout
-	// nex1.Stderr = os.Stderr
 	nex1.SysProcAttr = sysProcAttr()
 
-	nex2, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex2 := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
 	nex2.SysProcAttr = sysProcAttr()
-	// nex2.Stdout = os.Stdout
-	// nex2.Stderr = os.Stderr
 
-	err = nex1.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err := nex1.Start()
+	be.NilErr(t, err)
 	err = nex2.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -69,10 +47,8 @@ func TestAuctionDeploy(t *testing.T) {
 
 		// find unused port
 		listener, err := net.Listen("tcp", ":0")
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
+
 		port := listener.Addr().(*net.TCPAddr).Port
 		listener.Close()
 
@@ -80,9 +56,7 @@ func TestAuctionDeploy(t *testing.T) {
 		auctionDeploy.Stdout = stdout
 		auctionDeploy.Stderr = stderr
 		err = auctionDeploy.Run()
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, err)
 
 		stdout = new(bytes.Buffer)
 		stderr = new(bytes.Buffer)
@@ -90,28 +64,18 @@ func TestAuctionDeploy(t *testing.T) {
 		nodels.Stdout = stdout
 		nodels.Stderr = stderr
 		err = nodels.Run()
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, err)
 
 		lsout := []*gen.NodePingResponseJson{}
 		err = json.Unmarshal(stdout.Bytes(), &lsout)
-		if err != nil {
-			t.Log(stdout.String())
-			t.Log(stderr.String())
-			t.Error(err)
-		}
+		be.NilErr(t, err)
 
 		for _, n := range lsout {
 			switch n.Tags.Tags[models.TagNodeName] {
 			case "node1":
-				if n.RunningAgents.Status["direct-start"] != 1 {
-					t.Error("node1 does not have expected workload running")
-				}
+				be.Equal(t, 1, n.RunningAgents.Status["direct-start"])
 			case "node2":
-				if n.RunningAgents.Status["direct-start"] != 0 {
-					t.Error("node2 has unexpected workloads running")
-				}
+				be.Equal(t, 0, n.RunningAgents.Status["direct-start"])
 			default:
 				t.Log(stdout.String())
 				t.Error("this should never happen")
@@ -119,25 +83,15 @@ func TestAuctionDeploy(t *testing.T) {
 		}
 
 		err = stopProcess(nex1.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, err)
 		err = stopProcess(nex2.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, err)
 	}()
 
 	err = nex1.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 	err = nex2.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	if !bytes.Contains(stdout.Bytes(), []byte("ENV: nexenvset")) {
-		t.Error("Expected ENV Data missing | stdout:", stdout.String())
-	}
+	be.In(t, "ENV: nexenvset", stdout.Bytes())
 }

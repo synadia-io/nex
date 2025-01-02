@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
@@ -20,62 +21,33 @@ import (
 func TestCopyWorkload(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildTestBinary(t, "./testdata/nats_micro/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := BuildTestBinary(t, "./testdata/nats_micro/main.go", workingDir)
 
-	nexCli, err := buildNexCli(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nexCli := buildNexCli(t, workingDir)
 
-	s, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := StartNatsServer(t, workingDir)
 	defer s.Shutdown()
 
-	nex1, err := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex1 := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node1", "nexus")
 	nex1.SysProcAttr = sysProcAttr()
 
 	n2KP, err := nkeys.CreateServer()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	n2KPSeed, err := n2KP.Seed()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	n2KPPub, err := n2KP.PublicKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	nex2, err := startNexNodeCmd(t, workingDir, string(n2KPSeed), "", s.ClientURL(), "node2", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex2 := startNexNodeCmd(t, workingDir, string(n2KPSeed), "", s.ClientURL(), "node2", "nexus")
 	nex2.SysProcAttr = sysProcAttr()
 
-	err = nex1.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = nex2.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, nex1.Start())
+	be.NilErr(t, nex2.Start())
 
 	nc, err := nats.Connect(s.ClientURL())
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	go func() {
 		time.Sleep(500 * time.Millisecond)
@@ -84,38 +56,23 @@ func TestCopyWorkload(t *testing.T) {
 		origDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "file://"+binPath, fmt.Sprintf("--env=NATS_URL=%s", s.ClientURL()))
 		origDeploy.Stdout = origStdOut
 		err = origDeploy.Run()
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 
 		time.Sleep(500 * time.Millisecond)
 		msg, err := nc.Request("health", nil, time.Second)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, err)
 
-		if string(msg.Data) != "ok" {
-			t.Errorf("expected ok, got %s", string(msg.Data))
-		}
+		be.Equal(t, "ok", string(msg.Data))
 
 		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(origStdOut.String()))
-		if len(match) != 2 {
-			t.Error("tester workload failed to start: ", origStdOut.String())
-			return
-		}
+		be.Equal(t, 2, len(match))
 		origWorkloadId := match[1]
 
 		copyStdOut := new(bytes.Buffer)
 		copyDeploy := exec.Command(nexCli, "workload", "copy", "-s", s.ClientURL(), origWorkloadId, fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node2"))
 		copyDeploy.Stdout = copyStdOut
-		err = copyDeploy.Run()
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, copyDeploy.Run())
 
 		time.Sleep(500 * time.Millisecond)
 		node2InfoStdOut := new(bytes.Buffer)
@@ -123,102 +80,49 @@ func TestCopyWorkload(t *testing.T) {
 		node2Info := exec.Command(nexCli, "node", "info", "-s", s.ClientURL(), "--json", n2KPPub)
 		node2Info.Stdout = node2InfoStdOut
 		node2Info.Stderr = node2InfoStdErr
-		err = node2Info.Run()
-		if err != nil {
-			t.Log("stdout: ", node2InfoStdOut.String())
-			t.Log("stderr: ", node2InfoStdErr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, node2Info.Run())
 
 		resp := new(gen.NodeInfoResponseJson)
-		err = json.Unmarshal(node2InfoStdOut.Bytes(), resp)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, json.Unmarshal(node2InfoStdOut.Bytes(), resp))
 
-		if len(resp.WorkloadSummaries) != 1 {
-			t.Error("expected 1 workload, got ", len(resp.WorkloadSummaries))
-			return
-		}
+		be.Equal(t, 1, len(resp.WorkloadSummaries))
 
-		err = stopProcess(nex1.Process)
-		if err != nil {
-			t.Error(err)
-		}
-		err = stopProcess(nex2.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, stopProcess(nex1.Process))
+		be.NilErr(t, stopProcess(nex2.Process))
 	}()
 
-	err = nex1.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = nex2.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	be.NilErr(t, nex1.Wait())
+	be.NilErr(t, nex2.Wait())
 }
 
 func TestMultipleCopyWorkload(t *testing.T) {
 	workingDir := t.TempDir()
 
-	binPath, err := buildTestBinary(t, "./testdata/forever/main.go", workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	binPath := BuildTestBinary(t, "./testdata/forever/main.go", workingDir)
 
-	nexCli, err := buildNexCli(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	nexCli := buildNexCli(t, workingDir)
 
-	s, err := startNatsServer(t, workingDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := StartNatsServer(t, workingDir)
 	defer s.Shutdown()
 
 	n1KP, err := nkeys.CreateServer()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	n1KPSeed, err := n1KP.Seed()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
 	n1KPPub, err := n1KP.PublicKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, err)
 
-	nex1, err := startNexNodeCmd(t, workingDir, string(n1KPSeed), "", s.ClientURL(), "node1", "nexus")
-	if err != nil {
-		t.Fatal(err)
-	}
+	nex1 := startNexNodeCmd(t, workingDir, string(n1KPSeed), "", s.ClientURL(), "node1", "nexus")
 	nex1.SysProcAttr = sysProcAttr()
-	// nex1.Stdout = os.Stdout
-	// nex1.Stderr = os.Stderr
-
-	err = nex1.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
+	be.NilErr(t, nex1.Start())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
 	go func() {
 		<-ctx.Done()
-		err = stopProcess(nex1.Process)
-		if err != nil {
-			t.Error(err)
-		}
+		be.NilErr(t, stopProcess(nex1.Process))
 	}()
 
 	passed := false
@@ -228,76 +132,40 @@ func TestMultipleCopyWorkload(t *testing.T) {
 		origStdOut := new(bytes.Buffer)
 		origDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", "file://"+binPath)
 		origDeploy.Stdout = origStdOut
-		err = origDeploy.Run()
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, origDeploy.Run())
 
 		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(origStdOut.String()))
-		if len(match) != 2 {
-			t.Error("tester workload failed to start: ", origStdOut.String())
-			return
-		}
+		be.Equal(t, 2, len(match))
 		origWorkloadId := match[1]
 
 		copyStdOut := new(bytes.Buffer)
 		copyDeploy := exec.Command(nexCli, "workload", "copy", "-s", s.ClientURL(), origWorkloadId)
 		copyDeploy.Stdout = copyStdOut
-		err = copyDeploy.Run()
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, copyDeploy.Run())
 
 		copyStdOut = new(bytes.Buffer)
 		copyDeploy = exec.Command(nexCli, "workload", "copy", "-s", s.ClientURL(), origWorkloadId)
 		copyDeploy.Stdout = copyStdOut
-		// copyDeploy.Stdout = os.Stdout
-		// copyDeploy.Stderr = os.Stderr
-		err = copyDeploy.Run()
-		if err != nil {
-			t.Error(err)
-			return
-		}
-
+		be.NilErr(t, copyDeploy.Run())
 		time.Sleep(500 * time.Millisecond)
+
 		node2InfoStdOut := new(bytes.Buffer)
 		node2InfoStdErr := new(bytes.Buffer)
 		node2Info := exec.Command(nexCli, "node", "info", "-s", s.ClientURL(), "--json", n1KPPub)
 		node2Info.Stdout = node2InfoStdOut
 		node2Info.Stderr = node2InfoStdErr
-		err = node2Info.Run()
-		if err != nil {
-			t.Log("stdout: ", node2InfoStdOut.String())
-			t.Log("stderr: ", node2InfoStdErr.String())
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, node2Info.Run())
 
 		resp := new(gen.NodeInfoResponseJson)
-		err = json.Unmarshal(node2InfoStdOut.Bytes(), resp)
-		if err != nil {
-			t.Error(err)
-			return
-		}
+		be.NilErr(t, json.Unmarshal(node2InfoStdOut.Bytes(), resp))
 
-		if len(resp.WorkloadSummaries) != 3 {
-			t.Error("expected 3 workload, got ", len(resp.WorkloadSummaries))
-			return
-		}
+		be.Equal(t, 3, len(resp.WorkloadSummaries))
 
 		passed = true
 		cancel()
 	}()
 
-	err = nex1.Wait()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !passed {
-		t.Fatal("failed to multi clone workload")
-	}
+	be.NilErr(t, nex1.Wait())
+	be.True(t, passed)
 }
