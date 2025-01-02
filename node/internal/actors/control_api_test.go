@@ -23,7 +23,7 @@ func TestControlApiAgent(t *testing.T) {
 	s := startNatsServer(t, workingDir)
 	defer s.Shutdown()
 
-	nc, err := nats.Connect(nats.DefaultURL)
+	nc, err := nats.Connect(s.ClientURL())
 	be.NilErr(t, err)
 
 	kp, err := nkeys.CreateServer()
