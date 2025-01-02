@@ -8,11 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,35 +20,6 @@ import (
 	"github.com/synadia-io/nex/api/nodecontrol/gen"
 	"github.com/synadia-io/nex/models"
 )
-
-func buildTestBinary(t testing.TB, binMain string, workingDir string) (string, error) {
-	t.Helper()
-	binName := func() string {
-		if runtime.GOOS == "windows" {
-			return "test.exe"
-		}
-		return "test"
-	}
-
-	if _, err := os.Stat(filepath.Join(workingDir, binName())); err == nil {
-		return filepath.Join(workingDir, binName()), nil
-	}
-
-	cmd := exec.Command("go", "build", "-o", filepath.Join(workingDir, binName()), binMain)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	err := cmd.Run()
-	if err != nil {
-		return "", err
-	}
-
-	if _, err := os.Stat(filepath.Join(workingDir, binName())); err != nil {
-		return "", err
-	}
-
-	return filepath.Join(workingDir, binName()), nil
-}
 
 func TestDirectStartService(t *testing.T) {
 	workingDir := t.TempDir()
