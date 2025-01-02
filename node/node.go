@@ -209,9 +209,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
 		// TODO: figure out why they're gone or how we can plug in our own impls
-		//goakt.WithTelemetry(telemetry),
-		//goakt.WithTracing(),
-		//goakt.WithSupervisorDirective(restartDirective),
+		// goakt.WithTelemetry(telemetry),
+		// goakt.WithTracing(),
+		// goakt.WithSupervisorDirective(restartDirective),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
 		return err
@@ -227,10 +227,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	restartDirective.WithLimit(3, 30*time.Second)
 
 	// start the root actors
-	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options),
+	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(*nn.options),
 		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 	)
-
 	if err != nil {
 		return err
 	}
@@ -248,7 +247,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats,
 		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 	)
-
 	if err != nil {
 		return err
 	}
@@ -274,7 +272,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		_, err = agentSuper.SpawnChild(nn.ctx, models.DirectStartActorName, actors.CreateDirectStartAgent(nn.ctx, nn.nc, pk, *nn.options, nn.options.Logger.WithGroup(models.DirectStartActorName), nn),
 			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 		)
-
 		if err != nil {
 			return err
 		}
@@ -320,7 +317,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	if len(wl) > 0 {
-		//direct-start_wdhGT117n7TOHpsasG2lRP
+		// direct-start_wdhGT117n7TOHpsasG2lRP
 		nn.options.Logger.Info("Existing state detected, Restoring now")
 		for _, c := range agentSuper.Children() {
 			wl := getWorkloads(c.Name())
@@ -426,15 +423,8 @@ func (nn *nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 		return nil, err
 	}
 
-	nexus, ok := nn.options.Tags[models.TagNexus]
-	if !ok {
-		nexus = "_"
-		nn.options.Logger.Warn("Nexus tag not found when responding to ping request")
-	}
-
 	resp := &actorproto.PingNodeResponse{
 		NodeId:        pk,
-		Nexus:         nexus,
 		Version:       VERSION,
 		StartedAt:     st,
 		Tags:          nn.options.Tags,
@@ -477,8 +467,8 @@ func (nn *nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 	}
 	resp := &actorproto.NodeInfo{
 		Id: pk,
-		//FINDME
-		//TargetXkey: nn.options.
+		// FINDME
+		// TargetXkey: nn.options.
 		Tags:    nn.options.Tags,
 		Uptime:  time.Since(nn.startedAt).String(),
 		Version: VERSION,

@@ -23,8 +23,10 @@ import (
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
-const ControlAPIActorName = "control_api"
-const DefaultAskDuration = 10 * time.Second
+const (
+	ControlAPIActorName = "control_api"
+	DefaultAskDuration  = 10 * time.Second
+)
 
 const (
 	AuctionResponseType       = "io.nats.nex.v2.auction_response"
@@ -95,7 +97,6 @@ func (a *ControlAPI) PreStart(ctx context.Context) error {
 }
 
 func (a *ControlAPI) PostStop(ctx context.Context) error {
-
 	return nil
 }
 
@@ -386,7 +387,7 @@ findWorkload:
 		for _, grandchild := range child.Children() { // iterate over all workloads
 			if grandchild.Name() == workloadId {
 				askResp, err = api.self.Ask(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId}, DefaultAskDuration)
-				//err = api.self.Tell(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId})
+				// err = api.self.Tell(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId})
 				if err != nil {
 					api.logger.Error("Failed to stop workload", slog.Any("error", err))
 					models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("Failed to stop workload: %s", err))
@@ -477,7 +478,7 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		}
 
 		ticker := time.NewTicker(100 * time.Millisecond)
-		for _ = range ticker.C {
+		for range ticker.C {
 			if agentSuper.ChildrenCount() == 0 {
 				ticker.Stop()
 				cancel()

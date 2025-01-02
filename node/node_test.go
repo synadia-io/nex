@@ -90,3 +90,6 @@ resource directory does not exist` {
 		t.Fatal("failed to return expected errors")
 	}
 }
+
+func TestCallbackFunctions(t *testing.T) {
+}
