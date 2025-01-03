@@ -348,6 +348,8 @@ type Up struct {
 	HideWorkloadLogs                 bool              `name:"hide-workload-logs" help:"Hide logs from workloads" default:"false"`
 	ShowSystemLogs                   bool              `name:"system-logs" help:"Show verbose level logs from inside actor framework" default:"false" hidden:""`
 	OCICache                         string            `name:"oci-cache" help:"Path to OCI cache registry" placeholder:"localhost:5000"`
+	StartMessage                     string            `name:"start-message" help:"Message to display on the successful start of a workload" placeholder:"Great job!"`
+	StopMessage                      string            `name:"stop-message" help:"Message to display on the successful stop of a workload" placeholder:"Goodbye!"`
 
 	HostServicesConfig HostServicesConfig `embed:"" prefix:"hostservices." group:"Host Services Configuration"`
 	OtelConfig         OtelConfig         `embed:"" prefix:"otel." group:"OpenTelemetry Configuration"`
@@ -435,6 +437,8 @@ func (u Up) Run(ctx context.Context, globals *Globals, n *Node) error {
 		options.WithValidIssuers(u.ValidIssuers),
 		options.WithOCICacheRegistry(u.OCICache),
 		options.WithDevMode(globals.DevMode),
+		options.WithStartWorkloadMessage(u.StartMessage),
+		options.WithStopWorkloadMessage(u.StopMessage),
 		options.WithOTelOptions(options.OTelOptions{
 			MetricsEnabled:   u.OtelConfig.OtelMetrics,
 			MetricsPort:      u.OtelConfig.OtelMetricsPort,

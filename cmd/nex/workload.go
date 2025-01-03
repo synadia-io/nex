@@ -17,9 +17,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"time"
-
 	"strings"
+	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/synadia-io/nex/api/nodecontrol"
@@ -239,8 +238,14 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		if resp.Started {
 			if r.NodeId != "" {
 				fmt.Printf("Workload %s [%s] started on node %s\n", r.WorkloadName, resp.Id, r.NodeId)
+				if resp.Message != "" {
+					fmt.Println(resp.Message)
+				}
 			} else {
 				fmt.Printf("Workload %s [%s] started\n", r.WorkloadName, resp.Id)
+				if resp.Message != "" {
+					fmt.Println(resp.Message)
+				}
 			}
 		} else {
 			fmt.Printf("Workload %s failed to start\n", r.WorkloadName)
@@ -289,6 +294,9 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 
 	if resp.Stopped {
 		fmt.Printf("Workload %s stopped\n", s.WorkloadId)
+		if resp.Message != "" {
+			fmt.Println(resp.Message)
+		}
 	} else {
 		fmt.Printf("Workload %s failed to stop\n", s.WorkloadId)
 	}
@@ -779,7 +787,6 @@ func (b BundleWorkload) Run(ctx context.Context, globals *Globals) error {
 		_, err = io.Copy(tw, file)
 		return err
 	})
-
 	if err != nil {
 		return err
 	}

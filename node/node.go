@@ -94,8 +94,10 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			HostServiceOptions: models.HostServiceOptions{
 				Services: make(map[string]models.ServiceConfig),
 			},
-			OCICacheRegistry: "",
-			DevMode:          false,
+			OCICacheRegistry:     "",
+			DevMode:              false,
+			StartWorkloadMessage: "",
+			StopWorkloadMessage:  "",
 		},
 	}
 
@@ -209,9 +211,9 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		goakt.WithPassivationDisabled(),
 		// In the non-v2 version of goakt, these functions were supported.
 		// TODO: figure out why they're gone or how we can plug in our own impls
-		//goakt.WithTelemetry(telemetry),
-		//goakt.WithTracing(),
-		//goakt.WithSupervisorDirective(restartDirective),
+		// goakt.WithTelemetry(telemetry),
+		// goakt.WithTracing(),
+		// goakt.WithSupervisorDirective(restartDirective),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
 		return err
@@ -230,7 +232,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options),
 		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 	)
-
 	if err != nil {
 		return err
 	}
@@ -248,7 +249,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats,
 		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 	)
-
 	if err != nil {
 		return err
 	}
@@ -274,7 +274,6 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		_, err = agentSuper.SpawnChild(nn.ctx, models.DirectStartActorName, actors.CreateDirectStartAgent(nn.ctx, nn.nc, pk, *nn.options, nn.options.Logger.WithGroup(models.DirectStartActorName), nn),
 			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 		)
-
 		if err != nil {
 			return err
 		}
@@ -320,7 +319,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	if len(wl) > 0 {
-		//direct-start_wdhGT117n7TOHpsasG2lRP
+		// direct-start_wdhGT117n7TOHpsasG2lRP
 		nn.options.Logger.Info("Existing state detected, Restoring now")
 		for _, c := range agentSuper.Children() {
 			wl := getWorkloads(c.Name())
@@ -477,8 +476,8 @@ func (nn *nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 	}
 	resp := &actorproto.NodeInfo{
 		Id: pk,
-		//FINDME
-		//TargetXkey: nn.options.
+		// FINDME
+		// TargetXkey: nn.options.
 		Tags:    nn.options.Tags,
 		Uptime:  time.Since(nn.startedAt).String(),
 		Version: VERSION,
@@ -728,4 +727,12 @@ func (nn *nexNode) getState() (map[string]*actorproto.StartWorkload, error) {
 	}
 
 	return reqs, nil
+}
+
+func (nn *nexNode) StartWorkloadMetadata() string {
+	return nn.options.StartWorkloadMessage
+}
+
+func (nn *nexNode) StopWorkloadMetadata() string {
+	return nn.options.StopWorkloadMessage
 }
