@@ -15,21 +15,16 @@ import (
 
 func TestAgentSupervisor(t *testing.T) {
 	ctx := context.Background()
-	tk := testkit.New(ctx, t)
 
 	as := &AgentSupervisor{
 		logger:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 		nodeOptions: models.NodeOptions{},
 	}
 
-	t.Cleanup(func() {
-		tk.Shutdown(ctx)
-	})
-
+	tk := testkit.New(ctx, t)
 	t.Run("Send QueryWorkloads Message", func(t *testing.T) {
 		tk.Spawn(ctx, AgentSupervisorActorName, as)
 		probe := tk.NewProbe(ctx)
-		time.Sleep(250 * time.Millisecond)
 		msg := new(actorproto.QueryWorkloads)
 		probe.SendSync(AgentSupervisorActorName, msg, time.Second)
 		resp := &actorproto.WorkloadList{
@@ -43,10 +38,13 @@ func TestAgentSupervisor(t *testing.T) {
 	t.Run("Send SetLameDuck Message", func(t *testing.T) {
 		tk.Spawn(ctx, AgentSupervisorActorName, as)
 		probe := tk.NewProbe(ctx)
-		time.Sleep(250 * time.Millisecond)
 		msg := new(actorproto.SetLameDuck)
 		probe.Send(AgentSupervisorActorName, msg)
 		probe.ExpectNoMessage()
 		probe.Stop()
+	})
+
+	t.Cleanup(func() {
+		tk.Shutdown(ctx)
 	})
 }
