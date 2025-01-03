@@ -10,6 +10,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+var _ NodeCallback = (*mockNode)(nil)
+
 type mockNode struct {
 	options *models.NodeOptions
 }
@@ -79,3 +81,6 @@ func (n mockNode) GetRunRequest(string, string) (*actorproto.StartWorkload, erro
 func (n mockNode) DeleteRunRequest(string, string) error {
 	return nil
 }
+
+func (n mockNode) StartWorkloadMessage() string { return "" }
+func (n mockNode) StopWorkloadMessage() string  { return "" }
