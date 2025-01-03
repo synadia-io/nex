@@ -23,8 +23,10 @@ import (
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
-const ControlAPIActorName = "control_api"
-const DefaultAskDuration = 10 * time.Second
+const (
+	ControlAPIActorName = "control_api"
+	DefaultAskDuration  = 10 * time.Second
+)
 
 const (
 	AuctionResponseType       = "io.nats.nex.v2.auction_response"
@@ -59,6 +61,8 @@ type NodeCallback interface {
 	EncryptPayload([]byte, string) ([]byte, string, error)
 	DecryptPayload([]byte) ([]byte, error)
 	EmitEvent(string, json.RawMessage) error
+	StartWorkloadMessage() string
+	StopWorkloadMessage() string
 }
 
 type StateCallback interface {
@@ -95,7 +99,6 @@ func (a *ControlAPI) PreStart(ctx context.Context) error {
 }
 
 func (a *ControlAPI) PostStop(ctx context.Context) error {
-
 	return nil
 }
 
@@ -362,8 +365,9 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
 		return
 	}
-
-	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(&workloadStarted), "")
+	resp := startResponseFromProto(&workloadStarted)
+	resp.Message = api.nodeCallback.StartWorkloadMessage()
+	models.RespondEnvelope(m, RunResponseType, 200, resp, "")
 }
 
 func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
@@ -386,7 +390,7 @@ findWorkload:
 		for _, grandchild := range child.Children() { // iterate over all workloads
 			if grandchild.Name() == workloadId {
 				askResp, err = api.self.Ask(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId}, DefaultAskDuration)
-				//err = api.self.Tell(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId})
+				// err = api.self.Tell(context.Background(), child, &actorproto.StopWorkload{Namespace: namespace, WorkloadId: workloadId})
 				if err != nil {
 					api.logger.Error("Failed to stop workload", slog.Any("error", err))
 					models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("Failed to stop workload: %s", err))
@@ -418,7 +422,9 @@ findWorkload:
 		models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
 		return
 	}
-	models.RespondEnvelope(m, StopResponseType, 200, stopResponseFromProto(&workloadStopped), "")
+	resp := stopResponseFromProto(&workloadStopped)
+	resp.Message = api.nodeCallback.StopWorkloadMessage()
+	models.RespondEnvelope(m, StopResponseType, 200, resp, "")
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
@@ -477,7 +483,7 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		}
 
 		ticker := time.NewTicker(100 * time.Millisecond)
-		for _ = range ticker.C {
+		for range ticker.C {
 			if agentSuper.ChildrenCount() == 0 {
 				ticker.Stop()
 				cancel()

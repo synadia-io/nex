@@ -83,7 +83,7 @@ func TestDirectStartService(t *testing.T) {
 
 		be.Equal(t, 0, len(cmdstderr.Bytes()))
 
-		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started on node (?P<node>[A-Z0-9]+)$`)
+		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started on node (?P<node>[A-Z0-9]+)\n.*$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(cmdstdout.String()))
 		be.Equal(t, 3, len(match))
 		be.Equal(t, pub, match[2])
@@ -143,7 +143,7 @@ func TestDirectStartFunction(t *testing.T) {
 
 		be.Equal(t, 0, len(cmdstderr.Bytes()))
 
-		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
+		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started\n.*$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(cmdstdout.String()))
 		be.Equal(t, 2, len(match))
 		time.Sleep(500 * time.Millisecond)
@@ -244,7 +244,7 @@ func TestDirectStop(t *testing.T) {
 
 		be.Equal(t, 0, len(cmdstderr.Bytes()))
 
-		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
+		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started\n.*$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(cmdstdout.String()))
 		be.Equal(t, 2, len(match))
 
@@ -259,6 +259,7 @@ func TestDirectStop(t *testing.T) {
 		be.NilErr(t, cmd.Run())
 
 		be.In(t, "Workload "+workloadID+" stopped", cmdstdout.String())
+		be.In(t, "test workload stopped", cmdstdout.String())
 		cancel()
 	}()
 
@@ -297,6 +298,7 @@ func TestDirectStopNoWorkload(t *testing.T) {
 		be.NilErr(t, cmd.Run())
 
 		be.In(t, "Workload not found", cmdstdout.String())
+		be.NotIn(t, "test workload stopped", cmdstdout.String())
 		cancel()
 	}()
 

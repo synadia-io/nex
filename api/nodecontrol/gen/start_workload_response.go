@@ -12,6 +12,9 @@ type StartWorkloadResponseJson struct {
 	// Issuer corresponds to the JSON schema field "issuer".
 	Issuer string `json:"issuer"`
 
+	// Message corresponds to the JSON schema field "message".
+	Message string `json:"message"`
+
 	// Name corresponds to the JSON schema field "name".
 	Name string `json:"name"`
 
@@ -30,6 +33,9 @@ func (j *StartWorkloadResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["issuer"]; raw != nil && !ok {
 		return fmt.Errorf("field issuer in StartWorkloadResponseJson: required")
+	}
+	if _, ok := raw["message"]; raw != nil && !ok {
+		return fmt.Errorf("field message in StartWorkloadResponseJson: required")
 	}
 	if _, ok := raw["name"]; raw != nil && !ok {
 		return fmt.Errorf("field name in StartWorkloadResponseJson: required")

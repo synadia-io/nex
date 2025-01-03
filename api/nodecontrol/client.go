@@ -11,9 +11,7 @@ import (
 	"github.com/synadia-io/nex/models"
 )
 
-var (
-	DefaultRequestTimeout = 5 * time.Second
-)
+var DefaultRequestTimeout = 5 * time.Second
 
 type ControlAPIClient struct {
 	nc     *nats.Conn
