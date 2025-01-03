@@ -94,8 +94,10 @@ func NewNexNode(serverKey nkeys.KeyPair, nc *nats.Conn, opts ...models.NodeOptio
 			HostServiceOptions: models.HostServiceOptions{
 				Services: make(map[string]models.ServiceConfig),
 			},
-			OCICacheRegistry: "",
-			DevMode:          false,
+			OCICacheRegistry:     "",
+			DevMode:              false,
+			StartWorkloadMessage: "",
+			StopWorkloadMessage:  "",
 		},
 	}
 
@@ -718,4 +720,12 @@ func (nn *nexNode) getState() (map[string]*actorproto.StartWorkload, error) {
 	}
 
 	return reqs, nil
+}
+
+func (nn *nexNode) StartWorkloadMessage() string {
+	return nn.options.StartWorkloadMessage
+}
+
+func (nn *nexNode) StopWorkloadMessage() string {
+	return nn.options.StopWorkloadMessage
 }

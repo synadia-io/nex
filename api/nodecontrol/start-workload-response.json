@@ -15,13 +15,17 @@
     },
     "started": {
       "type": "boolean"
+    },
+    "message": {
+      "type": "string"
     }
   },
   "required": [
     "id",
     "issuer",
     "name",
-    "started"
+    "started",
+    "message"
   ],
   "definitions": {},
   "additionalProperties": false

@@ -61,6 +61,8 @@ type NodeCallback interface {
 	EncryptPayload([]byte, string) ([]byte, string, error)
 	DecryptPayload([]byte) ([]byte, error)
 	EmitEvent(string, json.RawMessage) error
+	StartWorkloadMessage() string
+	StopWorkloadMessage() string
 }
 
 type StateCallback interface {
@@ -363,8 +365,9 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		models.RespondEnvelope(m, RunResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
 		return
 	}
-
-	models.RespondEnvelope(m, RunResponseType, 200, startResponseFromProto(&workloadStarted), "")
+	resp := startResponseFromProto(&workloadStarted)
+	resp.Message = api.nodeCallback.StartWorkloadMessage()
+	models.RespondEnvelope(m, RunResponseType, 200, resp, "")
 }
 
 func (api *ControlAPI) handleUndeploy(m *nats.Msg) {
@@ -419,7 +422,9 @@ findWorkload:
 		models.RespondEnvelope(m, StopResponseType, 500, "", fmt.Sprintf("failed to unmarshal workload started response: %s", err))
 		return
 	}
-	models.RespondEnvelope(m, StopResponseType, 200, stopResponseFromProto(&workloadStopped), "")
+	resp := stopResponseFromProto(&workloadStopped)
+	resp.Message = api.nodeCallback.StopWorkloadMessage()
+	models.RespondEnvelope(m, StopResponseType, 200, resp, "")
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {

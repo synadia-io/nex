@@ -64,7 +64,7 @@ func TestCopyWorkload(t *testing.T) {
 
 		be.Equal(t, "ok", string(msg.Data))
 
-		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
+		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started\n.*$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(origStdOut.String()))
 		be.Equal(t, 2, len(match))
 		origWorkloadId := match[1]
@@ -134,7 +134,7 @@ func TestMultipleCopyWorkload(t *testing.T) {
 		origDeploy.Stdout = origStdOut
 		be.NilErr(t, origDeploy.Run())
 
-		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started$`)
+		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started\n.*$`)
 		match := re.FindStringSubmatch(strings.TrimSpace(origStdOut.String()))
 		be.Equal(t, 2, len(match))
 		origWorkloadId := match[1]

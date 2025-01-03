@@ -26,6 +26,9 @@ type NodeOptions struct {
 	OCICacheRegistry      string
 	DevMode               bool
 
+	StartWorkloadMessage string
+	StopWorkloadMessage  string
+
 	Errs error
 }
 
@@ -133,6 +136,18 @@ func WithOCICacheRegistry(r string) NodeOption {
 func WithDevMode(b bool) NodeOption {
 	return func(n *NodeOptions) {
 		n.DevMode = b
+	}
+}
+
+func WithStartWorkloadMessage(s string) NodeOption {
+	return func(n *NodeOptions) {
+		n.StartWorkloadMessage = s
+	}
+}
+
+func WithStopWorkloadMessage(s string) NodeOption {
+	return func(n *NodeOptions) {
+		n.StopWorkloadMessage = s
 	}
 }
 

@@ -12,12 +12,16 @@
     },
     "stopped": {
       "type": "boolean"
+    },
+    "message": {
+      "type": "string"
     }
   },
   "required": [
     "id",
     "issuer",
-    "stopped"
+    "stopped",
+    "message"
   ],
   "definitions": {},
   "additionalProperties": false
