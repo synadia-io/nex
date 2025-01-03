@@ -3,17 +3,11 @@ package actors
 import (
 	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nex/models"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-)
-
-const (
-	NodeXkey    string = "SXAAJQZR4DLEWWUAIDYHIV3JRXNHYMKV5O3POAWXQLATMPAF2OWLJTZ4BM"
-	NodeXkeyPub string = "XC6LBRSGPEQTOFBYEII2DX2RVWXEK27BARNJMX2V3WIKR6XIWFLRYYZY"
 )
 
 type mockNode struct {
@@ -32,8 +26,8 @@ func (n *mockNode) Auction(auctionId string, agentType []string, tags map[string
 	return &actorproto.AuctionResponse{
 		BidderId:   "abc123",
 		Version:    "0.0.0",
-		TargetXkey: NodeXkeyPub,
-		StartedAt:  timestamppb.New(time.Now()),
+		TargetXkey: "XNODEKEY",
+		StartedAt:  timestamppb.Now(),
 		Tags:       n.options.Tags,
 		Status:     make(map[string]int32),
 	}, nil
@@ -46,7 +40,7 @@ func (n mockNode) Ping() (*actorproto.PingNodeResponse, error) {
 		TargetXkey:    "XNODEXKEY",
 		StartedAt:     timestamppb.Now(),
 		Tags:          n.options.Tags,
-		RunningAgents: map[string]int32{},
+		RunningAgents: make(map[string]int32),
 	}, nil
 }
 
