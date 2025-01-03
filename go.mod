@@ -11,9 +11,9 @@ require (
 	github.com/nats-io/nuid v1.0.1
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/stretchr/testify v1.10.0
-	github.com/tochemey/goakt/v2 v2.10.2
+	github.com/tochemey/goakt/v2 v2.11.0
 	golang.org/x/sys v0.28.0
-	google.golang.org/protobuf v1.36.0
+	google.golang.org/protobuf v1.36.1
 	oras.land/oras-go/v2 v2.5.0
 )
 
@@ -30,6 +30,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.6.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/deckarep/golang-set/v2 v2.7.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/flowchartsman/retry v1.2.0 // indirect
 	github.com/google/btree v1.1.3 // indirect

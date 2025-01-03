@@ -229,7 +229,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	restartDirective.WithLimit(3, 30*time.Second)
 
 	// start the root actors
-	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(nn.actorSystem, *nn.options),
+	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(*nn.options),
 		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
 	)
 	if err != nil {
@@ -425,15 +425,8 @@ func (nn *nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 		return nil, err
 	}
 
-	nexus, ok := nn.options.Tags[models.TagNexus]
-	if !ok {
-		nexus = "_"
-		nn.options.Logger.Warn("Nexus tag not found when responding to ping request")
-	}
-
 	resp := &actorproto.PingNodeResponse{
 		NodeId:        pk,
-		Nexus:         nexus,
 		Version:       VERSION,
 		StartedAt:     st,
 		Tags:          nn.options.Tags,
