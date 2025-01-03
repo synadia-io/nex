@@ -10,6 +10,7 @@ import (
 
 	"disorder.dev/shandler"
 	"github.com/nats-io/nats.go"
+	"github.com/synadia-io/nex/models"
 )
 
 func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string, showSystemLogs, hideWorkloadLogs bool) *slog.Logger {
@@ -85,8 +86,8 @@ func configureLogger(cfg *Globals, nc *nats.Conn, serverPublicKey string, showSy
 		}
 	}
 	if slices.Contains(cfg.Target, "nats") {
-		natsLogSubject := fmt.Sprintf("$NEX.logs.%s.stdout", serverPublicKey)
-		natsErrLogSubject := fmt.Sprintf("$NEX.logs.%s.stderr", serverPublicKey)
+		natsLogSubject := fmt.Sprintf("%s.%s.%s.stdout", models.LogAPIPrefix, models.NodeSystemNamespace, serverPublicKey)
+		natsErrLogSubject := fmt.Sprintf("%s.%s.%s.stderr", models.LogAPIPrefix, models.NodeSystemNamespace, serverPublicKey)
 		stdoutWriters = append(stdoutWriters, NewNatsLogger(nc, natsLogSubject))
 		stderrWriters = append(stderrWriters, NewNatsLogger(nc, natsErrLogSubject))
 	}
