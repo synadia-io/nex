@@ -729,10 +729,10 @@ func (nn *nexNode) getState() (map[string]*actorproto.StartWorkload, error) {
 	return reqs, nil
 }
 
-func (nn *nexNode) StartWorkloadMetadata() string {
+func (nn *nexNode) StartWorkloadMessage() string {
 	return nn.options.StartWorkloadMessage
 }
 
-func (nn *nexNode) StopWorkloadMetadata() string {
+func (nn *nexNode) StopWorkloadMessage() string {
 	return nn.options.StopWorkloadMessage
 }

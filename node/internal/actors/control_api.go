@@ -61,8 +61,8 @@ type NodeCallback interface {
 	EncryptPayload([]byte, string) ([]byte, string, error)
 	DecryptPayload([]byte) ([]byte, error)
 	EmitEvent(string, json.RawMessage) error
-	StartWorkloadMetadata() string
-	StopWorkloadMetadata() string
+	StartWorkloadMessage() string
+	StopWorkloadMessage() string
 }
 
 type StateCallback interface {
@@ -366,7 +366,7 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		return
 	}
 	resp := startResponseFromProto(&workloadStarted)
-	resp.Message = api.nodeCallback.StartWorkloadMetadata()
+	resp.Message = api.nodeCallback.StartWorkloadMessage()
 	models.RespondEnvelope(m, RunResponseType, 200, resp, "")
 }
 
@@ -423,7 +423,7 @@ findWorkload:
 		return
 	}
 	resp := stopResponseFromProto(&workloadStopped)
-	resp.Message = api.nodeCallback.StopWorkloadMetadata()
+	resp.Message = api.nodeCallback.StopWorkloadMessage()
 	models.RespondEnvelope(m, StopResponseType, 200, resp, "")
 }
 
