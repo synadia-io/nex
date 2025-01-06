@@ -2,6 +2,7 @@ package actors
 
 import (
 	"context"
+	"io"
 	"log/slog"
 
 	"github.com/tochemey/goakt/v2/goaktpb"
@@ -16,8 +17,8 @@ const AgentSupervisorActorName = "agent_supervisor"
 
 var _ goakt.Actor = (*AgentSupervisor)(nil)
 
-func CreateAgentSupervisor(system goakt.ActorSystem, options models.NodeOptions) *AgentSupervisor {
-	return &AgentSupervisor{nodeOptions: options}
+func CreateAgentSupervisor(options models.NodeOptions) *AgentSupervisor {
+	return &AgentSupervisor{logger: slog.New(slog.NewTextHandler(io.Discard, nil)), nodeOptions: options}
 }
 
 // Agent manager is responsible for starting one agent per workload type, supplying it with
@@ -30,7 +31,6 @@ type AgentSupervisor struct {
 }
 
 func (s *AgentSupervisor) PreStart(ctx context.Context) error {
-
 	return nil
 }
 
