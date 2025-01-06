@@ -8,6 +8,10 @@
       "type": "string",
       "description": "A one-time identifier used to target deployments"
     },
+    "nexus": {
+      "type": "string",
+      "description": "The name of the nexus"
+    },
     "version": {
       "type": "string",
       "description": "The version of the node"
@@ -46,6 +50,7 @@
   },
   "required": [
     "bidder_id",
+    "nexus",
     "version",
     "uptime",
     "target_xkey",

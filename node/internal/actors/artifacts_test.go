@@ -14,21 +14,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 )
 
-func startNatsServer(t testing.TB, workingDir string) *server.Server {
+func startNatsServer(t testing.TB) (*server.Server, error) {
 	t.Helper()
 
 	s, err := server.NewServer(&server.Options{
 		Port:      -1,
 		JetStream: true,
-		StoreDir:  workingDir,
 	})
-	be.NilErr(t, err)
+
+	if err != nil {
+		return nil, err
+	}
 
 	go func() {
 		if err := server.Run(s); err != nil {
@@ -39,18 +40,22 @@ func startNatsServer(t testing.TB, workingDir string) *server.Server {
 	time.Sleep(1 * time.Second)
 
 	nc, err := nats.Connect(s.ClientURL())
-	be.NilErr(t, err)
-
+	if err != nil {
+		return nil, err
+	}
 	jsCtx, err := jetstream.New(nc)
-	be.NilErr(t, err)
-
+	if err != nil {
+		return nil, err
+	}
 	_, err = jsCtx.CreateKeyValue(context.TODO(), jetstream.KeyValueConfig{
 		Bucket: "registry",
 	})
-	be.NilErr(t, err)
+	if err != nil {
+		return nil, err
+	}
 	nc.Close()
 
-	return s
+	return s, nil
 }
 
 func createTestBinary(t testing.TB, tmpDir string) (string, string, int) {
@@ -97,7 +102,10 @@ func createTestBinary(t testing.TB, tmpDir string) (string, string, int) {
 }
 
 func prepNatsObjStoreArtifact(t testing.TB, workingDir, binPath string) (string, *nats.Conn, error) {
-	s := startNatsServer(t, t.TempDir())
+	s, err := startNatsServer(t)
+	if err != nil {
+		return "", nil, err
+	}
 
 	nc, err := nats.Connect(s.ClientURL())
 	if err != nil {

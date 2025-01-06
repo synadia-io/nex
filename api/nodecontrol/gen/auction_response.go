@@ -9,6 +9,9 @@ type AuctionResponseJson struct {
 	// A one-time identifier used to target deployments
 	BidderId string `json:"bidder_id"`
 
+	// The name of the nexus
+	Nexus string `json:"nexus"`
+
 	// The number of agents running and their workload counts
 	Status AuctionResponseJsonStatus `json:"status"`
 
@@ -48,6 +51,9 @@ func (j *AuctionResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["bidder_id"]; raw != nil && !ok {
 		return fmt.Errorf("field bidder_id in AuctionResponseJson: required")
+	}
+	if _, ok := raw["nexus"]; raw != nil && !ok {
+		return fmt.Errorf("field nexus in AuctionResponseJson: required")
 	}
 	if _, ok := raw["status"]; raw != nil && !ok {
 		return fmt.Errorf("field status in AuctionResponseJson: required")

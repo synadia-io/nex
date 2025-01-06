@@ -24,11 +24,12 @@ message PingNode {}
 
 message PingNodeResponse {
   string node_id = 1;
-  string version = 2;
-  string target_xkey = 3;
-  google.protobuf.Timestamp started_at = 4;
-  map<string, string> tags = 5;
-  map<string, int32> running_agents = 6;
+  string nexus = 2;
+  string version = 3;
+  string target_xkey = 4;
+  google.protobuf.Timestamp started_at = 5;
+  map<string, string> tags = 6;
+  map<string, int32> running_agents = 7;
 }
 
 message PingAgent {
@@ -71,11 +72,12 @@ message AuctionRequest {
 
 message AuctionResponse {
   string bidder_id = 1;
-  string version = 2;
-  string target_xkey = 3;
-  google.protobuf.Timestamp started_at = 4;
-  map<string, string> tags = 5;
-  map<string, int32> status = 6;
+  string nexus = 2;
+  string version = 3;
+  string target_xkey = 4;
+  google.protobuf.Timestamp started_at = 5;
+  map<string, string> tags = 6;
+  map<string, int32> status = 7;
 }
 
 // Sent by the control API actor to an agent actor to request a workload be started
@@ -152,12 +154,13 @@ message KillDirectStartProcess {}
 
 message GetNodeInfo {}
 message NodeInfo {
-  string id = 1;
-  map<string, string> tags = 2;
-  string target_xkey = 3;
-  string uptime = 4;
-  string version = 5;
-  repeated WorkloadSummary workloads = 6;
+  string nexus = 1;
+  string id = 2;
+  map<string, string> tags = 3;
+  string target_xkey = 4;
+  string uptime = 5;
+  string version = 6;
+  repeated WorkloadSummary workloads = 7;
 }
 
 message WorkloadSummary {
