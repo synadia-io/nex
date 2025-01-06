@@ -53,19 +53,18 @@ func CreateInternalNatsServer(serverPubKey string, options models.NodeOptions) (
 		ns.logger.Warn("DO NOT USE IN PRODUCTION: Running in dev mode, using default credentials")
 	}
 
-	hostUser, err := nkeys.CreateUser()
+	var err error
+	ns.hostUser, err = nkeys.CreateUser()
 	if err != nil {
 		options.Logger.Error("Failed to create host user", slog.Any("error", err))
 		return nil, err
 	}
-	ns.hostUser = hostUser
 
-	creds, err := ns.buildAgentCredentials()
+	ns.creds, err = ns.buildAgentCredentials()
 	if err != nil {
 		options.Logger.Error("Failed to build agent credentials", slog.Any("error", err))
 		return nil, err
 	}
-	ns.creds = creds
 
 	ns.storeDir = filepath.Join(options.ResourceDirectory, "inex-"+serverPubKey)
 	err = os.Mkdir(ns.storeDir, 0700)
@@ -74,13 +73,12 @@ func CreateInternalNatsServer(serverPubKey string, options models.NodeOptions) (
 		return nil, err
 	}
 
-	opts, err := ns.generateConfig()
+	ns.serverOptions, err = ns.generateConfig()
 	if err != nil {
 		options.Logger.Error("Failed to generate NATS server config", slog.Any("error", err))
 		return nil, err
 	}
 
-	ns.serverOptions = opts
 	return ns, nil
 }
 
@@ -108,6 +106,8 @@ func (s *InternalNatsServer) Receive(ctx *goakt.ReceiveContext) {
 		if err != nil {
 			ctx.Err(err)
 		}
+		// case addActor:
+		//
 	default:
 		ctx.Unhandled()
 	}
@@ -131,11 +131,13 @@ type AgentCredential struct {
 }
 
 type configTemplateData struct {
-	DevMode           bool
-	Credentials       map[string]*credentials
-	Connections       map[string]*nats.Conn
-	NexHostUserPublic string
-	NexHostUserSeed   string
+	DevMode              bool
+	Credentials          map[string]*credentials
+	Connections          map[string]*nats.Conn
+	NexHostUserPublic    string
+	NexHostUserSeed      string
+	NexAgentAPIPrefix    string
+	NexAgentAPINamespace string
 }
 
 type credentials struct {
@@ -179,7 +181,6 @@ func (ns *InternalNatsServer) startNatsServer(opts *server.Options) error {
 		MaxBytes:     50000000, // 50MB
 		MaxValueSize: 10000,    // 10KB
 	})
-
 	if err != nil {
 		return err
 	}
@@ -200,11 +201,13 @@ func (ns *InternalNatsServer) generateConfig() (*server.Options, error) {
 	}
 
 	data := &configTemplateData{
-		DevMode:           ns.devMode,
-		Credentials:       make(map[string]*credentials),
-		Connections:       make(map[string]*nats.Conn),
-		NexHostUserPublic: hostPub,
-		NexHostUserSeed:   string(hostSeed),
+		DevMode:              ns.devMode,
+		Credentials:          make(map[string]*credentials),
+		Connections:          make(map[string]*nats.Conn),
+		NexHostUserPublic:    hostPub,
+		NexHostUserSeed:      string(hostSeed),
+		NexAgentAPIPrefix:    models.AgentAPIPrefix,
+		NexAgentAPINamespace: models.NodeSystemNamespace,
 	}
 
 	for _, cred := range ns.creds {
@@ -275,53 +278,22 @@ func (ns *InternalNatsServer) generateTemplate(config *configTemplateData) ([]by
 }
 
 const (
-	configTemplate = `
-jetstream: true
+	configTemplate = `jetstream: true
 accounts: {
 	nexhost: {
 		jetstream: true
 		users: [
-      {{ if .DevMode }} { user: admin, password: password } {{ end }}
-			{nkey: "{{ .NexHostUserPublic }}"}
-		]
-		exports: [
-			{
-				service: hostint.>
-			}
-		],
-		imports: [
-			{{ range .Credentials }}
-			{
-				service: {subject: "agentint.{{ .WorkloadType }}.>", account: "{{ .WorkloadType }}"}
-			},
-			{
-				stream: {subject: agentevt.>, account: "{{ .WorkloadType }}"}, prefix: "{{ .WorkloadType }}"
-			},
-			{{ end }}
-		]
+      {{- if .DevMode }} { user: admin, password: password }, {{ end -}}
+			{ nkey: "{{ .NexHostUserPublic }}" }]
+		exports: [{ service: "{{ printf "%s.%s.>" .NexAgentAPIPrefix .NexAgentAPINamespace }}" }],
 	},
-	{{ range .Credentials }}
-	"{{ .WorkloadType }}": {
+	{{- range .Credentials }}
+	{{ .WorkloadType }}: {
 		jetstream: true
-		users: [
-			{nkey: "{{ .NkeyPublic }}"}
-		]
-		exports: [
-			{
-				service: "agentint.{{ .WorkloadType }}.>", accounts: [nexhost]
-			}
-			{
-				stream: agentevt.>, accounts: [nexhost]
-			}
-		]
-		imports: [
-			{
-				service: {account: nexhost, subject: "hostint.{{ .WorkloadType }}.>"}, to: "hostint.>"
-			}
-		]
-
+		users: [{ nkey: "{{ .NkeyPublic }}" }]
+		imports: [{ service: { account: nexhost, subject: "{{ printf "%s.%s.%s.>" $.NexAgentAPIPrefix $.NexAgentAPINamespace .WorkloadType }}" }}]
 	},
-	{{ end }}
+	{{ end -}}
 }
 no_sys_acc: true
 debug: true

@@ -6,6 +6,7 @@ const (
 	ControlAPIPrefix = "$NEX.control"
 	LogAPIPrefix     = "$NEX.logs"
 	EventAPIPrefix   = "$NEX.events"
+	AgentAPIPrefix   = "$NEX.agent"
 )
 
 // System only subjects
