@@ -17,8 +17,12 @@ func AgentAPIHeartbeatSubject(inAgentName string) string {
 	return fmt.Sprintf("%s.%s.%s.HEARTBEAT", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
 }
 
-func AgentAPIStartWorkloadSubject(inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
+func AgentAPIStartWorkloadSubscribeSubject(inAgentName string) string {
+	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.*", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
+}
+
+func AgentAPIStartWorkloadRequestSubject(inAgentName, inWorkloadId string) string {
+	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.%s", AgentAPIPrefix, NodeSystemNamespace, inAgentName, inWorkloadId)
 }
 
 func AgentAPIStopWorkloadSubject(inAgentName string) string {
