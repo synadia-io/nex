@@ -4,28 +4,13 @@
   "title": "AgentPingResponse",
   "type": "object",
   "properties": {
-    "node_id": {
-      "type": "string",
-      "description": "The unique identifier of the node on which the agent is running"
-    },
-    "target_xkey": {
+    "agent_xkey": {
       "type": "string",
       "description": "The target agents xkey"
     },
     "version": {
       "type": "string",
       "description": "The target agents version"
-    },
-    "tags": {
-      "type": "object",
-      "properties": {
-        "tags": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      }
     },
     "uptime": {
       "type": "string",
@@ -39,10 +24,8 @@
     }
   },
   "required": [
-    "node_id",
-    "target_xkey",
+    "agent_xkey",
     "version",
-    "tags",
     "uptime",
     "running_workloads"
   ],

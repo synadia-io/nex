@@ -6,17 +6,11 @@ import "encoding/json"
 import "fmt"
 
 type AgentPingResponse struct {
-	// The unique identifier of the node on which the agent is running
-	NodeId string `json:"node_id"`
+	// The target agents xkey
+	AgentXkey string `json:"agent_xkey"`
 
 	// RunningWorkloads corresponds to the JSON schema field "running_workloads".
 	RunningWorkloads []WorkloadSummary `json:"running_workloads"`
-
-	// Tags corresponds to the JSON schema field "tags".
-	Tags AgentPingResponseTags `json:"tags"`
-
-	// The target agents xkey
-	TargetXkey string `json:"target_xkey"`
 
 	// The uptime of the node
 	Uptime string `json:"uptime"`
@@ -25,30 +19,17 @@ type AgentPingResponse struct {
 	Version string `json:"version"`
 }
 
-type AgentPingResponseTags struct {
-	// Tags corresponds to the JSON schema field "tags".
-	Tags AgentPingResponseTagsTags `json:"tags,omitempty"`
-}
-
-type AgentPingResponseTagsTags map[string]string
-
 // UnmarshalJSON implements json.Unmarshaler.
 func (j *AgentPingResponse) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	if _, ok := raw["node_id"]; raw != nil && !ok {
-		return fmt.Errorf("field node_id in AgentPingResponse: required")
+	if _, ok := raw["agent_xkey"]; raw != nil && !ok {
+		return fmt.Errorf("field agent_xkey in AgentPingResponse: required")
 	}
 	if _, ok := raw["running_workloads"]; raw != nil && !ok {
 		return fmt.Errorf("field running_workloads in AgentPingResponse: required")
-	}
-	if _, ok := raw["tags"]; raw != nil && !ok {
-		return fmt.Errorf("field tags in AgentPingResponse: required")
-	}
-	if _, ok := raw["target_xkey"]; raw != nil && !ok {
-		return fmt.Errorf("field target_xkey in AgentPingResponse: required")
 	}
 	if _, ok := raw["uptime"]; raw != nil && !ok {
 		return fmt.Errorf("field uptime in AgentPingResponse: required")
