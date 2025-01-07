@@ -15,8 +15,8 @@ import (
 	"github.com/nats-io/nkeys"
 
 	"github.com/nats-io/natscli/columns"
-	"github.com/synadia-io/nex/api/nodecontrol"
-	"github.com/synadia-io/nex/api/nodecontrol/gen"
+	"github.com/synadia-io/nex/api"
+	gen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
 	options "github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/node"
@@ -68,7 +68,7 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdout, nil)))
 	if err != nil {
 		return err
 	}

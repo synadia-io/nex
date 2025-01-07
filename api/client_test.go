@@ -1,4 +1,4 @@
-package nodecontrol
+package api
 
 import (
 	"bytes"
@@ -17,7 +17,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 
-	"github.com/synadia-io/nex/api/nodecontrol/gen"
+	gen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/nex/test"
 )
@@ -181,7 +181,7 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 	encEnv, err := tAKey.Seal(envB, auctionResp[0].TargetXkey)
 	be.NilErr(t, err)
 
-	binPath := test.BuildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
+	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
 	resp, err := control.AuctionDeployWorkload(models.NodeSystemNamespace, auctionResp[0].BidderId, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
@@ -253,7 +253,7 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 	encEnv, err := tAKey.Seal(envB, test.Node1XkeyPublicKey)
 	be.NilErr(t, err)
 
-	binPath := test.BuildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
+	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
 	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
@@ -326,7 +326,7 @@ func TestUndeployWorkload(t *testing.T) {
 	encEnv, err := tAKey.Seal(envB, test.Node1XkeyPublicKey)
 	be.NilErr(t, err)
 
-	binPath := test.BuildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
+	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
 	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",
@@ -485,7 +485,7 @@ func TestCopyWorkload(t *testing.T) {
 	encEnv, err := tAKey.Seal(envB, test.Node1XkeyPublicKey)
 	be.NilErr(t, err)
 
-	binPath := test.BuildTestBinary(t, "../../test/testdata/forever/main.go", workingDir)
+	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
 	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequestJson{
 		Description:     "Test Workload",

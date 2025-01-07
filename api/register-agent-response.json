@@ -1,0 +1,10 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "io.nats.nex.v2.agent_register_response",
+    "title": "RegisterAgentResponse",
+    "type": "object",
+    "properties": {       
+    },
+    "required": [],
+    "additionalProperties": false
+}
