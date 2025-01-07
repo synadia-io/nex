@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/carlmjohnson/be"
-	"github.com/synadia-io/nex/api/nodecontrol/gen"
+	gen "github.com/synadia-io/nex/api/go"
 )
 
 func TestStartNode(t *testing.T) {

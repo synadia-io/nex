@@ -1,4 +1,4 @@
-package nodecontrol
+package api
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nuid"
-	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
+	nodegen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
 )
 

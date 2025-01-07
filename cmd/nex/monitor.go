@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/synadia-io/nex/api/nodecontrol"
+	"github.com/synadia-io/nex/api"
 	"golang.org/x/net/context"
 )
 
@@ -42,7 +42,7 @@ func (e *Events) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (l *Logs) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}

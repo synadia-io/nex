@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
-	"github.com/synadia-io/nex/api/nodecontrol"
-	"github.com/synadia-io/nex/api/nodecontrol/gen"
+	"github.com/synadia-io/nex/api"
+	gen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nats.go"
@@ -130,7 +130,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func (s StopWorkload) Run(ctx context.Context, globals *Globals, w *Workload) er
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ func (i InfoWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func (l ListWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}
@@ -485,7 +485,7 @@ func (c CopyWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	controller, err := nodecontrol.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
+	controller, err := api.NewControlApiClient(nc, slog.New(slog.NewTextHandler(os.Stdin, nil)))
 	if err != nil {
 		return err
 	}

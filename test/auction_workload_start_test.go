@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/carlmjohnson/be"
-	"github.com/synadia-io/nex/api/nodecontrol/gen"
+	gen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
 )
 

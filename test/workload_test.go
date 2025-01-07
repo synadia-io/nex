@@ -17,7 +17,7 @@ import (
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nex/api/nodecontrol/gen"
+	gen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
 )
 

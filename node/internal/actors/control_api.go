@@ -18,7 +18,7 @@ import (
 	"github.com/tochemey/goakt/v2/goaktpb"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	nodegen "github.com/synadia-io/nex/api/nodecontrol/gen"
+	nodegen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
