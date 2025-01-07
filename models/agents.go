@@ -38,14 +38,14 @@ func AgentAPIPingSubject(inAgentName string) string {
 }
 
 // User based
-func AgentAPIStartWorkloadSubject(inNamespace, inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.*", AgentAPIPrefix, inNamespace, inAgentName)
+func AgentAPIStartWorkloadSubject(inAgentName string) string {
+	return fmt.Sprintf("%s.*.%s.STARTWORKLOAD.*", AgentAPIPrefix, inAgentName)
 }
 
-func AgentAPIStopWorkloadSubject(inNamespace, inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.STOPWORKLOAD", AgentAPIPrefix, inNamespace, inAgentName)
+func AgentAPIStopWorkloadSubject(inAgentName string) string {
+	return fmt.Sprintf("%s.*.%s.STOPWORKLOAD", AgentAPIPrefix, inAgentName)
 }
 
-func AgentAPIQueryWorkloadSubject(inNamespace, inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.QUERYWORKLOAD", AgentAPIPrefix, inNamespace, inAgentName)
+func AgentAPIQueryWorkloadSubject(inAgentName string) string {
+	return fmt.Sprintf("%s.*.%s.QUERYWORKLOAD", AgentAPIPrefix, inAgentName)
 }
