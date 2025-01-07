@@ -100,7 +100,7 @@ func TestStartNexus(t *testing.T) {
 					continue
 				}
 
-				resp := []*gen.NodePingResponseJson{}
+				resp := []*gen.NodePingResponse{}
 				be.NilErr(t, json.Unmarshal(stdout.Bytes(), &resp))
 
 				if len(resp) == 3 {

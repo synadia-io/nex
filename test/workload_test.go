@@ -156,7 +156,7 @@ func TestDirectStartFunction(t *testing.T) {
 		be.NilErr(t, cmd.Run())
 
 		time.Sleep(500 * time.Millisecond)
-		var resp gen.WorkloadPingResponseJson
+		var resp gen.WorkloadPingResponse
 		be.NilErr(t, json.Unmarshal(cmdstdout.Bytes(), &resp))
 
 		be.Equal(t, models.WorkloadStateWarm, resp.WorkloadSummary.WorkloadState)

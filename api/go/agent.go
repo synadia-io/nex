@@ -5,9 +5,9 @@ package api
 import "encoding/json"
 import "fmt"
 
-type HeartbeatAgentJson map[string]interface{}
+type AgentHeartbeat map[string]interface{}
 
-type RegisterAgentRequestJson struct {
+type RegisterAgentRequest struct {
 	// A user friendly description of the agent
 	Description string `json:"description"`
 
@@ -25,36 +25,36 @@ type RegisterAgentRequestJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterAgentRequestJson) UnmarshalJSON(b []byte) error {
+func (j *RegisterAgentRequest) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["description"]; raw != nil && !ok {
-		return fmt.Errorf("field description in RegisterAgentRequestJson: required")
+		return fmt.Errorf("field description in RegisterAgentRequest: required")
 	}
 	if _, ok := raw["max_workloads"]; raw != nil && !ok {
-		return fmt.Errorf("field max_workloads in RegisterAgentRequestJson: required")
+		return fmt.Errorf("field max_workloads in RegisterAgentRequest: required")
 	}
 	if _, ok := raw["name"]; raw != nil && !ok {
-		return fmt.Errorf("field name in RegisterAgentRequestJson: required")
+		return fmt.Errorf("field name in RegisterAgentRequest: required")
 	}
 	if _, ok := raw["public_xkey"]; raw != nil && !ok {
-		return fmt.Errorf("field public_xkey in RegisterAgentRequestJson: required")
+		return fmt.Errorf("field public_xkey in RegisterAgentRequest: required")
 	}
 	if _, ok := raw["version"]; raw != nil && !ok {
-		return fmt.Errorf("field version in RegisterAgentRequestJson: required")
+		return fmt.Errorf("field version in RegisterAgentRequest: required")
 	}
-	type Plain RegisterAgentRequestJson
+	type Plain RegisterAgentRequest
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = RegisterAgentRequestJson(plain)
+	*j = RegisterAgentRequest(plain)
 	return nil
 }
 
-type RegisterAgentResponseJson struct {
+type RegisterAgentResponse struct {
 	// A message indicating the result of the registration
 	Message string `json:"message"`
 
@@ -63,22 +63,22 @@ type RegisterAgentResponseJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterAgentResponseJson) UnmarshalJSON(b []byte) error {
+func (j *RegisterAgentResponse) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["message"]; raw != nil && !ok {
-		return fmt.Errorf("field message in RegisterAgentResponseJson: required")
+		return fmt.Errorf("field message in RegisterAgentResponse: required")
 	}
 	if _, ok := raw["success"]; raw != nil && !ok {
-		return fmt.Errorf("field success in RegisterAgentResponseJson: required")
+		return fmt.Errorf("field success in RegisterAgentResponse: required")
 	}
-	type Plain RegisterAgentResponseJson
+	type Plain RegisterAgentResponse
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = RegisterAgentResponseJson(plain)
+	*j = RegisterAgentResponse(plain)
 	return nil
 }

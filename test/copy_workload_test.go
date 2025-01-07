@@ -82,7 +82,7 @@ func TestCopyWorkload(t *testing.T) {
 		node2Info.Stderr = node2InfoStdErr
 		be.NilErr(t, node2Info.Run())
 
-		resp := new(gen.NodeInfoResponseJson)
+		resp := new(gen.NodeInfoResponse)
 		be.NilErr(t, json.Unmarshal(node2InfoStdOut.Bytes(), resp))
 
 		be.Equal(t, 1, len(resp.WorkloadSummaries))
@@ -157,7 +157,7 @@ func TestMultipleCopyWorkload(t *testing.T) {
 		node2Info.Stderr = node2InfoStdErr
 		be.NilErr(t, node2Info.Run())
 
-		resp := new(gen.NodeInfoResponseJson)
+		resp := new(gen.NodeInfoResponse)
 		be.NilErr(t, json.Unmarshal(node2InfoStdOut.Bytes(), resp))
 
 		be.Equal(t, 3, len(resp.WorkloadSummaries))

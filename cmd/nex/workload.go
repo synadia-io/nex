@@ -135,11 +135,11 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		return err
 	}
 
-	startRequest := gen.StartWorkloadRequestJson{
+	startRequest := gen.StartWorkloadRequest{
 		Argv:        r.WorkloadArguments,
 		Description: r.WorkloadDescription,
 		Hash:        r.WorkloadHash,
-		HostServiceConfig: gen.SharedHostServiceJson{
+		HostServiceConfig: gen.HostService{
 			NatsUrl:      r.WorkloadHostServiceCreds.NatsUrl,
 			NatsUserJwt:  r.WorkloadHostServiceCreds.NatsUserJwt,
 			NatsUserSeed: r.WorkloadHostServiceCreds.NatsUserSeed,
@@ -173,14 +173,14 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 		}
 	}
 
-	var allResp []*gen.StartWorkloadResponseJson
+	var allResp []*gen.StartWorkloadResponse
 	if r.NodeId != "" {
 		enc_env_b, err := txk.Seal(env_b, startRequest.TargetPubXkey)
 		if err != nil {
 			return err
 		}
 		b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
-		startRequest.EncEnvironment = gen.SharedEncEnvJson{
+		startRequest.EncEnvironment = gen.EncEnv{
 			Base64EncryptedEnv: b64_enc_env,
 			EncryptedBy:        txk_pub,
 		}
@@ -217,7 +217,7 @@ func (r RunWorkload) Run(ctx context.Context, globals *Globals, w *Workload) err
 				return err
 			}
 			b64_enc_env := base64.StdEncoding.EncodeToString(enc_env_b)
-			startRequest.EncEnvironment = gen.SharedEncEnvJson{
+			startRequest.EncEnvironment = gen.EncEnv{
 				Base64EncryptedEnv: b64_enc_env,
 				EncryptedBy:        txk_pub,
 			}

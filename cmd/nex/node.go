@@ -283,7 +283,7 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	infoRequest := gen.NodeInfoRequestJson{
+	infoRequest := gen.NodeInfoRequest{
 		Namespace: globals.Namespace,
 	}
 

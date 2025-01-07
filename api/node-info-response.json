@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "io.nats.nex.v2.node_info_response",
-  "title": "InfoResponse",
+  "title": "NodeInfoResponse",
   "type": "object",
   "properties": {
     "node_id": {

@@ -167,7 +167,7 @@ func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
 	namespace := sSub[2]
 	workloadId := sSub[4]
 
-	req := new(nodegen.CloneWorkloadRequestJson)
+	req := new(nodegen.CloneWorkloadRequest)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal clone workload request", slog.Any("error", err))
@@ -242,13 +242,13 @@ func (api *ControlAPI) handleCloneWorkload(m *nats.Msg) {
 		EncryptedBy:        encBy,
 	}
 
-	ret := new(nodegen.CloneWorkloadResponseJson)
+	ret := new(nodegen.CloneWorkloadResponse)
 	ret.StartWorkloadRequest = startRequestFromProto(startRequest)
 	models.RespondEnvelope(m, AuctionResponseType, 200, ret, "")
 }
 
 func (api *ControlAPI) handleAuction(m *nats.Msg) {
-	req := new(nodegen.AuctionRequestJson)
+	req := new(nodegen.AuctionRequest)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Log(context.Background(), shandler.LevelTrace, "Failed to unmarshal auction request", slog.Any("error", err))
@@ -291,7 +291,7 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	req := new(nodegen.StartWorkloadRequestJson)
+	req := new(nodegen.StartWorkloadRequest)
 	err = json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal deploy request", slog.Any("error", err))
@@ -325,7 +325,7 @@ func (api *ControlAPI) handleDeploy(m *nats.Msg) {
 		return
 	}
 
-	req.EncEnvironment = nodegen.SharedEncEnvJson{
+	req.EncEnvironment = nodegen.EncEnv{
 		Base64EncryptedEnv: base64.StdEncoding.EncodeToString(newEncEnv),
 		EncryptedBy:        encTo,
 	}
@@ -428,7 +428,7 @@ findWorkload:
 }
 
 func (api *ControlAPI) handleInfo(m *nats.Msg) {
-	req := new(nodegen.NodeInfoRequestJson)
+	req := new(nodegen.NodeInfoRequest)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal info request", slog.Any("error", err))
@@ -449,7 +449,7 @@ func (api *ControlAPI) handleInfo(m *nats.Msg) {
 func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 	api.logger.Debug("Received lame duck request")
 
-	req := new(nodegen.LameduckRequestJson)
+	req := new(nodegen.LameduckRequest)
 	err := json.Unmarshal(m.Data, req)
 	if err != nil {
 		api.logger.Error("Failed to unmarshal lame duck request", slog.Any("error", err))
@@ -492,7 +492,7 @@ func (api *ControlAPI) handleLameDuck(m *nats.Msg) {
 		}
 	}()
 
-	models.RespondEnvelope(m, LameDuckResponseType, 200, &nodegen.LameduckResponseJson{Success: true}, "")
+	models.RespondEnvelope(m, LameDuckResponseType, 200, &nodegen.LameduckResponse{Success: true}, "")
 }
 
 func (api *ControlAPI) handlePing(m *nats.Msg) {

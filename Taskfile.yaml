@@ -30,7 +30,7 @@ tasks:
   gen-schema-api:
     dir: api
     cmds:
-      - go-jsonschema 
+      - go-jsonschema --struct-name-from-title
         --package api --tags json
         --schema-output=io.nats.nex.v2.agent_register_request=go/agent.go
         --schema-output=io.nats.nex.v2.agent_register_response=go/agent.go

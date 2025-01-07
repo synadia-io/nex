@@ -66,7 +66,7 @@ func TestAuctionDeploy(t *testing.T) {
 		err = nodels.Run()
 		be.NilErr(t, err)
 
-		lsout := []*gen.NodePingResponseJson{}
+		lsout := []*gen.NodePingResponse{}
 		err = json.Unmarshal(stdout.Bytes(), &lsout)
 		be.NilErr(t, err)
 

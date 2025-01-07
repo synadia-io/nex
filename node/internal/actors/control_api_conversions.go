@@ -7,7 +7,7 @@ import (
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
-func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.StartWorkload {
+func startRequestToProto(request *api.StartWorkloadRequest) *actorproto.StartWorkload {
 	return &actorproto.StartWorkload{
 		Argv:        request.Argv,
 		Description: request.Description,
@@ -32,16 +32,16 @@ func startRequestToProto(request *api.StartWorkloadRequestJson) *actorproto.Star
 	}
 }
 
-func startRequestFromProto(request *actorproto.StartWorkload) *api.StartWorkloadRequestJson {
-	return &api.StartWorkloadRequestJson{
+func startRequestFromProto(request *actorproto.StartWorkload) *api.StartWorkloadRequest {
+	return &api.StartWorkloadRequest{
 		Argv:        request.Argv,
 		Description: request.Description,
-		EncEnvironment: api.SharedEncEnvJson{
+		EncEnvironment: api.EncEnv{
 			Base64EncryptedEnv: request.Environment.Base64EncryptedEnv,
 			EncryptedBy:        request.Environment.EncryptedBy,
 		},
 		Hash: request.Hash,
-		HostServiceConfig: api.SharedHostServiceJson{
+		HostServiceConfig: api.HostService{
 			NatsUrl:      request.HostServiceConfig.NatsUrl,
 			NatsUserJwt:  request.HostServiceConfig.NatsUserJwt,
 			NatsUserSeed: request.HostServiceConfig.NatsUserSeed,
@@ -57,8 +57,8 @@ func startRequestFromProto(request *actorproto.StartWorkload) *api.StartWorkload
 	}
 }
 
-func startResponseFromProto(response *actorproto.WorkloadStarted) *api.StartWorkloadResponseJson {
-	return &api.StartWorkloadResponseJson{
+func startResponseFromProto(response *actorproto.WorkloadStarted) *api.StartWorkloadResponse {
+	return &api.StartWorkloadResponse{
 		Id:      response.Id,
 		Issuer:  response.Issuer,
 		Name:    response.Name,
@@ -66,18 +66,18 @@ func startResponseFromProto(response *actorproto.WorkloadStarted) *api.StartWork
 	}
 }
 
-func stopResponseFromProto(response *actorproto.WorkloadStopped) *api.StopWorkloadResponseJson {
-	return &api.StopWorkloadResponseJson{
+func stopResponseFromProto(response *actorproto.WorkloadStopped) *api.StopWorkloadResponse {
+	return &api.StopWorkloadResponse{
 		Id:      response.Id,
 		Issuer:  response.Issuer,
 		Stopped: response.Stopped,
 	}
 }
 
-func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJson {
-	ret := new(api.NodeInfoResponseJson)
+func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponse {
+	ret := new(api.NodeInfoResponse)
 	ret.NodeId = response.Id
-	ret.Tags = api.NodeInfoResponseJsonTags{Tags: response.Tags}
+	ret.Tags = api.NodeInfoResponseTags{Tags: response.Tags}
 	ret.TargetXkey = response.TargetXkey
 	ret.Uptime = response.Uptime
 	ret.Version = response.Version
@@ -96,7 +96,7 @@ func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJ
 	return ret
 }
 
-func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.AuctionResponseJson {
+func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.AuctionResponse {
 	convertedStatus := make(map[string]int)
 	if response.Status != nil {
 		for k, v := range response.Status {
@@ -104,35 +104,35 @@ func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.Auction
 		}
 	}
 
-	return &api.AuctionResponseJson{
+	return &api.AuctionResponse{
 		BidderId:   response.BidderId,
-		Status:     api.AuctionResponseJsonStatus{Status: convertedStatus},
-		Tags:       api.AuctionResponseJsonTags{Tags: response.Tags},
+		Status:     api.AuctionResponseStatus{Status: convertedStatus},
+		Tags:       api.AuctionResponseTags{Tags: response.Tags},
 		TargetXkey: response.TargetXkey,
 		Uptime:     time.Since(response.StartedAt.AsTime()).String(),
 		Version:    response.Version,
 	}
 }
 
-func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingResponseJson {
+func pingResponseFromProto(response *actorproto.PingNodeResponse) *api.NodePingResponse {
 	convertedStatus := make(map[string]int)
 	if response.RunningAgents != nil {
 		for k, v := range response.RunningAgents {
 			convertedStatus[k] = int(v)
 		}
 	}
-	return &api.NodePingResponseJson{
+	return &api.NodePingResponse{
 		NodeId:        response.NodeId,
-		RunningAgents: api.NodePingResponseJsonRunningAgents{Status: convertedStatus},
-		Tags:          api.NodePingResponseJsonTags{Tags: response.Tags},
+		RunningAgents: api.NodePingResponseRunningAgents{Status: convertedStatus},
+		Tags:          api.NodePingResponseTags{Tags: response.Tags},
 		TargetXkey:    response.TargetXkey,
 		Uptime:        time.Since(response.StartedAt.AsTime()).String(),
 		Version:       response.Version,
 	}
 }
 
-func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponseJson {
-	return &api.WorkloadPingResponseJson{
+func workloadPingResponseFromProto(response *actorproto.PingWorkloadResponse) *api.WorkloadPingResponse {
+	return &api.WorkloadPingResponse{
 		WorkloadSummary: &api.Workload{
 			Id:              response.Workload.Id,
 			Name:            response.Workload.Name,

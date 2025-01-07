@@ -5,7 +5,7 @@ package api
 import "encoding/json"
 import "fmt"
 
-type AuctionRequestJson struct {
+type AuctionRequest struct {
 	// The type of agent to auction for
 	AgentType []NexWorkload `json:"agent_type,omitempty"`
 
@@ -14,48 +14,48 @@ type AuctionRequestJson struct {
 
 	// A list of tags to associate with the node during auction. To be returned, node
 	// must satisfy ALL tags
-	Tags AuctionRequestJsonTags `json:"tags"`
+	Tags AuctionRequestTags `json:"tags"`
 }
 
 // A list of tags to associate with the node during auction. To be returned, node
 // must satisfy ALL tags
-type AuctionRequestJsonTags struct {
+type AuctionRequestTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AuctionRequestJsonTagsTags `json:"tags,omitempty"`
+	Tags AuctionRequestTagsTags `json:"tags,omitempty"`
 }
 
-type AuctionRequestJsonTagsTags map[string]string
+type AuctionRequestTagsTags map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionRequestJson) UnmarshalJSON(b []byte) error {
+func (j *AuctionRequest) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["auction_id"]; raw != nil && !ok {
-		return fmt.Errorf("field auction_id in AuctionRequestJson: required")
+		return fmt.Errorf("field auction_id in AuctionRequest: required")
 	}
 	if _, ok := raw["tags"]; raw != nil && !ok {
-		return fmt.Errorf("field tags in AuctionRequestJson: required")
+		return fmt.Errorf("field tags in AuctionRequest: required")
 	}
-	type Plain AuctionRequestJson
+	type Plain AuctionRequest
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = AuctionRequestJson(plain)
+	*j = AuctionRequest(plain)
 	return nil
 }
 
-type AuctionResponseJson struct {
+type AuctionResponse struct {
 	// A one-time identifier used to target deployments
 	BidderId string `json:"bidder_id"`
 
 	// The number of agents running and their workload counts
-	Status AuctionResponseJsonStatus `json:"status"`
+	Status AuctionResponseStatus `json:"status"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AuctionResponseJsonTags `json:"tags"`
+	Tags AuctionResponseTags `json:"tags"`
 
 	// The target nodes xkey
 	TargetXkey string `json:"target_xkey"`
@@ -68,113 +68,113 @@ type AuctionResponseJson struct {
 }
 
 // The number of agents running and their workload counts
-type AuctionResponseJsonStatus struct {
+type AuctionResponseStatus struct {
 	// Status corresponds to the JSON schema field "status".
-	Status AuctionResponseJsonStatusStatus `json:"status,omitempty"`
+	Status AuctionResponseStatusStatus `json:"status,omitempty"`
 }
 
-type AuctionResponseJsonStatusStatus map[string]int
+type AuctionResponseStatusStatus map[string]int
 
-type AuctionResponseJsonTags struct {
+type AuctionResponseTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AuctionResponseJsonTagsTags `json:"tags,omitempty"`
+	Tags AuctionResponseTagsTags `json:"tags,omitempty"`
 }
 
-type AuctionResponseJsonTagsTags map[string]string
+type AuctionResponseTagsTags map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionResponseJson) UnmarshalJSON(b []byte) error {
+func (j *AuctionResponse) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["bidder_id"]; raw != nil && !ok {
-		return fmt.Errorf("field bidder_id in AuctionResponseJson: required")
+		return fmt.Errorf("field bidder_id in AuctionResponse: required")
 	}
 	if _, ok := raw["status"]; raw != nil && !ok {
-		return fmt.Errorf("field status in AuctionResponseJson: required")
+		return fmt.Errorf("field status in AuctionResponse: required")
 	}
 	if _, ok := raw["tags"]; raw != nil && !ok {
-		return fmt.Errorf("field tags in AuctionResponseJson: required")
+		return fmt.Errorf("field tags in AuctionResponse: required")
 	}
 	if _, ok := raw["target_xkey"]; raw != nil && !ok {
-		return fmt.Errorf("field target_xkey in AuctionResponseJson: required")
+		return fmt.Errorf("field target_xkey in AuctionResponse: required")
 	}
 	if _, ok := raw["uptime"]; raw != nil && !ok {
-		return fmt.Errorf("field uptime in AuctionResponseJson: required")
+		return fmt.Errorf("field uptime in AuctionResponse: required")
 	}
 	if _, ok := raw["version"]; raw != nil && !ok {
-		return fmt.Errorf("field version in AuctionResponseJson: required")
+		return fmt.Errorf("field version in AuctionResponse: required")
 	}
-	type Plain AuctionResponseJson
+	type Plain AuctionResponse
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = AuctionResponseJson(plain)
+	*j = AuctionResponse(plain)
 	return nil
 }
 
-type CloneWorkloadRequestJson struct {
+type CloneWorkloadRequest struct {
 	// NewTargetXkey corresponds to the JSON schema field "new_target_xkey".
 	NewTargetXkey string `json:"new_target_xkey"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *CloneWorkloadRequestJson) UnmarshalJSON(b []byte) error {
+func (j *CloneWorkloadRequest) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["new_target_xkey"]; raw != nil && !ok {
-		return fmt.Errorf("field new_target_xkey in CloneWorkloadRequestJson: required")
+		return fmt.Errorf("field new_target_xkey in CloneWorkloadRequest: required")
 	}
-	type Plain CloneWorkloadRequestJson
+	type Plain CloneWorkloadRequest
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = CloneWorkloadRequestJson(plain)
+	*j = CloneWorkloadRequest(plain)
 	return nil
 }
 
-type CloneWorkloadResponseJson struct {
+type CloneWorkloadResponse struct {
 	// StartWorkloadRequest corresponds to the JSON schema field
 	// "start_workload_request".
-	StartWorkloadRequest *StartWorkloadRequestJson `json:"start_workload_request,omitempty"`
+	StartWorkloadRequest *StartWorkloadRequest `json:"start_workload_request,omitempty"`
 }
 
 type NexWorkload string
 
-type NodeInfoRequestJson struct {
+type NodeInfoRequest struct {
 	// Namespace of the node
 	Namespace string `json:"namespace"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodeInfoRequestJson) UnmarshalJSON(b []byte) error {
+func (j *NodeInfoRequest) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["namespace"]; raw != nil && !ok {
-		return fmt.Errorf("field namespace in NodeInfoRequestJson: required")
+		return fmt.Errorf("field namespace in NodeInfoRequest: required")
 	}
-	type Plain NodeInfoRequestJson
+	type Plain NodeInfoRequest
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = NodeInfoRequestJson(plain)
+	*j = NodeInfoRequest(plain)
 	return nil
 }
 
-type NodeInfoResponseJson struct {
+type NodeInfoResponse struct {
 	// The unique identifier of the node
 	NodeId string `json:"node_id"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodeInfoResponseJsonTags `json:"tags"`
+	Tags NodeInfoResponseTags `json:"tags"`
 
 	// The target nodes xkey
 	TargetXkey string `json:"target_xkey"`
@@ -189,55 +189,55 @@ type NodeInfoResponseJson struct {
 	WorkloadSummaries []WorkloadSummary `json:"workload_summaries"`
 }
 
-type NodeInfoResponseJsonTags struct {
+type NodeInfoResponseTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodeInfoResponseJsonTagsTags `json:"tags,omitempty"`
+	Tags NodeInfoResponseTagsTags `json:"tags,omitempty"`
 }
 
-type NodeInfoResponseJsonTagsTags map[string]string
+type NodeInfoResponseTagsTags map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodeInfoResponseJson) UnmarshalJSON(b []byte) error {
+func (j *NodeInfoResponse) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
-		return fmt.Errorf("field node_id in NodeInfoResponseJson: required")
+		return fmt.Errorf("field node_id in NodeInfoResponse: required")
 	}
 	if _, ok := raw["tags"]; raw != nil && !ok {
-		return fmt.Errorf("field tags in NodeInfoResponseJson: required")
+		return fmt.Errorf("field tags in NodeInfoResponse: required")
 	}
 	if _, ok := raw["target_xkey"]; raw != nil && !ok {
-		return fmt.Errorf("field target_xkey in NodeInfoResponseJson: required")
+		return fmt.Errorf("field target_xkey in NodeInfoResponse: required")
 	}
 	if _, ok := raw["uptime"]; raw != nil && !ok {
-		return fmt.Errorf("field uptime in NodeInfoResponseJson: required")
+		return fmt.Errorf("field uptime in NodeInfoResponse: required")
 	}
 	if _, ok := raw["version"]; raw != nil && !ok {
-		return fmt.Errorf("field version in NodeInfoResponseJson: required")
+		return fmt.Errorf("field version in NodeInfoResponse: required")
 	}
 	if _, ok := raw["workload_summaries"]; raw != nil && !ok {
-		return fmt.Errorf("field workload_summaries in NodeInfoResponseJson: required")
+		return fmt.Errorf("field workload_summaries in NodeInfoResponse: required")
 	}
-	type Plain NodeInfoResponseJson
+	type Plain NodeInfoResponse
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = NodeInfoResponseJson(plain)
+	*j = NodeInfoResponse(plain)
 	return nil
 }
 
-type NodePingResponseJson struct {
+type NodePingResponse struct {
 	// The unique identifier of the node
 	NodeId string `json:"node_id"`
 
 	// The number of agents running with workload count
-	RunningAgents NodePingResponseJsonRunningAgents `json:"running_agents"`
+	RunningAgents NodePingResponseRunningAgents `json:"running_agents"`
 
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodePingResponseJsonTags `json:"tags"`
+	Tags NodePingResponseTags `json:"tags"`
 
 	// The target nodes xkey
 	TargetXkey string `json:"target_xkey"`
@@ -250,50 +250,50 @@ type NodePingResponseJson struct {
 }
 
 // The number of agents running with workload count
-type NodePingResponseJsonRunningAgents struct {
+type NodePingResponseRunningAgents struct {
 	// Status corresponds to the JSON schema field "status".
-	Status NodePingResponseJsonRunningAgentsStatus `json:"status,omitempty"`
+	Status NodePingResponseRunningAgentsStatus `json:"status,omitempty"`
 }
 
-type NodePingResponseJsonRunningAgentsStatus map[string]int
+type NodePingResponseRunningAgentsStatus map[string]int
 
-type NodePingResponseJsonTags struct {
+type NodePingResponseTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodePingResponseJsonTagsTags `json:"tags,omitempty"`
+	Tags NodePingResponseTagsTags `json:"tags,omitempty"`
 }
 
-type NodePingResponseJsonTagsTags map[string]string
+type NodePingResponseTagsTags map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodePingResponseJson) UnmarshalJSON(b []byte) error {
+func (j *NodePingResponse) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
-		return fmt.Errorf("field node_id in NodePingResponseJson: required")
+		return fmt.Errorf("field node_id in NodePingResponse: required")
 	}
 	if _, ok := raw["running_agents"]; raw != nil && !ok {
-		return fmt.Errorf("field running_agents in NodePingResponseJson: required")
+		return fmt.Errorf("field running_agents in NodePingResponse: required")
 	}
 	if _, ok := raw["tags"]; raw != nil && !ok {
-		return fmt.Errorf("field tags in NodePingResponseJson: required")
+		return fmt.Errorf("field tags in NodePingResponse: required")
 	}
 	if _, ok := raw["target_xkey"]; raw != nil && !ok {
-		return fmt.Errorf("field target_xkey in NodePingResponseJson: required")
+		return fmt.Errorf("field target_xkey in NodePingResponse: required")
 	}
 	if _, ok := raw["uptime"]; raw != nil && !ok {
-		return fmt.Errorf("field uptime in NodePingResponseJson: required")
+		return fmt.Errorf("field uptime in NodePingResponse: required")
 	}
 	if _, ok := raw["version"]; raw != nil && !ok {
-		return fmt.Errorf("field version in NodePingResponseJson: required")
+		return fmt.Errorf("field version in NodePingResponse: required")
 	}
-	type Plain NodePingResponseJson
+	type Plain NodePingResponse
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = NodePingResponseJson(plain)
+	*j = NodePingResponse(plain)
 	return nil
 }
 
