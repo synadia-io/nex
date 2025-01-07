@@ -10,7 +10,7 @@ type AgentPingResponse struct {
 	NodeId string `json:"node_id"`
 
 	// RunningWorkloads corresponds to the JSON schema field "running_workloads".
-	RunningWorkloads []WorkloadPingMachineSummary `json:"running_workloads"`
+	RunningWorkloads []WorkloadSummary `json:"running_workloads"`
 
 	// Tags corresponds to the JSON schema field "tags".
 	Tags AgentPingResponseTags `json:"tags"`
@@ -429,44 +429,68 @@ type Workload struct {
 	WorkloadType string `json:"workload_type"`
 }
 
-type WorkloadPingMachineSummary struct {
-	// Id corresponds to the JSON schema field "id".
+type WorkloadPingResponse struct {
+	// WorkloadSummary corresponds to the JSON schema field "workload_summary".
+	WorkloadSummary *Workload `json:"workload_summary,omitempty"`
+}
+
+type WorkloadSummary struct {
+	// The unique identifier of the workload
 	Id string `json:"id"`
 
-	// Name corresponds to the JSON schema field "name".
+	// The name of the workload
 	Name string `json:"name"`
 
-	// Namespace corresponds to the JSON schema field "namespace".
-	Namespace string `json:"namespace"`
+	// The runtime of the workload
+	Runtime string `json:"runtime"`
+
+	// The start time of the workload
+	StartTime string `json:"start_time"`
+
+	// The runtype/lifecycle of the workload
+	WorkloadRuntype string `json:"workload_runtype"`
+
+	// The state of the workload
+	WorkloadState string `json:"workload_state"`
+
+	// The type of the workload
+	WorkloadType string `json:"workload_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadPingMachineSummary) UnmarshalJSON(b []byte) error {
+func (j *WorkloadSummary) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
-		return fmt.Errorf("field id in WorkloadPingMachineSummary: required")
+		return fmt.Errorf("field id in WorkloadSummary: required")
 	}
 	if _, ok := raw["name"]; raw != nil && !ok {
-		return fmt.Errorf("field name in WorkloadPingMachineSummary: required")
+		return fmt.Errorf("field name in WorkloadSummary: required")
 	}
-	if _, ok := raw["namespace"]; raw != nil && !ok {
-		return fmt.Errorf("field namespace in WorkloadPingMachineSummary: required")
+	if _, ok := raw["runtime"]; raw != nil && !ok {
+		return fmt.Errorf("field runtime in WorkloadSummary: required")
 	}
-	type Plain WorkloadPingMachineSummary
+	if _, ok := raw["start_time"]; raw != nil && !ok {
+		return fmt.Errorf("field start_time in WorkloadSummary: required")
+	}
+	if _, ok := raw["workload_runtype"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_runtype in WorkloadSummary: required")
+	}
+	if _, ok := raw["workload_state"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_state in WorkloadSummary: required")
+	}
+	if _, ok := raw["workload_type"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_type in WorkloadSummary: required")
+	}
+	type Plain WorkloadSummary
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = WorkloadPingMachineSummary(plain)
+	*j = WorkloadSummary(plain)
 	return nil
-}
-
-type WorkloadPingResponse struct {
-	// WorkloadSummary corresponds to the JSON schema field "workload_summary".
-	WorkloadSummary *Workload `json:"workload_summary,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

@@ -34,7 +34,7 @@
     "running_workloads": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/WorkloadPingMachineSummary"
+        "$ref": "./shared-workload-summary.json"
       }
     }
   },
@@ -46,27 +46,5 @@
     "uptime",
     "running_workloads"
   ],
-  "definitions": {
-    "WorkloadPingMachineSummary": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "namespace": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "namespace",
-        "name",
-        "type"
-      ]
-    }
-  },
   "additionalProperties": false
 }
