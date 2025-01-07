@@ -1,6 +1,6 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "https://github.com/synadia-io/nex/api/agent/register-agent-request",
+    "$id": "io.nats.nex.v2.agent_register_request",
     "title": "RegisterAgentRequest",
     "type": "object",
     "properties": {       

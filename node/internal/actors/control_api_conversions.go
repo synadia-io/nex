@@ -3,8 +3,7 @@ package actors
 import (
 	"time"
 
-	"github.com/synadia-io/nex/api/nodecontrol/gen"
-	api "github.com/synadia-io/nex/api/nodecontrol/gen"
+	api "github.com/synadia-io/nex/api/go"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
@@ -78,7 +77,7 @@ func stopResponseFromProto(response *actorproto.WorkloadStopped) *api.StopWorklo
 func infoResponseFromProto(response *actorproto.NodeInfo) *api.NodeInfoResponseJson {
 	ret := new(api.NodeInfoResponseJson)
 	ret.NodeId = response.Id
-	ret.Tags = gen.NodeInfoResponseJsonTags{Tags: response.Tags}
+	ret.Tags = api.NodeInfoResponseJsonTags{Tags: response.Tags}
 	ret.TargetXkey = response.TargetXkey
 	ret.Uptime = response.Uptime
 	ret.Version = response.Version
@@ -107,7 +106,7 @@ func auctionResponseFromProto(response *actorproto.AuctionResponse) *api.Auction
 
 	return &api.AuctionResponseJson{
 		BidderId:   response.BidderId,
-		Status:     gen.AuctionResponseJsonStatus{Status: convertedStatus},
+		Status:     api.AuctionResponseJsonStatus{Status: convertedStatus},
 		Tags:       api.AuctionResponseJsonTags{Tags: response.Tags},
 		TargetXkey: response.TargetXkey,
 		Uptime:     time.Since(response.StartedAt.AsTime()).String(),
