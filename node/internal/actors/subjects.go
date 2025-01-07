@@ -41,3 +41,7 @@ func WorkloadPingSubscribeSubject() string {
 func AgentAPIStartWorkloadRequestSubject(inNamespace, inAgentName, inWorkloadId string) string {
 	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.%s", models.AgentAPIPrefix, inNamespace, inAgentName, inWorkloadId)
 }
+
+func AgentAPIPingWorkloadRequestSubject(inNamespace, inAgentName, inWorkloadId string) string {
+	return fmt.Sprintf("%s.%s.%s.PINGWORKLOAD.%s", models.AgentAPIPrefix, inNamespace, inAgentName, inWorkloadId)
+}

@@ -29,15 +29,15 @@ func AgentAPISetLameduckSubject(inAgentName string) string {
 	return fmt.Sprintf("%s.%s.%s.SETLAMEDUCK", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
 }
 
-func AgentAPIPingWorkloadSubject(inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.PINGWORKLOAD", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
-}
-
 func AgentAPIPingSubject(inAgentName string) string {
 	return fmt.Sprintf("%s.%s.%s.PING", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
 }
 
 // User based
+func AgentAPIPingWorkloadSubject(inAgentName string) string {
+	return fmt.Sprintf("%s.*.%s.PINGWORKLOAD.*", AgentAPIPrefix, inAgentName)
+}
+
 func AgentAPIStartWorkloadSubject(inAgentName string) string {
 	return fmt.Sprintf("%s.*.%s.STARTWORKLOAD.*", AgentAPIPrefix, inAgentName)
 }

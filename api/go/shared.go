@@ -369,9 +369,6 @@ type StopWorkloadResponse struct {
 	// Id corresponds to the JSON schema field "id".
 	Id string `json:"id"`
 
-	// Issuer corresponds to the JSON schema field "issuer".
-	Issuer string `json:"issuer"`
-
 	// Message corresponds to the JSON schema field "message".
 	Message string `json:"message"`
 
@@ -387,9 +384,6 @@ func (j *StopWorkloadResponse) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
 		return fmt.Errorf("field id in StopWorkloadResponse: required")
-	}
-	if _, ok := raw["issuer"]; raw != nil && !ok {
-		return fmt.Errorf("field issuer in StopWorkloadResponse: required")
 	}
 	if _, ok := raw["message"]; raw != nil && !ok {
 		return fmt.Errorf("field message in StopWorkloadResponse: required")

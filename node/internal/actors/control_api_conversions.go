@@ -69,7 +69,6 @@ func startResponseFromProto(response *actorproto.WorkloadStarted) *api.StartWork
 func stopResponseFromProto(response *actorproto.WorkloadStopped) *api.StopWorkloadResponse {
 	return &api.StopWorkloadResponse{
 		Id:      response.Id,
-		Issuer:  response.Issuer,
 		Stopped: response.Stopped,
 	}
 }
