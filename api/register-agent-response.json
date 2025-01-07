@@ -1,10 +1,21 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema#",
-    "$id": "io.nats.nex.v2.agent_register_response",
-    "title": "RegisterAgentResponse",
-    "type": "object",
-    "properties": {       
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_register_response",
+  "title": "RegisterAgentResponse",
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Indicates if the agent was successfully registered"
     },
-    "required": [],
-    "additionalProperties": false
+    "message": {
+      "type": "string",
+      "description": "A message indicating the result of the registration"
+    }
+  },
+  "required": [
+    "success",
+    "message"
+  ],
+  "additionalProperties": false
 }
