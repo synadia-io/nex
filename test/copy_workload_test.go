@@ -169,3 +169,62 @@ func TestMultipleCopyWorkload(t *testing.T) {
 	be.NilErr(t, nex1.Wait())
 	be.True(t, passed)
 }
+
+func TestCopyWorkloadWithStop(t *testing.T) {
+	workingDir := t.TempDir()
+
+	binPath := BuildTestBinary(t, "./testdata/forever/main.go", workingDir)
+
+	nexCli := buildNexCli(t, workingDir)
+
+	s := StartNatsServer(t, workingDir)
+	defer s.Shutdown()
+
+	nex1 := startNexNodeCmd(t, workingDir, Node1ServerSeed, Node1XKeySeed, s.ClientURL(), "node1", "nexus")
+	nex1.SysProcAttr = sysProcAttr()
+
+	nex2 := startNexNodeCmd(t, workingDir, "", "", s.ClientURL(), "node2", "nexus")
+	nex2.SysProcAttr = sysProcAttr()
+
+	be.NilErr(t, nex1.Start())
+	be.NilErr(t, nex2.Start())
+
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+
+		origStdOut := new(bytes.Buffer)
+		origDeploy := exec.Command(nexCli, "workload", "run", "-s", s.ClientURL(), "--name", "tester", fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node1"), "file://"+binPath, fmt.Sprintf("--env=NATS_URL=%s", s.ClientURL()))
+		origDeploy.Stdout = origStdOut
+		err := origDeploy.Run()
+		be.NilErr(t, err)
+
+		re := regexp.MustCompile(`^Workload tester \[(?P<workload>[A-Za-z0-9]+)\] started\n.*$`)
+		match := re.FindStringSubmatch(strings.TrimSpace(origStdOut.String()))
+		be.Equal(t, 2, len(match))
+		origWorkloadId := match[1]
+
+		copyStdOut := new(bytes.Buffer)
+		copyDeploy := exec.Command(nexCli, "workload", "copy", "-s", s.ClientURL(), origWorkloadId, fmt.Sprintf("--node-tags=%s=%s", models.TagNodeName, "node2"), "--stop")
+		copyDeploy.Stdout = copyStdOut
+		be.NilErr(t, copyDeploy.Run())
+
+		time.Sleep(500 * time.Millisecond)
+		node1InfoStdOut := new(bytes.Buffer)
+		node1InfoStdErr := new(bytes.Buffer)
+		node1Info := exec.Command(nexCli, "node", "info", "-s", s.ClientURL(), "--json", Node1ServerPublicKey)
+		node1Info.Stdout = node1InfoStdOut
+		node1Info.Stderr = node1InfoStdErr
+		be.NilErr(t, node1Info.Run())
+
+		resp := new(gen.NodeInfoResponseJson)
+		be.NilErr(t, json.Unmarshal(node1InfoStdOut.Bytes(), resp))
+
+		be.Equal(t, 0, len(resp.WorkloadSummaries))
+
+		be.NilErr(t, stopProcess(nex1.Process))
+		be.NilErr(t, stopProcess(nex2.Process))
+	}()
+
+	be.NilErr(t, nex1.Wait())
+	be.NilErr(t, nex2.Wait())
+}
