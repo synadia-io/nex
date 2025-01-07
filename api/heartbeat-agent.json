@@ -3,8 +3,24 @@
   "$id": "io.nats.nex.v2.agent_heartbeat",
   "title": "AgentHeartbeat",
   "type": "object",
-  "properties": {},
+  "properties": {
+    "state": {
+      "type": "string",
+      "description": "The state of the agent. Must be of able to map to models.AgentState"
+    },
+    "workload_count": {
+      "type": "integer",
+      "description": "The number of agents running with workload count"
+    },
+    "data": {
+      "type": "string",
+      "description": "Send additional data in heartbeat"
+    }
+  },
   "required": [
+    "state",
+    "workload_count",
+    "data"
   ],
   "additionalProperties": false
 }

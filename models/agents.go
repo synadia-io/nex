@@ -2,35 +2,27 @@ package models
 
 import "fmt"
 
+type AgentState string
+
 const (
 	DirectStartActorName = "direct-start"
 
 	RunRequestKVBucket = "run_request"
+
+	AgentStateRunning  AgentState = "running"
+	AgentStateStopping AgentState = "stopping"
+	AgentStateLameduck AgentState = "lameduck"
+	AgentStateError    AgentState = "error"
 )
 
 // Subject map for internal comms between host and agents
+// System only
 func AgentAPIRegisterSubject() string {
 	return fmt.Sprintf("%s.%s.REGISTER", AgentAPIPrefix, NodeSystemNamespace)
 }
 
 func AgentAPIHeartbeatSubject(inAgentName string) string {
 	return fmt.Sprintf("%s.%s.%s.HEARTBEAT", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
-}
-
-func AgentAPIStartWorkloadSubscribeSubject(inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.*", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
-}
-
-func AgentAPIStartWorkloadRequestSubject(inAgentName, inWorkloadId string) string {
-	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.%s", AgentAPIPrefix, NodeSystemNamespace, inAgentName, inWorkloadId)
-}
-
-func AgentAPIStopWorkloadSubject(inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.STOPWORKLOAD", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
-}
-
-func AgentAPIQueryWorkloadSubject(inAgentName string) string {
-	return fmt.Sprintf("%s.%s.%s.QUERYWORKLOAD", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
 }
 
 func AgentAPISetLameduckSubject(inAgentName string) string {
@@ -43,4 +35,17 @@ func AgentAPIPingWorkloadSubject(inAgentName string) string {
 
 func AgentAPIPingSubject(inAgentName string) string {
 	return fmt.Sprintf("%s.%s.%s.PING", AgentAPIPrefix, NodeSystemNamespace, inAgentName)
+}
+
+// User based
+func AgentAPIStartWorkloadSubject(inNamespace, inAgentName string) string {
+	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.*", AgentAPIPrefix, inNamespace, inAgentName)
+}
+
+func AgentAPIStopWorkloadSubject(inNamespace, inAgentName string) string {
+	return fmt.Sprintf("%s.%s.%s.STOPWORKLOAD", AgentAPIPrefix, inNamespace, inAgentName)
+}
+
+func AgentAPIQueryWorkloadSubject(inNamespace, inAgentName string) string {
+	return fmt.Sprintf("%s.%s.%s.QUERYWORKLOAD", AgentAPIPrefix, inNamespace, inAgentName)
 }

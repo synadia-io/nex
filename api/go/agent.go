@@ -5,7 +5,40 @@ package api
 import "encoding/json"
 import "fmt"
 
-type AgentHeartbeat map[string]interface{}
+type AgentHeartbeat struct {
+	// Send additional data in heartbeat
+	Data string `json:"data"`
+
+	// The state of the agent. Must be of able to map to models.AgentState
+	State string `json:"state"`
+
+	// The number of agents running with workload count
+	WorkloadCount int `json:"workload_count"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AgentHeartbeat) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["data"]; raw != nil && !ok {
+		return fmt.Errorf("field data in AgentHeartbeat: required")
+	}
+	if _, ok := raw["state"]; raw != nil && !ok {
+		return fmt.Errorf("field state in AgentHeartbeat: required")
+	}
+	if _, ok := raw["workload_count"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_count in AgentHeartbeat: required")
+	}
+	type Plain AgentHeartbeat
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = AgentHeartbeat(plain)
+	return nil
+}
 
 type RegisterAgentRequest struct {
 	// A user friendly description of the agent

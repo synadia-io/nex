@@ -1,6 +1,8 @@
 package actors
 
 import (
+	"fmt"
+
 	"github.com/synadia-io/nex/models"
 )
 
@@ -33,4 +35,9 @@ func NamespacePingSubscribeSubject() string {
 func WorkloadPingSubscribeSubject() string {
 	// $NEX.control.namespace.WPING.workloadid
 	return models.ControlAPIPrefix + ".*.WPING.*"
+}
+
+// Internal NATS server agent REQUEST subjects
+func AgentAPIStartWorkloadRequestSubject(inNamespace, inAgentName, inWorkloadId string) string {
+	return fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.%s", models.AgentAPIPrefix, inNamespace, inAgentName, inWorkloadId)
 }
