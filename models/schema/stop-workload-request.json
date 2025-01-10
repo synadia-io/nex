@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.stop_workload_request",
+  "title": "StopWorkloadRequest",
+  "type": "object",
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "description": "Namespace of the workload to stop"
+    }
+  },
+  "required": [
+    "namespace"
+  ],
+  "additionalProperties": false
+}

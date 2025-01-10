@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.synadia.nex.event.workload_stopped",
+  "title": "WorkloadStoppedEvent",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "The unique identifier of the workload"
+    }
+  },
+  "required": [
+    "id"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_register_request",
+  "title": "RegisterAgentRequest",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the agent"
+    },
+    "description": {
+      "type": "string",
+      "description": "A user friendly description of the agent"
+    },
+    "version": {
+      "type": "string",
+      "description": "Version of the agent"
+    },
+    "max_workloads": {
+      "type": "number",
+      "description": "The maximum number of workloads this agent can hold. 0 indicates unlimited"
+    },
+    "public_xkey": {
+      "type": "string",
+      "description": "The public xkey of the agent. Node will encrypt environment with this key"
+    },
+    "supported_lifecycles": {
+      "type": "array",
+      "items": {
+        "$ref": "./shared-workload-lifecycle.json"
+      },
+      "description": "List of capabilities supported by the agent"
+    },
+    "assigned_id": {
+      "type": "string",
+      "description": "The assigned ID of the agent"
+    },
+    "start_request_schema": {
+      "type": "string",
+      "description": "JSONSchema shape for the start request; enforced by node"
+    }
+  },
+  "required": [
+    "name",
+    "version",
+    "description",
+    "max_workloads",
+    "public_xkey",
+    "capabilities",
+    "assigned_id",
+    "start_request_schema"
+  ],
+  "additionalProperties": false
+}

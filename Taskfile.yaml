@@ -1,0 +1,109 @@
+version: '3'
+
+env:
+  GOPRIVATE: "github.com/synadia-labs/nex,github.com/synadia-io/nexlet.go"
+  GOWORK: off
+
+tasks:
+  install-godeps:
+    cmds:
+      - go install github.com/atombender/go-jsonschema@latest
+
+
+  install-deps: 
+    deps: [install-godeps, install-protoc]
+
+  gen-schema:
+    dir: models/schema
+    cmds:
+      - go-jsonschema --struct-name-from-title
+        --package models --tags json
+        --schema-output=io.nats.nex.v2.agent_register_request=../api_agent.go
+        --schema-output=io.nats.nex.v2.agent_register_response=../api_agent.go
+        --schema-output=io.nats.nex.v2.agent_heartbeat=../api_agent.go 
+        --schema-output=io.nats.nex.v2.agent_list_workloads_request=../api_agent.go
+        --schema-output=io.nats.nex.v2.agent_list_workloads_response=../api_agent.go
+        --schema-output=io.nats.nex.v2.start_workload_request=../api_shared.go
+        --schema-output=io.nats.nex.v2.start_workload_response=../api_shared.go
+        --schema-output=io.nats.nex.v2.stop_workload_request=../api_shared.go
+        --schema-output=io.nats.nex.v2.stop_workload_response=../api_shared.go
+        --schema-output=io.nats.nex.v2.lameduck_request=../api_shared.go
+        --schema-output=io.nats.nex.v2.lameduck_response=../api_shared.go
+        --schema-output=io.nats.nex.v2.agent_ping_response=../api_shared.go
+        --schema-output=shared=../api_shared.go
+        --schema-output=io.nats.nex.v2.node_info_request=../api_control.go
+        --schema-output=io.nats.nex.v2.node_info_response=../api_control.go
+        --schema-output=io.nats.nex.v2.node_ping_request=../api_control.go
+        --schema-output=io.nats.nex.v2.node_ping_response=../api_control.go
+        --schema-output=io.nats.nex.v2.auction_request=../api_control.go
+        --schema-output=io.nats.nex.v2.auction_response=../api_control.go
+        --schema-output=io.nats.nex.v2.clone_workload_request=../api_control.go
+        --schema-output=io.nats.nex.v2.clone_workload_response=../api_control.go
+        --schema-output=io.synadia.nex.event.nexnode_started=../events.go
+        --schema-output=io.synadia.nex.event.agent_started=../events.go
+        --schema-output=io.synadia.nex.event.agent_lameduckset=../events.go
+        --schema-output=io.synadia.nex.event.workload_started=../events.go
+        --schema-output=io.synadia.nex.event.workload_stopped=../events.go
+        *.json
+
+  gen-native-schema:
+    dir: agents/native
+    cmds:
+      - go-jsonschema --struct-name-from-title
+        --package native --tags json
+        --schema-output=gen=./gen_start_request.go
+        *.json
+  
+  nex:
+    deps: [all-code-gen]
+    dir: cmd/nex
+    cmds:
+      - go build -o ../../target/nex .
+
+  test:
+    deps: [test:agents, test:cli, test:client, test:node]
+
+  test:agents:
+    dir: agents
+    cmds:
+      - go test -v ./...
+  
+  test:cli:
+    dir: cli
+    cmds:
+      - go test -v ./...
+  
+  test:client:
+    dir: client
+    cmds:
+      - go test -v ./...
+  
+  test:node:
+    cmds:
+      - go test -v ./... 
+
+  update:
+    deps: [update:agents, update:cli, update:client, update:node]
+
+  update:agents:
+    dir: agents
+    cmds:
+      - go get -u -v ./...
+      - go mod tidy
+  
+  update:cli:
+    dir: cli
+    cmds:
+      - go get -u -v ./...
+      - go mod tidy
+  
+  update:client:
+    dir: client
+    cmds:
+      - go get -u -v ./...
+      - go mod tidy
+  
+  update:node:
+    cmds:
+      - go get -u -v ./...
+      - go mod tidy

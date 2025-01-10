@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.lameduck_request",
+  "title": "LameduckRequest",
+  "type": "object",
+  "properties": {
+    "delay": {
+      "type": "string",
+      "description": "Time delay before lameduck mode is set"
+    }
+  },
+  "required": ["delay"],
+  "additionalProperties": false
+}

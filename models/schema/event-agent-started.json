@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.synadia.nex.event.agent_started",
+  "title": "AgentStartedEvent",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "The unique identifier of the nex agent"
+    },
+    "name": {
+      "type": "string",
+      "description": "The name of the agent"
+    },
+    "type": {
+      "type": "string",
+      "description": "The type of the agent",
+      "enum": [
+        "embedded",
+        "local",
+        "remote"
+      ]
+    },
+    "public_xkey": {
+      "type": "string",
+      "description": "The public xkey of the agent"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "type",
+    "public_xkey"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.node_info_response",
+  "title": "NodeInfoResponse",
+  "type": "object",
+  "properties": {
+    "node_id": {
+      "type": "string",
+      "description": "The public nkey of the node"
+    },
+    "version": {
+      "type": "string",
+      "description": "The version of the node"
+    },
+    "uptime": {
+      "type": "string",
+      "description": "The uptime of the node"
+    },
+    "xkey": {
+      "type": "string",
+      "description": "The public xkey of node"
+    },
+    "tags": {
+      "$ref": "./shared-tag-map.json",
+      "description": "Placement tags associated with node"
+    },
+    "agent_summaries": {
+      "$ref": "./shared-agent-summaries.json"
+    }
+  },
+  "required": [
+    "node_id",
+    "version",
+    "uptime",
+    "xkey",
+    "tags",
+    "agent_summary"
+  ],
+  "additionalProperties": false
+}

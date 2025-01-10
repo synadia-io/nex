@@ -1,0 +1,202 @@
+package credentials
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/nats-io/jwt/v2"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
+	"github.com/synadia-labs/nex/models"
+)
+
+type Credential struct {
+	Jwt      string
+	NkeySeed []byte
+}
+
+func (c *Credential) String() string {
+	return `-----BEGIN NATS USER JWT-----
+` + c.Jwt + `
+------END NATS USER JWT------
+
+************************* IMPORTANT *************************
+NKEY Seed printed below can be used to sign and prove identity.
+NKEYs are sensitive and should be treated as secrets.
+
+-----BEGIN USER NKEY SEED-----
+` + string(c.NkeySeed) + `
+------END USER NKEY SEED------
+
+*************************************************************
+`
+}
+
+type CredVendor interface {
+	MintRegister(agentId, nodeId string) (*models.NatsConnectionData, error)
+	Mint(typ models.CredType, namespace, id string) (*models.NatsConnectionData, error)
+}
+
+type SigningKeyMinter struct {
+	NodeId         string
+	NatsServer     string
+	RootAccountKey string
+	SigningSeed    string
+}
+
+func (m *SigningKeyMinter) MintRegister(agentId, nodeId string) (*models.NatsConnectionData, error) {
+	pkp, err := nkeys.FromSeed([]byte(m.SigningSeed))
+	if err != nil {
+		return nil, err
+	}
+
+	ret := new(models.NatsConnectionData)
+	ret.NatsUrl = m.NatsServer
+
+	kp, err := nkeys.CreateUser()
+	if err != nil {
+		return nil, err
+	}
+	seed, err := kp.Seed()
+	if err != nil {
+		return nil, err
+	}
+	ret.NatsUserSeed = string(seed)
+
+	pubKp, err := kp.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	claims := jwt.NewUserClaims(pubKp)
+	claims.Subject = pubKp
+	claims.Expires = time.Now().Add(time.Hour * 24 * 365).Unix()
+	claims.Name = agentId
+	claims.IssuerAccount = m.RootAccountKey
+	claims.Permissions = AgentRegistrationClaims(agentId, nodeId)
+
+	vr := jwt.CreateValidationResults()
+	claims.Validate(vr)
+
+	ret.NatsUserJwt, err = claims.Encode(pkp)
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (m *SigningKeyMinter) Mint(typ models.CredType, namespace, id string) (*models.NatsConnectionData, error) {
+	pkp, err := nkeys.FromSeed([]byte(m.SigningSeed))
+	if err != nil {
+		return nil, err
+	}
+
+	ret := new(models.NatsConnectionData)
+	ret.NatsUrl = m.NatsServer
+
+	kp, _ := nkeys.CreateUser()
+	if err != nil {
+		return nil, err
+	}
+	seed, err := kp.Seed()
+	if err != nil {
+		return nil, err
+	}
+	ret.NatsUserSeed = string(seed)
+	pubKp, err := kp.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	claims := jwt.NewUserClaims(pubKp)
+	claims.Subject = pubKp
+	claims.Expires = time.Now().Add(time.Hour * 24 * 365).Unix()
+	claims.Name = id
+	claims.IssuerAccount = m.RootAccountKey
+
+	switch typ {
+	case models.AgentCred:
+		claims.Permissions = AgentClaims(id, m.NodeId)
+	case models.WorkloadCred:
+		claims.Permissions = WorkloadClaims(namespace)
+	}
+
+	vr := jwt.CreateValidationResults()
+	claims.Validate(vr)
+
+	ret.NatsUserJwt, err = claims.Encode(pkp)
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+var (
+	AgentRegistrationClaims func(string, string) jwt.Permissions = func(id, nodeId string) jwt.Permissions {
+		return jwt.Permissions{
+			Pub: jwt.Permission{
+				Allow: []string{fmt.Sprintf("$NEX.agent.%s.REGISTER.%s", id, nodeId)},
+			},
+			Sub: jwt.Permission{
+				Allow: []string{nats.InboxPrefix + ">"},
+			},
+			Resp: &jwt.ResponsePermission{
+				MaxMsgs: 0,
+			},
+		}
+	}
+	AgentClaims func(string, string) jwt.Permissions = func(id, nodeId string) jwt.Permissions {
+		return jwt.Permissions{
+			Pub: jwt.Permission{
+				Allow: []string{
+					fmt.Sprintf("%s.%s.>", models.AgentAPIPrefix, id),
+					fmt.Sprintf("%s.%s.*", models.EventAPIPrefix, id),
+					fmt.Sprintf("%s.*.*", models.LogAPIPrefix), // workload logs // TODO: add agentID to this subject
+					"update_caddy",         // temporary for caddy
+					nats.InboxPrefix + ">", // responses
+				},
+			},
+			Sub: jwt.Permission{
+				Allow: []string{
+					fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.*", models.AgentAPIPrefix, nodeId, id),
+					fmt.Sprintf("%s.%s.%s.PING", models.AgentAPIPrefix, nodeId, id),
+					fmt.Sprintf("%s.%s.PING", models.AgentAPIPrefix, nodeId),
+					fmt.Sprintf("%s.%s.STOPWORKLOAD.*", models.AgentAPIPrefix, nodeId),
+					fmt.Sprintf("%s.%s.GETWORKLOAD.*", models.AgentAPIPrefix, nodeId),
+					fmt.Sprintf("%s.%s.QUERYWORKLOADS", models.AgentAPIPrefix, nodeId),
+					fmt.Sprintf("%s.%s.SETLAMEDUCK", models.AgentAPIPrefix, nodeId),
+					fmt.Sprintf("%s.PINGWORKLOAD.*", models.AgentAPIPrefix),
+					fmt.Sprintf("%s.*.*.TRIGGER", models.WorkloadAPIPrefix), // BUG: This should use the workload credentials
+					"$SRV.>",               // for micro
+					nats.InboxPrefix + ">", // responses
+				},
+			},
+			Resp: &jwt.ResponsePermission{
+				MaxMsgs: 1,
+			},
+		}
+	}
+	WorkloadClaims func(string) jwt.Permissions = func(namespace string) jwt.Permissions {
+		return jwt.Permissions{
+			Pub: jwt.Permission{
+				// $NEX.workload.<namespace>.<id>
+				Allow: []string{
+					fmt.Sprintf("%s.%s.>", models.WorkloadAPIPrefix, namespace),
+					nats.InboxPrefix + ">", // responses
+				},
+			},
+			Sub: jwt.Permission{
+				Allow: []string{
+					fmt.Sprintf("%s.%s.>", models.LogAPIPrefix, namespace),
+					fmt.Sprintf("%s.%s.>", models.WorkloadAPIPrefix, namespace),
+					nats.InboxPrefix + ">", // responses
+				},
+			},
+			Resp: &jwt.ResponsePermission{
+				MaxMsgs: 1,
+			},
+		}
+	}
+)

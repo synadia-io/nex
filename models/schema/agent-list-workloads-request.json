@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_list_workloads_request",
+  "title": "AgentListWorkloadsRequest",
+  "type": "object",
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "description": "Namespace to list workloads from"
+    },
+    "filter": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Filter to apply to the list of workloads"
+    }
+  },
+  "required": [
+    "namespace",
+    "filter"
+  ],
+  "additionalProperties": false
+}

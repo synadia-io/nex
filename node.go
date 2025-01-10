@@ -1,0 +1,384 @@
+package nex
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"runtime"
+	"strconv"
+	"time"
+
+	"github.com/synadia-labs/nex/internal"
+	"github.com/synadia-labs/nex/internal/credentials"
+	"github.com/synadia-labs/nex/models"
+
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
+	"github.com/nats-io/nats.go/micro"
+	"github.com/nats-io/nkeys"
+	"github.com/nats-io/nuid"
+	sdk "github.com/synadia-io/nexlet.go/agent"
+)
+
+const (
+	VERSION = "0.0.0"
+)
+
+var nodeStateBucket = ""
+
+type (
+	NexNodeOption func(*NexNode) error
+	NexNode       struct {
+		ctx       context.Context
+		cancel    context.CancelFunc
+		logger    *slog.Logger
+		startTime time.Time
+
+		allowAgentRegistration bool
+		noState                bool
+		auctionMap             *internal.TTLMap
+
+		nodeKeypair  nkeys.KeyPair
+		nodeXKeypair nkeys.KeyPair
+
+		signingKey string
+		issuerAcct string
+
+		name  string
+		nexus string
+		tags  map[string]string
+		state models.NodeState
+
+		// Embedded agents
+		embeddedRunners []*sdk.Runner
+		// Config based agents
+		localRunners []*internal.AgentProcess
+		agentWatcher *internal.AgentWatcher
+
+		minter models.CredVendor
+
+		regs *models.Regs
+
+		nc     *nats.Conn
+		jsCtx  jetstream.JetStream
+		server *server.Server
+
+		nodeShutdown chan struct{}
+	}
+)
+
+func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
+	kp, err := nkeys.CreateServer()
+	if err != nil {
+		return nil, err
+	}
+
+	xkp, err := nkeys.CreateCurveKeys()
+	if err != nil {
+		return nil, err
+	}
+
+	n := &NexNode{
+		ctx:       context.Background(),
+		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		startTime: time.Time{},
+
+		name:  "nexnode",
+		nexus: "nexus",
+		tags: map[string]string{
+			models.TagOS:       runtime.GOOS,
+			models.TagArch:     runtime.GOARCH,
+			models.TagCPUs:     strconv.Itoa(runtime.GOMAXPROCS(0)),
+			models.TagLameDuck: "false",
+		},
+		state: models.NodeStateStarting,
+
+		embeddedRunners: make([]*sdk.Runner, 0),
+		localRunners:    make([]*internal.AgentProcess, 0),
+		regs:            new(models.Regs),
+
+		minter: &credentials.FullAccessMinter{NatsServer: nats.DefaultURL},
+
+		nodeKeypair:            kp,
+		nodeXKeypair:           xkp,
+		allowAgentRegistration: false,
+		noState:                false,
+		auctionMap:             internal.NewTTLMap(time.Second * 10),
+
+		nc:     nil,
+		server: nil,
+
+		nodeShutdown: make(chan struct{}, 1),
+	}
+
+	var errs error
+	for _, opt := range opts {
+		if opt != nil {
+			errs = errors.Join(errs, opt(n))
+		}
+	}
+	if errs != nil {
+		return nil, errs
+	}
+
+	pubKey, err := n.nodeKeypair.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	if n.signingKey != "" && n.nc != nil {
+		n.minter = &credentials.SigningKeyMinter{
+			NodeId:         pubKey,
+			NatsServer:     n.nc.ConnectedUrl(),
+			RootAccountKey: n.issuerAcct,
+			SigningSeed:    n.signingKey,
+		}
+	}
+
+	n.ctx, n.cancel = context.WithCancel(n.ctx)
+	nodeStateBucket = "nex-" + pubKey
+
+	n.tags[models.TagNexus] = n.nexus
+	n.tags[models.TagNodeName] = n.name
+	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.logger.WithGroup("agent-watcher"), 3)
+
+	return n, nil
+}
+
+func (n *NexNode) agentCount() int {
+	return n.regs.Count()
+}
+
+func (n *NexNode) Start() error {
+	pubKey, err := n.nodeKeypair.PublicKey()
+	if err != nil {
+		return err
+	}
+
+	n.startTime = time.Now()
+	n.logger.Info("Starting nex node",
+		slog.String("version", VERSION),
+		slog.String("node_id", pubKey),
+		slog.String("name", n.name),
+		slog.String("nexus", n.nexus),
+		slog.String("start_time", n.startTime.Format(time.RFC3339)))
+
+	if n.server != nil {
+		n.server.Start()
+		n.logger.Info("Using internal nats server", slog.String("url", n.server.ClientURL()))
+
+		startNats := time.Now()
+		for !n.server.Running() {
+			if time.Since(startNats) > 5*time.Second {
+				return errors.New("internal nats server failed to start")
+			}
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+
+	if n.nc == nil {
+		if n.server != nil {
+			n.nc, err = nats.Connect(n.server.ClientURL())
+			if err != nil {
+				return err
+			}
+		} else {
+			n.nc, err = nats.Connect(nats.DefaultURL)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	n.jsCtx, err = jetstream.New(n.nc)
+	if err != nil {
+		return err
+	}
+
+	nex, err := micro.AddService(n.nc, micro.Config{
+		Name:    "nexnode",
+		Version: VERSION,
+	})
+	if err != nil {
+		return err
+	}
+
+	var errs error
+	// System only endpoints
+	errs = errors.Join(errs, nex.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("DirectDeployWorkload", micro.HandlerFunc(n.handleDirectDeploy()), micro.WithEndpointSubject(models.DirectDeploySubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	// System only agent endpoints
+	if n.allowAgentRegistration {
+		errs = errors.Join(errs, nex.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.RegisterRemoteAgentSubject()), micro.WithEndpointQueueGroup(n.nexus)))
+		errs = errors.Join(errs, nex.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+		errs = errors.Join(errs, nex.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	}
+	errs = errors.Join(errs, nex.AddEndpoint("RegisterLocalAgent", micro.HandlerFunc(n.handleRegisterLocalAgent()), micro.WithEndpointSubject(models.AgentAPILocalRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	// User endpoints
+	errs = errors.Join(errs, nex.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, nex.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+
+	if errs != nil {
+		return errs
+	}
+
+	// At this point, nex controller is running
+	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStartedEvent{
+		Id:    pubKey,
+		Name:  n.name,
+		Nexus: n.nexus,
+		Tags:  n.tags,
+		Type:  "io.synadia.nex.event.nexnode_started",
+	})
+	if err != nil {
+		n.logger.Error("failed to emit nex started event", slog.Any("err", err))
+	}
+
+	for _, e := range nex.Info().Endpoints {
+		if e.QueueGroup != micro.DefaultQueueGroup {
+			n.logger.Debug("Subscribed to nats subject", slog.String("subject", e.Subject), slog.String("queue_group", e.QueueGroup))
+		} else {
+			n.logger.Debug("Subscribed to nats subject", slog.String("subject", e.Subject))
+		}
+	}
+
+	// start embedded agent runners
+	assignedAgentId := nuid.New()
+	for _, runner := range n.embeddedRunners {
+		if _, _, ok := n.regs.Find(runner.String()); ok {
+			n.logger.Warn("agent already registered; skipping additional registration", slog.String("agent_name", runner.String()))
+			continue
+		}
+
+		id := assignedAgentId.Next()
+		n.regs.New(id, models.RegTypeEmbeddedAgent)
+
+		connData, err := n.minter.MintRegister(id, pubKey)
+		if err != nil {
+			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
+			continue
+		}
+
+		err = runner.Run(n.ctx, id, *connData)
+		if err != nil {
+			n.logger.Error("agent failed to run", slog.String("agent_name", runner.String()), slog.String("err", err.Error()))
+			continue
+		}
+		n.logger.Info("starting embedded agent", slog.String("agent_name", runner.String()))
+	}
+
+	// start local agents
+	for _, agentProcess := range n.localRunners {
+		agentProcess.HostNode = pubKey
+		agentProcess.Id = assignedAgentId.Next()
+		connData, err := n.minter.MintRegister(agentProcess.Id, pubKey)
+		if err != nil {
+			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
+			continue
+		}
+		go n.agentWatcher.New(n.regs, agentProcess, connData)
+	}
+
+	go func() {
+		for range time.Tick(10 * time.Second) {
+			// TODO: what should go in this payload??
+			err = n.nc.Publish(models.NodeEmitHeartbeatSubject(pubKey), nil)
+			if err != nil {
+				n.logger.Error("failed to publish heartbeat", slog.String("err", err.Error()))
+			}
+		}
+	}()
+
+	if n.regs.Count() == 0 {
+		n.logger.Warn("nex node started without any agents")
+	}
+
+	if !n.noState {
+		_, err := n.jsCtx.CreateKeyValue(n.ctx, jetstream.KeyValueConfig{
+			Bucket:       nodeStateBucket,
+			MaxBytes:     1_000_000_000, // 1GB
+			MaxValueSize: 10_000,        // 10KB
+		})
+		if err != nil && !errors.Is(err, jetstream.ErrBucketExists) {
+			return err
+		}
+	}
+
+	n.logger.Info("nex node ready")
+	n.state = models.NodeStateRunning
+	return nil
+}
+
+func (n *NexNode) Shutdown() error {
+	if n.state == models.NodeStateStopping {
+		n.logger.Warn("nex node already shutting down")
+		return nil
+	}
+
+	n.cancel()
+	n.state = models.NodeStateStopping
+
+	var err error
+	for _, agent := range n.embeddedRunners {
+		err = agent.Shutdown()
+		if err != nil {
+			n.logger.Error("agent failed to shutdown", slog.String("agent_name", agent.String()), slog.String("err", err.Error()))
+			continue
+		}
+		n.logger.Info("agent shutdown", slog.String("agent_name", agent.String()))
+	}
+
+	for _, agent := range n.regs.Items() {
+		if agent.Type == models.RegTypeEmbeddedAgent {
+			err = internal.StopProcess(agent.Process)
+			if err == nil {
+				procState, err := agent.Process.Wait()
+				if err != nil {
+					n.logger.Error("failed to cleanly shutdown local agent process; force killing", slog.String("err", err.Error()))
+					err = agent.Process.Kill()
+					if err != nil {
+						n.logger.Error("failed to kill local agent process", slog.String("err", err.Error()))
+						break
+					}
+				}
+				n.logger.Info("local agent shutdown", slog.String("agent", agent.OriginalRequest.Name), slog.String("exit_code", procState.String()))
+			} else {
+				n.logger.Error("failed to cleanly shutdown local agent process; force killing", slog.String("err", err.Error()))
+				err = agent.Process.Kill()
+				if err != nil {
+					n.logger.Error("failed to kill local agent process", slog.String("err", err.Error()), slog.Int("pid", agent.Process.Pid))
+					break
+				}
+			}
+		}
+	}
+
+	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
+
+	n.nodeShutdown <- struct{}{}
+	return nil
+}
+
+func (n *NexNode) WaitForShutdown() error {
+	<-n.nodeShutdown
+	return nil
+}
+
+func (n *NexNode) enterLameduck(delay time.Duration) {
+	n.state = models.NodeStateLameduck
+	go func() {
+		time.Sleep(delay)
+		err := n.Shutdown()
+		if err != nil {
+			n.logger.Error("failed to shutdown nex node", slog.Any("err", err))
+		}
+	}()
+}

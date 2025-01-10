@@ -1,0 +1,9 @@
+_cmd
+cli/counter
+dist/
+cli/_configs/
+
+go.work*
+cli/go.work*
+client/go.work*
+agents/go.work*

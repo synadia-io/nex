@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.auction_request",
+  "title": "AuctionRequest",
+  "type": "object",
+  "properties": {
+    "auction_id": {
+      "type": "string",
+      "description": "A unique identifier for the auction"
+    },
+    "tags": {
+      "$ref": "./shared-tag-map.json",
+      "description": "A map of tags to use for the auction"
+    },
+    "agent_type": {
+      "type": "string",
+      "description": "The type of agent to use for the auction"
+    }
+  },
+  "required": [
+    "auction_id",
+    "tags", 
+    "agent_type"
+  ],
+  "additionalProperties": false
+}

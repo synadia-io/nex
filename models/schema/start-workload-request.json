@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.start_workload_request",
+  "title": "StartWorkloadRequest",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the workload"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "The namespace of the workload"
+    },
+    "description": {
+      "type": "string",
+      "description": "A description of the workload"
+    },
+    "workload_type": {
+      "type": "string",
+      "description": "The type of the workload"
+    },
+    "workload_lifecycle": {
+      "$ref": "./shared-workload-lifecycle.json",
+      "description": "The lifecycle of the workload"
+    },
+    "run_request": {
+      "type": "string",
+      "description": "The agent specific run request for the workload"
+    }
+  },
+  "required": [
+    "name",
+    "namespace",
+    "description",
+    "workload_type",
+    "workload_lifecycle",
+    "run_request"
+  ]
+}

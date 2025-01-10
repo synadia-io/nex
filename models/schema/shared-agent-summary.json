@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "shared",
+  "title": "AgentSummary",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the workload"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "The start time of the workload"
+    },
+    "supported_lifecycles": {
+      "type": "string",
+      "description": "The lifecycle types supported by the agent"
+    },
+    "state": {
+      "type": "string",
+      "description": "The state of the agent"
+    },
+    "workload_count": {
+      "type": "integer",
+      "description": "The number of workloads"
+    },
+    "version": {
+      "type": "string",
+      "description": "The version of the agent"
+    }
+  },
+  "required": [
+    "name",
+    "start_time",
+    "supported_lifecycles",
+    "state",
+    "workload_count",
+    "version"
+  ],
+  "additionalProperties": false
+}
