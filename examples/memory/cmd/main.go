@@ -14,8 +14,13 @@ import (
 )
 
 const (
-	agentName    string = "inmem"
-	agentVersion string = "0.0.0"
+	agentName string = "inmem"
+)
+
+var (
+	VERSION   string = "0.0.0"
+	COMMIT    string = ""
+	BUILDDATE string = ""
 )
 
 func main() {
@@ -36,7 +41,7 @@ func main() {
 
 	myAgent := &inmem.InMemAgent{
 		Name:      agentName,
-		Version:   agentVersion,
+		Version:   VERSION,
 		XPair:     xkp,
 		StartTime: time.Now(),
 	}
@@ -57,7 +62,7 @@ func main() {
 		return
 	}
 
-	runner, err := agent.NewRunner(agentName, agentVersion, myAgent, opts...)
+	runner, err := agent.NewRunner(agentName, VERSION, myAgent, opts...)
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))
 	}
