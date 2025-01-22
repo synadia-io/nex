@@ -182,7 +182,7 @@ func (a *Runner) Run(ctx context.Context, agentId string) error {
 
 	var errs error
 	for _, ep := range endpoints {
-		err := a.micro.AddEndpoint(ep.Name, ep.Handler, micro.WithEndpointSubject(ep.Subject))
+		err := a.micro.AddEndpoint(ep.Name, ep.Handler, micro.WithEndpointSubject(ep.Subject), micro.WithEndpointQueueGroup(agentId))
 		if err != nil {
 			errs = errors.Join(errs, err)
 		}
