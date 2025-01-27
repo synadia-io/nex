@@ -198,6 +198,27 @@ func (a *Runner) Shutdown() error {
 	return a.micro.Stop()
 }
 
+func (a *Runner) EmitEvent(event any) error {
+	var eventB []byte
+	var err error
+	var eventType string
+
+	switch event.(type) {
+	case models.WorkloadStartedEvent:
+		eventType = "WorkloadStarted"
+	case models.WorkloadStoppedEvent:
+		eventType = "WorkloadStopped"
+	default:
+		return errors.New("invalid event type")
+	}
+
+	eventB, err = json.Marshal(event)
+	if err != nil {
+		return err
+	}
+	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentId, eventType), eventB)
+}
+
 func (a *Runner) handleStartWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
 		// $NEX.agent.<namespace>.<agentid>.STARTWORKLOAD.<workloadid>
