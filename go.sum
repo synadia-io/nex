@@ -14,6 +14,8 @@ github.com/synadia-labs/nex v0.0.0-20250123171146-51c90e163c0e h1:i3wLaSmzfCitjH
 github.com/synadia-labs/nex v0.0.0-20250123171146-51c90e163c0e/go.mod h1:18kUO47aPYHXUyFs83DqzUZKg2tkXNAXIELRcH0ugZg=
 github.com/synadia-labs/nex v0.0.0-20250127200306-8119f9148f12 h1:52DTjZeCTpaMuW1ErN72UW9Z4rEjpFGHFXHGuIxmZjg=
 github.com/synadia-labs/nex v0.0.0-20250127200306-8119f9148f12/go.mod h1:18kUO47aPYHXUyFs83DqzUZKg2tkXNAXIELRcH0ugZg=
+github.com/synadia-labs/nex v0.0.0-20250128200539-aab2887bcae8 h1:Xlui7atSmzJhgQ83GxNlAKziQGnXZa/AP8CRHkQ2IFQ=
+github.com/synadia-labs/nex v0.0.0-20250128200539-aab2887bcae8/go.mod h1:AulQyAPSK+Sa0d3yRmDvauamh3UaYaDoC6/Z4NMNcxg=
 golang.org/x/crypto v0.32.0 h1:euUpcYgM8WcP71gNpTqQCn6rC2t6ULUPiOzfWaXVVfc=
 golang.org/x/crypto v0.32.0/go.mod h1:ZnnJkOaASj8g0AjIduWNlq2NRxL0PlBrbKVyZ6V/Ugc=
 golang.org/x/sys v0.29.0 h1:TPYlXGxvx1MGTn2GiZDhnjPA9wZzZeGKHHmKhHYvgaU=
