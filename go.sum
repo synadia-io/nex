@@ -18,6 +18,8 @@ github.com/synadia-labs/nex v0.0.0-20250131211748-d99fb95334ca h1:JDSGxUt9h73M/z
 github.com/synadia-labs/nex v0.0.0-20250131211748-d99fb95334ca/go.mod h1:FPH7S4KD69t+KxMMsyD3D0X3IkgGWXtHQxXFPgaJ6QA=
 github.com/synadia-labs/nex v0.0.0-20250131222025-0392cc74adc7 h1:u+L5Rb5yngm378O16T/zglg2Yo367LFznNaJ794rV0Q=
 github.com/synadia-labs/nex v0.0.0-20250131222025-0392cc74adc7/go.mod h1:lSz4TuVkEopc7Ot+Icnh0Vap70sRjh/oGAki5qXkpZ8=
+github.com/synadia-labs/nex v0.0.0-20250203183628-eb9ab6f8d3a7 h1:R6DFNnJF7FnXMbsVhXQqRONcmQVJTviOVpbupMCOeeA=
+github.com/synadia-labs/nex v0.0.0-20250203183628-eb9ab6f8d3a7/go.mod h1:kLbQp/bnt5aYss94Gp5e0nvHVbr5ujbD1PjhjdQjLRI=
 golang.org/x/crypto v0.32.0 h1:euUpcYgM8WcP71gNpTqQCn6rC2t6ULUPiOzfWaXVVfc=
 golang.org/x/crypto v0.32.0/go.mod h1:ZnnJkOaASj8g0AjIduWNlq2NRxL0PlBrbKVyZ6V/Ugc=
 golang.org/x/sys v0.29.0 h1:TPYlXGxvx1MGTn2GiZDhnjPA9wZzZeGKHHmKhHYvgaU=

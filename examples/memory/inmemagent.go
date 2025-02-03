@@ -93,11 +93,13 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 	return errors.New("workload not found")
 }
 
-func (a *InMemAgent) QueryWorkloads(namespace string) (*models.AgentListWorkloadsResponse, error) {
+func (a *InMemAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
 	workloads, ok := a.Workloads[namespace]
 	if !ok {
 		return nil, errors.New("namespace not found")
 	}
+
+	// no filter implemented in this example agent
 
 	resp := models.AgentListWorkloadsResponse{}
 	for _, workload := range workloads {

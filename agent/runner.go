@@ -337,7 +337,7 @@ func (a *Runner) handleQueryWorkloads() func(micro.Request) {
 			}
 		}
 
-		wl, err := a.agent.QueryWorkloads(req.Namespace)
+		wl, err := a.agent.QueryWorkloads(req.Namespace, req.Filter)
 		if err != nil {
 			slog.Error("error querying workloads", slog.Any("err", err))
 			err = r.Error("100", err.Error(), nil)
