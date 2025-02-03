@@ -176,6 +176,7 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 		{Name: "PingAgent", Subject: models.AgentAPIPingSubject(a.nodeId, a.agentId), Handler: a.handlePing()},
 		{Name: "PingAllAgents", Subject: models.AgentAPIPingAllSubject(a.nodeId), Handler: a.handlePing()},
 		{Name: "SetLameduck", Subject: models.AgentAPISetLameduckSubject(a.nodeId), Handler: a.handleSetLameduck()},
+		{Name: "PingWorkload", Subject: models.AgentAPIPingWorkloadSubscribeSubject(), Handler: a.handleWorkloadPing()},
 	}
 
 	var errs error
@@ -442,6 +443,25 @@ func (a *Runner) handlePing() func(micro.Request) {
 			if err != nil {
 				slog.Error("error responding to start workload request", slog.Any("err", err))
 			}
+		}
+	}
+}
+
+// This response needs to be as quick as possible
+func (a *Runner) handleWorkloadPing() func(micro.Request) {
+	return func(r micro.Request) {
+		//$NEX.agent.PINGWORKLOAD.<workloadid>
+		subSplit := strings.SplitN(r.Subject(), ".", 4)
+		workloadId := subSplit[3]
+
+		found := a.agent.PingWorkload(workloadId)
+		if !found {
+			return
+		}
+
+		err := r.RespondJSON([]byte(fmt.Sprintf(`{"node_id":"%s"}`, a.nodeId)))
+		if err != nil {
+			slog.Error("error responding to workload ping", slog.Any("err", err))
 		}
 	}
 }

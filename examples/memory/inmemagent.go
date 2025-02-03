@@ -134,3 +134,14 @@ func (a *InMemAgent) Ping() (*models.AgentSummary, error) {
 		Version:             a.Version,
 	}, nil
 }
+
+func (a *InMemAgent) PingWorkload(id string) bool {
+	for _, namespace := range a.Workloads {
+		for _, workload := range namespace {
+			if workload.id == id {
+				return true
+			}
+		}
+	}
+	return false
+}

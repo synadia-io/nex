@@ -14,4 +14,5 @@ type Agent interface {
 	QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error)
 	SetLameduck(before time.Duration) error
 	Ping() (*models.AgentSummary, error)
+	PingWorkload(workloadId string) bool
 }
