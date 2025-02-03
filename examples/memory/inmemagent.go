@@ -55,24 +55,24 @@ func (a *InMemAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 	return status, nil
 }
 
-func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.StartWorkloadRequest) (*models.StartWorkloadResponse, error) {
-	if a.Workloads[startRequest.Namespace] == nil {
-		a.Workloads[startRequest.Namespace] = []inMemWorkload{}
+func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.AgentStartWorkloadRequest) (*models.StartWorkloadResponse, error) {
+	if a.Workloads[startRequest.Request.Namespace] == nil {
+		a.Workloads[startRequest.Request.Namespace] = []inMemWorkload{}
 	}
 
-	if startRequest.Name == "" {
-		startRequest.Name = workloadId
+	if startRequest.Request.Name == "" {
+		startRequest.Request.Name = workloadId
 	}
 
-	a.Workloads[startRequest.Namespace] = append(a.Workloads[startRequest.Namespace], inMemWorkload{
+	a.Workloads[startRequest.Request.Namespace] = append(a.Workloads[startRequest.Request.Namespace], inMemWorkload{
 		id:           workloadId,
 		startTime:    time.Now(),
-		startRequest: startRequest,
+		startRequest: &startRequest.Request,
 	})
 
 	return &models.StartWorkloadResponse{
 		Id:   workloadId,
-		Name: startRequest.Name,
+		Name: startRequest.Request.Name,
 	}, nil
 }
 
@@ -102,13 +102,13 @@ func (a *InMemAgent) QueryWorkloads(namespace string) (*models.AgentListWorkload
 	resp := models.AgentListWorkloadsResponse{}
 	for _, workload := range workloads {
 		resp = append(resp, models.WorkloadSummary{
-			Id:              workload.id,
-			Name:            workload.name,
-			Runtime:         time.Since(workload.startTime).String(),
-			StartTime:       workload.startTime.Format(time.RFC3339),
-			WorkloadRuntype: "inmem",
-			WorkloadState:   models.WorkloadStateRunning,
-			WorkloadType:    "service",
+			Id:                workload.id,
+			Name:              workload.name,
+			Runtime:           time.Since(workload.startTime).String(),
+			StartTime:         workload.startTime.Format(time.RFC3339),
+			WorkloadType:      "inmem",
+			WorkloadState:     models.WorkloadStateRunning,
+			WorkloadLifecycle: "service",
 		})
 	}
 

@@ -11,6 +11,7 @@ import (
 	"github.com/nats-io/nkeys"
 	agent "github.com/synadia-io/nexlet.go/agent"
 	inmem "github.com/synadia-io/nexlet.go/examples/memory"
+	"github.com/synadia-labs/nex/models"
 )
 
 const (
@@ -68,7 +69,7 @@ func main() {
 	}
 
 	// launch the agent
-	if err := runner.Run(ctx, agentId); err != nil {
+	if err := runner.Run(ctx, agentId, models.NatsConnectionData{}); err != nil {
 		panic(fmt.Errorf("failed to run agent: %w", err))
 	}
 }

@@ -5,7 +5,7 @@ go 1.23.4
 require (
 	github.com/nats-io/nats.go v1.38.0
 	github.com/nats-io/nkeys v0.4.9
-	github.com/synadia-labs/nex v0.0.0-20250128200539-aab2887bcae8
+	github.com/synadia-labs/nex v0.0.0-20250131222025-0392cc74adc7
 )
 
 require (

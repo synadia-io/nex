@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/synadia-labs/nex/models"
-
-	"github.com/synadia-io/nexlet.go/utils"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
@@ -28,8 +27,7 @@ type Runner struct {
 	remote   bool
 	nodeId   string
 	agentId  string
-	natsUrl  string
-	natsNkey string
+	triggers map[string]*nats.Subscription
 
 	agent Agent
 	nc    *nats.Conn
@@ -37,14 +35,6 @@ type Runner struct {
 }
 
 type RunnerOpt func(*Runner) error
-
-func WithNatsUrl(url, nk string) RunnerOpt {
-	return func(a *Runner) error {
-		a.natsUrl = url
-		a.natsNkey = nk
-		return nil
-	}
-}
 
 func AsLocalAgent(inNodeId string) RunnerOpt {
 	return func(a *Runner) error {
@@ -63,9 +53,10 @@ func WithLogger(logger *slog.Logger) RunnerOpt {
 
 func NewRunner(name, version string, na Agent, opts ...RunnerOpt) (*Runner, error) {
 	a := &Runner{
-		name:    name,
-		version: version,
-		agent:   na,
+		name:     name,
+		version:  version,
+		agent:    na,
+		triggers: make(map[string]*nats.Subscription),
 	}
 
 	for _, opt := range opts {
@@ -85,41 +76,37 @@ func (a *Runner) GetLogger(workloadId, namespace string, stderr bool) io.Writer 
 	return NewAgentLogCapture(a.nc, slog.Default(), stderr, a.agentId, workloadId, namespace)
 }
 
-func (a *Runner) Run(ctx context.Context, agentId string) error {
+func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsConnectionData) error {
 	var err error
 	a.agentId = agentId
 
-	if a.nc == nil {
-		if a.natsUrl != "" {
-			a.nc, err = nats.Connect(a.natsUrl)
-			if err != nil {
-				return err
-			}
-		} else {
-			a.nc, err = utils.NatsFromEnv(EnvVarPrefix)
-			if err != nil {
-				return err
-			}
-		}
+	a.nc, err = nats.Connect(connData.NatsUrl,
+		nats.UserJWTAndSeed(connData.NatsUserJwt, connData.NatsUserSeed),
+		nats.Name(a.agentId),
+	)
+	if err != nil {
+		return err
 	}
+
 	// Register the agent
 	register, err := a.agent.Register(agentId)
 	if err != nil {
 		return err
 	}
-	regData, err := json.Marshal(register)
+
+	registerB, err := json.Marshal(register)
 	if err != nil {
 		return err
 	}
 
 	var regRet *nats.Msg
 	if a.remote {
-		regRet, err = a.nc.Request(models.AgentAPIRemoteRegisterSubject(), regData, time.Second*3)
+		regRet, err = a.nc.Request(models.AgentAPIRemoteRegisterSubject(), registerB, time.Second*3)
 		if err != nil {
 			return err
 		}
 	} else {
-		regRet, err = a.nc.Request(models.AgentAPILocalRegisterSubject(a.nodeId), regData, time.Second*3)
+		regRet, err = a.nc.Request(models.AgentAPILocalRegisterRequestSubject(agentId, a.nodeId), registerB, time.Second*3)
 		if err != nil {
 			return err
 		}
@@ -131,8 +118,19 @@ func (a *Runner) Run(ctx context.Context, agentId string) error {
 		return err
 	}
 
+	a.nc.Close()
+
 	if !regRetJson.Success {
 		return errors.New("agent registration failed: " + regRetJson.Message)
+	}
+
+	a.nc, err = nats.Connect(
+		regRetJson.ConnectionData.NatsUrl,
+		nats.UserJWTAndSeed(regRetJson.ConnectionData.NatsUserJwt, regRetJson.ConnectionData.NatsUserSeed),
+		nats.Name(a.agentId),
+	)
+	if err != nil {
+		return err
 	}
 
 	// Start agent heartbeat
@@ -149,7 +147,7 @@ func (a *Runner) Run(ctx context.Context, agentId string) error {
 				slog.Warn("error marshalling heartbeat", slog.Any("err", err))
 				continue
 			}
-			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(regRetJson.NodeId, a.agentId), hbB)
+			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.agentId), hbB)
 			if err != nil {
 				slog.Warn("error publishing heartbeat", slog.Any("err", err))
 				continue
@@ -219,13 +217,32 @@ func (a *Runner) EmitEvent(event any) error {
 	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentId, eventType), eventB)
 }
 
+func (a *Runner) RegisterTrigger(namespace, workloadId string, tFunc func([]byte) ([]byte, error)) error {
+	sub, err := a.nc.Subscribe(fmt.Sprintf("%s.%s.%s.TRIGGER", models.WorkloadAPIPrefix, namespace, workloadId), func(m *nats.Msg) {
+		ret, err := tFunc(m.Data)
+		if err != nil {
+			slog.Error("error running trigger function", slog.Any("err", err))
+		}
+		err = a.nc.Publish(m.Reply, ret)
+		if err != nil {
+			slog.Error("error responding to trigger", slog.Any("err", err))
+		}
+	})
+	if err != nil {
+		return err
+	}
+
+	a.triggers[workloadId] = sub
+	return nil
+}
+
 func (a *Runner) handleStartWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
 		// $NEX.agent.<namespace>.<agentid>.STARTWORKLOAD.<workloadid>
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		workloadId := splitSub[5]
 
-		req := new(models.StartWorkloadRequest)
+		req := new(models.AgentStartWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
 			slog.Error("error unmarshalling start workload request", slog.Any("err", err), slog.String("data", string(r.Data())))
@@ -295,6 +312,13 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
 				slog.Error("error responding to start workload request", slog.Any("err", err))
+			}
+		}
+
+		if sub, ok := a.triggers[workloadId]; ok {
+			err := sub.Unsubscribe()
+			if err != nil {
+				slog.Error("error unsubscribing trigger", slog.Any("err", err))
 			}
 		}
 	}
