@@ -171,6 +171,7 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 	}{
 		{Name: "StartWorkload", Subject: models.AgentAPIStartWorkloadSubscribeSubject(a.nodeId, a.agentId), Handler: a.handleStartWorkload()},
 		{Name: "StopWorkload", Subject: models.AgentAPIStopWorkloadSubscribeSubject(a.nodeId), Handler: a.handleStopWorkload()},
+		{Name: "GetWorkload", Subject: models.AgentAPIGetWorkloadSubscribeSubject(a.nodeId), Handler: a.handleGetWorkload()},
 		{Name: "QueryWorkloads", Subject: models.AgentAPIQueryWorkloadsSubject(a.nodeId), Handler: a.handleQueryWorkloads()},
 		// System only endpoints
 		{Name: "PingAgent", Subject: models.AgentAPIPingSubject(a.nodeId, a.agentId), Handler: a.handlePing()},
@@ -218,6 +219,7 @@ func (a *Runner) EmitEvent(event any) error {
 	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentId, eventType), eventB)
 }
 
+// TODO: move this off agent connect to the workload connection
 func (a *Runner) RegisterTrigger(namespace, workloadId string, tFunc func([]byte) ([]byte, error)) error {
 	sub, err := a.nc.Subscribe(fmt.Sprintf("%s.%s.%s.TRIGGER", models.WorkloadAPIPrefix, namespace, workloadId), func(m *nats.Msg) {
 		ret, err := tFunc(m.Data)
@@ -294,7 +296,7 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 		}
 		err = a.agent.StopWorkload(workloadId, req)
 		if err != nil {
-			slog.Error("error unmarshalling stop workload request", slog.Any("err", err))
+			slog.Error("error stopping workload request", slog.Any("err", err))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
 				slog.Error("error responding to start workload request", slog.Any("err", err))
@@ -325,10 +327,34 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 	}
 }
 
+func (a *Runner) handleGetWorkload() func(r micro.Request) {
+	return func(r micro.Request) {
+		// $NEX.agent.<nodeid>.GETWORKLOAD.workloadId
+		splitSub := strings.SplitN(r.Subject(), ".", 5)
+		workloadId := splitSub[4]
+
+		// TODO: implement message with xkey
+		startRequest, err := a.agent.GetWorkload(workloadId, "")
+		if err != nil {
+			slog.Error("error getting workload", slog.Any("err", err))
+			err = r.Error("100", err.Error(), nil)
+			if err != nil {
+				slog.Error("error responding to get workload request", slog.Any("err", err))
+			}
+		}
+
+		err = r.RespondJSON(startRequest)
+		if err != nil {
+			slog.Error("error responding to get workload request", slog.Any("err", err))
+		}
+	}
+}
+
 func (a *Runner) handleQueryWorkloads() func(micro.Request) {
 	return func(r micro.Request) {
 		// $NEX.agent.<nodeid>.QUERYWORKLOADS
 		req := new(models.AgentListWorkloadsRequest)
+
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
 			slog.Error("error unmarshalling query workloads request", slog.Any("err", err))
@@ -459,7 +485,7 @@ func (a *Runner) handleWorkloadPing() func(micro.Request) {
 			return
 		}
 
-		err := r.RespondJSON([]byte(fmt.Sprintf(`{"node_id":"%s"}`, a.nodeId)))
+		err := r.Respond([]byte(fmt.Sprintf(`{"node_id":"%s"}`, a.nodeId)))
 		if err != nil {
 			slog.Error("error responding to workload ping", slog.Any("err", err))
 		}

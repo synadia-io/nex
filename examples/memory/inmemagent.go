@@ -145,3 +145,15 @@ func (a *InMemAgent) PingWorkload(id string) bool {
 	}
 	return false
 }
+
+func (a *InMemAgent) GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error) {
+	// TODO: implement encryption for target
+	for _, workloads := range a.Workloads {
+		for _, workload := range workloads {
+			if workload.id == workloadId {
+				return workload.startRequest, nil
+			}
+		}
+	}
+	return nil, errors.New("workload not found")
+}

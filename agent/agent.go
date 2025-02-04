@@ -11,6 +11,7 @@ type Agent interface {
 	Heartbeat() (*models.AgentHeartbeat, error)
 	StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest) (*models.StartWorkloadResponse, error)
 	StopWorkload(workloadId string, req *models.StopWorkloadRequest) error
+	GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error)
 	QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error)
 	SetLameduck(before time.Duration) error
 	Ping() (*models.AgentSummary, error)
