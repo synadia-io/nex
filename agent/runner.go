@@ -23,6 +23,7 @@ const (
 type Runner struct {
 	name    string
 	version string
+	logger  *slog.Logger
 
 	remote   bool
 	nodeId   string
@@ -55,6 +56,7 @@ func NewRunner(name, version string, na Agent, opts ...RunnerOpt) (*Runner, erro
 	a := &Runner{
 		name:     name,
 		version:  version,
+		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 		agent:    na,
 		triggers: make(map[string]*nats.Subscription),
 	}
@@ -189,6 +191,16 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 	}
 	if errs != nil {
 		return errs
+	}
+
+	if regRetJson.ExistingState != nil {
+		a.logger.Info("restoring existing state", slog.Int("num_workloads", len(regRetJson.ExistingState)))
+		for workloadId, startRequest := range regRetJson.ExistingState {
+			_, err = a.agent.StartWorkload(workloadId, &startRequest)
+			if err != nil {
+				a.logger.Error("error restoring existing state", slog.String("workload_id", workloadId), slog.Any("err", err))
+			}
+		}
 	}
 
 	return nil
@@ -341,6 +353,7 @@ func (a *Runner) handleGetWorkload() func(r micro.Request) {
 			if err != nil {
 				slog.Error("error responding to get workload request", slog.Any("err", err))
 			}
+			return
 		}
 
 		err = r.RespondJSON(startRequest)
