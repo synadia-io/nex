@@ -2,6 +2,7 @@ package inmem
 
 import (
 	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/synadia-io/nexlet.go/agent"
@@ -55,7 +56,11 @@ func (a *InMemAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 	return status, nil
 }
 
-func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.AgentStartWorkloadRequest) (*models.StartWorkloadResponse, error) {
+func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
+	if existing {
+		slog.Info("restarting existing workload", slog.String("workloadId", workloadId))
+	}
+
 	if a.Workloads[startRequest.Request.Namespace] == nil {
 		a.Workloads[startRequest.Request.Namespace] = []inMemWorkload{}
 	}

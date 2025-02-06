@@ -196,7 +196,7 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 	if regRetJson.ExistingState != nil {
 		a.logger.Info("restoring existing state", slog.Int("num_workloads", len(regRetJson.ExistingState)))
 		for workloadId, startRequest := range regRetJson.ExistingState {
-			_, err = a.agent.StartWorkload(workloadId, &startRequest)
+			_, err = a.agent.StartWorkload(workloadId, &startRequest, true)
 			if err != nil {
 				a.logger.Error("error restoring existing state", slog.String("workload_id", workloadId), slog.Any("err", err))
 			}
@@ -268,7 +268,7 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 			return
 		}
 
-		startResp, err := a.agent.StartWorkload(workloadId, req)
+		startResp, err := a.agent.StartWorkload(workloadId, req, false)
 		if err != nil {
 			slog.Error("error unmarshalling start workload request", slog.Any("err", err))
 			err = r.Error("100", err.Error(), nil)

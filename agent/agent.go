@@ -9,7 +9,7 @@ import (
 type Agent interface {
 	Register(agentId string) (*models.RegisterAgentRequest, error)
 	Heartbeat() (*models.AgentHeartbeat, error)
-	StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest) (*models.StartWorkloadResponse, error)
+	StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error)
 	StopWorkload(workloadId string, req *models.StopWorkloadRequest) error
 	GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error)
 	QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error)
