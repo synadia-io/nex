@@ -116,6 +116,7 @@ func (a *InMemAgent) QueryWorkloads(namespace string, filter []string) (*models.
 			WorkloadType:      "inmem",
 			WorkloadState:     models.WorkloadStateRunning,
 			WorkloadLifecycle: "service",
+			Metadata:          map[string]string{"extra": "metadata"},
 		})
 	}
 

@@ -8,6 +8,8 @@ github.com/nats-io/nats.go v1.39.0 h1:2/yg2JQjiYYKLwDuBzV0FbB2sIV+eFNkEevlRi4n9l
 github.com/nats-io/nats.go v1.39.0/go.mod h1:MgRb8oOdigA6cYpEPhXJuRVH6UE/V4jblJ2jQ27IXYM=
 github.com/nats-io/nkeys v0.4.9 h1:qe9Faq2Gxwi6RZnZMXfmGMZkg3afLLOtrU+gDZJ35b0=
 github.com/nats-io/nkeys v0.4.9/go.mod h1:jcMqs+FLG+W5YO36OX6wFIFcmpdAns+w1Wm6D3I/evE=
+github.com/nats-io/nkeys v0.4.10 h1:glmRrpCmYLHByYcePvnTBEAwawwapjCPMjy2huw20wc=
+github.com/nats-io/nkeys v0.4.10/go.mod h1:OjRrnIKnWBFl+s4YK5ChQfvHP2fxqZexrKJoVVyWB3U=
 github.com/nats-io/nuid v1.0.1 h1:5iA8DT8V7q8WK2EScv2padNa/rTESc1KdnPw4TC2paw=
 github.com/nats-io/nuid v1.0.1/go.mod h1:19wcPz3Ph3q0Jbyiqsd0kePYG7A95tJPxeL+1OSON2c=
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 h1:PKK9DyHxif4LZo+uQSgXNqs0jj5+xZwwfKHgph2lxBw=
@@ -16,8 +18,12 @@ github.com/synadia-labs/nex v0.0.0-20250204190804-00f970b57c61 h1:sn3R5u+FGyq2rE
 github.com/synadia-labs/nex v0.0.0-20250204190804-00f970b57c61/go.mod h1:gNDN+tVUn1VuUCVGr2iXMNdKKmiJXbCJdm7/3VmN+jI=
 github.com/synadia-labs/nex v0.0.0-20250206175529-a42ddea77d98 h1:3w4MrZVettUsdivADQEtvhhT8HWRrbPsfTdvLvLBeqE=
 github.com/synadia-labs/nex v0.0.0-20250206175529-a42ddea77d98/go.mod h1:07PKrQmLNiVF7gM1Fu+cDO54dULXwzG+QM58zx/vo4Y=
+github.com/synadia-labs/nex v0.0.0-20250210201034-3eb3ce700eeb h1:9CHngb0TFudyD6n0lZAxPX0OyH+dVC8alsaK4X661d8=
+github.com/synadia-labs/nex v0.0.0-20250210201034-3eb3ce700eeb/go.mod h1:QMyDwKPqoujLZdFI86CzlVaNlrmunQoLF+AZ8beOtbQ=
 golang.org/x/crypto v0.32.0 h1:euUpcYgM8WcP71gNpTqQCn6rC2t6ULUPiOzfWaXVVfc=
 golang.org/x/crypto v0.32.0/go.mod h1:ZnnJkOaASj8g0AjIduWNlq2NRxL0PlBrbKVyZ6V/Ugc=
+golang.org/x/crypto v0.33.0 h1:IOBPskki6Lysi0lo9qQvbxiQ+FvsCC/YWOecCHAixus=
+golang.org/x/crypto v0.33.0/go.mod h1:bVdXmD7IV/4GdElGPozy6U7lWdRXA4qyRVGJV57uQ5M=
 golang.org/x/sys v0.30.0 h1:QjkSwP/36a20jFYWkSue1YwXzLmsV5Gfq7Eiy72C1uc=
 golang.org/x/sys v0.30.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/text v0.22.0 h1:bofq7m3/HAFvbF51jz3Q9wLg3jkvSPuiZu/pD1XwgtM=
