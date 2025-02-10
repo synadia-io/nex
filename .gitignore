@@ -1,6 +1,8 @@
 _cmd
 cli/counter
 dist/
+cli/nex
+
 cli/_configs/
 
 go.work*

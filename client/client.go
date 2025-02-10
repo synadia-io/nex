@@ -343,9 +343,13 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, err
 	}
 
-	resp, err := n.nc.Request(models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, 10*time.Second)
-	if err != nil {
+	resp, err := n.nc.Request(models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, 5*time.Second)
+	if err != nil && !errors.Is(err, nats.ErrTimeout) {
 		return nil, err
+	}
+
+	if errors.Is(err, nats.ErrTimeout) {
+		return nil, errors.New("workload not found")
 	}
 
 	cloneResp := new(models.StartWorkloadRequest)

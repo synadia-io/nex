@@ -8,10 +8,10 @@ require (
 	github.com/nats-io/jwt/v2 v2.7.3
 	github.com/nats-io/nats-server/v2 v2.10.25
 	github.com/nats-io/nats.go v1.39.0
-	github.com/nats-io/nkeys v0.4.9
+	github.com/nats-io/nkeys v0.4.10
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
-	github.com/synadia-io/nexlet.go v0.0.0-20250206183151-4afda8a1a9b7
+	github.com/synadia-io/nexlet.go v0.0.0-20250210201841-2a69a78b438c
 	golang.org/x/sys v0.30.0
 )
 

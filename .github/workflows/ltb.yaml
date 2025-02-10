@@ -4,7 +4,7 @@ name: Lint | Test | Build
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "dev" ]
   push:
     branches: [ "dev" ]
 

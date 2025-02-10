@@ -410,16 +410,16 @@ func (n *NativeWorkloadAgent) Ping() (*models.AgentSummary, error) {
 	return ret, nil
 }
 
+// AgentIngessWorkloads Interface
+
 func (n *NativeWorkloadAgent) PingWorkload(inWorkloadId string) bool {
 	_, ok := n.workloadState.FindWorkload(inWorkloadId)
 	return ok
 }
 
 func (n *NativeWorkloadAgent) GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error) {
-	workload, ok := n.workloadState.FindWorkload(workloadId)
-	if !ok {
-		// noop if workload not found
-		return nil, nil
+	if workload, ok := n.workloadState.FindWorkload(workloadId); ok {
+		return workload.StartRequest, nil
 	}
-	return workload.StartRequest, nil
+	return nil, errors.New("workload not found")
 }

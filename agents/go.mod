@@ -7,9 +7,9 @@ replace github.com/synadia-labs/nex => ..
 require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.39.0
-	github.com/nats-io/nkeys v0.4.9
-	github.com/synadia-io/nexlet.go v0.0.0-20250206183151-4afda8a1a9b7
-	github.com/synadia-labs/nex v0.0.0-20250207230947-db8f5631d618
+	github.com/nats-io/nkeys v0.4.10
+	github.com/synadia-io/nexlet.go v0.0.0-20250210201841-2a69a78b438c
+	github.com/synadia-labs/nex v0.0.0-20250210201034-3eb3ce700eeb
 	golang.org/x/sys v0.30.0
 )
 

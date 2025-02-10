@@ -351,7 +351,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		if namespace != models.SystemNamespace && namespace != req.Namespace {
+		if namespace != req.Namespace && namespace != models.SystemNamespace {
 			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
@@ -397,9 +397,15 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		err = n.nc.PublishRequest(models.AgentAPIStartWorkloadRequestSubject(pubKey, aid, workloadId), r.Reply(), aReqB)
+		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, aid, workloadId), aReqB, time.Second*5)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish start workload request")
+			return
+		}
+
+		err = r.Respond(auctionDeploy.Data)
+		if err != nil {
+			n.logger.Error("failed to respond to auction deploy workload request", slog.Any("err", err))
 			return
 		}
 
@@ -433,7 +439,7 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		if namespace != models.SystemNamespace && namespace != req.Namespace {
+		if namespace != req.Namespace && namespace != models.SystemNamespace {
 			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
@@ -444,9 +450,21 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		err = n.nc.PublishRequest(models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Reply(), r.Data())
+		// err = n.nc.PublishRequest(models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Reply(), r.Data())
+		// if err != nil {
+		// 	n.handlerError(r, err, "100", "failed to publish stop workload request")
+		// 	return
+		// }
+
+		stopWorkload, err := n.nc.Request(models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), time.Second*5)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish stop workload request")
+			return
+		}
+
+		err = r.Respond(stopWorkload.Data)
+		if err != nil {
+			n.logger.Error("failed to respond to stop workload request", slog.Any("err", err))
 			return
 		}
 
@@ -489,7 +507,7 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 			return
 		}
 
-		if namespace != models.SystemNamespace && namespace != req.Namespace {
+		if namespace != req.Namespace && namespace != models.SystemNamespace {
 			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
@@ -500,9 +518,19 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 			return
 		}
 
-		err = n.nc.PublishRequest(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadId), r.Reply(), r.Data())
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadId), r.Data(), time.Second*3)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to publish stop workload request")
+			n.logger.Debug("failed to find workload request", slog.Any("err", err))
+			return
+		}
+
+		if getWorkload.Header.Get("Nats-Service-Error") == "workload not found" {
+			return
+		}
+
+		err = r.Respond(getWorkload.Data)
+		if err != nil {
+			n.logger.Error("failed to respond to clone workload request", slog.Any("err", err))
 			return
 		}
 	}
@@ -521,7 +549,7 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 			return
 		}
 
-		if namespace != req.Namespace {
+		if namespace != req.Namespace && namespace != models.SystemNamespace {
 			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
@@ -532,9 +560,21 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 			return
 		}
 
-		err = n.nc.PublishRequest(models.AgentAPIQueryWorkloadsSubject(pubKey), r.Reply(), r.Data())
+		// err = n.nc.PublishRequest(models.AgentAPIQueryWorkloadsSubject(pubKey), r.Reply(), r.Data())
+		// if err != nil {
+		// 	n.handlerError(r, err, "100", "failed to publish query workloads request")
+		// 	return
+		// }
+
+		queryWorkload, err := n.nc.Request(models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), time.Second*5)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish query workloads request")
+			return
+		}
+
+		err = r.Respond(queryWorkload.Data)
+		if err != nil {
+			n.logger.Error("failed to respond to namespace ping request", slog.Any("err", err))
 			return
 		}
 	}
