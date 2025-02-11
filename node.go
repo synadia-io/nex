@@ -230,6 +230,17 @@ func (n *NexNode) Start() error {
 		return errs
 	}
 
+	if !n.noState {
+		_, err := n.jsCtx.CreateKeyValue(n.ctx, jetstream.KeyValueConfig{
+			Bucket:       nodeStateBucket,
+			MaxBytes:     1_000_000_000, // 1GB
+			MaxValueSize: 10_000,        // 10KB
+		})
+		if err != nil && !errors.Is(err, jetstream.ErrBucketExists) {
+			return err
+		}
+	}
+
 	// At this point, nex controller is running
 	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStartedEvent{
 		Id:    pubKey,
@@ -299,17 +310,6 @@ func (n *NexNode) Start() error {
 
 	if n.regs.Count() == 0 {
 		n.logger.Warn("nex node started without any agents")
-	}
-
-	if !n.noState {
-		_, err := n.jsCtx.CreateKeyValue(n.ctx, jetstream.KeyValueConfig{
-			Bucket:       nodeStateBucket,
-			MaxBytes:     1_000_000_000, // 1GB
-			MaxValueSize: 10_000,        // 10KB
-		})
-		if err != nil && !errors.Is(err, jetstream.ErrBucketExists) {
-			return err
-		}
 	}
 
 	n.logger.Info("nex node ready")
