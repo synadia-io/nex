@@ -1,11 +1,11 @@
 module github.com/synadia-io/nexlet.go
 
-go 1.23.4
+go 1.24.0
 
 require (
 	github.com/nats-io/nats.go v1.39.0
 	github.com/nats-io/nkeys v0.4.10
-	github.com/synadia-labs/nex v0.0.0-20250210201034-3eb3ce700eeb
+	github.com/synadia-labs/nex v0.0.0-20250212004254-da283100238c
 )
 
 require (
