@@ -1,6 +1,6 @@
 module github.com/synadia-labs/nex/cli
 
-go 1.23.4
+go 1.24.0
 
 replace github.com/synadia-labs/nex => ..
 
@@ -19,9 +19,9 @@ require (
 	github.com/nats-io/natscli v0.1.6
 	github.com/nats-io/nkeys v0.4.10
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
-	github.com/synadia-labs/nex v0.0.0-20250210201034-3eb3ce700eeb
-	github.com/synadia-labs/nex/agents v0.0.0-20250210201034-3eb3ce700eeb
-	github.com/synadia-labs/nex/client v0.0.0-20250210201034-3eb3ce700eeb
+	github.com/synadia-labs/nex v0.0.0-20250211164025-d2e242769480
+	github.com/synadia-labs/nex/agents v0.0.0-20250211164025-d2e242769480
+	github.com/synadia-labs/nex/client v0.0.0-20250211164025-d2e242769480
 )
 
 require (
