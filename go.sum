@@ -12,6 +12,8 @@ github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 h1:PKK9DyHxif4LZo+uQSgXNqs0jj5+x
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.1/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
 github.com/synadia-labs/nex v0.0.0-20250212004254-da283100238c h1:aVEfGzbuItGHL2a8lLwVwCZbNj0OYvxU5ZMTe41erQI=
 github.com/synadia-labs/nex v0.0.0-20250212004254-da283100238c/go.mod h1:sKFkXw5B3CjUuGXlh9A1/Sei2NGIfD6KtOMafhpnYvw=
+github.com/synadia-labs/nex v0.0.0-20250213213818-3cdd82e8392e h1:oluNzhhRKMGr9ymm8sErKeu0H9iawHSD7XItvECER1Q=
+github.com/synadia-labs/nex v0.0.0-20250213213818-3cdd82e8392e/go.mod h1:tfzFtkrURAcB/q7unrr9c/2mVY+N+mHS/tU3+oRv1Bg=
 golang.org/x/crypto v0.33.0 h1:IOBPskki6Lysi0lo9qQvbxiQ+FvsCC/YWOecCHAixus=
 golang.org/x/crypto v0.33.0/go.mod h1:bVdXmD7IV/4GdElGPozy6U7lWdRXA4qyRVGJV57uQ5M=
 golang.org/x/sys v0.30.0 h1:QjkSwP/36a20jFYWkSue1YwXzLmsV5Gfq7Eiy72C1uc=

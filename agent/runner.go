@@ -91,7 +91,7 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 	}
 
 	// Register the agent
-	register, err := a.agent.Register(agentId)
+	register, err := a.agent.Register()
 	if err != nil {
 		return err
 	}

@@ -29,13 +29,12 @@ type inMemWorkload struct {
 	startRequest *models.StartWorkloadRequest
 }
 
-func (a *InMemAgent) Register(agentId string) (*models.RegisterAgentRequest, error) {
+func (a *InMemAgent) Register() (*models.RegisterAgentRequest, error) {
 	pub, err := a.XPair.PublicKey()
 	if err != nil {
 		return nil, err
 	}
 	return &models.RegisterAgentRequest{
-		AssignedId:          agentId,
 		Description:         "In memory no-op agent",
 		MaxWorkloads:        0,
 		Name:                "inmem",
