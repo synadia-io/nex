@@ -90,20 +90,24 @@ tasks:
     cmds:
       - go get -u -v ./...
       - go mod tidy
+      - git add go.mod go.sum
   
   update:cli:
     dir: cli
     cmds:
       - go get -u -v ./...
       - go mod tidy
+      - git add go.mod go.sum
   
   update:client:
     dir: client
     cmds:
       - go get -u -v ./...
       - go mod tidy
+      - git add go.mod go.sum
   
   update:node:
     cmds:
       - go get -u -v ./...
       - go mod tidy
+      - git add go.mod go.sum

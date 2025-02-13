@@ -9,3 +9,9 @@ go.work*
 cli/go.work*
 client/go.work*
 agents/go.work*
+
+# test binaries
+_test/counter/counter
+_test/nexlet_inmem/cmd/nexlet_inmem
+_test/webapp/derp
+_test/webapp/

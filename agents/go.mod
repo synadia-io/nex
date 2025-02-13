@@ -9,7 +9,7 @@ require (
 	github.com/nats-io/nats.go v1.39.0
 	github.com/nats-io/nkeys v0.4.10
 	github.com/synadia-io/nexlet.go v0.0.0-20250213161520-59ed74a1f231
-	github.com/synadia-labs/nex v0.0.0-20250212004254-da283100238c
+	github.com/synadia-labs/nex v0.0.0-20250213183824-3aeb97e562c6
 	golang.org/x/sys v0.30.0
 )
 

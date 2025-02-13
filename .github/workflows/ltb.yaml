@@ -59,7 +59,17 @@ jobs:
       name: Private Module Setup
       run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/ 
     - 
-      name: Run test suite | node
+      name: Run test suite | nex
+      run: |
+        go test -v ./...
+    - 
+      name: Run test suite | agents
+      working-directory: ./agents
+      run: |
+        go test -v ./...
+    - 
+      name: Run test suite | client
+      working-directory: ./client
       run: |
         go test -v ./...
     - 

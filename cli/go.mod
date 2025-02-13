@@ -10,7 +10,7 @@ replace github.com/synadia-labs/nex/client => ../client
 
 require (
 	disorder.dev/shandler v0.0.0-20250212150133-c29daa0276fc
-	github.com/alecthomas/kong v1.8.0
+	github.com/alecthomas/kong v1.8.1
 	github.com/carlmjohnson/be v0.24.1
 	github.com/jedib0t/go-pretty/v6 v6.6.6
 	github.com/nats-io/jsm.go v0.1.2
@@ -20,9 +20,9 @@ require (
 	github.com/nats-io/nkeys v0.4.10
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/stretchr/testify v1.10.0
-	github.com/synadia-labs/nex v0.0.0-20250212004254-da283100238c
-	github.com/synadia-labs/nex/agents v0.0.0-20250212004254-da283100238c
-	github.com/synadia-labs/nex/client v0.0.0-20250212004254-da283100238c
+	github.com/synadia-labs/nex v0.0.0-20250213183824-3aeb97e562c6
+	github.com/synadia-labs/nex/agents v0.0.0-20250213183824-3aeb97e562c6
+	github.com/synadia-labs/nex/client v0.0.0-20250213183824-3aeb97e562c6
 )
 
 require (

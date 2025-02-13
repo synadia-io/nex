@@ -145,7 +145,7 @@ func TestNodeUp(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	reset()
 
-	be.True(t, strings.Contains(buffer.String(), fmt.Sprintf("[INFO] Starting nex node version=0.0.0 node_id=%s name=testnode nexus=testnexus start_time=", TestServerPublicKey)))
+	be.True(t, strings.Contains(buffer.String(), fmt.Sprintf("[INFO] Starting nex node version=0.0.0 node_id=%s name=testnode nexus=testnexus nats_server=%s start_time=", TestServerPublicKey, s.ClientURL())))
 	be.True(t, strings.Contains(buffer.String(), "[WARN] nex node started without any agents"))
 	be.True(t, strings.Contains(buffer.String(), "[INFO] nex node ready"))
 }

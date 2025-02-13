@@ -1,72 +1,25 @@
 package client
 
 import (
-	"fmt"
-	"io"
-	"log/slog"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
+	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/carlmjohnson/be"
-	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex"
+	"github.com/synadia-labs/nex/_test"
 	"github.com/synadia-labs/nex/models"
 )
 
-const (
-	Node1Seed = "SNAD2VTZQ7Z3CCB6TJWFFJK6J7DDZ5SQUHOFPQFRKDIVDQBM2WLGZGELSE"
-	Node1Pub  = "NB4XOM2IOV2NRLRZZU5PFMQFBAQXYQOG4WOVGOWRYJRBWI3JO5QJK7AG"
-)
-
-func StartNatsServer(t testing.TB, workDir string) *server.Server {
-	t.Helper()
-
-	server := server.New(&server.Options{
-		Port:      -1,
-		JetStream: true,
-		StoreDir:  workDir,
-	})
-
-	server.Start()
-
-	return server
-}
-
-// TODO - move the inmem nexlet here and use it for testing
-
-func StartNexNode(t testing.TB, workDir string, nc *nats.Conn) *nex.NexNode {
-	t.Helper()
-
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-	kp, err := nkeys.FromSeed([]byte(Node1Seed))
-	be.NilErr(t, err)
-
-	// runner, err := native.NewNativeWorkloadAgent(nc.ConnectedAddr(), Node1Pub, logger)
-	// be.NilErr(t, err)
-
-	node, err := nex.NewNexNode(
-		nex.WithNodeKeyPair(kp),
-		nex.WithNatsConn(nc),
-		//		nex.WithAgentRunner(runner),
-		nex.WithLogger(logger),
-		nex.WithTag("foo", "bar"),
-	)
-	be.NilErr(t, err)
-
-	be.NilErr(t, node.Start())
-	return node
-}
-
 func TestNewNexClient(t *testing.T) {
-	server := StartNatsServer(t, t.TempDir())
-	defer server.Shutdown()
+	server := _test.StartNatsServer(t, t.TempDir())
+	defer func() {
+		for server.NumClients() == 0 {
+			server.Shutdown()
+			return
+		}
+	}()
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
@@ -80,152 +33,318 @@ func TestNewNexClient(t *testing.T) {
 }
 
 func TestNexClient_User(t *testing.T) {
-	t.SkipNow()
 	workDir := t.TempDir()
-	server := StartNatsServer(t, workDir)
-	defer server.Shutdown()
+	server := _test.StartNatsServer(t, workDir)
+	defer func() {
+		for server.NumClients() == 0 {
+			server.Shutdown()
+			return
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	_test.StartNexus(t, ctx, server.ClientURL(), 1, false, &wg)
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	nn := StartNexNode(t, workDir, nc)
-	defer nn.Shutdown() //nolint
-
-	binPath := BuildWorkloadBinary(t, workDir)
-
 	client := NewClient(nc, "user")
 	be.Nonzero(t, client)
 
-	ar, err := client.Auction("native", map[string]string{})
+	ar, err := client.Auction("inmem", map[string]string{})
 	be.NilErr(t, err)
 	be.Equal(t, 1, len(ar))
 
-	sr, err := client.StartWorkload(ar[0].BidderId, "tester", "My test workload", fmt.Sprintf(`{"uri":"%s"}`, binPath), "native", models.WorkloadLifecycleService)
+	sr, err := client.StartWorkload(ar[0].BidderId, "tester", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
 	be.NilErr(t, err)
 	be.Equal(t, "tester", sr.Name)
-
-	logs := SampleWorkloadLogs(t, nc, time.Millisecond*1500, sr.Id)
-	be.True(t, strings.Contains(logs, "Count:"))
 
 	str, err := client.StopWorkload(sr.Id)
 	be.NilErr(t, err)
 
 	be.Equal(t, sr.Id, str.Id)
 	be.True(t, str.Stopped)
+
+	cancel()
+	wg.Wait()
 }
 
 func TestNexClient_System(t *testing.T) {
-	workDir := t.TempDir()
-	server := StartNatsServer(t, workDir)
-	defer server.Shutdown()
+	nodeSize := []struct {
+		name string
+		size int
+	}{
+		{"OneNodeNexus", 1},
+		{"ThreeNodeNexus", 3},
+		{"FiveNodeNexus", 5},
+	}
 
-	nc, err := nats.Connect(server.ClientURL())
-	be.NilErr(t, err)
-	defer nc.Close()
+	for _, tt := range nodeSize {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workDir := t.TempDir()
+			server := _test.StartNatsServer(t, workDir)
+			defer func() {
+				for server.NumClients() == 0 {
+					server.Shutdown()
+					return
+				}
+			}()
 
-	StartNexNode(t, workDir, nc)
+			nc, err := nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
 
-	client := NewClient(nc, models.SystemNamespace)
-	be.Nonzero(t, client)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 
-	info, err := client.GetNodeInfo(Node1Pub)
-	be.NilErr(t, err)
-	be.Equal(t, Node1Pub, info.NodeId)
+			var wg sync.WaitGroup
+			wg.Add(tt.size)
+			_test.StartNexus(t, ctx, server.ClientURL(), tt.size, false, &wg)
 
-	nodes, err := client.ListNodes(map[string]string{"foo": "bar"})
-	be.NilErr(t, err)
-	be.Equal(t, 1, len(nodes))
-	be.Equal(t, Node1Pub, nodes[0].NodeId)
+			nc, err = nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
 
-	ldr, err := client.SetLameduck(Node1Pub, 0)
-	be.NilErr(t, err)
-	be.True(t, ldr.Success)
+			client := NewClient(nc, models.SystemNamespace)
+			be.Nonzero(t, client)
+
+			info, err := client.GetNodeInfo(_test.Node1Pub)
+			be.NilErr(t, err)
+			be.Equal(t, _test.Node1Pub, info.NodeId)
+
+			nodes, err := client.ListNodes(map[string]string{"nex.node": "testnexus-1"})
+			be.NilErr(t, err)
+			be.Equal(t, 1, len(nodes))
+			be.Equal(t, _test.Node1Pub, nodes[0].NodeId)
+
+			ldr, err := client.SetLameduck(_test.Node1Pub, 0)
+			be.NilErr(t, err)
+			be.True(t, ldr.Success)
+			time.Sleep(250 * time.Millisecond)
+
+			nodes, err = client.ListNodes(nil)
+			if tt.size == 1 {
+				be.Equal(t, "no nodes found", err.Error())
+			} else {
+				be.NilErr(t, err)
+				be.Equal(t, tt.size-1, len(nodes))
+			}
+
+			cancel()
+			wg.Wait()
+		})
+	}
 }
 
 func TestNexClient_SystemAsUser(t *testing.T) {
 	workDir := t.TempDir()
-	server := StartNatsServer(t, workDir)
-	defer server.Shutdown()
+	server := _test.StartNatsServer(t, workDir)
+	defer func() {
+		for server.NumClients() == 0 {
+			server.Shutdown()
+			return
+		}
+	}()
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	StartNexNode(t, workDir, nc)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	_test.StartNexus(t, ctx, server.ClientURL(), 1, false, &wg)
 
 	client := NewClient(nc, "user")
 	be.Nonzero(t, client)
 
-	_, err = client.GetNodeInfo(Node1Pub)
+	_, err = client.GetNodeInfo(_test.Node1Pub)
 	be.Equal(t, "node not found", err.Error())
 
 	nodes, err := client.ListNodes(map[string]string{"foo": "bar"})
-	be.NilErr(t, err)
+	be.Equal(t, "no nodes found", err.Error())
 	be.Equal(t, 0, len(nodes))
 
-	_, err = client.SetLameduck(Node1Pub, 0)
+	_, err = client.SetLameduck(_test.Node1Pub, 0)
 	be.Equal(t, "no nodes found", err.Error())
+
+	cancel()
+	wg.Wait()
 }
 
-func BuildWorkloadBinary(t testing.TB, workingDir string) string {
-	t.Helper()
-
-	const (
-		main string = `package main
-
-import (
-    "fmt"
-    "os"
-    "os/signal"
-    "time"
-)
-
-func main() {
-    sigChan := make(chan os.Signal, 1)
-
-    signal.Notify(sigChan, os.Interrupt)
-
-    go func() {
-        <-sigChan  
-        os.Exit(0) 
-    }()
-
-    count := 0
-    for {
-        fmt.Fprintf(os.Stdout, "Count: %d\n", count)
-        time.Sleep(1 * time.Second)
-        count++
-    }
-}`
-	)
-
-	f, err := os.Create(filepath.Join(workingDir, "main.go"))
-	be.NilErr(t, err)
-	_, err = f.WriteString(main)
-	be.NilErr(t, err)
-	f.Close()
-
-	out, err := exec.Command("go", "build", "-o", filepath.Join(workingDir, "workload"), filepath.Join(workingDir, "main.go")).CombinedOutput()
-	if err != nil {
-		t.Log(string(out))
+func TestNexClient_ListWorkloads(t *testing.T) {
+	nodeSize := []struct {
+		name string
+		size int
+	}{
+		{"OneNodeNexus", 1},
+		{"ThreeNodeNexus", 3},
+		{"FiveNodeNexus", 5},
 	}
-	be.NilErr(t, err)
-	return filepath.Join(workingDir, "workload")
+
+	for _, tt := range nodeSize {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workDir := t.TempDir()
+			server := _test.StartNatsServer(t, workDir)
+			defer func() {
+				for server.NumClients() == 0 {
+					server.Shutdown()
+					return
+				}
+			}()
+
+			ctx, cancel := context.WithCancel(context.Background())
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			_test.StartNexus(t, ctx, server.ClientURL(), 1, false, &wg)
+
+			nc, err := nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			client := NewClient(nc, "user")
+			be.Nonzero(t, client)
+
+			ar, err := client.Auction("inmem", map[string]string{})
+			be.NilErr(t, err)
+			be.Equal(t, 1, len(ar))
+
+			_, err = client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			be.NilErr(t, err)
+
+			ar, err = client.Auction("inmem", map[string]string{})
+			be.NilErr(t, err)
+			be.Equal(t, 1, len(ar))
+
+			_, err = client.StartWorkload(ar[0].BidderId, "tester2", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			be.NilErr(t, err)
+
+			ar, err = client.Auction("inmem", map[string]string{})
+			be.NilErr(t, err)
+			be.Equal(t, 1, len(ar))
+
+			_, err = client.StartWorkload(ar[0].BidderId, "tester3", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			be.NilErr(t, err)
+
+			wl, err := client.ListWorkloads([]string{})
+			be.NilErr(t, err)
+
+			be.Equal(t, 1, len(wl))
+			be.Equal(t, 3, len(*wl[0]))
+
+			cancel()
+			wg.Wait()
+		})
+	}
 }
 
-func SampleWorkloadLogs(t testing.TB, nc *nats.Conn, duration time.Duration, workloadId string) string {
-	t.Helper()
+func TestNexClient_List_NoNodes(t *testing.T) {
+	server := _test.StartNatsServer(t, t.TempDir())
+	defer func() {
+		for server.NumClients() == 0 {
+			server.Shutdown()
+		}
+	}()
 
-	resp := strings.Builder{}
-	sub, err := nc.Subscribe(models.AgentEmitLogSubject("user", workloadId), func(m *nats.Msg) {
-		resp.Write(m.Data)
-	})
+	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
+	defer nc.Close()
 
-	time.Sleep(duration)
-	err = sub.Unsubscribe()
-	be.NilErr(t, err)
+	tt := []string{
+		models.SystemNamespace,
+		"user",
+	}
 
-	return resp.String()
+	for _, ns := range tt {
+		t.Run("As:"+ns, func(t *testing.T) {
+			client := NewClient(nc, models.SystemNamespace)
+			be.Nonzero(t, client)
+
+			t.Run("ListNodes", func(t *testing.T) {
+				_, err = client.ListNodes(nil)
+				be.Equal(t, "no nodes found", err.Error())
+			})
+
+			t.Run("ListWorkloads", func(t *testing.T) {
+				_, err = client.ListWorkloads(nil)
+				be.Equal(t, "no workloads found", err.Error())
+			})
+		})
+	}
+}
+
+func TestNexClient_CloneWorkload(t *testing.T) {
+	nodeSize := []struct {
+		name string
+		size int
+	}{
+		{"OneNodeNexus", 1},
+		{"ThreeNodeNexus", 3},
+		{"FiveNodeNexus", 5},
+	}
+
+	for _, tt := range nodeSize {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workDir := t.TempDir()
+			server := _test.StartNatsServer(t, workDir)
+			defer func() {
+				for server.NumClients() == 0 {
+					server.Shutdown()
+					return
+				}
+			}()
+
+			nc, err := nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+
+			var wg sync.WaitGroup
+			wg.Add(tt.size)
+			_test.StartNexus(t, ctx, server.ClientURL(), tt.size, false, &wg)
+
+			nc, err = nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			client := NewClient(nc, "user")
+			be.Nonzero(t, client)
+
+			ar, err := client.Auction("inmem", map[string]string{})
+			be.NilErr(t, err)
+			be.Equal(t, tt.size, len(ar))
+
+			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			be.NilErr(t, err)
+
+			_, err = client.CloneWorkload(swr.Id, nil)
+			be.NilErr(t, err)
+
+			time.Sleep(250 * time.Millisecond)
+
+			wl, err := client.ListWorkloads(nil)
+			be.NilErr(t, err)
+
+			totalCount := 0
+			for _, w := range wl {
+				totalCount += len(*w)
+			}
+
+			be.Equal(t, 2, totalCount)
+
+			cancel()
+			wg.Wait()
+		})
+	}
 }

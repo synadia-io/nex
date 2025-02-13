@@ -61,9 +61,10 @@ type (
 
 		regs *models.Regs
 
-		nc     *nats.Conn
-		jsCtx  jetstream.JetStream
-		server *server.Server
+		nc      *nats.Conn
+		service micro.Service
+		jsCtx   jetstream.JetStream
+		server  *server.Server
 
 		nodeShutdown chan struct{}
 	}
@@ -163,6 +164,7 @@ func (n *NexNode) Start() error {
 		slog.String("node_id", pubKey),
 		slog.String("name", n.name),
 		slog.String("nexus", n.nexus),
+		slog.String("nats_server", n.nc.ConnectedUrl()),
 		slog.String("start_time", n.startTime.Format(time.RFC3339)))
 
 	if n.server != nil {
@@ -197,7 +199,7 @@ func (n *NexNode) Start() error {
 		return err
 	}
 
-	nex, err := micro.AddService(n.nc, micro.Config{
+	n.service, err = micro.AddService(n.nc, micro.Config{
 		Name:    "nexnode",
 		Version: VERSION,
 	})
@@ -207,24 +209,24 @@ func (n *NexNode) Start() error {
 
 	var errs error
 	// System only endpoints
-	errs = errors.Join(errs, nex.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("DirectDeployWorkload", micro.HandlerFunc(n.handleDirectDeploy()), micro.WithEndpointSubject(models.DirectDeploySubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("DirectDeployWorkload", micro.HandlerFunc(n.handleDirectDeploy()), micro.WithEndpointSubject(models.DirectDeploySubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// System only agent endpoints
 	if n.allowAgentRegistration {
-		errs = errors.Join(errs, nex.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.RegisterRemoteAgentSubject()), micro.WithEndpointQueueGroup(n.nexus)))
-		errs = errors.Join(errs, nex.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-		errs = errors.Join(errs, nex.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.RegisterRemoteAgentSubject()), micro.WithEndpointQueueGroup(n.nexus)))
+		errs = errors.Join(errs, n.service.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+		errs = errors.Join(errs, n.service.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	}
-	errs = errors.Join(errs, nex.AddEndpoint("RegisterLocalAgent", micro.HandlerFunc(n.handleRegisterLocalAgent()), micro.WithEndpointSubject(models.AgentAPILocalRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("RegisterLocalAgent", micro.HandlerFunc(n.handleRegisterLocalAgent()), micro.WithEndpointSubject(models.AgentAPILocalRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// User endpoints
-	errs = errors.Join(errs, nex.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, nex.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
 
 	if errs != nil {
 		return errs
@@ -253,7 +255,7 @@ func (n *NexNode) Start() error {
 		n.logger.Error("failed to emit nex started event", slog.Any("err", err))
 	}
 
-	for _, e := range nex.Info().Endpoints {
+	for _, e := range n.service.Info().Endpoints {
 		if e.QueueGroup != micro.DefaultQueueGroup {
 			n.logger.Debug("Subscribed to nats subject", slog.String("subject", e.Subject), slog.String("queue_group", e.QueueGroup))
 		} else {
@@ -300,6 +302,9 @@ func (n *NexNode) Start() error {
 
 	go func() {
 		for range time.Tick(10 * time.Second) {
+			if n.nc.IsClosed() {
+				return
+			}
 			// TODO: what should go in this payload??
 			err = n.nc.Publish(models.NodeEmitHeartbeatSubject(pubKey), nil)
 			if err != nil {
@@ -317,13 +322,16 @@ func (n *NexNode) Start() error {
 	return nil
 }
 
+func (n *NexNode) IsReady() bool {
+	return n.state == models.NodeStateRunning
+}
+
 func (n *NexNode) Shutdown() error {
 	if n.state == models.NodeStateStopping {
 		n.logger.Warn("nex node already shutting down")
 		return nil
 	}
 
-	n.cancel()
 	n.state = models.NodeStateStopping
 
 	var err error
@@ -361,6 +369,17 @@ func (n *NexNode) Shutdown() error {
 		}
 	}
 
+	err = n.service.Stop()
+	if err != nil {
+		n.logger.Error("failed to stop micro service", slog.String("err", err.Error()))
+	}
+	if !n.nc.IsClosed() {
+		err = n.nc.Drain()
+		if err != nil {
+			n.logger.Error("failed to drain nats connection", slog.String("err", err.Error()))
+		}
+	}
+
 	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
 
 	n.nodeShutdown <- struct{}{}
@@ -368,8 +387,18 @@ func (n *NexNode) Shutdown() error {
 }
 
 func (n *NexNode) WaitForShutdown() error {
-	<-n.nodeShutdown
-	return nil
+	for {
+		select {
+		case <-n.ctx.Done(): // shutdown by context
+			n.logger.Warn("shutdown by context cancellation")
+			err := n.Shutdown()
+			if err != nil {
+				return err
+			}
+		case <-n.nodeShutdown: // shutdown by command, recommended
+			return nil
+		}
+	}
 }
 
 func (n *NexNode) enterLameduck(delay time.Duration) {

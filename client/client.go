@@ -33,11 +33,11 @@ func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
 	}
 
 	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, 10*time.Second)
-	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
+	if err != nil && !errors.Is(err, nats.ErrNoResponders) && !errors.Is(err, nats.ErrTimeout) {
 		return nil, err
 	}
 
-	if errors.Is(err, nats.ErrNoResponders) {
+	if err != nil || len(resp.Data) == 0 {
 		return nil, errors.New("node not found")
 	}
 
@@ -93,6 +93,12 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 
 	inbox := nats.NewInbox()
 	_, err = n.nc.Subscribe(inbox, func(m *nats.Msg) {
+		// TODO:- check for header errors
+
+		if len(m.Data) == 0 {
+			return
+		}
+
 		last = time.Now()
 		t := new(models.NodePingResponse)
 		err := json.Unmarshal(m.Data, t)
@@ -100,6 +106,7 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 			errs = errors.Join(errs, err)
 			return
 		}
+
 		resp = append(resp, t)
 	})
 	if err != nil {
@@ -127,11 +134,12 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
 		return nil, err
 	}
-	if errors.Is(err, nats.ErrNoResponders) {
-		return nil, errors.New("no nodes found")
-	}
 
 	<-ctx.Done()
+
+	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) || len(resp) == 0 {
+		return nil, errors.New("no nodes found")
+	}
 
 	return resp, nil
 }
@@ -188,7 +196,7 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 	}()
 
 	err = n.nc.PublishRequest(models.AuctionRequestSubject(n.namespace), respInbox, auctionRequestB)
-	if err != nil {
+	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
 		return nil, err
 	}
 
@@ -279,6 +287,9 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 
 	inbox := nats.NewInbox()
 	_, err = n.nc.Subscribe(inbox, func(m *nats.Msg) {
+		if len(m.Data) == 0 {
+			return
+		}
 		last = time.Now()
 		t := new(models.AgentListWorkloadsResponse)
 		err := json.Unmarshal(m.Data, t)
@@ -316,9 +327,10 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 
 	<-ctx.Done()
 
-	if errors.Is(err, nats.ErrNoResponders) {
+	if errors.Is(err, nats.ErrNoResponders) || len(resp) == 0 {
 		return nil, errors.New("no workloads found")
 	}
+
 	return resp, nil
 }
 

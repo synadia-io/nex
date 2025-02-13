@@ -85,7 +85,7 @@ func (n *Regs) Get(id string) *Reg {
 func (n *Regs) Find(name string) (string, *Reg, bool) {
 	n.Lock()
 	for id, r := range n.r {
-		if name == r.OriginalRequest.Name {
+		if r.OriginalRequest != nil && name == r.OriginalRequest.Name {
 			n.Unlock()
 			return id, r, true
 		}
