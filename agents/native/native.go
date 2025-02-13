@@ -112,7 +112,6 @@ func (r *workloadState) FindWorkload(workloadId string) (*NativeProcess, bool) {
 
 type NativeWorkloadAgent struct {
 	ctx context.Context
-	id  string
 
 	logger              *slog.Logger
 	xKeyPair            nkeys.KeyPair
@@ -126,15 +125,12 @@ type NativeWorkloadAgent struct {
 	runner *sdk.Runner
 }
 
-func (n *NativeWorkloadAgent) Register(assignedID string) (*models.RegisterAgentRequest, error) {
-	n.id = assignedID
-
+func (n *NativeWorkloadAgent) Register() (*models.RegisterAgentRequest, error) {
 	xPub, err := n.xKeyPair.PublicKey()
 	if err != nil {
 		return nil, err
 	}
 	return &models.RegisterAgentRequest{
-		AssignedId:          assignedID,
 		Description:         "Runs workloads as subprocesses on the host machine",
 		MaxWorkloads:        0,
 		Name:                nativeAgentName,
@@ -192,9 +188,6 @@ func (n *NativeWorkloadAgent) StartWorkload(workloadId string, req *models.Agent
 
 	if n.workloadState[req.Request.Namespace][workloadId].Restarts < n.workloadState[req.Request.Namespace][workloadId].MaxRestarts {
 		ctx := n.ctx
-		if req.Request.WorkloadLifecycle == models.WorkloadLifecycleFunction {
-			ctx, _ = context.WithTimeoutCause(n.ctx, funcTimeLimit, errors.New("exceeded allowed function execution time limit"))
-		}
 
 		env := []string{}
 		for k, v := range startReq.Environment {
@@ -204,7 +197,6 @@ func (n *NativeWorkloadAgent) StartWorkload(workloadId string, req *models.Agent
 			"NEX_WORKLOAD_NATS_URL=" + req.WorkloadCreds.NatsUrl,
 			"NEX_WORKLOAD_NATS_NKEY=" + req.WorkloadCreds.NatsUserSeed,
 			"NEX_WORKLOAD_NATS_B64_JWT=" + base64.StdEncoding.EncodeToString([]byte(req.WorkloadCreds.NatsUserJwt)),
-			"NEX_WORKLOAD_AGENT_ID=" + n.id,
 		}...)
 
 		cmd := exec.CommandContext(ctx, startReq.Uri, startReq.Argv...)

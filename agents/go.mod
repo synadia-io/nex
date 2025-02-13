@@ -8,8 +8,8 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.39.0
 	github.com/nats-io/nkeys v0.4.10
-	github.com/synadia-io/nexlet.go v0.0.0-20250213161520-59ed74a1f231
-	github.com/synadia-labs/nex v0.0.0-20250213183824-3aeb97e562c6
+	github.com/synadia-io/nexlet.go v0.0.0-20250213215012-7d1d52db7607
+	github.com/synadia-labs/nex v0.0.0-20250213213818-3cdd82e8392e
 	golang.org/x/sys v0.30.0
 )
 

@@ -31,10 +31,6 @@
       },
       "description": "List of capabilities supported by the agent"
     },
-    "assigned_id": {
-      "type": "string",
-      "description": "The assigned ID of the agent"
-    },
     "start_request_schema": {
       "type": "string",
       "description": "JSONSchema shape for the start request; enforced by node"
@@ -47,7 +43,6 @@
     "max_workloads",
     "public_xkey",
     "capabilities",
-    "assigned_id",
     "start_request_schema"
   ],
   "additionalProperties": false

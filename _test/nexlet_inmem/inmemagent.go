@@ -68,13 +68,12 @@ func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 	return inmemAgent.runner, nil
 }
 
-func (a *inMemAgent) Register(agentId string) (*models.RegisterAgentRequest, error) {
+func (a *inMemAgent) Register() (*models.RegisterAgentRequest, error) {
 	pub, err := a.xPair.PublicKey()
 	if err != nil {
 		return nil, err
 	}
 	return &models.RegisterAgentRequest{
-		AssignedId:         agentId,
 		Description:        "In memory no-op agent",
 		MaxWorkloads:       0,
 		Name:               a.name,

@@ -592,6 +592,10 @@ func (n *NexNode) handleStopAgent() func(micro.Request) {
 
 func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 	return func(r micro.Request) {
+		// return fmt.Sprintf("%s.%s.REGISTER.%s", AgentAPIPrefix, inAgentId, inNodeId)
+		splitSub := strings.SplitN(r.Subject(), ".", 5)
+		agentId := splitSub[2]
+
 		registrationRequest := new(models.RegisterAgentRequest)
 		err := json.Unmarshal(r.Data(), registrationRequest)
 		if err != nil {
@@ -599,8 +603,8 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			return
 		}
 
-		if !n.regs.Has(registrationRequest.AssignedId) {
-			n.handlerError(r, errors.New(registrationRequest.Name+" agent provided invalid agentid ["+registrationRequest.AssignedId+"]"), "100", "invalid agent id provided")
+		if !n.regs.Has(agentId) {
+			n.handlerError(r, errors.New(registrationRequest.Name+" agent provided invalid agentid ["+agentId+"]"), "100", "invalid agent id provided")
 			return
 		}
 
@@ -631,7 +635,7 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			return
 		}
 
-		err = n.regs.Update(registrationRequest.AssignedId, &models.Reg{
+		err = n.regs.Update(agentId, &models.Reg{
 			OriginalRequest: registrationRequest,
 			Schema:          schema,
 		})
@@ -640,7 +644,7 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			return
 		}
 
-		natsConn, err := n.minter.Mint(models.AgentCred, "", registrationRequest.AssignedId)
+		natsConn, err := n.minter.Mint(models.AgentCred, "", agentId)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to mint nats connection")
 			return
@@ -701,7 +705,7 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			n.logger.Error("failed to respond to register local agent request", slog.Any("err", err))
 			return
 		}
-		n.logger.Info("agent registered", slog.String("name", registrationRequest.Name), slog.String("agent_id", registrationRequest.AssignedId))
+		n.logger.Info("agent registered", slog.String("name", registrationRequest.Name), slog.String("agent_id", agentId))
 	}
 }
 

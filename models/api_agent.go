@@ -72,9 +72,6 @@ func (j *AgentListWorkloadsRequest) UnmarshalJSON(b []byte) error {
 type AgentListWorkloadsResponse []WorkloadSummary
 
 type RegisterAgentRequest struct {
-	// The assigned ID of the agent
-	AssignedId string `json:"assigned_id"`
-
 	// A user friendly description of the agent
 	Description string `json:"description"`
 
@@ -102,9 +99,6 @@ func (j *RegisterAgentRequest) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
-	}
-	if _, ok := raw["assigned_id"]; raw != nil && !ok {
-		return fmt.Errorf("field assigned_id in RegisterAgentRequest: required")
 	}
 	if _, ok := raw["description"]; raw != nil && !ok {
 		return fmt.Errorf("field description in RegisterAgentRequest: required")
