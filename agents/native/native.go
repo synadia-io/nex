@@ -26,7 +26,10 @@ import (
 //go:embed start_request.json
 var startRequest string
 
-var funcTimeLimit = 5 * time.Minute
+var (
+	funcTimeLimit           = 5 * time.Minute
+	_             sdk.Agent = (*NativeWorkloadAgent)(nil)
+)
 
 const (
 	nativeAgentName    = "native"

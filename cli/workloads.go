@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"os"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/stretchr/testify/assert/yaml"
 	"github.com/synadia-labs/nex/client"
 	"github.com/synadia-labs/nex/models"
 )
@@ -40,14 +42,15 @@ type (
 
 		// This will need to validate against start request provided by agent at registration
 		WorkloadStartRequest json.RawMessage `name:"start-request" placeholder:"{}" help:"Start request for the workload"`
-		WorkloadNexfile      *os.File        `name:"nexfile" short:"f" placeholder:"Nexfile" help:"Nexfile for the workload"`
+		WorkloadNexfile      *os.File        `name:"nexfile" short:"f" placeholder:"Nexfile" help:"Nexfile for the workload; formatted in YAML"`
 	}
 	StopWorkload struct {
 		WorkloadId string `arg:"" name:"id" help:"ID of the workload to stop"`
 	}
 	ListWorkload struct {
-		AgentType string   `name:"type" help:"Type of workload" placeholder:"native"`
-		Filter    []string `name:"filter" help:"Workload filter sent to agent for processing" placeholder:"state"`
+		AgentType    string   `name:"type" help:"Type of workload" placeholder:"native"`
+		ShowMetadata bool     `name:"show-metadata" default:"false" help:"Show metadata for workloads"`
+		Filter       []string `name:"filter" help:"Workload filter sent to agent for processing" placeholder:"state"`
 	}
 	// InfoWorkload struct{}
 	CloneWorkload struct {
@@ -74,6 +77,7 @@ func (r *StartWorkload) Run(globals *Globals) error {
 	client := client.NewClient(nc, globals.Namespace)
 
 	deploymentId := r.NodeId
+
 	if r.WorkloadNexfile == nil {
 		if info, err := os.Stat("./Nexfile"); err == nil && !info.IsDir() {
 			f, err := os.Open("./Nexfile")
@@ -84,9 +88,19 @@ func (r *StartWorkload) Run(globals *Globals) error {
 		}
 	}
 
-	startRequest, err := jsonschema.UnmarshalJSON(r.WorkloadNexfile)
-	if err != nil {
-		return err
+	var startRequest interface{}
+	if r.WorkloadNexfile != nil {
+		defer r.WorkloadNexfile.Close()
+
+		data, err := io.ReadAll(r.WorkloadNexfile)
+		if err != nil {
+			return err
+		}
+
+		err = yaml.Unmarshal(data, &startRequest)
+		if err != nil {
+			return err
+		}
 	}
 
 	if r.NodeId == "" {
@@ -116,28 +130,25 @@ func (r *StartWorkload) Run(globals *Globals) error {
 			return err
 		}
 
-		if r.WorkloadNexfile != nil {
-			defer r.WorkloadNexfile.Close()
-
+		if startRequest != nil {
 			err = schema.Validate(startRequest)
 			if err != nil {
 				return err
 			}
-
 		} else if r.WorkloadStartRequest == nil && r.WorkloadNexfile == nil {
-			if schema.Properties == nil {
-				return errors.New("schema has no properties")
-			}
-
-			for fieldName, fieldSchema := range schema.Properties {
-				fmt.Printf("%s: %s\n", fieldName, fieldSchema.Types.String())
-			}
-
 			// TODO: create an interactive mode to fill out start request
+			// if schema.Properties == nil {
+			// 	return errors.New("schema has no properties")
+			// }
+			// for fieldName, fieldSchema := range schema.Properties {
+			// 	fmt.Printf("%s: %s\n", fieldName, fieldSchema.Types.String())
+			// }
+
 			return errors.New("interactive start request not yet implemented")
 		}
 		deploymentId = randomNode.BidderId
 	}
+
 	r.WorkloadStartRequest, err = json.Marshal(startRequest)
 	if err != nil {
 		return err
@@ -216,14 +227,30 @@ func (r *ListWorkload) Run(globals *Globals) error {
 		tW.Style().Title.Align = text.AlignCenter
 		tW.Style().Format.Header = text.FormatDefault
 		tW.SetTitle("Running Workloads - " + globals.Namespace)
-		tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State"})
+		if r.ShowMetadata {
+			tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State", "Metadata"})
+		} else {
+			tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State"})
+		}
 		for _, agentResponse := range resp {
 			for _, workload := range *agentResponse {
 				rt := workload.Runtime
-				if workload.WorkloadType != "function" {
+				if workload.WorkloadLifecycle != "function" {
 					rt = "--"
 				}
-				tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState})
+
+				if r.ShowMetadata {
+					meta := "--"
+					if workload.Metadata != nil {
+						metaB, err := json.Marshal(workload.Metadata)
+						if err == nil {
+							meta = string(metaB)
+						}
+					}
+					tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState, meta})
+				} else {
+					tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState})
+				}
 				workloads++
 			}
 		}
