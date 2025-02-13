@@ -234,14 +234,18 @@ func (a *Runner) EmitEvent(event any) error {
 // TODO: move this off agent connect to the workload connection
 func (a *Runner) RegisterTrigger(namespace, workloadId string, tFunc func([]byte) ([]byte, error)) error {
 	sub, err := a.nc.Subscribe(fmt.Sprintf("%s.%s.%s.TRIGGER", models.WorkloadAPIPrefix, namespace, workloadId), func(m *nats.Msg) {
-		ret, err := tFunc(m.Data)
-		if err != nil {
-			slog.Error("error running trigger function", slog.Any("err", err))
-		}
-		err = a.nc.Publish(m.Reply, ret)
-		if err != nil {
-			slog.Error("error responding to trigger", slog.Any("err", err))
-		}
+		go func() {
+			ret, err := tFunc(m.Data)
+			if err != nil {
+				slog.Error("error running trigger function", slog.Any("err", err))
+			}
+			if m.Reply != "" { // empty if orginal trigger was a publish and not request
+				err = a.nc.Publish(m.Reply, ret)
+				if err != nil {
+					slog.Error("error responding to trigger", slog.Any("err", err))
+				}
+			}
+		}()
 	})
 	if err != nil {
 		return err
