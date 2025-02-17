@@ -54,7 +54,6 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 				"NEX_AGENT_NATS_NKEY=" + regCreds.NatsUserSeed,
 				"NEX_AGENT_NATS_B64_JWT=" + base64.StdEncoding.EncodeToString([]byte(regCreds.NatsUserJwt)),
 				"NEX_AGENT_NODE_ID=" + ap.HostNode,
-				"NEX_AGENT_ASSIGNED_ID=" + ap.Id,
 			}...)
 
 			// Start the process
@@ -74,7 +73,7 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 			}
 
 			ap.Process = cmd.Process
-			a.logger.Info("starting local agent", slog.String("agent", info.Name()), slog.Int("pid", ap.Process.Pid), slog.Int("restart_count", ap.restartCount), slog.Int("reset_limit", a.resetLimit))
+			a.logger.Info("starting local agent", slog.String("agent", info.Name()), slog.Int("restart_count", ap.restartCount), slog.Int("reset_limit", a.resetLimit), slog.Int("pid", ap.Process.Pid))
 
 			time.Sleep(250 * time.Millisecond)
 
@@ -82,7 +81,7 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 			if err != nil {
 				a.logger.Error("Process exited with error", slog.Int("process", ap.Process.Pid), slog.Any("err", err))
 			} else if state != nil && ap.state != models.AgentStateStopping || ap.state != models.AgentStateLameduck {
-				a.logger.Warn("Process unexpectedly exited with state", slog.Int("process", ap.Process.Pid), slog.Any("state", state))
+				a.logger.Warn("Process unexpectedly exited with state", slog.Any("state", state), slog.Int("process", ap.Process.Pid))
 			}
 
 			regs.Remove(ap.Id)
