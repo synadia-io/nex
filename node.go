@@ -265,6 +265,8 @@ func (n *NexNode) Start() error {
 
 	// start embedded agent runners
 	assignedAgentId := nuid.New()
+
+	startedRunners := []*sdk.Runner{}
 	for _, runner := range n.embeddedRunners {
 		if _, _, ok := n.regs.Find(runner.String()); ok {
 			n.logger.Warn("agent already registered; skipping additional registration", slog.String("agent_name", runner.String()))
@@ -283,10 +285,13 @@ func (n *NexNode) Start() error {
 		err = runner.Run(n.ctx, id, *connData)
 		if err != nil {
 			n.logger.Error("agent failed to run", slog.String("agent_name", runner.String()), slog.String("err", err.Error()))
+			n.regs.Remove(id)
 			continue
 		}
 		n.logger.Info("starting embedded agent", slog.String("agent_name", runner.String()))
+		startedRunners = append(startedRunners, runner)
 	}
+	n.embeddedRunners = startedRunners
 
 	// start local agents
 	for _, agentProcess := range n.localRunners {

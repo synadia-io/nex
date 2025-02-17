@@ -112,6 +112,7 @@ func (a *inMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 	}
 
 	a.workloads[startRequest.Request.Namespace] = append(a.workloads[startRequest.Request.Namespace], inMemWorkload{
+		name:         startRequest.Request.Name,
 		id:           workloadId,
 		startTime:    time.Now(),
 		startRequest: &startRequest.Request,
