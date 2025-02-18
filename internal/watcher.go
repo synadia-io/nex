@@ -49,10 +49,14 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 			for k, v := range ap.Config.Env {
 				env = append(env, k+"="+v)
 			}
+
 			env = append(env, []string{
 				"NEX_AGENT_NATS_URL=" + regCreds.NatsUrl,
 				"NEX_AGENT_NATS_NKEY=" + regCreds.NatsUserSeed,
 				"NEX_AGENT_NATS_B64_JWT=" + base64.StdEncoding.EncodeToString([]byte(regCreds.NatsUserJwt)),
+				"NEX_AGENT_NATS_USER=" + regCreds.NatsUserName,
+				"NEX_AGENT_NATS_PASSWORD=" + regCreds.NatsUserPassword,
+				"NEX_AGENT_NATS_USER_NKEY=" + regCreds.NatsUserNkey,
 				"NEX_AGENT_NODE_ID=" + ap.HostNode,
 			}...)
 

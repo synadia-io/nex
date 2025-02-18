@@ -54,6 +54,7 @@ func (m *SigningKeyMinter) MintRegister(agentId, nodeId string) (*models.NatsCon
 	if err != nil {
 		return nil, err
 	}
+
 	ret.NatsUserSeed = string(seed)
 
 	pubKp, err := kp.PublicKey()
@@ -96,7 +97,9 @@ func (m *SigningKeyMinter) Mint(typ models.CredType, namespace, id string) (*mod
 	if err != nil {
 		return nil, err
 	}
+
 	ret.NatsUserSeed = string(seed)
+
 	pubKp, err := kp.PublicKey()
 	if err != nil {
 		return nil, err

@@ -166,14 +166,38 @@ func (j *LameduckResponse) UnmarshalJSON(b []byte) error {
 }
 
 type NatsConnectionData struct {
+	// ConnName corresponds to the JSON schema field "conn_name".
+	ConnName string `json:"conn_name"`
+
 	// NatsUrl corresponds to the JSON schema field "nats_url".
 	NatsUrl string `json:"nats_url"`
 
-	// NatsUserJwt corresponds to the JSON schema field "nats_user_jwt".
+	// JWT for nats user, used with Seed
 	NatsUserJwt string `json:"nats_user_jwt"`
 
-	// NatsUserSeed corresponds to the JSON schema field "nats_user_seed".
+	// Name of the nats user, used with password
+	NatsUserName string `json:"nats_user_name"`
+
+	// NatsUserNkey corresponds to the JSON schema field "nats_user_nkey".
+	NatsUserNkey string `json:"nats_user_nkey"`
+
+	// Password for the nats user, used with user name
+	NatsUserPassword string `json:"nats_user_password"`
+
+	// Seed for nats user, used with JWT
 	NatsUserSeed string `json:"nats_user_seed"`
+
+	// TlsCa corresponds to the JSON schema field "tls_ca".
+	TlsCa string `json:"tls_ca"`
+
+	// TlsCert corresponds to the JSON schema field "tls_cert".
+	TlsCert string `json:"tls_cert"`
+
+	// TlsFirst corresponds to the JSON schema field "tls_first".
+	TlsFirst bool `json:"tls_first"`
+
+	// TlsKey corresponds to the JSON schema field "tls_key".
+	TlsKey string `json:"tls_key"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -182,14 +206,38 @@ func (j *NatsConnectionData) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
+	if _, ok := raw["conn_name"]; raw != nil && !ok {
+		return fmt.Errorf("field conn_name in NatsConnectionData: required")
+	}
 	if _, ok := raw["nats_url"]; raw != nil && !ok {
 		return fmt.Errorf("field nats_url in NatsConnectionData: required")
 	}
 	if _, ok := raw["nats_user_jwt"]; raw != nil && !ok {
 		return fmt.Errorf("field nats_user_jwt in NatsConnectionData: required")
 	}
+	if _, ok := raw["nats_user_name"]; raw != nil && !ok {
+		return fmt.Errorf("field nats_user_name in NatsConnectionData: required")
+	}
+	if _, ok := raw["nats_user_nkey"]; raw != nil && !ok {
+		return fmt.Errorf("field nats_user_nkey in NatsConnectionData: required")
+	}
+	if _, ok := raw["nats_user_password"]; raw != nil && !ok {
+		return fmt.Errorf("field nats_user_password in NatsConnectionData: required")
+	}
 	if _, ok := raw["nats_user_seed"]; raw != nil && !ok {
 		return fmt.Errorf("field nats_user_seed in NatsConnectionData: required")
+	}
+	if _, ok := raw["tls_ca"]; raw != nil && !ok {
+		return fmt.Errorf("field tls_ca in NatsConnectionData: required")
+	}
+	if _, ok := raw["tls_cert"]; raw != nil && !ok {
+		return fmt.Errorf("field tls_cert in NatsConnectionData: required")
+	}
+	if _, ok := raw["tls_first"]; raw != nil && !ok {
+		return fmt.Errorf("field tls_first in NatsConnectionData: required")
+	}
+	if _, ok := raw["tls_key"]; raw != nil && !ok {
+		return fmt.Errorf("field tls_key in NatsConnectionData: required")
 	}
 	type Plain NatsConnectionData
 	var plain Plain

@@ -134,6 +134,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 		for k, v := range startReq.Environment {
 			env = append(env, k+"="+v)
 		}
+
 		env = append(env, []string{
 			"NEX_WORKLOAD_NATS_URL=" + req.WorkloadCreds.NatsUrl,
 			"NEX_WORKLOAD_NATS_NKEY=" + req.WorkloadCreds.NatsUserSeed,
