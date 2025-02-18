@@ -7,6 +7,7 @@ import (
 	"syscall"
 )
 
+// nolint
 func stopProcess(proc *os.Process) error {
 	return proc.Signal(os.Interrupt)
 }

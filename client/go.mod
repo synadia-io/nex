@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nats.go v1.39.0
 	github.com/nats-io/nkeys v0.4.10
 	github.com/nats-io/nuid v1.0.1
-	github.com/synadia-labs/nex v0.0.0-20250213213818-3cdd82e8392e
+	github.com/synadia-labs/nex v0.0.0-20250217040344-c30fa21fb692
 )
 
 require (

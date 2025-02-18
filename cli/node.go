@@ -140,17 +140,6 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		logger.Warn("No NATS connection available, logs will not be sent over NATS")
 	}
 
-	var natsUrl string
-	if nc != nil {
-		natsUrl = nc.ConnectedUrl()
-	} else {
-		natsOpts, err := server.ProcessConfigFile(u.InternalNatsServerConf)
-		if err != nil {
-			return err
-		}
-		natsUrl = fmt.Sprintf("nats://%s:%d", natsOpts.Host, natsOpts.Port)
-	}
-
 	opts := []nex.NexNodeOption{
 		nex.WithNodeName(u.NodeName),
 		nex.WithNexus(u.NexusName),
@@ -165,7 +154,7 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 	}
 
 	if !u.DisableNativeStart {
-		nativeAgent, err := native.NewNativeWorkloadAgent(natsUrl, nodePub, logger.WithGroup("native-agent"))
+		nativeAgent, err := native.NewNativeWorkloadRunner(ctx, nodePub, logger.WithGroup("native-agent"))
 		if err != nil {
 			return err
 		}

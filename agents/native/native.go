@@ -3,165 +3,132 @@ package native
 import (
 	"context"
 	_ "embed"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"os"
-	"os/exec"
-	"slices"
-	"strings"
-	"sync"
-	"syscall"
 	"time"
 
 	"github.com/goombaio/namegenerator"
-	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/models"
-
 	"github.com/nats-io/nkeys"
-	sdk "github.com/synadia-io/nexlet.go/agent"
+	"github.com/synadia-io/nexlet.go/agent"
+	"github.com/synadia-labs/nex/models"
 )
 
 //go:embed start_request.json
 var startRequest string
 
-var (
-	funcTimeLimit           = 5 * time.Minute
-	_             sdk.Agent = (*NativeWorkloadAgent)(nil)
-)
-
 const (
-	nativeAgentName    = "native"
-	nativeAgentVersion = "0.0.0"
-
-	maxRestarts = 3
+	NEXLET_NAME  string = "native"
+	MAX_RESTARTS int    = 3
 )
 
-func NewNativeWorkloadAgent(natsUrl string, nodeId string, logger *slog.Logger) (*sdk.Runner, error) {
+var (
+	_                    agent.Agent = (*NativeAgent)(nil)
+	VERSION              string      = "0.0.0"
+	SUPPORTED_LIFECYCLES             = []models.WorkloadLifecycle{
+		models.WorkloadLifecycleJob,
+		models.WorkloadLifecycleService,
+	}
+)
+
+type NativeAgent struct {
+	ctx       context.Context
+	xkp       nkeys.KeyPair
+	startTime time.Time
+
+	state      *nexletState
+	runner     *agent.Runner
+	agentState models.AgentState
+}
+
+//go:generate go tool github.com/atombender/go-jsonschema --struct-name-from-title --package native --tags json --output gen_start_request.go start_request.json
+func NewNativeWorkloadRunner(ctx context.Context, nodeId string, logger *slog.Logger) (*agent.Runner, error) {
+	slog.SetDefault(logger)
+
+	da, err := newNativeWorkloadAgent(ctx, nodeId, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := []agent.RunnerOpt{
+		agent.WithLogger(logger),
+	}
+
+	if nkeys.IsValidPublicServerKey(nodeId) {
+		opts = append(opts, agent.AsLocalAgent(nodeId))
+	} else {
+		return nil, errors.New("node id is not a valid public server key")
+	}
+
+	da.runner, err = agent.NewRunner(NEXLET_NAME, VERSION, da, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	da.state = newNexletState(da.ctx, da.runner)
+	return da.runner, nil
+}
+
+func newNativeWorkloadAgent(ctx context.Context, nodeId string, logger *slog.Logger) (*NativeAgent, error) {
 	xkp, err := nkeys.CreateCurveKeys()
 	if err != nil {
 		return nil, err
 	}
 
-	agent := &NativeWorkloadAgent{
-		ctx:           context.Background(),
-		logger:        logger,
-		xKeyPair:      xkp,
-		agentState:    models.AgentStateRunning,
-		workloadState: make(map[string]NativeProcesses),
-		supportedLifecycles: []models.WorkloadLifecycle{
-			// models.WorkloadLifecycleFunction,
-			models.WorkloadLifecycleJob,
-			models.WorkloadLifecycleService,
-		},
-		startedAt:     time.Now(),
-		natsServerUrl: natsUrl,
+	da := &NativeAgent{
+		ctx:        ctx,
+		xkp:        xkp,
+		startTime:  time.Now(),
+		state:      new(nexletState),
+		agentState: models.AgentStateStarting,
 	}
 
-	opts := []sdk.RunnerOpt{
-		sdk.WithLogger(logger),
-	}
+	da.state.ctx = ctx
+	da.state.workloads = make(map[string]NativeProcesses)
 
-	if nkeys.IsValidPublicServerKey(nodeId) {
-		opts = append(opts, sdk.AsLocalAgent(nodeId))
-	} else {
-		return nil, errors.New("node id is not a valid public server key")
-	}
+	return da, nil
+}
 
-	agent.runner, err = sdk.NewRunner(nativeAgentName, nativeAgentVersion, agent, opts...)
+func (a *NativeAgent) Register() (*models.RegisterAgentRequest, error) {
+	a.startTime = time.Now()
+
+	xPub, err := a.xkp.PublicKey()
 	if err != nil {
 		return nil, err
 	}
 
-	return agent.runner, nil
-}
-
-type NativeProcess struct {
-	Process      *os.Process
-	Name         string
-	Id           string
-	StartRequest *models.StartWorkloadRequest
-	StartedAt    time.Time
-	State        models.WorkloadState
-	Restarts     int
-	MaxRestarts  int
-}
-
-type (
-	NativeProcesses map[string]*NativeProcess
-	workloadState   map[string]NativeProcesses
-)
-
-func (r *workloadState) WorkloadCount() int {
-	count := 0
-	for _, workloads := range *r {
-		count += len(workloads)
-	}
-	return count
-}
-
-func (r *workloadState) FindWorkload(workloadId string) (*NativeProcess, bool) {
-	for _, workloads := range *r {
-		if workload, ok := workloads[workloadId]; ok {
-			return workload, true
-		}
-	}
-	return nil, false
-}
-
-type NativeWorkloadAgent struct {
-	ctx context.Context
-
-	logger              *slog.Logger
-	xKeyPair            nkeys.KeyPair
-	agentState          models.AgentState
-	stateLock           sync.RWMutex
-	workloadState       workloadState // map[namespace][workloadid]workloads
-	supportedLifecycles []models.WorkloadLifecycle
-	natsServerUrl       string
-	startedAt           time.Time
-
-	runner *sdk.Runner
-}
-
-func (n *NativeWorkloadAgent) Register() (*models.RegisterAgentRequest, error) {
-	xPub, err := n.xKeyPair.PublicKey()
-	if err != nil {
-		return nil, err
-	}
 	return &models.RegisterAgentRequest{
 		Description:         "Runs workloads as subprocesses on the host machine",
 		MaxWorkloads:        0,
-		Name:                nativeAgentName,
+		Name:                NEXLET_NAME,
 		PublicXkey:          xPub,
-		Version:             nativeAgentVersion,
-		SupportedLifecycles: n.supportedLifecycles,
+		Version:             VERSION,
+		SupportedLifecycles: SUPPORTED_LIFECYCLES,
 		StartRequestSchema:  startRequest,
 	}, nil
 }
 
-func (n *NativeWorkloadAgent) Heartbeat() (*models.AgentHeartbeat, error) {
-	return &models.AgentHeartbeat{
-		Data:          "",
-		State:         string(n.agentState),
-		WorkloadCount: n.workloadState.WorkloadCount(),
-	}, nil
-}
-
-func (n *NativeWorkloadAgent) StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
-	if n.workloadState[req.Request.Namespace] == nil {
-		n.workloadState[req.Request.Namespace] = make(NativeProcesses)
+func (a *NativeAgent) Heartbeat() (*models.AgentHeartbeat, error) {
+	stats := struct {
+		TotalNamespaces int `json:"namespace_count"`
+	}{
+		TotalNamespaces: a.state.NamespaceCount(),
 	}
 
-	startReq := new(StartRequest)
-	err := json.Unmarshal([]byte(req.Request.RunRequest), startReq)
+	statsB, err := json.Marshal(stats)
 	if err != nil {
 		return nil, err
 	}
+
+	return &models.AgentHeartbeat{
+		Data:          string(statsB),
+		State:         string(a.agentState),
+		WorkloadCount: a.state.WorkloadCount(),
+	}, nil
+}
+
+func (a *NativeAgent) StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
+	slog.Debug("start workload request received", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
 
 	if req.Request.Name == "" {
 		seed := time.Now().UTC().UnixNano()
@@ -169,252 +136,48 @@ func (n *NativeWorkloadAgent) StartWorkload(workloadId string, req *models.Agent
 		req.Request.Name = nameGenerator.Generate()
 	}
 
-	if n.workloadState[req.Request.Namespace][workloadId] == nil {
-		n.workloadState[req.Request.Namespace][workloadId] = &NativeProcess{
-			Id:           workloadId,
-			Name:         req.Request.Name,
-			StartRequest: &req.Request,
-			StartedAt:    time.Now(),
-			State:        models.WorkloadStateStarting,
-			Restarts:     0,
-			MaxRestarts: func() int {
-				if req.Request.WorkloadLifecycle == models.WorkloadLifecycleJob {
-					return 1
-				}
-				return maxRestarts
-			}(),
-		}
-	}
-
-	if n.workloadState[req.Request.Namespace][workloadId].Restarts < n.workloadState[req.Request.Namespace][workloadId].MaxRestarts {
-		ctx := n.ctx
-
-		env := []string{}
-		for k, v := range startReq.Environment {
-			env = append(env, k+"="+v)
-		}
-		env = append(env, []string{
-			"NEX_WORKLOAD_NATS_URL=" + req.WorkloadCreds.NatsUrl,
-			"NEX_WORKLOAD_NATS_NKEY=" + req.WorkloadCreds.NatsUserSeed,
-			"NEX_WORKLOAD_NATS_B64_JWT=" + base64.StdEncoding.EncodeToString([]byte(req.WorkloadCreds.NatsUserJwt)),
-		}...)
-
-		cmd := exec.CommandContext(ctx, startReq.Uri, startReq.Argv...)
-		cmd.Env = env
-		cmd.Stdout = n.runner.GetLogger(workloadId, req.Request.Namespace, false)
-		cmd.Stderr = n.runner.GetLogger(workloadId, req.Request.Namespace, true)
-		cmd.SysProcAttr = internal.SysProcAttr()
-
-		if err := cmd.Start(); err != nil {
-			return nil, err
-		}
-		n.workloadState[req.Request.Namespace][workloadId].Process = cmd.Process
-
-		go func() {
-			wlId := workloadId
-			wlReq := req
-
-			pState, err := n.workloadState[wlReq.Request.Namespace][wlId].Process.Wait()
-			if err != nil && !errors.Is(err, syscall.ECHILD) {
-				n.logger.Error("error waiting for process to exit", slog.Any("err", err))
-			}
-
-			if pState.ExitCode() == 0 {
-				err = n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: wlId})
-				if err != nil {
-					n.logger.Error("error emitting event", slog.Any("err", err))
-				}
-				return
-			}
-
-			// This should only hit when the workload was killed via a proper stop request
-			if errors.Is(err, syscall.ECHILD) {
-				return
-			}
-
-			n.workloadState[wlReq.Request.Namespace][wlId].State = models.WorkloadStateError
-			// Stopped by user command
-			if x, ok := n.workloadState[wlReq.Request.Namespace][wlId]; !ok || x.State == models.WorkloadStateStopping {
-				return
-			}
-
-			n.workloadState[wlReq.Request.Namespace][wlId].Restarts++
-			n.logger.Debug("workload process exited unexpectedly; attempting restart", slog.String("workloadId", wlId), slog.String("namespace", wlReq.Request.Namespace), slog.Any("restarts", n.workloadState[wlReq.Request.Namespace][wlId].Restarts))
-
-			if n.workloadState[wlReq.Request.Namespace][wlId].Restarts == maxRestarts {
-				n.logger.Error("max restarts reached", slog.String("workloadId", wlId), slog.String("namespace", wlReq.Request.Namespace))
-				delete(n.workloadState[wlReq.Request.Namespace], wlId)
-				return
-			}
-
-			_, err = n.StartWorkload(wlId, wlReq, false)
-			if err != nil {
-				n.logger.Error("error restarting workload", slog.Any("err", err))
-			}
-		}()
-
-		n.workloadState[req.Request.Namespace][workloadId].State = func() models.WorkloadState {
-			if req.Request.WorkloadType == string(models.WorkloadLifecycleFunction) {
-				return models.WorkloadStateWarm
-			}
-			return models.WorkloadStateRunning
-		}()
-
-		n.logger.Debug("workload started", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace), slog.Bool("preexisting", existing))
-		err = n.runner.EmitEvent(models.WorkloadStartedEvent{Id: workloadId})
-		if err != nil {
-			n.logger.Error("error emitting event", slog.Any("err", err))
-		}
-
-		return &models.StartWorkloadResponse{
-			Id:   workloadId,
-			Name: req.Request.Name,
-		}, nil
-	}
-
-	return nil, errors.New("max restarts reached")
-}
-
-func (n *NativeWorkloadAgent) StopWorkload(workloadId string, req *models.StopWorkloadRequest) error {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
-	_, ok := n.workloadState[req.Namespace]
-	if !ok {
-		// If the agent doesnt find the workload, this is a noop
-		return nil
-	}
-
-	workload, ok := n.workloadState[req.Namespace][workloadId]
-	if !ok {
-		// If the agent doesnt find the workload, this is a noop
-		return nil
-	}
-
-	workload.State = models.WorkloadStateStopping
-	err := internal.StopProcess(workload.Process)
+	err := a.state.AddWorkload(req.Request.Namespace, workloadId, req)
 	if err != nil {
-		n.logger.Error("error stopping process; force killing", slog.Any("err", err))
-		err = workload.Process.Kill()
-		if err != nil {
-			return err
-		}
+		return nil, err
 	}
 
-	state, err := workload.Process.Wait()
-	if err != nil {
-		return err
-	}
-
-	n.logger.Debug("workload process exited", slog.String("workloadId", workload.Id), slog.String("state", state.String()))
-	delete(n.workloadState[req.Namespace], workloadId)
-
-	err = n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: workloadId})
-	if err != nil {
-		n.logger.Error("error emitting event", slog.Any("err", err))
-	}
-	return nil
+	return &models.StartWorkloadResponse{
+		Id:   workloadId,
+		Name: req.Request.Name,
+	}, nil
 }
 
-func (n *NativeWorkloadAgent) SetLameduck(before time.Duration) error {
-	n.stateLock.Lock()
-	defer n.stateLock.Unlock()
-
-	var wg sync.WaitGroup
-	for _, processes := range n.workloadState {
-		wg.Add(len(processes))
-		for _, process := range processes {
-			process.State = models.WorkloadStateStopping
-
-			err := internal.StopProcess(process.Process)
-			if err != nil {
-				return err
-			}
-
-			go func() {
-				msg, err := process.Process.Wait()
-				if err != nil {
-					n.logger.Error("error waiting for process to exit; force killing", slog.Any("err", err))
-					err = process.Process.Kill()
-					if err != nil {
-						n.logger.Error("error killing process", slog.Any("err", err))
-					}
-					wg.Done()
-					return
-				}
-				n.logger.Debug("workload process exited", slog.String("workloadId", process.Id), slog.String("state", msg.String()))
-				wg.Done()
-			}()
-		}
-	}
-
-	wg.Wait()
-	return nil
+func (a *NativeAgent) StopWorkload(workloadId string, req *models.StopWorkloadRequest) error {
+	return a.state.RemoveWorkload(req.Namespace, workloadId)
 }
 
-func (n *NativeWorkloadAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
-	resp := models.AgentListWorkloadsResponse{}
-
-	workloads, ok := n.workloadState[namespace]
-	if !ok {
-		return &resp, nil
-	}
-
-	for _, workload := range workloads {
-		resp = append(resp, models.WorkloadSummary{
-			Id:                workload.Id,
-			Name:              workload.Name,
-			Runtime:           time.Since(workload.StartedAt).String(),
-			StartTime:         workload.StartedAt.Format(time.RFC3339),
-			WorkloadLifecycle: string(workload.StartRequest.WorkloadLifecycle),
-			WorkloadState:     workload.State,
-			WorkloadType:      workload.StartRequest.WorkloadType,
-		})
-	}
-
-	if len(filter) > 0 {
-		filteredResp := models.AgentListWorkloadsResponse{}
-		for _, workload := range resp {
-			if slices.Contains(filter, workload.Id) {
-				filteredResp = append(filteredResp, workload)
-			}
-		}
-		resp = filteredResp
-	}
-
-	return &resp, nil
-}
-
-func (n *NativeWorkloadAgent) Ping() (*models.AgentSummary, error) {
-	supportedLifecycles := strings.Builder{}
-	for i, lc := range n.supportedLifecycles {
-		if i < len(n.supportedLifecycles)-1 {
-			supportedLifecycles.WriteString(string(lc) + ",")
-		} else {
-			supportedLifecycles.WriteString(string(lc))
-		}
-	}
-	ret := &models.AgentSummary{
-		Name:                nativeAgentName,
-		StartTime:           n.startedAt.Format(time.RFC3339),
-		State:               string(n.agentState),
-		SupportedLifecycles: supportedLifecycles.String(),
-		WorkloadCount:       n.workloadState.WorkloadCount(),
-	}
-
-	return ret, nil
-}
-
-// AgentIngessWorkloads Interface
-
-func (n *NativeWorkloadAgent) PingWorkload(inWorkloadId string) bool {
-	_, ok := n.workloadState.FindWorkload(inWorkloadId)
-	return ok
-}
-
-func (n *NativeWorkloadAgent) GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error) {
-	if workload, ok := n.workloadState.FindWorkload(workloadId); ok {
-		return workload.StartRequest, nil
+func (a *NativeAgent) GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error) {
+	if wl, ok := a.state.Exists(workloadId); ok {
+		return wl, nil
 	}
 	return nil, errors.New("workload not found")
+}
+
+func (a *NativeAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
+	return a.state.GetNamespaceWorkloadList(namespace)
+}
+
+func (a *NativeAgent) SetLameduck(before time.Duration) error {
+	return a.state.SetLameduckMode(before)
+}
+
+func (a *NativeAgent) Ping() (*models.AgentSummary, error) {
+	return &models.AgentSummary{
+		Name:                NEXLET_NAME,
+		StartTime:           a.startTime.Format(time.RFC3339),
+		State:               string(models.AgentStateRunning),
+		SupportedLifecycles: "job,service",
+		Version:             VERSION,
+		WorkloadCount:       a.state.WorkloadCount(),
+	}, nil
+}
+
+func (a *NativeAgent) PingWorkload(workloadId string) bool {
+	_, ok := a.state.Exists(workloadId)
+	return ok
 }
