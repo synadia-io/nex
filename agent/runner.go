@@ -82,10 +82,7 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 	var err error
 	a.agentId = agentId
 
-	a.nc, err = nats.Connect(connData.NatsUrl,
-		nats.UserJWTAndSeed(connData.NatsUserJwt, connData.NatsUserSeed),
-		nats.Name(a.agentId),
-	)
+	a.nc, err = configureNatsConnection(connData)
 	if err != nil {
 		return err
 	}
@@ -126,11 +123,7 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 		return errors.New("agent registration failed: " + regRetJson.Message)
 	}
 
-	a.nc, err = nats.Connect(
-		regRetJson.ConnectionData.NatsUrl,
-		nats.UserJWTAndSeed(regRetJson.ConnectionData.NatsUserJwt, regRetJson.ConnectionData.NatsUserSeed),
-		nats.Name(a.agentId),
-	)
+	a.nc, err = configureNatsConnection(regRetJson.ConnectionData)
 	if err != nil {
 		return err
 	}
