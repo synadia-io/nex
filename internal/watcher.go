@@ -58,6 +58,7 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 				"NEX_AGENT_NATS_PASSWORD=" + regCreds.NatsUserPassword,
 				"NEX_AGENT_NATS_USER_NKEY=" + regCreds.NatsUserNkey,
 				"NEX_AGENT_NODE_ID=" + ap.HostNode,
+				"NEX_AGENT_ASSIGNED_ID=" + ap.Id,
 			}...)
 
 			// Start the process
