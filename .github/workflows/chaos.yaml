@@ -1,0 +1,26 @@
+name: Nightly Chaos 
+
+on:
+  schedule:
+    - cron: "30 8 * * *" # 8:30 AM UTC
+  workflow_dispatch:  # Allows manual runs
+
+env:
+  GO_VER: '1.24.*'
+  GOPRIVATE: github.com/synadia-io/nexlet.go
+  GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+
+jobs:
+  run-nexus:
+    timeout-minutes: 130 # 2h 10m
+    runs-on: [ self-hosted, failground ]
+    steps:
+    - 
+      name: Run a nexus
+      uses: synadia-io/nex-runner@main
+      with:
+        nexus-size: 5
+        nats-server: nats://127.0.0.1:18001
+        run-timeout: 2h
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
