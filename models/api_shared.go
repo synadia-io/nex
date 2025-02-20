@@ -400,6 +400,9 @@ type StopWorkloadResponse struct {
 
 	// Stopped corresponds to the JSON schema field "stopped".
 	Stopped bool `json:"stopped"`
+
+	// WorkloadType corresponds to the JSON schema field "workload_type".
+	WorkloadType string `json:"workload_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -416,6 +419,9 @@ func (j *StopWorkloadResponse) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["stopped"]; raw != nil && !ok {
 		return fmt.Errorf("field stopped in StopWorkloadResponse: required")
+	}
+	if _, ok := raw["workload_type"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_type in StopWorkloadResponse: required")
 	}
 	type Plain StopWorkloadResponse
 	var plain Plain
@@ -463,6 +469,7 @@ type WorkloadState string
 const WorkloadStateError WorkloadState = "error"
 const WorkloadStateRunning WorkloadState = "running"
 const WorkloadStateStarting WorkloadState = "starting"
+const WorkloadStateStopped WorkloadState = "stopped"
 const WorkloadStateStopping WorkloadState = "stopping"
 const WorkloadStateWarm WorkloadState = "warm"
 
@@ -471,6 +478,7 @@ var enumValues_WorkloadState = []interface{}{
 	"running",
 	"warm",
 	"stopping",
+	"stopped",
 	"error",
 }
 

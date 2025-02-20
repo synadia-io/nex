@@ -1,30 +1,27 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
-	"strconv"
 	"time"
 )
 
 var (
-	counter  int = 0
-	maxCount int = -1
+	counter     int = 0
+	maxCount    int
+	panicChance float64
 )
 
 func main() {
+	flag.IntVar(&maxCount, "max", -1, "max count then exit 0")
+	flag.Float64Var(&panicChance, "panic", 0, "panic chance X% of the time; inputs need to be between 0-1")
+	flag.Parse()
+
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, os.Interrupt)
-
-	if args := os.Args[1:]; len(args) > 0 {
-		var err error
-		maxCount, err = strconv.Atoi(args[0])
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	}
 
 	go func() {
 		<-exit
@@ -33,6 +30,11 @@ func main() {
 	}()
 
 	for range time.Tick(time.Second) {
+		if panicChance > 0 {
+			if rand.Float64() < panicChance {
+				panic("simulated panic")
+			}
+		}
 		if counter == maxCount {
 			fmt.Fprintf(os.Stdout, "Counter reached max count: %d\n", maxCount)
 			os.Exit(0)

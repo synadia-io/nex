@@ -3,6 +3,6 @@
   "$id": "shared",
   "title": "WorkloadState",
   "type": "string",
-  "enum": ["starting", "running", "warm", "stopping", "error"],
+  "enum": ["starting", "running", "warm", "stopping","stopped", "error"],
   "additionalProperties": false
 }

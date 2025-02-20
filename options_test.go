@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 )
 
@@ -117,13 +118,13 @@ func TestNexNodeOptions(t *testing.T) {
 		be.NilErr(t, err)
 		be.True(t, nn.allowAgentRegistration)
 	})
-	t.Run("WithNoState", func(t *testing.T) {
+	t.Run("WithState", func(t *testing.T) {
 		t.Parallel()
 		nn, err := NewNexNode(
-			WithNoState(),
+			WithState(&state.NoState{}),
 		)
 		be.NilErr(t, err)
-		be.True(t, nn.noState)
+		be.Nonzero(t, nn.state)
 	})
 	t.Run("WithSigningKey", func(t *testing.T) {
 		kp, err := nkeys.CreateAccount()

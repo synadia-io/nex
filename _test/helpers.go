@@ -100,9 +100,6 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 			nex.WithLogger(logger),
 			nex.WithTag("foo", "bar"),
 		}
-		if !state {
-			opts = append(opts, nex.WithNoState())
-		}
 
 		if !debugNodeNoRunner {
 			runner, err := inmem.NewInMemAgent(pubKey, logger)

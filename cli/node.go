@@ -20,6 +20,7 @@ import (
 	"github.com/synadia-labs/nex"
 	"github.com/synadia-labs/nex/agents/native"
 	"github.com/synadia-labs/nex/client"
+	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 )
 
@@ -41,7 +42,7 @@ type (
 		NodeXKeySeed           string            `name:"node-xkey-seed" help:"Node XKey Seed used for encryption.  Default is generated" placeholder:"XAIHERHS..."`
 		ResourceDir            string            `name:"resource-directory" default:"${defaultResourcePath}"`
 		Tags                   map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
-		NoState                bool              `name:"no-state" help:"Disable state persistence" default:"false"`
+		State                  string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
 		InternalNatsServerConf string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
 		SigningKey             string            `name:"signing-key" help:"Seed key for signing" placeholder:"SASIGNINGKEY..."`
 		RootAccountKey         string            `name:"root-account-key" help:"Public key for root account" placeholder:"AAMYACCOUNT..."`
@@ -149,16 +150,21 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		nex.WithNodeXKeyPair(nodeXkeyPair),
 	}
 
-	if u.NoState {
-		opts = append(opts, nex.WithNoState())
-	}
-
 	if !u.DisableNativeStart {
 		nativeAgent, err := native.NewNativeWorkloadRunner(ctx, nodePub, logger.WithGroup("native-agent"))
 		if err != nil {
 			return err
 		}
 		opts = append(opts, nex.WithAgentRunner(nativeAgent))
+	}
+
+	switch u.State {
+	case "kv":
+		kvState, err := state.NewNatsKVState(nc, fmt.Sprintf("nex-%s", nodePub), logger)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, nex.WithState(kvState))
 	}
 
 	if u.InternalNatsServerConf != "" {

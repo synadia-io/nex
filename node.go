@@ -11,6 +11,7 @@ import (
 
 	"github.com/synadia-labs/nex/internal"
 	"github.com/synadia-labs/nex/internal/credentials"
+	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 
 	"github.com/nats-io/nats-server/v2/server"
@@ -26,8 +27,6 @@ const (
 	VERSION = "0.0.0"
 )
 
-var nodeStateBucket = ""
-
 type (
 	NexNodeOption func(*NexNode) error
 	NexNode       struct {
@@ -37,7 +36,6 @@ type (
 		startTime time.Time
 
 		allowAgentRegistration bool
-		noState                bool
 		auctionMap             *internal.TTLMap
 
 		nodeKeypair  nkeys.KeyPair
@@ -46,10 +44,10 @@ type (
 		signingKey string
 		issuerAcct string
 
-		name  string
-		nexus string
-		tags  map[string]string
-		state models.NodeState
+		name      string
+		nexus     string
+		tags      map[string]string
+		nodeState models.NodeState
 
 		// Embedded agents
 		embeddedRunners []*sdk.Runner
@@ -58,6 +56,7 @@ type (
 		agentWatcher *internal.AgentWatcher
 
 		minter models.CredVendor
+		state  models.NexNodeState
 
 		regs *models.Regs
 
@@ -94,18 +93,18 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 			models.TagCPUs:     strconv.Itoa(runtime.GOMAXPROCS(0)),
 			models.TagLameDuck: "false",
 		},
-		state: models.NodeStateStarting,
+		nodeState: models.NodeStateStarting,
 
 		embeddedRunners: make([]*sdk.Runner, 0),
 		localRunners:    make([]*internal.AgentProcess, 0),
 		regs:            new(models.Regs),
 
 		minter: &credentials.FullAccessMinter{NatsServer: nats.DefaultURL},
+		state:  &state.NoState{},
 
 		nodeKeypair:            kp,
 		nodeXKeypair:           xkp,
 		allowAgentRegistration: false,
-		noState:                false,
 		auctionMap:             internal.NewTTLMap(time.Second * 10),
 
 		nc:     nil,
@@ -139,8 +138,6 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	}
 
 	n.ctx, n.cancel = context.WithCancel(n.ctx)
-	nodeStateBucket = "nex-" + pubKey
-
 	n.tags[models.TagNexus] = n.nexus
 	n.tags[models.TagNodeName] = n.name
 	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.logger.WithGroup("agent-watcher"), 3)
@@ -212,7 +209,6 @@ func (n *NexNode) Start() error {
 	errs = errors.Join(errs, n.service.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("DirectDeployWorkload", micro.HandlerFunc(n.handleDirectDeploy()), micro.WithEndpointSubject(models.DirectDeploySubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// System only agent endpoints
 	if n.allowAgentRegistration {
@@ -230,17 +226,6 @@ func (n *NexNode) Start() error {
 
 	if errs != nil {
 		return errs
-	}
-
-	if !n.noState {
-		_, err := n.jsCtx.CreateKeyValue(n.ctx, jetstream.KeyValueConfig{
-			Bucket:       nodeStateBucket,
-			MaxBytes:     1_000_000_000, // 1GB
-			MaxValueSize: 10_000,        // 10KB
-		})
-		if err != nil && !errors.Is(err, jetstream.ErrBucketExists) {
-			return err
-		}
 	}
 
 	// At this point, nex controller is running
@@ -323,21 +308,21 @@ func (n *NexNode) Start() error {
 	}
 
 	n.logger.Info("nex node ready")
-	n.state = models.NodeStateRunning
+	n.nodeState = models.NodeStateRunning
 	return nil
 }
 
 func (n *NexNode) IsReady() bool {
-	return n.state == models.NodeStateRunning
+	return n.nodeState == models.NodeStateRunning
 }
 
 func (n *NexNode) Shutdown() error {
-	if n.state == models.NodeStateStopping {
+	if n.nodeState == models.NodeStateStopping {
 		n.logger.Warn("nex node already shutting down")
 		return nil
 	}
 
-	n.state = models.NodeStateStopping
+	n.nodeState = models.NodeStateStopping
 
 	var err error
 	for _, agent := range n.embeddedRunners {
@@ -407,7 +392,7 @@ func (n *NexNode) WaitForShutdown() error {
 }
 
 func (n *NexNode) enterLameduck(delay time.Duration) {
-	n.state = models.NodeStateLameduck
+	n.nodeState = models.NodeStateLameduck
 	go func() {
 		time.Sleep(delay)
 		err := n.Shutdown()

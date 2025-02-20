@@ -110,9 +110,9 @@ func WithAllowAgentRegistration() NexNodeOption {
 	}
 }
 
-func WithNoState() NexNodeOption {
+func WithState(s models.NexNodeState) NexNodeOption {
 	return func(n *NexNode) error {
-		n.noState = true
+		n.state = s
 		return nil
 	}
 }

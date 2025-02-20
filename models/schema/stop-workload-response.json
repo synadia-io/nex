@@ -7,6 +7,9 @@
     "id": {
       "type": "string"
     },
+    "workload_type": {
+      "type": "string"
+    },
     "stopped": {
       "type": "boolean"
     },
@@ -16,6 +19,7 @@
   },
   "required": [
     "id",
+    "workload_type",
     "stopped",
     "message"
   ],

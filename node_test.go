@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"runtime"
@@ -16,13 +15,13 @@ import (
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
 	sdk "github.com/synadia-io/nexlet.go/agent"
 	tminter "github.com/synadia-labs/nex/_test/minter"
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
 	"github.com/synadia-labs/nex/internal"
+	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 )
 
@@ -48,14 +47,13 @@ func TestDefaultNexNodeConstructor(t *testing.T) {
 	be.Nonzero(t, n.logger)
 	be.Zero(t, n.startTime)
 	be.False(t, n.allowAgentRegistration)
-	be.False(t, n.noState)
 	be.Equal(t, "nexnode", n.name)
 	be.Equal(t, "nexus", n.nexus)
 	be.Equal(t, runtime.GOOS, n.tags[models.TagOS])
 	be.Equal(t, runtime.GOARCH, n.tags[models.TagArch])
 	be.Equal(t, strconv.Itoa(runtime.GOMAXPROCS(0)), n.tags[models.TagCPUs])
 	be.Equal(t, "false", n.tags[models.TagLameDuck])
-	be.Equal(t, models.NodeStateStarting, n.state)
+	be.Equal(t, models.NodeStateStarting, n.nodeState)
 	be.Nonzero(t, n.nodeKeypair)
 	be.Nonzero(t, n.nodeXKeypair)
 	be.AllEqual(t, []*sdk.Runner{}, n.embeddedRunners)
@@ -82,7 +80,7 @@ func TestNodeOptions(t *testing.T) {
 		{"WithInternalLogger", WithInternalNatsServer(&server.Options{Host: "1.2.3.4", Port: 10001}), func(t *testing.T, n *NexNode) { be.Equal(t, "nats://1.2.3.4:10001", n.server.ClientURL()) }},
 		{"WithNodeKeyPair", WithNodeKeyPair(kp), func(t *testing.T, n *NexNode) { be.Equal(t, kp, n.nodeKeypair) }},
 		{"WithNodeXKeyPair", WithNodeXKeyPair(xkp), func(t *testing.T, n *NexNode) { be.Equal(t, xkp, n.nodeXKeypair) }},
-		{"WithNoState", WithNoState(), func(t *testing.T, n *NexNode) { be.True(t, n.noState) }},
+		{"WithState", WithState(&state.NoState{}), func(t *testing.T, n *NexNode) { be.Nonzero(t, n.state) }},
 		{"WithAgentRunner", WithAgentRunner(&sdk.Runner{}), func(t *testing.T, n *NexNode) { be.Equal(t, 1, len(n.embeddedRunners)) }},
 		{"WithLocalAgent", WithLocalAgent(models.Agent{}), func(t *testing.T, n *NexNode) { be.Equal(t, 1, len(n.localRunners)) }},
 		{"WithTags", WithTag("foo", "bar"), func(t *testing.T, n *NexNode) { be.Equal(t, "bar", n.tags["foo"]) }},
@@ -147,14 +145,8 @@ func TestNodeStartStop(t *testing.T) {
 	}
 
 	be.Equal(t, 1, nn.agentCount())
-	be.Equal(t, 21, nc.NumSubscriptions())
-	be.Equal(t, models.NodeStateRunning, nn.state)
-
-	jsCtx, err := jetstream.New(nc)
-	be.NilErr(t, err)
-
-	_, err = jsCtx.KeyValue(ctx, fmt.Sprintf("nex-%s", pub))
-	be.NilErr(t, err)
+	be.Equal(t, 19, nc.NumSubscriptions())
+	be.Equal(t, models.NodeStateRunning, nn.nodeState)
 
 	cancel()
 	be.NilErr(t, nn.WaitForShutdown())

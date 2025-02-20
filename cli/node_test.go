@@ -37,7 +37,6 @@ func startNexus(t testing.TB, ctx context.Context, natsUrl string, size int) {
 					NexusName:          "testnexus",
 					ResourceDir:        t.TempDir(),
 					Tags:               map[string]string{},
-					NoState:            true,
 				},
 			},
 		}
@@ -76,7 +75,7 @@ func TestNodeCommandDefaults(t *testing.T) {
 		be.Zero(t, nex.Node.Up.NodeXKeySeed)
 		be.Equal(t, workingDir, nex.Node.Up.ResourceDir)
 		be.DeepEqual(t, map[string]string(nil), nex.Node.Up.Tags)
-		be.False(t, nex.Node.Up.NoState)
+		be.Zero(t, nex.Node.Up.State)
 		be.Zero(t, nex.Node.Up.InternalNatsServerConf)
 		be.Zero(t, nex.Node.Up.SigningKey)
 		be.Zero(t, nex.Node.Up.RootAccountKey)
@@ -129,7 +128,6 @@ func TestNodeUp(t *testing.T) {
 				NodeName:           "testnode",
 				ResourceDir:        t.TempDir(),
 				Tags:               map[string]string{},
-				NoState:            true,
 				NodeSeed:           TestServerSeed,
 			},
 		},

@@ -54,7 +54,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 			Uptime:     time.Since(n.startTime).String(),
 			Version:    VERSION,
 			Xkey:       pubXKey,
-			State:      n.state,
+			State:      n.nodeState,
 		})
 		if err != nil {
 			n.logger.Error("failed to respond to node info request", slog.Any("err", err))
@@ -268,70 +268,6 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 	}
 }
 
-func (n *NexNode) handleDirectDeploy() func(micro.Request) {
-	return func(r micro.Request) {
-		// $NEX.control.system.DDEPLOY.NCYUEPWG2LI6EHCCWOP4UR7R7EH2KWZ3HOVQIVHL6COEX3LZ4NECXAXG
-		splitSub := strings.SplitN(r.Subject(), ".", 5)
-		namespace := splitSub[2]
-
-		if namespace != models.SystemNamespace {
-			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, models.SystemNamespace))
-			return
-		}
-
-		req := new(models.StartWorkloadRequest)
-		err := json.Unmarshal(r.Data(), req)
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal auction deploy workload request")
-			return
-		}
-
-		aid, reg, ok := n.regs.Find(req.WorkloadType)
-		if !ok {
-			n.handlerError(r, errors.New("workload type not found"), "100", "workload type not found")
-			return
-		}
-
-		rr, err := jsonschema.UnmarshalJSON(strings.NewReader(req.RunRequest))
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal start request")
-			return
-		}
-
-		err = reg.Schema.Validate(rr)
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to validate run request")
-			return
-		}
-
-		pubKey, err := n.nodeKeypair.PublicKey()
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
-			return
-		}
-
-		workloadId := nuid.New().Next()
-		err = n.nc.PublishRequest(models.AgentAPIStartWorkloadRequestSubject(pubKey, aid, workloadId), r.Reply(), r.Data())
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to publish start workload request")
-			return
-		}
-
-		if !n.noState {
-			kv, err := n.jsCtx.KeyValue(n.ctx, nodeStateBucket)
-			if err != nil {
-				n.logger.Warn("failed to get node state for creation", slog.Any("err", err))
-				return
-			}
-			_, err = kv.Create(n.ctx, fmt.Sprintf("%s_%s", req.WorkloadType, workloadId), r.Data())
-			if err != nil {
-				n.logger.Warn("failed to store node state", slog.Any("err", err))
-				return
-			}
-		}
-	}
-}
-
 func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 	return func(r micro.Request) {
 		// $NEX.control.namespace.ADEPLOY.bidid
@@ -409,17 +345,10 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		if !n.noState {
-			kv, err := n.jsCtx.KeyValue(n.ctx, nodeStateBucket)
-			if err != nil {
-				n.logger.Warn("failed to get node state for creation", slog.Any("err", err))
-				return
-			}
-			_, err = kv.Create(n.ctx, fmt.Sprintf("%s_%s", req.WorkloadType, workloadId), r.Data())
-			if err != nil {
-				n.logger.Warn("failed to store node state", slog.Any("err", err))
-				return
-			}
+		err = n.state.StoreWorkload(workloadId, *req)
+		if err != nil {
+			n.logger.Warn("failed to store node state", slog.Any("err", err))
+			return
 		}
 	}
 }
@@ -468,27 +397,17 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		if !n.noState {
-			kv, err := n.jsCtx.KeyValue(n.ctx, nodeStateBucket)
-			if err != nil {
-				n.logger.Warn("failed to get node state for deletion", slog.Any("err", err))
-				return
-			}
-			keyListener, err := kv.ListKeys(n.ctx)
-			if err != nil {
-				n.logger.Warn("failed to list keys", slog.Any("err", err))
-				return
-			}
-			for key := range keyListener.Keys() {
-				if strings.HasSuffix(key, workloadId) {
-					err = kv.Delete(n.ctx, key)
-					if err != nil {
-						n.logger.Warn("failed to delete node state", slog.Any("err", err))
-						return
-					}
-					break
-				}
-			}
+		ret := new(models.StopWorkloadResponse)
+		err = json.Unmarshal(stopWorkload.Data, ret)
+		if err != nil {
+			n.logger.Error("failed to unmarshal stop workload response", slog.Any("err", err))
+			return
+		}
+
+		err = n.state.RemoveWorkload(ret.WorkloadType, workloadId)
+		if err != nil {
+			n.logger.Warn("failed to delete node state", slog.Any("err", err))
+			return
 		}
 	}
 }
@@ -650,49 +569,23 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			return
 		}
 
-		var state models.RegisterAgentResponseExistingState
-		if !n.noState {
-			state = make(models.RegisterAgentResponseExistingState)
-			kv, err := n.jsCtx.KeyValue(n.ctx, nodeStateBucket)
+		agentState, err := n.state.GetStateByAgent(registrationRequest.Name)
+		if err != nil {
+			n.logger.Warn("failed to get agent state", slog.Any("err", err))
+		}
+
+		state := models.RegisterAgentResponseExistingState{}
+		for workloadId, swr := range agentState {
+			natsConn, err := n.minter.Mint(models.WorkloadCred, swr.Namespace, workloadId)
 			if err != nil {
-				n.logger.Warn("failed to get node state kv", slog.Any("err", err))
-				return
+				n.logger.Warn("failed to mint workload nats connection", slog.Any("err", err), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadId))
+				continue
 			}
-			keyListener, err := kv.ListKeys(n.ctx)
-			if err != nil {
-				n.logger.Warn("failed to list keys", slog.Any("err", err))
-				return
+			aswr := models.AgentStartWorkloadRequest{
+				Request:       swr,
+				WorkloadCreds: *natsConn,
 			}
-			for key := range keyListener.Keys() {
-				if strings.HasPrefix(key, registrationRequest.Name) {
-					workloadId := strings.TrimPrefix(key, registrationRequest.Name+"_")
-
-					kve, err := kv.Get(n.ctx, key)
-					if err != nil {
-						n.logger.Warn("failed to get workload state", slog.String("workload_id", key), slog.Any("err", err))
-						continue
-					}
-					sr := new(models.StartWorkloadRequest)
-					err = json.Unmarshal(kve.Value(), sr)
-					if err != nil {
-						n.logger.Warn("failed to unmarshal workload state", slog.String("workload_id", key), slog.Any("err", err))
-						continue
-					}
-
-					wlNatsConn, err := n.minter.Mint(models.WorkloadCred, sr.Namespace, workloadId)
-					if err != nil {
-						n.handlerError(r, err, "100", "failed to mint workload nats connection")
-						return
-					}
-
-					asr := models.AgentStartWorkloadRequest{
-						Request:       *sr,
-						WorkloadCreds: *wlNatsConn,
-					}
-
-					state[workloadId] = asr
-				}
-			}
+			state[workloadId] = aswr
 		}
 
 		err = r.RespondJSON(models.RegisterAgentResponse{
