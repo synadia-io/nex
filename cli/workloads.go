@@ -29,9 +29,6 @@ type Workload struct {
 
 type (
 	StartWorkload struct {
-		// Options for directly tasking workload to node; requires system namespace
-		NodeId      string `help:"Node ID to run the workload on"`
-		NodePubXKey string `name:"node-xkey-pub" help:"Node public xkey used for encryption"`
 		// Options for auction starting a workload
 		AuctionTags map[string]string `name:"tags" help:"Node tags to run the workload on; --node-id will take precedence"`
 
@@ -42,7 +39,7 @@ type (
 
 		// This will need to validate against start request provided by agent at registration
 		WorkloadStartRequest json.RawMessage `name:"start-request" placeholder:"{}" help:"Start request for the workload"`
-		WorkloadNexfile      *os.File        `name:"nexfile" short:"f" placeholder:"Nexfile" help:"Nexfile for the workload; formatted in YAML"`
+		WorkloadNexfile      *os.File        `name:"nexfile" short:"f" placeholder:"Nexfile" help:"Nexfile for the workload; overrides all other workload options"`
 	}
 	StopWorkload struct {
 		WorkloadId string `arg:"" name:"id" help:"ID of the workload to stop"`
@@ -61,10 +58,6 @@ type (
 )
 
 func (r *StartWorkload) Run(globals *Globals) error {
-	if r.NodeId != "" && globals.Namespace != models.NodeSystemNamespace {
-		return errors.New("node-id can only be used with system namespace")
-	}
-
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
@@ -76,11 +69,10 @@ func (r *StartWorkload) Run(globals *Globals) error {
 
 	client := client.NewClient(nc, globals.Namespace)
 
-	deploymentId := r.NodeId
-
+	// if 'Nexfile' is located in the current directory, use it
 	if r.WorkloadNexfile == nil {
-		if info, err := os.Stat("./Nexfile"); err == nil && !info.IsDir() {
-			f, err := os.Open("./Nexfile")
+		if info, err := os.Stat(models.NexfileName); err == nil && !info.IsDir() {
+			f, err := os.Open(models.NexfileName)
 			if err != nil {
 				return err
 			}
@@ -88,7 +80,7 @@ func (r *StartWorkload) Run(globals *Globals) error {
 		}
 	}
 
-	var startRequest interface{}
+	var nexfile models.Nexfile
 	if r.WorkloadNexfile != nil {
 		defer r.WorkloadNexfile.Close()
 
@@ -97,64 +89,83 @@ func (r *StartWorkload) Run(globals *Globals) error {
 			return err
 		}
 
-		err = yaml.Unmarshal(data, &startRequest)
+		// try to unmarshal as JSON, fallback to YAML
+		err = json.Unmarshal(data, &nexfile)
 		if err != nil {
-			return err
-		}
-	}
-
-	if r.NodeId == "" {
-		aucResp, err := client.Auction(r.AgentType, r.AuctionTags)
-		if err != nil {
-			return err
-		}
-
-		randomNode := aucResp[rand.Intn(len(aucResp))]
-
-		if !slices.Contains(randomNode.SupportedLifecycles, models.WorkloadLifecycle(r.WorkloadLifecycle)) {
-			return errors.New("agent does not support requested lifecycle")
-		}
-
-		compiler := jsonschema.NewCompiler()
-		sch, err := jsonschema.UnmarshalJSON(bytes.NewReader([]byte(randomNode.StartRequestSchema)))
-		if err != nil {
-			return err
-		}
-		err = compiler.AddResource("schema.json", sch)
-		if err != nil {
-			return err
-		}
-
-		schema, err := compiler.Compile("schema.json")
-		if err != nil {
-			return err
-		}
-
-		if startRequest != nil {
-			err = schema.Validate(startRequest)
+			err = yaml.Unmarshal(data, &nexfile)
 			if err != nil {
-				return err
+				return errors.New("failed to unmarshal Nexfile")
 			}
-		} else if r.WorkloadStartRequest == nil && r.WorkloadNexfile == nil {
-			// TODO: create an interactive mode to fill out start request
-			// if schema.Properties == nil {
-			// 	return errors.New("schema has no properties")
-			// }
-			// for fieldName, fieldSchema := range schema.Properties {
-			// 	fmt.Printf("%s: %s\n", fieldName, fieldSchema.Types.String())
-			// }
-
-			return errors.New("interactive start request not yet implemented")
 		}
-		deploymentId = randomNode.BidderId
+
+		r.WorkloadName = nexfile.Name
+		r.WorkloadDescription = nexfile.Description
+		r.AuctionTags = nexfile.AuctionTags
+		r.AgentType = nexfile.Type
+		r.WorkloadLifecycle = nexfile.Lifecycle
+
+		srB, err := json.Marshal(nexfile.StartRequest)
+		if err != nil {
+			return err
+		}
+		r.WorkloadStartRequest = json.RawMessage(srB)
 	}
 
-	r.WorkloadStartRequest, err = json.Marshal(startRequest)
+	aucResp, err := client.Auction(r.AgentType, r.AuctionTags)
 	if err != nil {
 		return err
 	}
 
-	startResponse, err := client.StartWorkload(deploymentId, r.WorkloadName, r.WorkloadDescription, string(r.WorkloadStartRequest), r.AgentType, models.WorkloadLifecycle(r.WorkloadLifecycle))
+	randomNode := aucResp[rand.Intn(len(aucResp))]
+
+	if !slices.Contains(randomNode.SupportedLifecycles, models.WorkloadLifecycle(r.WorkloadLifecycle)) {
+		return errors.New("agent does not support requested lifecycle")
+	}
+
+	compiler := jsonschema.NewCompiler()
+	sch, err := jsonschema.UnmarshalJSON(bytes.NewReader([]byte(randomNode.StartRequestSchema)))
+	if err != nil {
+		return err
+	}
+	err = compiler.AddResource("schema.json", sch)
+	if err != nil {
+		return err
+	}
+
+	schema, err := compiler.Compile("schema.json")
+	if err != nil {
+		return err
+	}
+
+	if r.WorkloadStartRequest != nil {
+		var startRequest any
+		err = json.Unmarshal(r.WorkloadStartRequest, &startRequest)
+		if err != nil {
+			return err
+		}
+
+		err = schema.Validate(startRequest)
+		if err != nil {
+			return err
+		}
+	} else if r.WorkloadStartRequest == nil && r.WorkloadNexfile == nil {
+		// TODO: create an interactive mode to fill out start request
+		// if schema.Properties == nil {
+		// 	return errors.New("schema has no properties")
+		// }
+		// for fieldName, fieldSchema := range schema.Properties {
+		// 	fmt.Printf("%s: %s\n", fieldName, fieldSchema.Types.String())
+		// }
+
+		return errors.New("interactive start request not yet implemented; please provide a Nexfile or start request")
+	}
+
+	wsrB, err := json.Marshal(r.WorkloadStartRequest)
+	if err != nil {
+		return err
+	}
+
+	startResponse, err := client.StartWorkload(randomNode.BidderId, r.WorkloadName, r.WorkloadDescription, string(wsrB), r.AgentType, models.WorkloadLifecycle(r.WorkloadLifecycle))
 	if err != nil {
 		return err
 	}
