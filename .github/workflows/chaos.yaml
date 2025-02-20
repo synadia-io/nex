@@ -22,5 +22,6 @@ jobs:
         nexus-size: 5
         nats-server: nats://127.0.0.1:18001
         run-timeout: 2h
+        with-load: true
       env:
         GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
