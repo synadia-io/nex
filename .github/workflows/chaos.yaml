@@ -3,7 +3,22 @@ name: Nightly Chaos
 on:
   schedule:
     - cron: "30 8 * * 1-5" # 8:30 AM UTC, Monday to Friday
-  workflow_dispatch:  # Allows manual runs
+  workflow_dispatch:
+    inputs:
+      runtimeout:
+        description: 'How long to run the chaos test'
+        required: true
+        default: '2h'
+      nexussize:
+        description: 'Number of nex nodes to run'
+        required: true
+        default: '5'
+      withload:
+        type: boolean
+        description: 'Run with load'
+        required: true
+        default: 'true'
+    
 
 env:
   GO_VER: '1.24.*'
@@ -16,12 +31,25 @@ jobs:
     runs-on: [ self-hosted, failground ]
     steps:
     - 
+      name: Set variables
+      id: set-vars
+      run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "NEXTIMEOUT=2h" >> $GITHUB_ENV
+            echo "NEXUSSIZE=5" >> $GITHUB_ENV
+            echo "NEXWITHLOAD=true" >> $GITHUB_ENV
+          else
+            echo "NEXTIMEOUT=${{ github.event.inputs.runtimeout }}" >> $GITHUB_ENV
+            echo "NEXUSSIZE=${{ github.event.inputs.nexussize }}" >> $GITHUB_ENV
+            echo "NEXWITHLOAD=${{ github.event.inputs.withload }}" >> $GITHUB_ENV
+          fi
+    - 
       name: Run a nexus
       uses: synadia-io/nex-runner@main
       with:
-        nexus-size: 5
+        nexus-size: ${{ env.NEXUSSIZE }}
         nats-server: nats://127.0.0.1:18001
-        run-timeout: 2h
-        with-load: true
+        run-timeout: ${{ env.NEXTIMEOUT }}
+        with-load: ${{ env.NEXWITHLOAD }}
       env:
         GITHUB_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
