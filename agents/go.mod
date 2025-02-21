@@ -8,8 +8,8 @@ require (
 	github.com/carlmjohnson/be v0.24.1
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nkeys v0.4.10
-	github.com/synadia-io/nexlet.go v0.0.0-20250213215012-7d1d52db7607
-	github.com/synadia-labs/nex v0.0.0-20250217040344-c30fa21fb692
+	github.com/synadia-io/nexlet.go v0.0.0-20250221041127-599581e258c6
+	github.com/synadia-labs/nex v0.0.0-20250220221056-d294833cdc58
 	golang.org/x/sys v0.30.0
 )
 
@@ -18,14 +18,14 @@ require (
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/goccy/go-yaml v1.12.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/nats-io/jwt/v2 v2.7.3 // indirect
 	github.com/nats-io/nats-server/v2 v2.10.25 // indirect
-	github.com/nats-io/nats.go v1.39.0 // indirect
+	github.com/nats-io/nats.go v1.39.1 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sanity-io/litter v1.5.5 // indirect
