@@ -2,8 +2,12 @@ github.com/dlclark/regexp2 v1.11.0 h1:G/nrcoOa7ZXlpoa/91N3X7mM3r8eIlMBBJZvsz/mxK
 github.com/dlclark/regexp2 v1.11.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
 github.com/klauspost/compress v1.17.11 h1:In6xLpyWOi1+C7tXUUWv2ot1QvBjxevKAaI6IXrJmUc=
 github.com/klauspost/compress v1.17.11/go.mod h1:pMDklpSncoRMuLFrf1W9Ss9KT+0rH90U12bZKk7uwG0=
+github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
+github.com/klauspost/compress v1.18.0/go.mod h1:2Pp+KzxcywXVXMr50+X0Q/Lsb43OQHYWRCY2AiWywWQ=
 github.com/nats-io/nats.go v1.39.0 h1:2/yg2JQjiYYKLwDuBzV0FbB2sIV+eFNkEevlRi4n9lI=
 github.com/nats-io/nats.go v1.39.0/go.mod h1:MgRb8oOdigA6cYpEPhXJuRVH6UE/V4jblJ2jQ27IXYM=
+github.com/nats-io/nats.go v1.39.1 h1:oTkfKBmz7W047vRxV762M67ZdXeOtUgvbBaNoQ+3PPk=
+github.com/nats-io/nats.go v1.39.1/go.mod h1:MgRb8oOdigA6cYpEPhXJuRVH6UE/V4jblJ2jQ27IXYM=
 github.com/nats-io/nkeys v0.4.10 h1:glmRrpCmYLHByYcePvnTBEAwawwapjCPMjy2huw20wc=
 github.com/nats-io/nkeys v0.4.10/go.mod h1:OjRrnIKnWBFl+s4YK5ChQfvHP2fxqZexrKJoVVyWB3U=
 github.com/nats-io/nuid v1.0.1 h1:5iA8DT8V7q8WK2EScv2padNa/rTESc1KdnPw4TC2paw=
@@ -16,6 +20,8 @@ github.com/synadia-labs/nex v0.0.0-20250213213818-3cdd82e8392e h1:oluNzhhRKMGr9y
 github.com/synadia-labs/nex v0.0.0-20250213213818-3cdd82e8392e/go.mod h1:tfzFtkrURAcB/q7unrr9c/2mVY+N+mHS/tU3+oRv1Bg=
 github.com/synadia-labs/nex v0.0.0-20250218163305-3cd58f18d049 h1:XTChvZJJsxwhpQeXiztpvcqgu9uYKxQw0SIy4CDLlWY=
 github.com/synadia-labs/nex v0.0.0-20250218163305-3cd58f18d049/go.mod h1:1IvBP05F0hazvVxvKVB281ZGI9O9eAYUCnfRG6Mc4GE=
+github.com/synadia-labs/nex v0.0.0-20250220221056-d294833cdc58 h1:FeEYSXK2poJ7xqClQXoJSMevzCVT3AFivBDFPqvj2cc=
+github.com/synadia-labs/nex v0.0.0-20250220221056-d294833cdc58/go.mod h1:1IvBP05F0hazvVxvKVB281ZGI9O9eAYUCnfRG6Mc4GE=
 golang.org/x/crypto v0.33.0 h1:IOBPskki6Lysi0lo9qQvbxiQ+FvsCC/YWOecCHAixus=
 golang.org/x/crypto v0.33.0/go.mod h1:bVdXmD7IV/4GdElGPozy6U7lWdRXA4qyRVGJV57uQ5M=
 golang.org/x/sys v0.30.0 h1:QjkSwP/36a20jFYWkSue1YwXzLmsV5Gfq7Eiy72C1uc=

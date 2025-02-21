@@ -21,9 +21,10 @@ const (
 )
 
 type Runner struct {
-	name    string
-	version string
-	logger  *slog.Logger
+	name         string
+	registerName string // this is that is used in the --type field for workloads
+	version      string
+	logger       *slog.Logger
 
 	remote   bool
 	nodeId   string
@@ -92,6 +93,8 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 	if err != nil {
 		return err
 	}
+
+	a.registerName = register.Name
 
 	registerB, err := json.Marshal(register)
 	if err != nil {
@@ -303,6 +306,7 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 				slog.Error("error responding to start workload request", slog.Any("err", err))
 			}
 		}
+
 		err = a.agent.StopWorkload(workloadId, req)
 		if err != nil {
 			slog.Error("error stopping workload request", slog.Any("err", err))
@@ -313,9 +317,10 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 		}
 
 		ret := models.StopWorkloadResponse{
-			Id:      workloadId,
-			Message: "Success",
-			Stopped: true,
+			Id:           workloadId,
+			Message:      "Success",
+			Stopped:      true,
+			WorkloadType: a.registerName,
 		}
 
 		err = r.RespondJSON(ret)

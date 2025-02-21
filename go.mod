@@ -3,13 +3,13 @@ module github.com/synadia-io/nexlet.go
 go 1.24.0
 
 require (
-	github.com/nats-io/nats.go v1.39.0
+	github.com/nats-io/nats.go v1.39.1
 	github.com/nats-io/nkeys v0.4.10
-	github.com/synadia-labs/nex v0.0.0-20250218163305-3cd58f18d049
+	github.com/synadia-labs/nex v0.0.0-20250220221056-d294833cdc58
 )
 
 require (
-	github.com/klauspost/compress v1.17.11 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
