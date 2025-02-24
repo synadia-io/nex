@@ -3,53 +3,58 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nkeys"
+	"github.com/synadia-labs/nex/_test"
+	"github.com/synadia-labs/nex/models"
 )
 
-func startNexus(t testing.TB, ctx context.Context, natsUrl string, size int) {
-	t.Helper()
-
-	nex := func(num int) NexCLI {
-		return NexCLI{
-			Globals: Globals{
-				Namespace: "system",
-				GlobalNats: GlobalNats{
-					NatsServers: []string{natsUrl},
-				},
-				// GlobalLogger: GlobalLogger{
-				// 	Target:   []string{"std"},
-				// 	LogLevel: "debug",
-				// },
-			},
-			Node: Node{
-				Up: Up{
-					Agents:             []AgentConfig{},
-					DisableNativeStart: true,
-					NodeName:           fmt.Sprintf("testnexus-%d", num),
-					NexusName:          "testnexus",
-					ResourceDir:        t.TempDir(),
-					Tags:               map[string]string{},
-				},
-			},
-		}
-	}
-
-	for i := 0; i < size; i++ {
-		go func() {
-			n := nex(i)
-			err := n.Node.Up.Run(ctx, &n.Globals)
-			be.NilErr(t, err)
-		}()
-	}
-}
+// func startNexus(t testing.TB, ctx context.Context, natsUrl string, size int) {
+// 	t.Helper()
+//
+// 	nex := func(num int) NexCLI {
+// 		return NexCLI{
+// 			Globals: Globals{
+// 				Namespace: "system",
+// 				GlobalNats: GlobalNats{
+// 					NatsServers: []string{natsUrl},
+// 				},
+// 				// GlobalLogger: GlobalLogger{
+// 				// 	Target:   []string{"std"},
+// 				// 	LogLevel: "debug",
+// 				// },
+// 			},
+// 			Node: Node{
+// 				Up: Up{
+// 					Agents:             []AgentConfig{},
+// 					DisableNativeStart: true,
+// 					NodeName:           fmt.Sprintf("testnexus-%d", num),
+// 					NexusName:          "testnexus",
+// 					ResourceDir:        t.TempDir(),
+// 					Tags:               map[string]string{},
+// 				},
+// 			},
+// 		}
+// 	}
+//
+// 	for i := 0; i < size; i++ {
+// 		go func() {
+// 			n := nex(i)
+// 			err := n.Node.Up.Run(ctx, &n.Globals)
+// 			be.NilErr(t, err)
+// 		}()
+// 	}
+// }
 
 func TestNodeCommandDefaults(t *testing.T) {
 	nex := NexCLI{
@@ -107,7 +112,12 @@ func TestNodeCommandDefaults(t *testing.T) {
 
 func TestNodeUp(t *testing.T) {
 	s := startNatsServer(t)
-	defer s.Shutdown()
+	defer func() {
+		for s.NumClients() == 0 {
+			s.Shutdown()
+			return
+		}
+	}()
 
 	nex := NexCLI{
 		Globals: Globals{
@@ -136,27 +146,30 @@ func TestNodeUp(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	buffer := new(bytes.Buffer)
-	reset := catchStdout(ctx, buffer)
-	err := nex.Node.Up.Run(ctx, &nex.Globals)
-	be.NilErr(t, err)
-	time.Sleep(500 * time.Millisecond)
-	reset()
+	stdout := captureOutput(t, func() {
+		err := nex.Node.Up.Run(ctx, &nex.Globals)
+		be.NilErr(t, err)
+		time.Sleep(500 * time.Millisecond)
+	})
 
-	be.True(t, strings.Contains(buffer.String(), fmt.Sprintf("[INFO] Starting nex node version=0.0.0 node_id=%s name=testnode nexus=testnexus nats_server=%s start_time=", TestServerPublicKey, s.ClientURL())))
-	be.True(t, strings.Contains(buffer.String(), "[WARN] nex node started without any agents"))
-	be.True(t, strings.Contains(buffer.String(), "[INFO] nex node ready"))
+	be.True(t, strings.Contains(stdout, fmt.Sprintf("[INFO] Starting nex node version=0.0.0 node_id=%s name=testnode nexus=testnexus nats_server=%s start_time=", TestServerPublicKey, s.ClientURL())))
+	be.True(t, strings.Contains(stdout, "[WARN] nex node started without any agents"))
+	be.True(t, strings.Contains(stdout, "[INFO] nex node ready"))
 }
 
 func TestNodeList(t *testing.T) {
 	s := startNatsServer(t)
-	defer s.Shutdown()
+	defer func() {
+		for s.NumClients() == 0 {
+			s.Shutdown()
+			return
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	startNexus(t, ctx, s.ClientURL(), 3)
-	time.Sleep(time.Second)
+	nexNodes := _test.StartNexus(t, ctx, s.ClientURL(), 3, false)
 
 	nex := NexCLI{
 		Globals: Globals{
@@ -168,34 +181,51 @@ func TestNodeList(t *testing.T) {
 		},
 	}
 
-	buf := new(bytes.Buffer)
-	reset := catchStdout(ctx, buf)
-	err := nex.Node.List.Run(ctx, &nex.Globals)
-	be.NilErr(t, err)
-	time.Sleep(500 * time.Millisecond)
-	reset()
+	stdout := captureOutput(t, func() {
+		err := nex.Node.List.Run(ctx, &nex.Globals)
+		be.NilErr(t, err)
+		time.Sleep(500 * time.Millisecond)
+	})
 
-	// fmt.Println(buf.String())
-	// resp := []*models.NodePingResponse{}
-	// err = json.Unmarshal(buf.Bytes(), &resp)
-	// be.NilErr(t, err)
-	//
-	// be.Equal(t, 3, len(resp))
+	resp := []*models.NodePingResponse{}
+	err := json.Unmarshal([]byte(stdout), &resp)
+	be.NilErr(t, err)
+
+	be.Equal(t, 3, len(resp))
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
 }
 
-func catchStdout(ctx context.Context, buf *bytes.Buffer) context.CancelFunc {
-	ctx, cancel := context.WithCancel(ctx)
-	go func() {
-		stdout := os.Stdout
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-		go func() {
-			_, _ = buf.ReadFrom(r)
-		}()
-		<-ctx.Done()
-		_ = w.Close()
-		os.Stdout = stdout
-		r.Close()
-	}()
-	return cancel
+var stdoutMu sync.Mutex
+
+func captureOutput(t testing.TB, f func()) string {
+	t.Helper()
+
+	stdoutMu.Lock()
+	defer stdoutMu.Unlock()
+
+	origStdout := os.Stdout
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal("failed to create pipe: " + err.Error())
+	}
+
+	os.Stdout = w
+
+	f()
+
+	w.Close()
+	os.Stdout = origStdout
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	if err != nil {
+		t.Fatal("failed to read from pipe: " + err.Error())
+	}
+	r.Close()
+
+	return buf.String()
 }

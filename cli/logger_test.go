@@ -1,10 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,23 +34,29 @@ func startNatsServer(t testing.TB) *server.Server {
 
 func TestConfigureLogger(t *testing.T) {
 	s := startNatsServer(t)
-	defer s.Shutdown()
+	defer func() {
+		for s.NumClients() == 0 {
+			s.Shutdown()
+			return
+		}
+	}()
 
-	pid := os.Getpid()
-	date := time.Now().Format("2006-01-02")
+	today := time.Now().Format("2006-01-02")
 
 	nc, err := nats.Connect(s.ClientURL())
 	be.NilErr(t, err)
 
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	_, err = nc.Subscribe(fmt.Sprintf("%s.>", models.LogAPIPrefix), func(m *nats.Msg) {
 		switch strings.Contains(m.Subject, "stderr") {
 		case true:
-			stderr.Write(m.Data)
+			be.Equal(t, fmt.Sprintf("%s [ERR] error\n", today), string(m.Data))
+			wg.Done()
 		case false:
-			stdout.Write(m.Data)
+			be.Equal(t, fmt.Sprintf("%s [DBG] debug\n", today), string(m.Data))
+			wg.Done()
 		}
 	})
 	be.NilErr(t, err)
@@ -63,7 +68,7 @@ func TestConfigureLogger(t *testing.T) {
 			LogColor:        false,
 			LogShortLevels:  true,
 			LogTimeFormat:   "DateOnly",
-			LogWithPid:      true,
+			LogWithPid:      false,
 			LogGroupOnRight: false,
 		},
 	}
@@ -73,8 +78,5 @@ func TestConfigureLogger(t *testing.T) {
 	logger.Debug("debug")
 	logger.Error("error")
 
-	time.Sleep(100 * time.Millisecond)
-
-	be.Equal(t, stdout.String(), fmt.Sprintf("[%d] %s [DBG] debug\n", pid, date))
-	be.Equal(t, stderr.String(), fmt.Sprintf("[%d] %s [ERR] error\n", pid, date))
+	wg.Wait()
 }

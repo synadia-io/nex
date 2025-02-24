@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"sync"
 	"testing"
 
 	"github.com/carlmjohnson/be"
@@ -65,12 +64,10 @@ func StartNatsServer(t testing.TB, workDir string) *server.Server {
 	return server
 }
 
-func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, state bool, wg *sync.WaitGroup) {
+func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, state bool) []*nex.NexNode {
 	t.Helper()
 
-	var readyGroup sync.WaitGroup
-	readyGroup.Add(size)
-
+	ret := make([]*nex.NexNode, size)
 	for i := 0; i < size; i++ {
 		logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
@@ -111,25 +108,11 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 		be.NilErr(t, err)
 		be.NilErr(t, node.Start())
 
-		go func() {
-			for node.IsReady() {
-				readyGroup.Done()
-				return
-			}
-		}()
+		for node.IsReady() {
+			break
+		}
 
-		go func() {
-			err = node.WaitForShutdown()
-			be.NilErr(t, err)
-			wg.Done()
-		}()
-
-		go func() {
-			<-ctx.Done()
-			err = node.Shutdown()
-			be.NilErr(t, err)
-		}()
+		ret[i] = node
 	}
-
-	readyGroup.Wait()
+	return ret
 }

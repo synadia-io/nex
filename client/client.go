@@ -10,6 +10,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
+	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-labs/nex/models"
 )
 
@@ -65,7 +66,7 @@ func (n *nexClient) SetLameduck(nodeId string, delay time.Duration) (*models.Lam
 		return nil, err
 	}
 	if errors.Is(err, nats.ErrNoResponders) {
-		return nil, errors.New("no nodes found")
+		return &models.LameduckResponse{Success: false}, nil
 	}
 
 	resp := new(models.LameduckResponse)
@@ -87,59 +88,29 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 		return nil, err
 	}
 
-	resp := []*models.NodePingResponse{}
-	var last time.Time
-	var errs error
-
-	inbox := nats.NewInbox()
-	_, err = n.nc.Subscribe(inbox, func(m *nats.Msg) {
-		// TODO:- check for header errors
-
-		if len(m.Data) == 0 {
-			return
-		}
-
-		last = time.Now()
-		t := new(models.NodePingResponse)
-		err := json.Unmarshal(m.Data, t)
-		if err != nil {
-			errs = errors.Join(errs, err)
-			return
-		}
-
-		resp = append(resp, t)
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(500*time.Millisecond))
+	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) {
+		return []*models.NodePingResponse{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	go func() {
-		for range time.Tick(250 * time.Millisecond) {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if last.IsZero() {
-					continue
-				}
-				if time.Since(last) > time.Second {
-					cancel()
-				}
+	var errs error
+	resp := []*models.NodePingResponse{}
+	msgs(func(m *nats.Msg, err error) bool {
+		if err == nil {
+			t := new(models.NodePingResponse)
+			err = json.Unmarshal(m.Data, t)
+			if err == nil {
+				resp = append(resp, t)
 			}
 		}
-	}()
-
-	err = n.nc.PublishRequest(models.PingRequestSubject(n.namespace), inbox, reqB)
-	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
-		return nil, err
-	}
-
-	<-ctx.Done()
-
-	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) || len(resp) == 0 {
-		return nil, errors.New("no nodes found")
-	}
+		errs = errors.Join(errs, err)
+		return true
+	})
 
 	return resp, nil
 }
@@ -156,55 +127,29 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 		return nil, err
 	}
 
-	resp := []*models.AuctionResponse{}
-	var last time.Time
-	var errs error
-
-	respInbox := nats.NewInbox()
-	sub, err := n.nc.Subscribe(respInbox, func(m *nats.Msg) {
-		last = time.Now()
-		t := new(models.AuctionResponse)
-		err := json.Unmarshal(m.Data, t)
-		if err != nil {
-			errs = errors.Join(errs, err)
-			return
-		}
-		resp = append(resp, t)
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(500*time.Millisecond))
+	if errors.Is(err, nats.ErrNoResponders) {
+		return []*models.AuctionResponse{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = sub.Unsubscribe()
-	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	go func() {
-		for range time.Tick(250 * time.Millisecond) {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if last.IsZero() {
-					continue
-				}
-				if time.Since(last) > time.Second {
-					cancel()
-				}
+	var errs error
+	resp := []*models.AuctionResponse{}
+	msgs(func(m *nats.Msg, err error) bool {
+		if err == nil {
+			t := new(models.AuctionResponse)
+			err = json.Unmarshal(m.Data, t)
+			if err == nil {
+				resp = append(resp, t)
 			}
 		}
-	}()
-
-	err = n.nc.PublishRequest(models.AuctionRequestSubject(n.namespace), respInbox, auctionRequestB)
-	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
-		return nil, err
-	}
-
-	<-ctx.Done()
-
-	if errors.Is(err, nats.ErrNoResponders) || len(resp) == 0 {
-		return nil, errors.New("no nodes found to satisfy workload request")
-	}
+		errs = errors.Join(errs, err)
+		return true
+	})
 
 	return resp, nil
 }
@@ -280,56 +225,29 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 		return nil, err
 	}
 
-	resp := []*models.AgentListWorkloadsResponse{}
-
-	var last time.Time
-	var errs error
-
-	inbox := nats.NewInbox()
-	_, err = n.nc.Subscribe(inbox, func(m *nats.Msg) {
-		if len(m.Data) == 0 {
-			return
-		}
-		last = time.Now()
-		t := new(models.AgentListWorkloadsResponse)
-		err := json.Unmarshal(m.Data, t)
-		if err != nil {
-			errs = errors.Join(errs, err)
-			return
-		}
-		resp = append(resp, t)
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(500*time.Millisecond))
+	if errors.Is(err, nats.ErrNoResponders) {
+		return []*models.AgentListWorkloadsResponse{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	go func() {
-		for range time.Tick(250 * time.Millisecond) {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if last.IsZero() {
-					continue
-				}
-				if time.Since(last) > time.Second {
-					cancel()
-				}
+	var errs error
+	resp := []*models.AgentListWorkloadsResponse{}
+	msgs(func(m *nats.Msg, err error) bool {
+		if err == nil {
+			t := new(models.AgentListWorkloadsResponse)
+			err = json.Unmarshal(m.Data, t)
+			if err == nil {
+				resp = append(resp, t)
 			}
 		}
-	}()
-
-	err = n.nc.PublishRequest(models.NamespacePingRequestSubject(n.namespace), inbox, reqB)
-	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
-		return nil, err
-	}
-
-	<-ctx.Done()
-
-	if errors.Is(err, nats.ErrNoResponders) || len(resp) == 0 {
-		return nil, errors.New("no workloads found")
-	}
+		errs = errors.Join(errs, err)
+		return true
+	})
 
 	return resp, nil
 }

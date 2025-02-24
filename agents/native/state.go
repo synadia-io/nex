@@ -43,7 +43,7 @@ func (n *nexletState) Exists(workloadId string) (*models.StartWorkloadRequest, b
 
 	for _, ns := range n.workloads {
 		if wl, ok := ns[workloadId]; ok {
-			return wl.StartRequest, true
+			return &wl.StartRequest, true
 		}
 	}
 	return nil, false
@@ -114,7 +114,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 		n.workloads[namespace][workloadId] = &NativeProcess{
 			cancel:       cancel,
 			Name:         req.Request.Name,
-			StartRequest: &req.Request,
+			StartRequest: req.Request,
 			StartedAt:    time.Now(),
 			State:        models.WorkloadStateStarting,
 			Restarts:     0,
@@ -153,20 +153,20 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 			return err
 		}
 		n.workloads[namespace][workloadId].Process = cmd.Process
-		n.workloads[namespace][workloadId].State = models.WorkloadStateRunning
+		n.workloads[namespace][workloadId].SetState(models.WorkloadStateRunning)
 
 		go func(namespace, workloadId string, req *models.AgentStartWorkloadRequest) {
-			pState, err := n.workloads[namespace][workloadId].Process.Wait()
-			if err == nil {
+			workload := n.workloads[namespace][workloadId]
+			if pState, err := workload.Process.Wait(); err == nil {
 				// can only by true if StopWorkload was called
-				if n.workloads[namespace][workloadId].State == models.WorkloadStateStopping || n.workloads[namespace][workloadId].StartRequest.WorkloadLifecycle == models.WorkloadLifecycleJob {
+				if workload.GetState() == models.WorkloadStateStopping || workload.StartRequest.WorkloadLifecycle == models.WorkloadLifecycleJob {
 					slog.Debug("workload exited without error", slog.String("workload_id", workloadId), slog.String("namespace", namespace), slog.Any("exit_code", pState.ExitCode()))
 					return
 				}
 			}
 			slog.Debug("workload process exited unexpectedly; attempting restart", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace), slog.Any("restarts", n.workloads[req.Request.Namespace][workloadId].Restarts))
-			n.workloads[namespace][workloadId].State = models.WorkloadStateError
-			n.workloads[namespace][workloadId].Restarts++
+			workload.SetState(models.WorkloadStateError)
+			workload.Restarts++
 
 			err = n.AddWorkload(namespace, workloadId, req)
 			if err != nil {
@@ -191,19 +191,23 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 	if ns, ok := n.workloads[namespace]; ok {
 		if w, ok := ns[workloadId]; ok {
 			go func() {
-				n.workloads[namespace][workloadId].State = models.WorkloadStateStopping
+				n.workloads[namespace][workloadId].SetState(models.WorkloadStateStopping)
 
 				err := stopProcess(w.Process)
 				if errors.Is(err, os.ErrProcessDone) {
 					slog.Debug("process already exited", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
+					n.Lock()
 					delete(n.workloads[namespace], workloadId)
+					n.Unlock()
 					return
 				}
 
 				if err != nil {
 					slog.Error("error stopping process; attempting to cancel context", slog.Any("err", err))
 					w.cancel()
+					n.Lock()
 					delete(n.workloads[namespace], workloadId)
+					n.Unlock()
 					return
 				}
 
@@ -219,13 +223,17 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 							slog.Error("Error killing process", slog.Any("err", err))
 							w.cancel()
 						}
+						n.Lock()
 						delete(n.workloads[namespace], workloadId)
+						n.Unlock()
 					case <-ticker.C:
 						if err := w.Process.Signal(syscall.Signal(0)); err != nil {
 							if err := n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: workloadId}); err != nil {
 								slog.Error("error emitting workload stopped event", slog.Any("err", err))
 							}
+							n.Lock()
 							delete(n.workloads[namespace], workloadId)
+							n.Unlock()
 						}
 					}
 				}
@@ -246,7 +254,7 @@ func (n *nexletState) SetLameduckMode(before time.Duration) error {
 		wg.Add(len(processes))
 		for id, process := range processes {
 			go func() {
-				process.State = models.WorkloadStateStopping
+				process.SetState(models.WorkloadStateStopping)
 				err := internal.StopProcess(process.Process)
 				if err != nil {
 					slog.Error("error stopping process; cancelling context", slog.Any("err", err))

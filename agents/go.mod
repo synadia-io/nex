@@ -9,7 +9,7 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nkeys v0.4.10
 	github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9
-	github.com/synadia-labs/nex v0.0.0-20250221042458-45e17023d430
+	github.com/synadia-labs/nex v0.0.0-20250224211924-2fd6d7e5f97f
 	golang.org/x/sys v0.30.0
 )
 
@@ -32,6 +32,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
 	golang.org/x/text v0.22.0 // indirect

@@ -142,6 +142,7 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 	}
 
 	opts := []nex.NexNodeOption{
+		nex.WithContext(ctx),
 		nex.WithNodeName(u.NodeName),
 		nex.WithNexus(u.NexusName),
 		nex.WithNatsConn(nc),
@@ -196,27 +197,24 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	go func() {
-		select {
-		case <-ctx.Done():
-			logger.Warn("shutting down due to cancelled context")
-			err := nex.Shutdown()
-			if err != nil {
-				logger.Error("Error shutting down nex", "error", err)
-			}
-		case <-quit:
-			err := nex.Shutdown()
-			if err != nil {
-				logger.Error("Error shutting down nex", "error", err)
-			}
-		}
-	}()
-
 	if err := nex.Start(); err != nil {
 		return err
 	}
+
+	for nex.IsReady() {
+		time.Sleep(100 * time.Millisecond)
+		break
+	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	go func() {
+		<-quit
+		err := nex.Shutdown()
+		if err != nil {
+			logger.Error("Error shutting down nex", "error", err)
+		}
+	}()
 
 	return nex.WaitForShutdown()
 }

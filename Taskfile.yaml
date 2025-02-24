@@ -61,26 +61,31 @@ tasks:
       - go build -o ../../target/nex .
 
   test:
-    deps: [test:agents, test:cli, test:client, test:node]
+    cmds: 
+      - go clean -testcache
+      - task: test:cli
+      - task: test:client
+      - task: test:node
+      - task: test:agents
 
   test:agents:
     dir: agents
     cmds:
-      - go test -v -cover ./...
+      - go test -v -cover -race ./...
   
   test:cli:
     dir: cli
     cmds:
-      - go test -v -cover ./...
+      - go test -v -cover -race ./...
   
   test:client:
     dir: client
     cmds:
-      - go test -v -cover ./...
+      - go test -v -cover -race ./...
   
   test:node:
     cmds:
-      - go test -v -cover ./... 
+      - go test -v -cover -race ./... 
 
   update:
     deps: [update:agents, update:cli, update:client, update:node]

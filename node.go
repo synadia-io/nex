@@ -381,10 +381,7 @@ func (n *NexNode) WaitForShutdown() error {
 		select {
 		case <-n.ctx.Done(): // shutdown by context
 			n.logger.Warn("shutdown by context cancellation")
-			err := n.Shutdown()
-			if err != nil {
-				return err
-			}
+			return n.Shutdown()
 		case <-n.nodeShutdown: // shutdown by command, recommended
 			return nil
 		}

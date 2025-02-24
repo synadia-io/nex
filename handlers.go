@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-labs/nex/models"
 
 	"github.com/nats-io/nats.go"
@@ -94,46 +95,45 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 			return
 		}
 
-		inbox := nats.NewInbox()
-		go func() {
-			sub, err := n.nc.Subscribe(inbox, func(m *nats.Msg) {
-				var ldr models.LameduckResponse
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
 
-				agentId := m.Header.Get("agentId")
-				if agentId == "" {
-					n.logger.Error("failed to get agentId from header")
-					return
+		// TODO: Adds agentid to lameduck response
+		var errs error
+		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPISetLameduckSubject(pubKey), ldReqB, natsext.RequestManyStall(500*time.Millisecond))
+		if err == nil {
+			msgs(func(m *nats.Msg, err error) bool {
+				if err == nil {
+					agentId := m.Header.Get("agentId")
+					if agentId == "" {
+						errs = errors.Join(errs, errors.New("failed to get agentId from header"))
+						return true
+					}
+
+					t := new(models.LameduckResponse)
+					err = json.Unmarshal(m.Data, t)
+					if err == nil {
+						errs = errors.Join(errs, err)
+						return true
+					}
+
+					err = emitSystemEvent(n.nc, n.nodeKeypair, &models.AgentLameduckSetEvent{
+						Success: t.Success,
+					})
+					if err != nil {
+						errs = errors.Join(errs, err)
+					}
 				}
 
-				err := json.Unmarshal(m.Data, &ldr)
-				if err != nil {
-					n.logger.Error("failed to unmarshal lame duck response", slog.Any("err", err), slog.String("data", string(m.Data)))
-					return
-				}
-
-				err = emitSystemEvent(n.nc, n.nodeKeypair, &models.AgentLameduckSetEvent{
-					Success: ldr.Success,
-				})
-				if err != nil {
-					n.logger.Error("failed to emit system event", slog.Any("err", err))
-				}
+				errs = errors.Join(errs, err)
+				return true
 			})
-			if err != nil {
-				n.handlerError(r, err, "100", "failed to subscribe to inbox")
-				return
-			}
-			defer func() {
-				err := sub.Unsubscribe()
-				if err != nil {
-					n.logger.Error("failed to unsubscribe from inbox", slog.Any("err", err))
-				}
-			}()
-		}()
+		} else {
+			errs = errors.Join(errs, err)
+		}
 
-		err = n.nc.PublishRequest(models.AgentAPISetLameduckSubject(pubKey), inbox, ldReqB)
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to publish lameduck request")
-			return
+		if errs != nil {
+			n.logger.Error("error gathering agent responses", slog.Any("errs", errs))
 		}
 
 		n.enterLameduck(delay)
@@ -163,57 +163,37 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 			return
 		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		var errs error
 		as := models.AgentSummaries{}
-		inbox := nats.NewInbox()
-		sub, err := n.nc.Subscribe(inbox, func(m *nats.Msg) {
-			var agent models.AgentSummary
+		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPIPingAllSubject(pubKey), nil, natsext.RequestManyStall(500*time.Millisecond))
+		if err == nil {
+			msgs(func(m *nats.Msg, err error) bool {
+				if err == nil {
+					agentId := m.Header.Get("agentId")
+					if agentId == "" {
+						n.logger.Error("failed to get agentId from header")
+						return true
+					}
 
-			agentId := m.Header.Get("agentId")
-			if agentId == "" {
-				n.logger.Error("failed to get agentId from header")
-				return
-			}
-
-			err := json.Unmarshal(m.Data, &agent)
-			if err != nil {
-				n.logger.Error("failed to unmarshal agent summary", slog.Any("err", err), slog.String("data", string(m.Data)))
-				return
-			}
-			as[agentId] = agent
-		})
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to subscribe to inbox")
-			return
-		}
-		defer func() {
-			err := sub.Unsubscribe()
-			if err != nil {
-				n.logger.Error("failed to unsubscribe from inbox", slog.Any("err", err))
-			}
-		}()
-
-		ctx, cancel := context.WithTimeout(n.ctx, time.Second*5)
-		go func() {
-			for range time.Tick(250 * time.Millisecond) {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					if len(as) == n.agentCount() {
-						cancel()
+					t := new(models.AgentSummary)
+					err = json.Unmarshal(m.Data, t)
+					if err == nil {
+						as[agentId] = *t
 					}
 				}
-			}
-		}()
-
-		err = n.nc.PublishRequest(models.AgentAPIPingAllSubject(pubKey), inbox, nil)
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to publish ping agents request")
-			return
+				errs = errors.Join(errs, err)
+				return true
+			})
+		} else {
+			errs = errors.Join(errs, err)
 		}
 
-		<-ctx.Done()
-
+		if errs != nil {
+			n.logger.Error("errors in gathering agent summaries", slog.Any("errs", errs))
+		}
 		err = r.RespondJSON(models.NodeInfoResponse{
 			AgentSummaries: as,
 			NodeId:         pubKey,

@@ -12,6 +12,7 @@ require (
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9
+	github.com/synadia-io/orbit.go/natsext v0.1.1
 	golang.org/x/sys v0.30.0
 )
 

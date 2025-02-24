@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -45,9 +44,8 @@ func TestNexClient_User(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	_test.StartNexus(t, ctx, server.ClientURL(), 1, false, &wg)
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+	be.Equal(t, 1, len(nexNodes))
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
@@ -70,8 +68,9 @@ func TestNexClient_User(t *testing.T) {
 	be.Equal(t, sr.Id, str.Id)
 	be.True(t, str.Stopped)
 
-	cancel()
-	wg.Wait()
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
 }
 
 func TestNexClient_System(t *testing.T) {
@@ -101,10 +100,10 @@ func TestNexClient_System(t *testing.T) {
 			defer nc.Close()
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
 
-			var wg sync.WaitGroup
-			wg.Add(tt.size)
-			_test.StartNexus(t, ctx, server.ClientURL(), tt.size, false, &wg)
+			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), tt.size, false)
+			be.Equal(t, tt.size, len(nexNodes))
 
 			nc, err = nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -128,15 +127,12 @@ func TestNexClient_System(t *testing.T) {
 			time.Sleep(250 * time.Millisecond)
 
 			nodes, err = client.ListNodes(nil)
-			if tt.size == 1 {
-				be.Equal(t, "no nodes found", err.Error())
-			} else {
-				be.NilErr(t, err)
-				be.Equal(t, tt.size-1, len(nodes))
-			}
+			be.NilErr(t, err)
+			be.Equal(t, tt.size-1, len(nodes))
 
-			cancel()
-			wg.Wait()
+			for _, node := range nexNodes {
+				be.NilErr(t, node.Shutdown())
+			}
 		})
 	}
 }
@@ -158,9 +154,8 @@ func TestNexClient_SystemAsUser(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	_test.StartNexus(t, ctx, server.ClientURL(), 1, false, &wg)
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+	be.Equal(t, 1, len(nexNodes))
 
 	client := NewClient(nc, "user")
 	be.Nonzero(t, client)
@@ -169,14 +164,17 @@ func TestNexClient_SystemAsUser(t *testing.T) {
 	be.Equal(t, "node not found", err.Error())
 
 	nodes, err := client.ListNodes(map[string]string{"foo": "bar"})
-	be.Equal(t, "no nodes found", err.Error())
+	be.NilErr(t, err)
+	//	be.Equal(t, "no nodes found", err.Error())
 	be.Equal(t, 0, len(nodes))
 
-	_, err = client.SetLameduck(_test.Node1Pub, 0)
-	be.Equal(t, "no nodes found", err.Error())
+	ldresp, err := client.SetLameduck(_test.Node1Pub, 0)
+	be.NilErr(t, err)
+	be.False(t, ldresp.Success)
 
-	cancel()
-	wg.Wait()
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
 }
 
 func TestNexClient_ListWorkloads(t *testing.T) {
@@ -202,10 +200,10 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			}()
 
 			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			var wg sync.WaitGroup
-			wg.Add(1)
-			_test.StartNexus(t, ctx, server.ClientURL(), 1, false, &wg)
+			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+			be.Equal(t, 1, len(nexNodes))
 
 			nc, err := nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -241,8 +239,9 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			be.Equal(t, 1, len(wl))
 			be.Equal(t, 3, len(*wl[0]))
 
-			cancel()
-			wg.Wait()
+			for _, node := range nexNodes {
+				be.NilErr(t, node.Shutdown())
+			}
 		})
 	}
 }
@@ -270,13 +269,15 @@ func TestNexClient_List_NoNodes(t *testing.T) {
 			be.Nonzero(t, client)
 
 			t.Run("ListNodes", func(t *testing.T) {
-				_, err = client.ListNodes(nil)
-				be.Equal(t, "no nodes found", err.Error())
+				nodes, err := client.ListNodes(nil)
+				be.NilErr(t, err)
+				be.Equal(t, 0, len(nodes))
 			})
 
 			t.Run("ListWorkloads", func(t *testing.T) {
-				_, err = client.ListWorkloads(nil)
-				be.Equal(t, "no workloads found", err.Error())
+				workloads, err := client.ListWorkloads(nil)
+				be.NilErr(t, err)
+				be.Equal(t, 0, len(workloads))
 			})
 		})
 	}
@@ -309,10 +310,10 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			defer nc.Close()
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
 
-			var wg sync.WaitGroup
-			wg.Add(tt.size)
-			_test.StartNexus(t, ctx, server.ClientURL(), tt.size, false, &wg)
+			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), tt.size, false)
+			be.Equal(t, tt.size, len(nexNodes))
 
 			nc, err = nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -343,8 +344,9 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 
 			be.Equal(t, 2, totalCount)
 
-			cancel()
-			wg.Wait()
+			for _, node := range nexNodes {
+				be.NilErr(t, node.Shutdown())
+			}
 		})
 	}
 }

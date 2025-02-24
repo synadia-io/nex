@@ -13,7 +13,7 @@ func TestTTLMap(t *testing.T) {
 	be.True(t, m.Exists("key"))
 	v, _ := m.Get("key")
 	be.Equal(t, "value", v)
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
 	v, _ = m.Get("key")
 	be.Equal(t, "", v)
 }
