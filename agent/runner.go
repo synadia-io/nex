@@ -75,8 +75,8 @@ func (a *Runner) String() string {
 	return a.name
 }
 
-func (a *Runner) GetLogger(workloadId, namespace string, stderr bool) io.Writer {
-	return NewAgentLogCapture(a.nc, slog.Default(), stderr, a.agentId, workloadId, namespace)
+func (a *Runner) GetLogger(workloadId, namespace string, lType LogType) io.Writer {
+	return NewAgentLogCapture(a.nc, slog.Default(), lType, a.agentId, workloadId, namespace)
 }
 
 func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsConnectionData) error {

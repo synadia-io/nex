@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -8,22 +9,43 @@ import (
 	"github.com/synadia-labs/nex/models"
 )
 
+type LogType int
+
+func (lt LogType) String() string {
+	switch lt {
+	case LogTypeStdout:
+		return "stdout"
+	case LogTypeStderr:
+		return "stderr"
+	case LogTypeMetrics:
+		return "metrics"
+	default:
+		return "unknown"
+	}
+}
+
+const (
+	LogTypeStdout LogType = iota
+	LogTypeStderr
+	LogTypeMetrics
+)
+
 type agentLogCapture struct {
 	nc         *nats.Conn
 	logger     *slog.Logger
-	stderr     bool
+	logType    LogType
 	agentId    string
 	workloadId string
 	namespace  string
 }
 
 func NewAgentLogCapture(
-	nc *nats.Conn, logger *slog.Logger, stderr bool, agentId string, workloadId string, namespace string,
+	nc *nats.Conn, logger *slog.Logger, logType LogType, agentId string, workloadId string, namespace string,
 ) *agentLogCapture {
 	return &agentLogCapture{
 		nc:         nc,
 		logger:     logger,
-		stderr:     stderr,
+		logType:    logType,
 		agentId:    agentId,
 		workloadId: workloadId,
 		namespace:  namespace,
@@ -31,13 +53,14 @@ func NewAgentLogCapture(
 }
 
 func (l agentLogCapture) Write(p []byte) (n int, err error) {
-	if l.stderr {
-		l.logger.WithGroup("workload").With("agent", l.agentId).With("workload", l.workloadId).Error(strings.ReplaceAll(string(p), "\n", "\\n"))
-	} else {
+	switch l.logType {
+	case LogTypeStdout:
 		l.logger.WithGroup("workload").With("agent", l.agentId).With("workload", l.workloadId).Info(strings.ReplaceAll(string(p), "\n", "\\n"))
+	case LogTypeStderr:
+		l.logger.WithGroup("workload").With("agent", l.agentId).With("workload", l.workloadId).Error(strings.ReplaceAll(string(p), "\n", "\\n"))
 	}
 
-	err = l.nc.Publish(models.AgentEmitLogSubject(l.namespace, l.workloadId), p)
+	err = l.nc.Publish(fmt.Sprintf("%s.%s", models.AgentEmitLogSubject(l.namespace, l.workloadId), l.logType.String()), p)
 	if err != nil {
 		slog.Error("Failed to publish log message to nats", slog.Any("err", err), slog.Any("workload", l.workloadId))
 	}
