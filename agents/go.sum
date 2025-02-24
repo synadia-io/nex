@@ -80,10 +80,10 @@ github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An
 github.com/stretchr/testify v0.0.0-20161117074351-18a02ba4a312/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/synadia-io/nexlet.go v0.0.0-20250221041127-599581e258c6 h1:vbai2DiTHBS8ClLNENboKjuJQFkJNsAJ5CpiR9f6TD4=
-github.com/synadia-io/nexlet.go v0.0.0-20250221041127-599581e258c6/go.mod h1:KJIWK2hGf4WbOAlUH2XDWQOhBzVGbp4kJbXlFMBO8D8=
-golang.org/x/crypto v0.33.0 h1:IOBPskki6Lysi0lo9qQvbxiQ+FvsCC/YWOecCHAixus=
-golang.org/x/crypto v0.33.0/go.mod h1:bVdXmD7IV/4GdElGPozy6U7lWdRXA4qyRVGJV57uQ5M=
+github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9 h1:/agDdQHKDkCLZ5q7TiFxq8i9YhFr4OdNw/cfmPGKiL4=
+github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9/go.mod h1:KJIWK2hGf4WbOAlUH2XDWQOhBzVGbp4kJbXlFMBO8D8=
+golang.org/x/crypto v0.35.0 h1:b15kiHdrGCHrP6LvwaQ3c03kgNhhiMgvlhxHQhmg2Xs=
+golang.org/x/crypto v0.35.0/go.mod h1:dy7dXNW32cAb/6/PRuTNsix8T+vJAqvuIy5Bli/x0YQ=
 golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c h1:7dEasQXItcW1xKJ2+gg5VOiBnqWrJc+rq0DPKyvvdbY=
 golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c/go.mod h1:NQtJDoLvd6faHhE7m4T/1IY708gDefGGjR/iUW8yQQ8=
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=

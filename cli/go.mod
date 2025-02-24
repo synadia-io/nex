@@ -20,9 +20,9 @@ require (
 	github.com/nats-io/nkeys v0.4.10
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/stretchr/testify v1.10.0
-	github.com/synadia-labs/nex v0.0.0-20250220221056-d294833cdc58
-	github.com/synadia-labs/nex/agents v0.0.0-20250220221056-d294833cdc58
-	github.com/synadia-labs/nex/client v0.0.0-20250220221056-d294833cdc58
+	github.com/synadia-labs/nex v0.0.0-20250221042458-45e17023d430
+	github.com/synadia-labs/nex/agents v0.0.0-20250221042458-45e17023d430
+	github.com/synadia-labs/nex/client v0.0.0-20250221042458-45e17023d430
 )
 
 require (
@@ -37,12 +37,12 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
-	github.com/muesli/termenv v0.15.2 // indirect
+	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nats-io/jwt/v2 v2.7.3 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/synadia-io/nexlet.go v0.0.0-20250221041127-599581e258c6 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect

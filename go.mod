@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nkeys v0.4.10
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
-	github.com/synadia-io/nexlet.go v0.0.0-20250221041127-599581e258c6
+	github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9
 	golang.org/x/sys v0.30.0
 )
 
@@ -26,7 +26,7 @@ require (
 	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	golang.org/x/crypto v0.33.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
 )

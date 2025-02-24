@@ -43,10 +43,10 @@ github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 h1:PKK9DyHxif4LZo+uQSgXNqs0jj5+x
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.1/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/synadia-io/nexlet.go v0.0.0-20250221041127-599581e258c6 h1:vbai2DiTHBS8ClLNENboKjuJQFkJNsAJ5CpiR9f6TD4=
-github.com/synadia-io/nexlet.go v0.0.0-20250221041127-599581e258c6/go.mod h1:KJIWK2hGf4WbOAlUH2XDWQOhBzVGbp4kJbXlFMBO8D8=
-golang.org/x/crypto v0.33.0 h1:IOBPskki6Lysi0lo9qQvbxiQ+FvsCC/YWOecCHAixus=
-golang.org/x/crypto v0.33.0/go.mod h1:bVdXmD7IV/4GdElGPozy6U7lWdRXA4qyRVGJV57uQ5M=
+github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9 h1:/agDdQHKDkCLZ5q7TiFxq8i9YhFr4OdNw/cfmPGKiL4=
+github.com/synadia-io/nexlet.go v0.0.0-20250224193051-85b1a77a3bf9/go.mod h1:KJIWK2hGf4WbOAlUH2XDWQOhBzVGbp4kJbXlFMBO8D8=
+golang.org/x/crypto v0.35.0 h1:b15kiHdrGCHrP6LvwaQ3c03kgNhhiMgvlhxHQhmg2Xs=
+golang.org/x/crypto v0.35.0/go.mod h1:dy7dXNW32cAb/6/PRuTNsix8T+vJAqvuIy5Bli/x0YQ=
 golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.21.0/go.mod h1:/VUhepiaJMQUp4+oa/7Zr1D23ma6VTLIYjOOTFZPUcA=
 golang.org/x/sys v0.30.0 h1:QjkSwP/36a20jFYWkSue1YwXzLmsV5Gfq7Eiy72C1uc=
