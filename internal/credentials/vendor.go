@@ -28,7 +28,9 @@ var (
 				Allow: []string{
 					fmt.Sprintf("%s.%s.>", models.AgentAPIPrefix, id),
 					fmt.Sprintf("%s.%s.*", models.EventAPIPrefix, id),
-					fmt.Sprintf("%s.*.*", models.LogAPIPrefix), // workload logs // TODO: add agentID to this subject
+					fmt.Sprintf("%s.*.*.stdout", models.LogAPIPrefix),  // workload logs
+					fmt.Sprintf("%s.*.*.stderr", models.LogAPIPrefix),  // workload logs
+					fmt.Sprintf("%s.*.*.metrics", models.LogAPIPrefix), // workload metrics
 					"update_caddy",         // temporary for caddy
 					nats.InboxPrefix + ">", // responses
 				},
