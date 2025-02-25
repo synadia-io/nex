@@ -227,8 +227,40 @@ func (a *Runner) EmitEvent(event any) error {
 	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentId, eventType), eventB)
 }
 
-// TODO: move this off agent connect to the workload connection
-func (a *Runner) RegisterTrigger(namespace, workloadId string, tFunc func([]byte) ([]byte, error)) error {
+func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConnData *models.NatsConnectionData, tFunc func([]byte) ([]byte, error)) error {
+	nc, err := configureNatsConnection(*workloadConnData)
+	if err != nil {
+		return err
+	}
+
+	sub, err := nc.Subscribe(triggerSubject, func(m *nats.Msg) {
+		go func() {
+			ret, err := tFunc(m.Data)
+			if err != nil {
+				slog.Error("error running trigger function", slog.Any("err", err))
+			}
+			if m.Reply != "" { // empty if orginal trigger was a publish and not request
+				msg := &nats.Msg{
+					Subject: m.Reply,
+					Header:  nats.Header{"workload_id": []string{workloadId}},
+					Data:    ret,
+				}
+				err = a.nc.PublishMsg(msg)
+				if err != nil {
+					slog.Error("error responding to trigger", slog.Any("err", err))
+				}
+			}
+		}()
+	})
+	if err != nil {
+		return err
+	}
+
+	a.triggers[workloadId] = sub
+	return nil
+}
+
+func (a *Runner) RegisterTriggerWithAgent(namespace, workloadId string, tFunc func([]byte) ([]byte, error)) error {
 	sub, err := a.nc.Subscribe(fmt.Sprintf("%s.%s.%s.TRIGGER", models.WorkloadAPIPrefix, namespace, workloadId), func(m *nats.Msg) {
 		go func() {
 			ret, err := tFunc(m.Data)
