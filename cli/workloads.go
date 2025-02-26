@@ -116,6 +116,10 @@ func (r *StartWorkload) Run(globals *Globals) error {
 		return err
 	}
 
+	if len(aucResp) == 0 {
+		return errors.New("no agents available for workload placement")
+	}
+
 	randomNode := aucResp[rand.Intn(len(aucResp))]
 
 	if !slices.Contains(randomNode.SupportedLifecycles, models.WorkloadLifecycle(r.WorkloadLifecycle)) {
