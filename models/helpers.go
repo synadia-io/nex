@@ -1,26 +1,31 @@
 package models
 
 import (
+	"context"
 	"errors"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
 
+	"disorder.dev/shandler"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 type (
 	Reg struct {
-		Id              string
-		OriginalRequest *RegisterAgentRequest
-		Schema          *jsonschema.Schema
-		Type            RegType
+		Id              string                `json:"id"`
+		OriginalRequest *RegisterAgentRequest `json:"original_request"`
+		Schema          *jsonschema.Schema    `json:"-"`
+		Type            RegType               `json:"type"`
 
-		Process *os.Process
+		Process *os.Process `json:"-"`
 	}
 	Regs struct {
 		sync.Mutex
-		r map[string]*Reg
+
+		logger *slog.Logger
+		r      map[string]*Reg
 	}
 	RegType string
 )
@@ -29,6 +34,13 @@ const (
 	RegTypeEmbeddedAgent RegType = "embedded_agent"
 	RegTypeLocalAgent    RegType = "local_agent"
 )
+
+func NewRegistrationList(logger *slog.Logger) *Regs {
+	return &Regs{
+		logger: logger,
+		r:      make(map[string]*Reg),
+	}
+}
 
 func (r *Reg) SetProcess(proc *os.Process) {
 	r.Process = proc
@@ -53,6 +65,7 @@ func (n *Regs) New(id string, _type RegType) {
 	n.r[id].Id = id
 	n.r[id].Type = _type
 	n.Unlock()
+	n.logger.Log(context.TODO(), shandler.LevelTrace, "registration created", slog.String("id", id), slog.String("type", string(_type)))
 }
 
 func (n *Regs) Update(id string, r *Reg) error {
@@ -62,6 +75,7 @@ func (n *Regs) Update(id string, r *Reg) error {
 	}
 	n.r[id] = r
 	n.Unlock()
+	n.logger.Log(context.TODO(), shandler.LevelTrace, "registration updated", slog.String("id", id), slog.Any("registration", r))
 	return nil
 }
 
@@ -87,10 +101,12 @@ func (n *Regs) Find(name string) (string, *Reg, bool) {
 	for id, r := range n.r {
 		if r.OriginalRequest != nil && name == r.OriginalRequest.Name {
 			n.Unlock()
+			n.logger.Log(context.TODO(), shandler.LevelTrace, "registration found", slog.String("id", id), slog.String("name", name))
 			return id, r, true
 		}
 	}
 	n.Unlock()
+	n.logger.Log(context.TODO(), shandler.LevelTrace, "registration not found", slog.String("name", name))
 	return "", nil, false
 }
 

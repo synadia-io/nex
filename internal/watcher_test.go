@@ -28,7 +28,7 @@ func TestNewAgent(t *testing.T) {
 	uri, err := exec.LookPath("sleep")
 	be.NilErr(t, err)
 
-	regs := &models.Regs{}
+	regs := models.NewRegistrationList(logger)
 	ap := &AgentProcess{
 		Config: &models.Agent{
 			Uri:  uri,
@@ -80,7 +80,7 @@ func TestNewAgentBadBinary(t *testing.T) {
 	be.NilErr(t, err)
 	fakeBinary.Close()
 
-	regs := &models.Regs{}
+	regs := models.NewRegistrationList(logger)
 	ap := &AgentProcess{
 		Config: &models.Agent{
 			Uri: fakeBinary.Name(),
@@ -105,7 +105,7 @@ func TestNewAgentBadCommandArgs(t *testing.T) {
 	uri, err := exec.LookPath("sleep")
 	be.NilErr(t, err)
 
-	regs := &models.Regs{}
+	regs := models.NewRegistrationList(logger)
 	ap := &AgentProcess{
 		Config: &models.Agent{
 			Uri: uri,

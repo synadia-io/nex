@@ -2,6 +2,7 @@ package nex
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -97,7 +98,6 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 
 		embeddedRunners: make([]*sdk.Runner, 0),
 		localRunners:    make([]*internal.AgentProcess, 0),
-		regs:            new(models.Regs),
 
 		minter: &credentials.FullAccessMinter{NatsServer: nats.DefaultURL},
 		state:  &state.NoState{},
@@ -112,6 +112,8 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 
 		nodeShutdown: make(chan struct{}, 1),
 	}
+
+	n.regs = models.NewRegistrationList(n.logger)
 
 	var errs error
 	for _, opt := range opts {
@@ -296,7 +298,16 @@ func (n *NexNode) Start() error {
 				return
 			}
 			// TODO: what should go in this payload??
-			err = n.nc.Publish(models.NodeEmitHeartbeatSubject(pubKey), nil)
+			hb := struct {
+				Registrations string `json:"registrations"`
+			}{
+				Registrations: n.regs.String(),
+			}
+			hbB, err := json.Marshal(hb)
+			if err != nil {
+				n.logger.Error("failed Marshal heartbeat", slog.String("err", err.Error()))
+			}
+			err = n.nc.Publish(models.NodeEmitHeartbeatSubject(pubKey), hbB)
 			if err != nil {
 				n.logger.Error("failed to publish heartbeat", slog.String("err", err.Error()))
 			}

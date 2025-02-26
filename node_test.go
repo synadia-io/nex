@@ -396,7 +396,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	nsPingReqB, err := json.Marshal(nsPingReq)
 	be.NilErr(t, err)
 
-	nsPingRespRaw, err := nc.Request(models.NamespacePingRequestSubject(models.SystemNamespace), nsPingReqB, time.Second)
+	nsPingRespRaw, err := nc.Request(models.NamespacePingRequestSubject(models.SystemNamespace), nsPingReqB, time.Second*5)
 	be.NilErr(t, err)
 
 	nsPingResp := models.AgentListWorkloadsResponse{}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"disorder.dev/shandler"
 	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-labs/nex/models"
 
@@ -221,12 +222,14 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 		// If node doesnt have agent type, request is thrown away
 		_, reg, ok := n.regs.Find(req.AgentType)
 		if !ok {
+			n.logger.Log(n.ctx, shandler.LevelTrace, "agent type not found during auction", slog.String("agent_type", req.AgentType))
 			return
 		}
 
 		// If all auction tags aren't satisfied, request is thrown away
 		for k, v := range req.Tags {
 			if tV, ok := n.tags[k]; !ok || tV != v {
+				n.logger.Log(n.ctx, shandler.LevelTrace, "tag not satisfied during auction", slog.String("tag", k), slog.String("value", v))
 				return
 			}
 		}
@@ -359,12 +362,6 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		// err = n.nc.PublishRequest(models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Reply(), r.Data())
-		// if err != nil {
-		// 	n.handlerError(r, err, "100", "failed to publish stop workload request")
-		// 	return
-		// }
-
 		stopWorkload, err := n.nc.Request(models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), time.Second*5)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish stop workload request")
@@ -459,19 +456,43 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 			return
 		}
 
-		// err = n.nc.PublishRequest(models.AgentAPIQueryWorkloadsSubject(pubKey), r.Reply(), r.Data())
-		// if err != nil {
-		// 	n.handlerError(r, err, "100", "failed to publish query workloads request")
-		// 	return
-		// }
-
-		queryWorkload, err := n.nc.Request(models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), time.Second*5)
+		resp := models.AgentListWorkloadsResponse{}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), natsext.RequestManyStall(1000*time.Millisecond))
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to publish query workloads request")
+			respB, err := json.Marshal(resp)
+			if err != nil {
+				n.handlerError(r, err, "100", "failed to marshal response")
+				return
+			}
+			err = r.Error("100", "failed to publish query workloads request", respB)
+			if err != nil {
+				n.logger.Error("failed to send micro request error message", slog.Any("err", err))
+			}
 			return
 		}
 
-		err = r.Respond(queryWorkload.Data)
+		var errs error
+		msgs(func(m *nats.Msg, err error) bool {
+			if err == nil && m.Data != nil {
+				tResp := models.AgentListWorkloadsResponse{}
+				err = json.Unmarshal(m.Data, &tResp)
+				if err == nil {
+					resp = append(resp, tResp...)
+				}
+			}
+			errs = errors.Join(errs, err)
+			return true
+		})
+
+		respB, err := json.Marshal(resp)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed to marshal response")
+			return
+		}
+
+		err = r.Respond(respB)
 		if err != nil {
 			n.logger.Error("failed to respond to namespace ping request", slog.Any("err", err))
 			return

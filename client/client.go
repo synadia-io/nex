@@ -224,10 +224,9 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 	if err != nil {
 		return nil, err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	msgs, err := natsext.RequestMany(ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(500*time.Millisecond))
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(1000*time.Millisecond))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return []*models.AgentListWorkloadsResponse{}, nil
 	}
