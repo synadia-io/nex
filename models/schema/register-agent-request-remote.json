@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_remote_register_request",
+  "title": "RegisterRemoteAgentRequest",
+  "type": "object",
+  "properties": {
+    "public_signing_key": {
+      "type": "string",
+      "description": "The registration request will need to be signed by this key"
+    }
+  },
+  "required": [
+    "public_signing_key"
+  ]
+}

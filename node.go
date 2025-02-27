@@ -215,8 +215,8 @@ func (n *NexNode) Start() error {
 	// System only agent endpoints
 	if n.allowAgentRegistration {
 		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.RegisterRemoteAgentSubject()), micro.WithEndpointQueueGroup(n.nexus)))
-		errs = errors.Join(errs, n.service.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-		errs = errors.Join(errs, n.service.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+		// errs = errors.Join(errs, n.service.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+		// errs = errors.Join(errs, n.service.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	}
 	errs = errors.Join(errs, n.service.AddEndpoint("RegisterLocalAgent", micro.HandlerFunc(n.handleRegisterLocalAgent()), micro.WithEndpointSubject(models.AgentAPILocalRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// User endpoints
@@ -261,7 +261,11 @@ func (n *NexNode) Start() error {
 		}
 
 		id := assignedAgentId.Next()
-		n.regs.New(id, models.RegTypeEmbeddedAgent)
+		err = n.regs.New(id, models.RegTypeEmbeddedAgent, "")
+		if err != nil {
+			n.logger.Error("failed to register agent", slog.String("agent_name", runner.String()), slog.String("err", err.Error()))
+			continue
+		}
 
 		connData, err := n.minter.MintRegister(id, pubKey)
 		if err != nil {

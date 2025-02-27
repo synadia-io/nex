@@ -85,7 +85,7 @@ func (n *nexletState) GetNamespaceWorkloadList(ns string) (*models.AgentListWork
 			Runtime:           "--",
 			StartTime:         w.StartedAt.Format(time.RFC3339),
 			WorkloadLifecycle: string(w.StartRequest.WorkloadLifecycle),
-			WorkloadState:     w.State,
+			WorkloadState:     w.GetState(),
 			WorkloadType:      NEXLET_NAME,
 		}
 		*ret = append(*ret, ws)
@@ -226,6 +226,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 						n.Lock()
 						delete(n.workloads[namespace], workloadId)
 						n.Unlock()
+						return
 					case <-ticker.C:
 						if err := w.Process.Signal(syscall.Signal(0)); err != nil {
 							if err := n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: workloadId}); err != nil {
@@ -234,6 +235,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 							n.Lock()
 							delete(n.workloads[namespace], workloadId)
 							n.Unlock()
+							return
 						}
 					}
 				}

@@ -43,7 +43,13 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 			return
 		default:
 			mu.Lock()
-			regs.New(ap.Id, models.RegTypeLocalAgent)
+
+			err = regs.New(ap.Id, models.RegTypeLocalAgent, "")
+			if err != nil {
+				a.logger.Error("failed to register local agent", slog.String("agent", info.Name()), slog.String("err", err.Error()))
+				mu.Unlock()
+				return
+			}
 
 			env := []string{}
 			for k, v := range ap.Config.Env {

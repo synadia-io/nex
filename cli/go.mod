@@ -20,9 +20,9 @@ require (
 	github.com/nats-io/nkeys v0.4.10
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1
 	github.com/stretchr/testify v1.10.0
-	github.com/synadia-labs/nex v0.0.0-20250226022059-374316c9d1c7
-	github.com/synadia-labs/nex/agents v0.0.0-20250226022059-374316c9d1c7
-	github.com/synadia-labs/nex/client v0.0.0-20250226022059-374316c9d1c7
+	github.com/synadia-labs/nex v0.0.0-20250227011447-c138131b6b04
+	github.com/synadia-labs/nex/agents v0.0.0-20250227011447-c138131b6b04
+	github.com/synadia-labs/nex/client v0.0.0-20250227011447-c138131b6b04
 )
 
 require (

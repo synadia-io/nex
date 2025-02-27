@@ -35,6 +35,7 @@ type (
 	Up struct {
 		Agents                 AgentConfigs      `name:"agents" help:"Workload types configurations for nex node to initialize"`
 		DisableNativeStart     bool              `name:"disable-native-start" help:"Disable native start agent" default:"false"`
+		AllowAgentRegistration bool              `name:"allow-agent-registration" help:"Allow agents to register with the node after start" default:"false"`
 		ShowWorkloadLogs       bool              `name:"show-workload-logs" help:"Hide logs from workloads" default:"false"`
 		NexusName              string            `name:"nexus" default:"nexus" help:"Nexus name"`
 		NodeName               string            `name:"node-name" placeholder:"nex-node" help:"Name of the node; random if not provided"`
@@ -157,6 +158,10 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 			return err
 		}
 		opts = append(opts, nex.WithAgentRunner(nativeAgent))
+	}
+
+	if u.AllowAgentRegistration {
+		opts = append(opts, nex.WithAllowAgentRegistration())
 	}
 
 	switch u.State {

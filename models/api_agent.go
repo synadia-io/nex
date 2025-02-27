@@ -181,3 +181,58 @@ func (j *RegisterAgentResponse) UnmarshalJSON(b []byte) error {
 	*j = RegisterAgentResponse(plain)
 	return nil
 }
+
+type RegisterRemoteAgentRequest struct {
+	// The registration request will need to be signed by this key
+	PublicSigningKey string `json:"public_signing_key"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RegisterRemoteAgentRequest) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["public_signing_key"]; raw != nil && !ok {
+		return fmt.Errorf("field public_signing_key in RegisterRemoteAgentRequest: required")
+	}
+	type Plain RegisterRemoteAgentRequest
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = RegisterRemoteAgentRequest(plain)
+	return nil
+}
+
+type RegisterRemoteAgentResponse struct {
+	// The assigned agent id
+	AssignedAgentId string `json:"assigned_agent_id"`
+
+	// Agent registration credentials
+	RegistrationCreds *NatsConnectionData `json:"registration_creds,omitempty"`
+
+	// The node waiting for response
+	RespondTo string `json:"respond_to"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RegisterRemoteAgentResponse) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["assigned_agent_id"]; raw != nil && !ok {
+		return fmt.Errorf("field assigned_agent_id in RegisterRemoteAgentResponse: required")
+	}
+	if _, ok := raw["respond_to"]; raw != nil && !ok {
+		return fmt.Errorf("field respond_to in RegisterRemoteAgentResponse: required")
+	}
+	type Plain RegisterRemoteAgentResponse
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = RegisterRemoteAgentResponse(plain)
+	return nil
+}

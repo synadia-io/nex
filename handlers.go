@@ -500,15 +500,16 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 	}
 }
 
-func (n *NexNode) handleStartAgent() func(micro.Request) {
-	return func(r micro.Request) {
-	}
-}
-
-func (n *NexNode) handleStopAgent() func(micro.Request) {
-	return func(r micro.Request) {
-	}
-}
+// TODO: future work
+// func (n *NexNode) handleStartAgent() func(micro.Request) {
+// 	return func(r micro.Request) {
+// 	}
+// }
+//
+// func (n *NexNode) handleStopAgent() func(micro.Request) {
+// 	return func(r micro.Request) {
+// 	}
+// }
 
 func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 	return func(r micro.Request) {
@@ -610,7 +611,43 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 
 func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 	return func(r micro.Request) {
-		n.handlerError(r, errors.New("not implemented"), "100", "endpoint not implemented")
+		req := new(models.RegisterRemoteAgentRequest)
+		err := json.Unmarshal(r.Data(), req)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed to unmarshal register remote agent request")
+			return
+		}
+
+		agentId := nuid.New().Next()
+		err = n.regs.New(agentId, models.ReqTypeRemoteAgent, req.PublicSigningKey)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed to register remote agent")
+			return
+		}
+
+		pubNodeKey, err := n.nodeKeypair.PublicKey()
+		if err != nil {
+			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			return
+		}
+
+		connData, err := n.minter.MintRegister(agentId, pubNodeKey)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed to mint register")
+			return
+		}
+
+		ret := models.RegisterRemoteAgentResponse{
+			AssignedAgentId:   agentId,
+			RegistrationCreds: connData,
+			RespondTo:         pubNodeKey,
+		}
+
+		err = r.RespondJSON(ret)
+		if err != nil {
+			n.logger.Error("failed to respond to register remote agent request", slog.Any("err", err))
+			return
+		}
 	}
 }
 

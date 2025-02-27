@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"disorder.dev/shandler"
+	"github.com/nats-io/nkeys"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -18,6 +19,9 @@ type (
 		OriginalRequest *RegisterAgentRequest `json:"original_request"`
 		Schema          *jsonschema.Schema    `json:"-"`
 		Type            RegType               `json:"type"`
+
+		// Only used in remote agent registration
+		PubSigningKey string `json:"-"`
 
 		Process *os.Process `json:"-"`
 	}
@@ -33,6 +37,7 @@ type (
 const (
 	RegTypeEmbeddedAgent RegType = "embedded_agent"
 	RegTypeLocalAgent    RegType = "local_agent"
+	ReqTypeRemoteAgent   RegType = "remote_agent"
 )
 
 func NewRegistrationList(logger *slog.Logger) *Regs {
@@ -56,16 +61,27 @@ func (n *Regs) Items() []*Reg {
 	return ret
 }
 
-func (n *Regs) New(id string, _type RegType) {
+func (n *Regs) New(id string, _type RegType, signingKey string) error {
 	n.Lock()
-	if n.r == nil {
-		n.r = make(map[string]*Reg)
+	defer n.Unlock()
+
+	if _, ok := n.r[id]; ok {
+		return errors.New("registration id already exists")
 	}
+
 	n.r[id] = new(Reg)
 	n.r[id].Id = id
 	n.r[id].Type = _type
-	n.Unlock()
+
+	if _type == ReqTypeRemoteAgent {
+		if signingKey == "" || !nkeys.IsValidPublicKey(signingKey) {
+			return errors.New("invalid public signing key")
+		}
+		n.r[id].PubSigningKey = signingKey
+	}
+
 	n.logger.Log(context.TODO(), shandler.LevelTrace, "registration created", slog.String("id", id), slog.String("type", string(_type)))
+	return nil
 }
 
 func (n *Regs) Update(id string, r *Reg) error {

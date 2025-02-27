@@ -1,7 +1,7 @@
 version: '3'
 
 env:
-  GOPRIVATE: "github.com/synadia-labs/nex,github.com/synadia-io/nexlet.go"
+  GOPRIVATE: "github.com/synadia-labs,github.com/synadia-io"
   GOWORK: off
 
 tasks:
@@ -20,6 +20,8 @@ tasks:
         --package models --tags json
         --schema-output=io.nats.nex.v2.agent_register_request=../api_agent.go
         --schema-output=io.nats.nex.v2.agent_register_response=../api_agent.go
+        --schema-output=io.nats.nex.v2.agent_remote_register_request=../api_agent.go
+        --schema-output=io.nats.nex.v2.agent_remote_register_response=../api_agent.go
         --schema-output=io.nats.nex.v2.agent_heartbeat=../api_agent.go 
         --schema-output=io.nats.nex.v2.agent_list_workloads_request=../api_agent.go
         --schema-output=io.nats.nex.v2.agent_list_workloads_response=../api_agent.go
