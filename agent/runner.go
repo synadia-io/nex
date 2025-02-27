@@ -21,12 +21,12 @@ const (
 )
 
 type Runner struct {
+	ctx          context.Context
 	name         string
-	registerName string // this is that is used in the --type field for workloads
+	registerType string // this is used in the --type field for workloads
 	version      string
 	logger       *slog.Logger
 
-	remote   bool
 	nodeId   string
 	agentId  string
 	triggers map[string]*nats.Subscription
@@ -38,14 +38,6 @@ type Runner struct {
 
 type RunnerOpt func(*Runner) error
 
-func AsLocalAgent(inNodeId string) RunnerOpt {
-	return func(a *Runner) error {
-		a.remote = false
-		a.nodeId = inNodeId
-		return nil
-	}
-}
-
 func WithLogger(logger *slog.Logger) RunnerOpt {
 	return func(a *Runner) error {
 		slog.SetDefault(logger)
@@ -53,11 +45,30 @@ func WithLogger(logger *slog.Logger) RunnerOpt {
 	}
 }
 
-func NewRunner(name, version string, na Agent, opts ...RunnerOpt) (*Runner, error) {
+func RemoteAgentInit(nc *nats.Conn, pubKey string) (*models.RegisterRemoteAgentResponse, error) {
+	regResp, err := nc.Request(models.RegisterRemoteAgentSubject(), fmt.Appendf([]byte{}, `{"public_signing_key":"%s"}`, pubKey), time.Second*3)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp models.RegisterRemoteAgentResponse
+	err = json.Unmarshal(regResp.Data, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp, nil
+}
+
+func NewRunner(ctx context.Context, nodeId string, na Agent, opts ...RunnerOpt) (*Runner, error) {
 	a := &Runner{
-		name:     name,
-		version:  version,
-		logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
+		ctx:          ctx,
+		name:         "default",
+		registerType: "default",
+		version:      "0.0.0",
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+
+		nodeId:   nodeId,
 		agent:    na,
 		triggers: make(map[string]*nats.Subscription),
 	}
@@ -72,14 +83,14 @@ func NewRunner(name, version string, na Agent, opts ...RunnerOpt) (*Runner, erro
 }
 
 func (a *Runner) String() string {
-	return a.name
+	return fmt.Sprintf("%s-%s", a.registerType, a.name)
 }
 
 func (a *Runner) GetLogger(workloadId, namespace string, lType LogType) io.Writer {
 	return NewAgentLogCapture(a.nc, slog.Default(), lType, a.agentId, workloadId, namespace)
 }
 
-func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsConnectionData) error {
+func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 	var err error
 	a.agentId = agentId
 
@@ -94,7 +105,9 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 		return err
 	}
 
-	a.registerName = register.Name
+	a.name = register.Name
+	a.registerType = register.RegisterType
+	a.version = register.Version
 
 	registerB, err := json.Marshal(register)
 	if err != nil {
@@ -102,16 +115,10 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 	}
 
 	var regRet *nats.Msg
-	if a.remote {
-		regRet, err = a.nc.Request(models.AgentAPIRemoteRegisterSubject(), registerB, time.Second*3)
-		if err != nil {
-			return err
-		}
-	} else {
-		regRet, err = a.nc.Request(models.AgentAPILocalRegisterRequestSubject(agentId, a.nodeId), registerB, time.Second*3)
-		if err != nil {
-			return err
-		}
+
+	regRet, err = a.nc.Request(models.AgentAPILocalRegisterRequestSubject(agentId, a.nodeId), registerB, time.Second*3)
+	if err != nil {
+		return err
 	}
 
 	var regRetJson models.RegisterAgentResponse
@@ -133,8 +140,7 @@ func (a *Runner) Run(ctx context.Context, agentId string, connData models.NatsCo
 
 	// Start agent heartbeat
 	go func() {
-		ticker := time.NewTicker(time.Second * 10)
-		for range ticker.C {
+		for range time.Tick(time.Second * 10) {
 			hb, err := a.agent.Heartbeat()
 			if err != nil {
 				slog.Warn("error generating heartbeat", slog.Any("err", err))
@@ -352,7 +358,7 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			Id:           workloadId,
 			Message:      "Success",
 			Stopped:      true,
-			WorkloadType: a.registerName,
+			WorkloadType: a.registerType,
 		}
 
 		err = r.RespondJSON(ret)
@@ -532,7 +538,7 @@ func (a *Runner) handleWorkloadPing() func(micro.Request) {
 			return
 		}
 
-		err := r.Respond([]byte(fmt.Sprintf(`{"node_id":"%s"}`, a.nodeId)))
+		err := r.Respond(fmt.Appendf([]byte{}, `{"node_id":"%s"}`, a.nodeId))
 		if err != nil {
 			slog.Error("error responding to workload ping", slog.Any("err", err))
 		}

@@ -53,8 +53,9 @@ func main() {
 		slog.Error("NEX_AGENT_NODE_ID is required")
 		return
 	}
-	if nkeys.IsValidPublicServerKey(nodeId) {
-		opts = append(opts, agent.AsLocalAgent(nodeId))
+	if !nkeys.IsValidPublicServerKey(nodeId) {
+		slog.Error("NEX_AGENT_NODE_ID is not a valid public server key")
+		return
 	}
 
 	agentId, ok := os.LookupEnv("NEX_AGENT_ASSIGNED_ID")
@@ -63,13 +64,13 @@ func main() {
 		return
 	}
 
-	runner, err := agent.NewRunner(agentName, VERSION, myAgent, opts...)
+	runner, err := agent.NewRunner(ctx, nodeId, myAgent, opts...)
 	if err != nil {
 		panic(fmt.Errorf("failed to create runner: %w", err))
 	}
 
 	// launch the agent
-	if err := runner.Run(ctx, agentId, models.NatsConnectionData{}); err != nil {
+	if err := runner.Run(agentId, models.NatsConnectionData{}); err != nil {
 		panic(fmt.Errorf("failed to run agent: %w", err))
 	}
 }
