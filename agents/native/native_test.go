@@ -42,9 +42,11 @@ func TestNewWorkloadAgent(t *testing.T) {
 		be.NilErr(t, err)
 
 		stats := struct {
-			TotalNamespaces int `json:"namespace_count"`
+			TotalNamespaces int    `json:"namespace_count"`
+			RegisterType    string `json:"register_type"`
 		}{
 			TotalNamespaces: 0,
+			RegisterType:    "native",
 		}
 
 		statsB, err := json.Marshal(stats)

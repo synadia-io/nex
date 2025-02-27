@@ -12,7 +12,7 @@ require (
 	github.com/nats-io/nkeys v0.4.10
 	github.com/nats-io/nuid v1.0.1
 	github.com/synadia-io/orbit.go/natsext v0.1.1
-	github.com/synadia-labs/nex v0.0.0-20250227011447-c138131b6b04
+	github.com/synadia-labs/nex v0.0.0-20250227180915-f940769199f9
 )
 
 require (
@@ -30,7 +30,7 @@ require (
 	github.com/nats-io/nats-server/v2 v2.10.26 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
-	github.com/synadia-io/nexlet.go v0.0.0-20250225225929-7ea3d0502be2 // indirect
+	github.com/synadia-io/nexlet.go v0.0.0-20250227183554-a1a4a16b689d // indirect
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect

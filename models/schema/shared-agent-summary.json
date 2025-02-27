@@ -6,11 +6,11 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "The name of the workload"
+      "description": "The name of the agent"
     },
     "start_time": {
       "type": "string",
-      "description": "The start time of the workload"
+      "description": "The start time of the agent"
     },
     "supported_lifecycles": {
       "type": "string",

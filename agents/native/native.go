@@ -18,8 +18,9 @@ import (
 var startRequest string
 
 const (
-	NEXLET_NAME  string = "go_exec"
-	MAX_RESTARTS int    = 3
+	NEXLET_NAME          string = "go_exec"
+	NEXLET_REGISTER_TYPE string = "native"
+	MAX_RESTARTS         int    = 3
 )
 
 var (
@@ -54,13 +55,11 @@ func NewNativeWorkloadRunner(ctx context.Context, nodeId string, logger *slog.Lo
 		agent.WithLogger(logger),
 	}
 
-	if nkeys.IsValidPublicServerKey(nodeId) {
-		opts = append(opts, agent.AsLocalAgent(nodeId))
-	} else {
+	if !nkeys.IsValidPublicServerKey(nodeId) {
 		return nil, errors.New("node id is not a valid public server key")
 	}
 
-	da.runner, err = agent.NewRunner(NEXLET_NAME, VERSION, da, opts...)
+	da.runner, err = agent.NewRunner(ctx, nodeId, da, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func (a *NativeAgent) Register() (*models.RegisterAgentRequest, error) {
 		Description:         "Runs workloads as subprocesses on the host machine",
 		MaxWorkloads:        0,
 		Name:                NEXLET_NAME,
-		RegisterType:        "native",
+		RegisterType:        NEXLET_REGISTER_TYPE,
 		PublicXkey:          xPub,
 		Version:             VERSION,
 		SupportedLifecycles: SUPPORTED_LIFECYCLES,
@@ -111,9 +110,11 @@ func (a *NativeAgent) Register() (*models.RegisterAgentRequest, error) {
 
 func (a *NativeAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 	stats := struct {
-		TotalNamespaces int `json:"namespace_count"`
+		TotalNamespaces int    `json:"namespace_count"`
+		RegisterType    string `json:"register_type"`
 	}{
 		TotalNamespaces: a.state.NamespaceCount(),
+		RegisterType:    NEXLET_REGISTER_TYPE,
 	}
 
 	statsB, err := json.Marshal(stats)

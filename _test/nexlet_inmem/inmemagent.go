@@ -1,6 +1,7 @@
 package inmem
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"slices"
@@ -54,13 +55,11 @@ func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 		agent.WithLogger(logger),
 	}
 
-	if nkeys.IsValidPublicServerKey(nodeId) {
-		opts = append(opts, agent.AsLocalAgent(nodeId))
-	} else {
+	if !nkeys.IsValidPublicServerKey(nodeId) {
 		return nil, errors.New("node id is not a valid public server key")
 	}
 
-	inmemAgent.runner, err = agent.NewRunner(agentName, VERSION, inmemAgent, opts...)
+	inmemAgent.runner, err = agent.NewRunner(context.Background(), nodeId, inmemAgent, opts...)
 	if err != nil {
 		return nil, err
 	}

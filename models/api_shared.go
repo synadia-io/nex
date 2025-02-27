@@ -38,10 +38,10 @@ func (j *AgentStartWorkloadRequest) UnmarshalJSON(b []byte) error {
 type AgentSummaries map[string]AgentSummary
 
 type AgentSummary struct {
-	// The name of the workload
+	// The name of the agent
 	Name string `json:"name"`
 
-	// The start time of the workload
+	// The start time of the agent
 	StartTime string `json:"start_time"`
 
 	// The state of the agent

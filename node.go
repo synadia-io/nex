@@ -273,7 +273,7 @@ func (n *NexNode) Start() error {
 			continue
 		}
 
-		err = runner.Run(n.ctx, id, *connData)
+		err = runner.Run(id, *connData)
 		if err != nil {
 			n.logger.Error("agent failed to run", slog.String("agent_name", runner.String()), slog.String("err", err.Error()))
 			n.regs.Remove(id)
