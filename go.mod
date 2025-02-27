@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nuid v1.0.1
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/stretchr/testify v1.10.0
-	github.com/tochemey/goakt/v3 v3.1.1
+	github.com/tochemey/goakt/v3 v3.1.2
 	golang.org/x/sys v0.30.0
 	google.golang.org/protobuf v1.36.5
 	oras.land/oras-go/v2 v2.5.0

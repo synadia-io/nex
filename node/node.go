@@ -228,7 +228,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	// define the supervision strategy
 	supervisor := goakt.NewSupervisor(
 		goakt.WithStrategy(goakt.OneForOneStrategy),
-		goakt.WithDirective(nil, goakt.RestartDirective), // TODO(arsene): maybe use some wildcards here for any error
+		goakt.WithAnyErrorDirective(goakt.RestartDirective),
 		goakt.WithRetry(3, 30*time.Second),
 	)
 
