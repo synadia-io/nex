@@ -334,9 +334,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 					kSplit := strings.SplitN(k, "_", 2)
 					nn.options.Logger.Info("Restoring workload", slog.String("id", kSplit[1]), slog.Any("name", v.WorkloadName), slog.String("namespace", v.Namespace))
 					v.WorkloadId = kSplit[1]
-					// NOTE: would prefer Tell/Async here, but seems to have bug
-					_, err := agentSuper.Ask(nn.ctx, c, v, 5*time.Second)
-					if err != nil {
+					if err := agentSuper.Tell(nn.ctx, c, v); err != nil {
 						nn.options.Logger.Error("Failed to restore workload", slog.String("id", kSplit[1]), slog.Any("err", err))
 					}
 				}
