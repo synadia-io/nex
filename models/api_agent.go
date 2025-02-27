@@ -78,11 +78,14 @@ type RegisterAgentRequest struct {
 	// The maximum number of workloads this agent can hold. 0 indicates unlimited
 	MaxWorkloads float64 `json:"max_workloads"`
 
-	// Name of the agent
+	// Name of the agent; used primarily for logging
 	Name string `json:"name"`
 
 	// The public xkey of the agent. Node will encrypt environment with this key
 	PublicXkey string `json:"public_xkey"`
+
+	// Type of registration; will be used when auctioning for placement (--type)
+	RegisterType string `json:"register_type"`
 
 	// JSONSchema shape for the start request; enforced by node
 	StartRequestSchema string `json:"start_request_schema"`
@@ -111,6 +114,9 @@ func (j *RegisterAgentRequest) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["public_xkey"]; raw != nil && !ok {
 		return fmt.Errorf("field public_xkey in RegisterAgentRequest: required")
+	}
+	if _, ok := raw["register_type"]; raw != nil && !ok {
+		return fmt.Errorf("field register_type in RegisterAgentRequest: required")
 	}
 	if _, ok := raw["start_request_schema"]; raw != nil && !ok {
 		return fmt.Errorf("field start_request_schema in RegisterAgentRequest: required")

@@ -523,6 +523,11 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			return
 		}
 
+		if registrationRequest.RegisterType == "" {
+			n.handlerError(r, errors.New("register_type is required"), "100", "register_type is required")
+			return
+		}
+
 		if !n.regs.Has(agentId) {
 			n.handlerError(r, errors.New(registrationRequest.Name+" agent provided invalid agentid ["+agentId+"]"), "100", "invalid agent id provided")
 			return
@@ -570,7 +575,7 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			return
 		}
 
-		agentState, err := n.state.GetStateByAgent(registrationRequest.Name)
+		agentState, err := n.state.GetStateByAgent(registrationRequest.RegisterType)
 		if err != nil {
 			n.logger.Warn("failed to get agent state", slog.Any("err", err))
 		}
@@ -599,7 +604,7 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			n.logger.Error("failed to respond to register local agent request", slog.Any("err", err))
 			return
 		}
-		n.logger.Info("agent registered", slog.String("name", registrationRequest.Name), slog.String("agent_id", agentId))
+		n.logger.Info("agent registered", slog.String("name", registrationRequest.Name), slog.String("type", registrationRequest.RegisterType), slog.String("agent_id", agentId))
 	}
 }
 

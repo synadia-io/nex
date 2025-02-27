@@ -18,7 +18,7 @@ import (
 var startRequest string
 
 const (
-	NEXLET_NAME  string = "native"
+	NEXLET_NAME  string = "go_exec"
 	MAX_RESTARTS int    = 3
 )
 
@@ -101,6 +101,7 @@ func (a *NativeAgent) Register() (*models.RegisterAgentRequest, error) {
 		Description:         "Runs workloads as subprocesses on the host machine",
 		MaxWorkloads:        0,
 		Name:                NEXLET_NAME,
+		RegisterType:        "native",
 		PublicXkey:          xPub,
 		Version:             VERSION,
 		SupportedLifecycles: SUPPORTED_LIFECYCLES,

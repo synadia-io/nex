@@ -358,7 +358,7 @@ func (n *NexNode) Shutdown() error {
 						break
 					}
 				}
-				n.logger.Info("local agent shutdown", slog.String("agent", agent.OriginalRequest.Name), slog.String("exit_code", procState.String()))
+				n.logger.Info("local agent shutdown", slog.String("agent_name", agent.OriginalRequest.Name), slog.String("agent_type", agent.OriginalRequest.RegisterType), slog.String("exit_code", procState.String()))
 			} else {
 				n.logger.Error("failed to cleanly shutdown local agent process; force killing", slog.String("err", err.Error()))
 				err = agent.Process.Kill()

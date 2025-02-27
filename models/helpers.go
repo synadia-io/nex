@@ -96,17 +96,17 @@ func (n *Regs) Get(id string) *Reg {
 	return n.r[id]
 }
 
-func (n *Regs) Find(name string) (string, *Reg, bool) {
+func (n *Regs) Find(regType string) (string, *Reg, bool) {
 	n.Lock()
 	for id, r := range n.r {
-		if r.OriginalRequest != nil && name == r.OriginalRequest.Name {
+		if r.OriginalRequest != nil && regType == r.OriginalRequest.RegisterType {
 			n.Unlock()
-			n.logger.Log(context.TODO(), shandler.LevelTrace, "registration found", slog.String("id", id), slog.String("name", name))
+			n.logger.Log(context.TODO(), shandler.LevelTrace, "registration found", slog.String("id", id), slog.String("name", r.OriginalRequest.Name), slog.String("type", regType))
 			return id, r, true
 		}
 	}
 	n.Unlock()
-	n.logger.Log(context.TODO(), shandler.LevelTrace, "registration not found", slog.String("name", name))
+	n.logger.Log(context.TODO(), shandler.LevelTrace, "registration not found", slog.String("name", regType))
 	return "", nil, false
 }
 
@@ -126,9 +126,9 @@ func (n *Regs) String() string {
 			continue
 		}
 		if counter != len(n.r)-1 {
-			ret.WriteString(rr.OriginalRequest.Name + ",")
+			ret.WriteString(rr.OriginalRequest.RegisterType + ",")
 		} else {
-			ret.WriteString(rr.OriginalRequest.Name)
+			ret.WriteString(rr.OriginalRequest.RegisterType)
 		}
 		counter++
 	}

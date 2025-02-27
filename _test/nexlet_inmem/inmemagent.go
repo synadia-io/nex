@@ -77,6 +77,7 @@ func (a *inMemAgent) Register() (*models.RegisterAgentRequest, error) {
 		Description:        "In memory no-op agent",
 		MaxWorkloads:       0,
 		Name:               a.name,
+		RegisterType:       a.name,
 		PublicXkey:         pub,
 		StartRequestSchema: "{}",
 		SupportedLifecycles: []models.WorkloadLifecycle{

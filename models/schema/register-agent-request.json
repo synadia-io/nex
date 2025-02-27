@@ -6,7 +6,11 @@
   "properties": {
     "name": {
       "type": "string",
-      "description": "Name of the agent"
+      "description": "Name of the agent; used primarily for logging"
+    },
+    "register_type": {
+      "type": "string",
+      "description": "Type of registration; will be used when auctioning for placement (--type)"
     },
     "description": {
       "type": "string",
@@ -38,6 +42,7 @@
   },
   "required": [
     "name",
+    "register_type",
     "version",
     "description",
     "max_workloads",
