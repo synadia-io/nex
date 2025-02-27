@@ -17,7 +17,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
-	goakt "github.com/tochemey/goakt/v2/actors"
+	goakt "github.com/tochemey/goakt/v3/actor"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/synadia-io/nex/internal/logger"
@@ -225,12 +225,18 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		return err
 	}
 
-	restartDirective := goakt.NewRestartDirective()
-	restartDirective.WithLimit(3, 30*time.Second)
+	// define the supervision strategy
+	supervisor := goakt.NewSupervisor(
+		goakt.WithStrategy(goakt.OneForOneStrategy),
+		goakt.WithAnyErrorDirective(goakt.RestartDirective),
+		goakt.WithRetry(3, 30*time.Second),
+	)
 
 	// start the root actors
-	agentSuper, err := nn.actorSystem.Spawn(nn.ctx, actors.AgentSupervisorActorName, actors.CreateAgentSupervisor(*nn.options),
-		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+	agentSuper, err := nn.actorSystem.Spawn(nn.ctx,
+		actors.AgentSupervisorActorName,
+		actors.CreateAgentSupervisor(*nn.options),
+		goakt.WithSupervisor(supervisor),
 	)
 	if err != nil {
 		return err
@@ -247,7 +253,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	}
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats,
-		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+		goakt.WithSupervisor(supervisor),
 	)
 	if err != nil {
 		return err
@@ -259,7 +265,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	nn.iNatsURL = inats.GetServerURL()
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions),
-		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+		goakt.WithSupervisor(supervisor),
 	)
 	if err != nil {
 		return err
@@ -272,7 +278,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	if !nn.options.DisableDirectStart {
 		_, err = agentSuper.SpawnChild(nn.ctx, models.DirectStartActorName, actors.CreateDirectStartAgent(nn.ctx, nn.nc, pk, *nn.options, nn.options.Logger.WithGroup(models.DirectStartActorName), nn),
-			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+			goakt.WithSupervisor(supervisor),
 		)
 		if err != nil {
 			return err
@@ -281,7 +287,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	for _, agent := range nn.options.AgentOptions {
 		// This map lookup works because the agent name is identical to the workload type
 		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(nn.options.Logger.WithGroup(agent.Name), allCreds[agent.Name], agent),
-			goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+			goakt.WithSupervisor(supervisor),
 		)
 		if err != nil {
 			return err
@@ -290,7 +296,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
 		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn),
-		goakt.WithSupervisorStrategies(goakt.NewSupervisorStrategy(nil, restartDirective)),
+		goakt.WithSupervisor(supervisor),
 	)
 	if err != nil {
 		return err
@@ -328,9 +334,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 					kSplit := strings.SplitN(k, "_", 2)
 					nn.options.Logger.Info("Restoring workload", slog.String("id", kSplit[1]), slog.Any("name", v.WorkloadName), slog.String("namespace", v.Namespace))
 					v.WorkloadId = kSplit[1]
-					// NOTE: would prefer Tell/Async here, but seems to have bug
-					_, err := agentSuper.Ask(nn.ctx, c, v, 5*time.Second)
-					if err != nil {
+					if err := agentSuper.Tell(nn.ctx, c, v); err != nil {
 						nn.options.Logger.Error("Failed to restore workload", slog.String("id", kSplit[1]), slog.Any("err", err))
 					}
 				}

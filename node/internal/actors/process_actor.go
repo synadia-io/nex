@@ -8,8 +8,8 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nex/models"
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
-	goakt "github.com/tochemey/goakt/v2/actors"
-	"github.com/tochemey/goakt/v2/goaktpb"
+	goakt "github.com/tochemey/goakt/v3/actor"
+	"github.com/tochemey/goakt/v3/goaktpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

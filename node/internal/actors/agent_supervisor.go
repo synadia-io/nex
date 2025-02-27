@@ -5,10 +5,10 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/tochemey/goakt/v2/goaktpb"
+	"github.com/tochemey/goakt/v3/goaktpb"
 
 	"github.com/synadia-io/nex/models"
-	goakt "github.com/tochemey/goakt/v2/actors"
+	goakt "github.com/tochemey/goakt/v3/actor"
 
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
