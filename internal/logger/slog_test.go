@@ -11,7 +11,7 @@ import (
 	"disorder.dev/shandler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tochemey/goakt/v2/log"
+	"github.com/tochemey/goakt/v3/log"
 )
 
 func TestSlogDebug(t *testing.T) {

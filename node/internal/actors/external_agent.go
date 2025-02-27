@@ -5,8 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/synadia-io/nex/models"
-	goakt "github.com/tochemey/goakt/v2/actors"
-	"github.com/tochemey/goakt/v2/goaktpb"
+	goakt "github.com/tochemey/goakt/v3/actor"
+	"github.com/tochemey/goakt/v3/goaktpb"
 
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
