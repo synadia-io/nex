@@ -7,9 +7,11 @@ replace github.com/synadia-labs/nex => ..
 require (
 	github.com/carlmjohnson/be v0.24.1
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
+	github.com/nats-io/nats-server/v2 v2.10.26
+	github.com/nats-io/nats.go v1.39.1
 	github.com/nats-io/nkeys v0.4.10
 	github.com/synadia-io/nexlet.go v0.0.0-20250227183554-a1a4a16b689d
-	github.com/synadia-labs/nex v0.0.0-20250227191011-22c0d5621e13
+	github.com/synadia-labs/nex v0.0.0-20250228035640-1e2818c49471
 	golang.org/x/sys v0.30.0
 )
 
@@ -31,8 +33,6 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nats-io/jwt/v2 v2.7.3 // indirect
-	github.com/nats-io/nats-server/v2 v2.10.26 // indirect
-	github.com/nats-io/nats.go v1.39.1 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

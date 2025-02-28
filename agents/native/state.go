@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/nats-io/nats.go"
 	"github.com/synadia-io/nexlet.go/agent"
 	"github.com/synadia-labs/nex/internal"
 	"github.com/synadia-labs/nex/models"
@@ -104,6 +106,33 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 		return err
 	}
 
+	if !strings.HasPrefix(startReq.Uri, "file://") && !strings.HasPrefix(startReq.Uri, "nats://") {
+		n.Unlock()
+		return errors.New("invalid uri; must be prefixed with file:// or nats://")
+	}
+
+	var nc *nats.Conn
+	if strings.HasPrefix(startReq.Uri, "nats://") {
+		nc, err = nats.Connect(req.WorkloadCreds.NatsUrl,
+			nats.UserJWTAndSeed(req.WorkloadCreds.NatsUserJwt, req.WorkloadCreds.NatsUserSeed),
+			nats.Name("artifact_fetcher-"+workloadId))
+		if err != nil {
+			slog.Error("error connecting to nats", slog.Any("err", err))
+			return err
+		}
+	}
+
+	ar, err := getArtifact(startReq.Uri, nc)
+	if err != nil {
+		n.Unlock()
+		return err
+	}
+
+	if nc != nil {
+		nc.Close()
+	}
+
+	slog.Debug("located artifact", slog.Any("artifact_reference", ar))
 	if _, ok := n.workloads[namespace]; !ok {
 		slog.Debug("namespace created", slog.String("namespace", namespace))
 		n.workloads[namespace] = make(NativeProcesses)
@@ -141,7 +170,8 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 			"NEX_WORKLOAD_NATS_B64_JWT=" + base64.StdEncoding.EncodeToString([]byte(req.WorkloadCreds.NatsUserJwt)),
 		}...)
 
-		cmd := exec.CommandContext(poisonPill, startReq.Uri, startReq.Argv...)
+		slog.Debug("running binary", slog.Any("binary", ar.OriginalURI), slog.Any("args", startReq.Argv))
+		cmd := exec.CommandContext(poisonPill, ar.LocalCachePath, startReq.Argv...)
 		cmd.Env = env
 		cmd.Stdout = n.runner.GetLogger(workloadId, namespace, agent.LogTypeStdout)
 		cmd.Stderr = n.runner.GetLogger(workloadId, namespace, agent.LogTypeStderr)
