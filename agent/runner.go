@@ -168,11 +168,13 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 	}
 
 	// Start subscriptions to the host
-	endpoints := []struct {
+	type endpoint struct {
 		Name    string
 		Subject string
 		Handler micro.HandlerFunc
-	}{
+	}
+
+	endpoints := []endpoint{
 		{Name: "StartWorkload", Subject: models.AgentAPIStartWorkloadSubscribeSubject(a.nodeId, a.agentId), Handler: a.handleStartWorkload()},
 		{Name: "StopWorkload", Subject: models.AgentAPIStopWorkloadSubscribeSubject(a.nodeId), Handler: a.handleStopWorkload()},
 		{Name: "GetWorkload", Subject: models.AgentAPIGetWorkloadSubscribeSubject(a.nodeId), Handler: a.handleGetWorkload()},
@@ -182,6 +184,10 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 		{Name: "PingAllAgents", Subject: models.AgentAPIPingAllSubject(a.nodeId), Handler: a.handlePing()},
 		{Name: "SetLameduck", Subject: models.AgentAPISetLameduckSubject(a.nodeId), Handler: a.handleSetLameduck()},
 		{Name: "PingWorkload", Subject: models.AgentAPIPingWorkloadSubscribeSubject(), Handler: a.handleWorkloadPing()},
+	}
+
+	if _, ok := a.agent.(AgentEventListener); ok {
+		endpoints = append(endpoints, endpoint{Name: "EventListener", Subject: fmt.Sprintf("$NEX.agent.%s.EVENT", a.agentId), Handler: a.handleReceivedEvent()})
 	}
 
 	var errs error
@@ -346,6 +352,9 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 		}
 
 		err = a.agent.StopWorkload(workloadId, req)
+		if err != nil && err.Error() == "workload not found" {
+			return
+		}
 		if err != nil {
 			slog.Error("error stopping workload request", slog.Any("err", err))
 			err = r.Error("100", err.Error(), nil)
@@ -387,6 +396,9 @@ func (a *Runner) handleGetWorkload() func(r micro.Request) {
 
 		// TODO: implement message with xkey
 		startRequest, err := a.agent.GetWorkload(workloadId, "")
+		if err != nil && err.Error() == "workload not found" {
+			return
+		}
 		if err != nil {
 			slog.Error("error getting workload", slog.Any("err", err))
 			err = r.Error("100", err.Error(), nil)
@@ -542,5 +554,16 @@ func (a *Runner) handleWorkloadPing() func(micro.Request) {
 		if err != nil {
 			slog.Error("error responding to workload ping", slog.Any("err", err))
 		}
+	}
+}
+
+func (a *Runner) handleReceivedEvent() func(micro.Request) {
+	return func(r micro.Request) {
+		// $NEX.agent.<agentid>.EVENT
+		aE, ok := a.agent.(AgentEventListener)
+		if !ok {
+			return
+		}
+		aE.EventListener(r.Data())
 	}
 }

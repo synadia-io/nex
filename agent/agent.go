@@ -17,3 +17,7 @@ type Agent interface {
 	Ping() (*models.AgentSummary, error)
 	PingWorkload(workloadId string) bool
 }
+
+type AgentEventListener interface {
+	EventListener(msg []byte)
+}
