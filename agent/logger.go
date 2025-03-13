@@ -63,6 +63,7 @@ func (l agentLogCapture) Write(p []byte) (n int, err error) {
 	msg := nats.NewMsg(fmt.Sprintf("%s.%s", models.AgentEmitLogSubject(l.namespace, l.workloadId), l.logType.String()))
 	msg.Header.Add(models.NexGroupMetaKey, "") // TODO: add group label
 	msg.Header.Add(models.NexNamespaceMetaKey, l.namespace)
+	msg.Data = p
 
 	err = l.nc.PublishMsg(msg)
 	if err != nil {
