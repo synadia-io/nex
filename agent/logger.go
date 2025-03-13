@@ -60,7 +60,11 @@ func (l agentLogCapture) Write(p []byte) (n int, err error) {
 		l.logger.WithGroup("workload").With("agent", l.agentId).With("workload", l.workloadId).Error(strings.ReplaceAll(string(p), "\n", "\\n"))
 	}
 
-	err = l.nc.Publish(fmt.Sprintf("%s.%s", models.AgentEmitLogSubject(l.namespace, l.workloadId), l.logType.String()), p)
+	msg := nats.NewMsg(fmt.Sprintf("%s.%s", models.AgentEmitLogSubject(l.namespace, l.workloadId), l.logType.String()))
+	msg.Header.Add(models.NexGroupMetaKey, "") // TODO: add group label
+	msg.Header.Add(models.NexNamespaceMetaKey, l.namespace)
+
+	err = l.nc.PublishMsg(msg)
 	if err != nil {
 		slog.Error("Failed to publish log message to nats", slog.Any("err", err), slog.Any("workload", l.workloadId))
 	}

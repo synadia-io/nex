@@ -352,7 +352,7 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 		}
 
 		err = a.agent.StopWorkload(workloadId, req)
-		if err != nil && err.Error() == "workload not found" {
+		if err != nil && err.Error() == "workload not found" { // TODO: this is a hack for native
 			return
 		}
 		if err != nil {
