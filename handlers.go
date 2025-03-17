@@ -316,7 +316,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, aid, workloadId), aReqB, time.Second*5)
+		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, aid, workloadId), aReqB, time.Minute)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish start workload request")
 			return

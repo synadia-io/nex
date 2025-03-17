@@ -176,7 +176,7 @@ func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, 
 			return nil, err
 		}
 	} else {
-		startResponseMsg, err = n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, 10*time.Second)
+		startResponseMsg, err = n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, time.Minute)
 		if err != nil {
 			return nil, err
 		}
