@@ -7,9 +7,21 @@
     "id": {
       "type": "string",
       "description": "The unique identifier of the workload"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "The namespace of the workload"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "The metadata of the workload",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "required": [
-    "id"
+    "id",
+    "namespace"
   ]
 }

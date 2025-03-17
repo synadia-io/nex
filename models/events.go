@@ -152,7 +152,16 @@ func (j *NexNodeStartedEvent) UnmarshalJSON(b []byte) error {
 type WorkloadStartedEvent struct {
 	// The unique identifier of the workload
 	Id string `json:"id"`
+
+	// The metadata of the workload
+	Metadata WorkloadStartedEventMetadata `json:"metadata,omitempty"`
+
+	// The namespace of the workload
+	Namespace string `json:"namespace"`
 }
+
+// The metadata of the workload
+type WorkloadStartedEventMetadata map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (j *WorkloadStartedEvent) UnmarshalJSON(b []byte) error {
@@ -162,6 +171,9 @@ func (j *WorkloadStartedEvent) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
 		return fmt.Errorf("field id in WorkloadStartedEvent: required")
+	}
+	if _, ok := raw["namespace"]; raw != nil && !ok {
+		return fmt.Errorf("field namespace in WorkloadStartedEvent: required")
 	}
 	type Plain WorkloadStartedEvent
 	var plain Plain
@@ -173,9 +185,53 @@ func (j *WorkloadStartedEvent) UnmarshalJSON(b []byte) error {
 }
 
 type WorkloadStoppedEvent struct {
+	// The error that caused the workload to stop; nil if the workload stopped
+	// successfully
+	Error *WorkloadStoppedEventError `json:"error,omitempty"`
+
 	// The unique identifier of the workload
 	Id string `json:"id"`
+
+	// The metadata of the workload
+	Metadata WorkloadStoppedEventMetadata `json:"metadata,omitempty"`
+
+	// The namespace of the workload
+	Namespace string `json:"namespace"`
 }
+
+// The error that caused the workload to stop; nil if the workload stopped
+// successfully
+type WorkloadStoppedEventError struct {
+	// The error code
+	Code string `json:"code"`
+
+	// The error message
+	Message string `json:"message"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *WorkloadStoppedEventError) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["code"]; raw != nil && !ok {
+		return fmt.Errorf("field code in WorkloadStoppedEventError: required")
+	}
+	if _, ok := raw["message"]; raw != nil && !ok {
+		return fmt.Errorf("field message in WorkloadStoppedEventError: required")
+	}
+	type Plain WorkloadStoppedEventError
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = WorkloadStoppedEventError(plain)
+	return nil
+}
+
+// The metadata of the workload
+type WorkloadStoppedEventMetadata map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (j *WorkloadStoppedEvent) UnmarshalJSON(b []byte) error {
@@ -185,6 +241,9 @@ func (j *WorkloadStoppedEvent) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
 		return fmt.Errorf("field id in WorkloadStoppedEvent: required")
+	}
+	if _, ok := raw["namespace"]; raw != nil && !ok {
+		return fmt.Errorf("field namespace in WorkloadStoppedEvent: required")
 	}
 	type Plain WorkloadStoppedEvent
 	var plain Plain

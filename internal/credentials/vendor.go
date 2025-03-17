@@ -37,6 +37,7 @@ var (
 			},
 			Sub: jwt.Permission{
 				Allow: []string{
+					fmt.Sprintf("%s.%s.EVENT", models.AgentAPIPrefix, id), // TODO: this should be EVENTS
 					fmt.Sprintf("%s.%s.%s.STARTWORKLOAD.*", models.AgentAPIPrefix, nodeId, id),
 					fmt.Sprintf("%s.%s.%s.PING", models.AgentAPIPrefix, nodeId, id),
 					fmt.Sprintf("%s.%s.PING", models.AgentAPIPrefix, nodeId),
