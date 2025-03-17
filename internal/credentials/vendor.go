@@ -56,11 +56,12 @@ var (
 			},
 		}
 	}
-	WorkloadClaims func(string) jwt.Permissions = func(namespace string) jwt.Permissions {
+	WorkloadClaims func(string, string) jwt.Permissions = func(namespace, workloadId string) jwt.Permissions {
 		return jwt.Permissions{
 			Pub: jwt.Permission{
 				// $NEX.workload.<namespace>.<id>
 				Allow: []string{
+					fmt.Sprintf("%s.%s.%s.metrics", models.LogAPIPrefix, namespace, workloadId), // workload metrics
 					fmt.Sprintf("%s.%s.>", models.WorkloadAPIPrefix, namespace),
 					nats.InboxPrefix + ">", // responses
 				},

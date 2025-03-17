@@ -55,7 +55,7 @@ func TestSigningKeyMinter_Mint(t *testing.T) {
 		perms jwt.Permissions
 	}{
 		{"Agent Cred", models.AgentCred, "", "agentId", AgentClaims("agentId", kpPub)},
-		{"Workload Cred", models.WorkloadCred, "user", "workloadId", WorkloadClaims("user")},
+		{"Workload Cred", models.WorkloadCred, "user", "workloadId", WorkloadClaims("user", "workloadId")},
 	}
 
 	for _, tc := range tt {

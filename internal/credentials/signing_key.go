@@ -115,7 +115,7 @@ func (m *SigningKeyMinter) Mint(typ models.CredType, namespace, id string) (*mod
 	case models.AgentCred:
 		claims.Permissions = AgentClaims(id, m.NodeId)
 	case models.WorkloadCred:
-		claims.Permissions = WorkloadClaims(namespace)
+		claims.Permissions = WorkloadClaims(namespace, id)
 	}
 
 	vr := jwt.CreateValidationResults()
