@@ -58,7 +58,7 @@ func TestNexClient_User(t *testing.T) {
 	be.NilErr(t, err)
 	be.Equal(t, 1, len(ar))
 
-	sr, err := client.StartWorkload(ar[0].BidderId, "tester", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+	sr, err := client.StartWorkload(ar[0].BidderId, "tester", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 	be.NilErr(t, err)
 	be.Equal(t, "tester", sr.Name)
 
@@ -216,21 +216,21 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			be.NilErr(t, err)
 			be.Equal(t, 1, len(ar))
 
-			_, err = client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			_, err = client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
 			ar, err = client.Auction("inmem", map[string]string{})
 			be.NilErr(t, err)
 			be.Equal(t, 1, len(ar))
 
-			_, err = client.StartWorkload(ar[0].BidderId, "tester2", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			_, err = client.StartWorkload(ar[0].BidderId, "tester2", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
 			ar, err = client.Auction("inmem", map[string]string{})
 			be.NilErr(t, err)
 			be.Equal(t, 1, len(ar))
 
-			_, err = client.StartWorkload(ar[0].BidderId, "tester3", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			_, err = client.StartWorkload(ar[0].BidderId, "tester3", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
 			wl, err := client.ListWorkloads([]string{})
@@ -326,7 +326,7 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			be.Equal(t, tt.size, len(ar))
 
-			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService)
+			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
 			_, err = client.CloneWorkload(swr.Id, nil)

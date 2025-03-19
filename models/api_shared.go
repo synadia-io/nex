@@ -299,6 +299,9 @@ type StartWorkloadRequest struct {
 	// The agent specific run request for the workload
 	RunRequest string `json:"run_request"`
 
+	// Placement tags associated with the workload
+	Tags NodeTags `json:"tags"`
+
 	// The lifecycle of the workload
 	WorkloadLifecycle WorkloadLifecycle `json:"workload_lifecycle"`
 
@@ -323,6 +326,9 @@ func (j *StartWorkloadRequest) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["run_request"]; raw != nil && !ok {
 		return fmt.Errorf("field run_request in StartWorkloadRequest: required")
+	}
+	if _, ok := raw["tags"]; raw != nil && !ok {
+		return fmt.Errorf("field tags in StartWorkloadRequest: required")
 	}
 	if _, ok := raw["workload_lifecycle"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_lifecycle in StartWorkloadRequest: required")
@@ -518,6 +524,9 @@ type WorkloadSummary struct {
 	// The start time of the workload
 	StartTime string `json:"start_time"`
 
+	// The tags of the workload
+	Tags NodeTags `json:"tags"`
+
 	// The lifecycle of the workload: service,job,function
 	WorkloadLifecycle string `json:"workload_lifecycle"`
 
@@ -548,6 +557,9 @@ func (j *WorkloadSummary) UnmarshalJSON(b []byte) error {
 	}
 	if _, ok := raw["start_time"]; raw != nil && !ok {
 		return fmt.Errorf("field start_time in WorkloadSummary: required")
+	}
+	if _, ok := raw["tags"]; raw != nil && !ok {
+		return fmt.Errorf("field tags in WorkloadSummary: required")
 	}
 	if _, ok := raw["workload_lifecycle"]; raw != nil && !ok {
 		return fmt.Errorf("field workload_lifecycle in WorkloadSummary: required")

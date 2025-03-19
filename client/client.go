@@ -154,7 +154,11 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 	return resp, nil
 }
 
-func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, lifecycle models.WorkloadLifecycle) (*models.StartWorkloadResponse, error) {
+func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, lifecycle models.WorkloadLifecycle, pTags models.NodeTags) (*models.StartWorkloadResponse, error) {
+	if pTags == nil {
+		pTags = make(models.NodeTags)
+	}
+
 	req := &models.StartWorkloadRequest{
 		Namespace:         n.namespace,
 		Name:              name,
@@ -162,6 +166,7 @@ func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, 
 		RunRequest:        runRequest,
 		WorkloadLifecycle: lifecycle,
 		WorkloadType:      typ,
+		Tags:              pTags,
 	}
 
 	reqB, err := json.Marshal(req)
@@ -294,5 +299,5 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 
 	randomNode := aucResp[rand.Intn(len(aucResp))]
 
-	return n.StartWorkload(randomNode.BidderId, cloneResp.Name, cloneResp.Description, cloneResp.RunRequest, cloneResp.WorkloadType, cloneResp.WorkloadLifecycle)
+	return n.StartWorkload(randomNode.BidderId, cloneResp.Name, cloneResp.Description, cloneResp.RunRequest, cloneResp.WorkloadType, cloneResp.WorkloadLifecycle, tags)
 }

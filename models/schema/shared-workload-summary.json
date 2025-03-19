@@ -38,6 +38,10 @@
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "tags": {
+      "$ref": "./shared-tag-map.json",
+      "description": "The tags of the workload"
     }
   },
   "required": [
@@ -47,7 +51,8 @@
     "runtime",
     "workload_type",
     "workload_lifecycle",
-    "workload_state"
+    "workload_state",
+    "tags"
   ],
   "additionalProperties": false
 }

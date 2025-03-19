@@ -169,7 +169,7 @@ func (r *StartWorkload) Run(globals *Globals) error {
 		return err
 	}
 
-	startResponse, err := client.StartWorkload(randomNode.BidderId, r.WorkloadName, r.WorkloadDescription, string(wsrB), r.AgentType, models.WorkloadLifecycle(r.WorkloadLifecycle))
+	startResponse, err := client.StartWorkload(randomNode.BidderId, r.WorkloadName, r.WorkloadDescription, string(wsrB), r.AgentType, models.WorkloadLifecycle(r.WorkloadLifecycle), r.AuctionTags)
 	if err != nil {
 		return err
 	}
