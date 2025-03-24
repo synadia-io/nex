@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"disorder.dev/shandler"
 	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-labs/nex/models"
 
@@ -219,31 +218,13 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 			return
 		}
 
-		// If node doesnt have agent type, request is thrown away
-		_, reg, ok := n.regs.Find(req.AgentType)
-		if !ok {
-			n.logger.Log(n.ctx, shandler.LevelTrace, "agent type not found during auction", slog.String("agent_type", req.AgentType))
+		aResp, err := n.auctioneer.Auction(req.AuctionId, req.AgentType, req.Tags, n.tags, n.logger)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed to auction")
 			return
 		}
 
-		// If all auction tags aren't satisfied, request is thrown away
-		for k, v := range req.Tags {
-			if tV, ok := n.tags[k]; !ok || tV != v {
-				n.logger.Log(n.ctx, shandler.LevelTrace, "tag not satisfied during auction", slog.String("tag", k), slog.String("value", v))
-				return
-			}
-		}
-
-		bidderId := nuid.New().Next()
-		n.auctionMap.Put(bidderId, "", nil)
-
-		n.logger.Debug("responding to auction", slog.Any("auctionId", req.AuctionId))
-		err = r.RespondJSON(models.AuctionResponse{
-			BidderId:            bidderId,
-			Xkey:                reg.OriginalRequest.PublicXkey,
-			StartRequestSchema:  reg.OriginalRequest.StartRequestSchema,
-			SupportedLifecycles: reg.OriginalRequest.SupportedLifecycles,
-		})
+		err = r.RespondJSON(aResp)
 		if err != nil {
 			n.logger.Error("failed to respond to auction request", slog.Any("err", err))
 			return

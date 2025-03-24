@@ -131,3 +131,10 @@ func WithMinter(m models.CredVendor) NexNodeOption {
 		return nil
 	}
 }
+
+func WithAuctioneer(a models.Auctioneer) NexNodeOption {
+	return func(n *NexNode) error {
+		n.auctioneer = a
+		return nil
+	}
+}

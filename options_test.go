@@ -152,6 +152,23 @@ func TestNexNodeOptions(t *testing.T) {
 		be.True(t, ok)
 		be.DeepEqual(t, m, mm)
 	})
+	t.Run("WithAuctioneer", func(t *testing.T) {
+		t.Parallel()
+		a := &auction{}
+		nn, err := NewNexNode(
+			WithAuctioneer(a),
+		)
+		be.NilErr(t, err)
+		aa, ok := nn.auctioneer.(*auction)
+		be.True(t, ok)
+		be.DeepEqual(t, a, aa)
+	})
+}
+
+type auction struct{}
+
+func (a *auction) Auction(id, _type string, aTags, nTags map[string]string, l *slog.Logger) (*models.AuctionResponse, error) {
+	return nil, nil
 }
 
 type minter struct{}
