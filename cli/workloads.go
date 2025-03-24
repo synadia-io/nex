@@ -243,7 +243,7 @@ func (r *ListWorkload) Run(globals *Globals) error {
 		tW.Style().Format.Header = text.FormatDefault
 		tW.SetTitle("Running Workloads - " + globals.Namespace)
 		if r.ShowMetadata {
-			tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State", "Metadata"})
+			tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State", "Metadata", "Tags"})
 		} else {
 			tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State"})
 		}
@@ -262,7 +262,7 @@ func (r *ListWorkload) Run(globals *Globals) error {
 							meta = string(metaB)
 						}
 					}
-					tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState, meta})
+					tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState, meta, workload.Tags})
 				} else {
 					tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState})
 				}
@@ -285,17 +285,14 @@ func (r *CloneWorkload) Run(globals *Globals) error {
 	if err != nil {
 		return err
 	}
-
 	if nc == nil {
 		return errors.New("no NATS connection available")
 	}
-
 	nexClient := client.NewClient(nc, globals.Namespace)
 	resp, err := nexClient.CloneWorkload(r.WorkloadId, r.AuctionTags)
 	if err != nil {
 		return err
 	}
-
 	var stopped bool
 	if r.StopOrig {
 		stopResp, err := nexClient.StopWorkload(r.WorkloadId)
@@ -305,7 +302,6 @@ func (r *CloneWorkload) Run(globals *Globals) error {
 			stopped = true
 		}
 	}
-
 	if globals.JSON {
 		respB, err := json.Marshal(resp)
 		if err != nil {

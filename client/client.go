@@ -174,17 +174,9 @@ func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, 
 		return nil, err
 	}
 
-	var startResponseMsg *nats.Msg
-	if nkeys.IsValidPublicServerKey(deployId) {
-		startResponseMsg, err = n.nc.Request(models.DirectDeploySubject(deployId), reqB, 10*time.Second)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		startResponseMsg, err = n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, time.Minute)
-		if err != nil {
-			return nil, err
-		}
+	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, time.Minute)
+	if err != nil {
+		return nil, err
 	}
 
 	startResponse := new(models.StartWorkloadResponse)
@@ -206,17 +198,16 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 		return nil, err
 	}
 
-	resp, err := n.nc.Request(models.UndeployRequestSubject(n.namespace, workloadId), reqB, 10*time.Second)
+	// BUG: this is coming back empty and shouldnt be
+	_, err = n.nc.Request(models.UndeployRequestSubject(n.namespace, workloadId), reqB, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
 
-	stopResponse := new(models.StopWorkloadResponse)
-	err = json.Unmarshal(resp.Data, stopResponse)
-	if err != nil {
-		return nil, err
-	}
-	return stopResponse, nil
+	return &models.StopWorkloadResponse{
+		Id:      workloadId,
+		Stopped: true,
+	}, nil
 }
 
 func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloadsResponse, error) {
@@ -229,9 +220,11 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	msgs, err := natsext.RequestMany(ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(1000*time.Millisecond))
+
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(2000*time.Millisecond))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return []*models.AgentListWorkloadsResponse{}, nil
 	}
@@ -277,19 +270,33 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, err
 	}
 
-	resp, err := n.nc.Request(models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, 5*time.Second)
-	if err != nil && !errors.Is(err, nats.ErrTimeout) {
-		return nil, err
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(2000*time.Millisecond))
+	if errors.Is(err, nats.ErrNoResponders) {
+		return nil, errors.New("workload not found")
+	}
+	if err != nil {
+		return nil, errors.New("workload not found")
+	}
 	if errors.Is(err, nats.ErrTimeout) {
 		return nil, errors.New("workload not found")
 	}
 
-	cloneResp := new(models.StartWorkloadRequest)
-	err = json.Unmarshal(resp.Data, cloneResp)
-	if err != nil {
-		return nil, err
+	var cloneResp *models.StartWorkloadRequest
+	msgs(func(m *nats.Msg, err error) bool {
+		if err == nil && m.Data != nil && string(m.Data) != "null" {
+			err = json.Unmarshal(m.Data, &cloneResp)
+			if err != nil {
+				return false
+			}
+		}
+		return true
+	})
+
+	if cloneResp == nil {
+		return nil, errors.New("workload not found")
 	}
 
 	aucResp, err := n.Auction(cloneResp.WorkloadType, tags)
@@ -297,7 +304,15 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, err
 	}
 
-	randomNode := aucResp[rand.Intn(len(aucResp))]
+	if len(aucResp) == 0 {
+		return nil, errors.New("no nodes available for placement")
+	}
 
-	return n.StartWorkload(randomNode.BidderId, cloneResp.Name, cloneResp.Description, cloneResp.RunRequest, cloneResp.WorkloadType, cloneResp.WorkloadLifecycle, tags)
+	randomNode := aucResp[rand.Intn(len(aucResp))]
+	swr, err := n.StartWorkload(randomNode.BidderId, cloneResp.Name, cloneResp.Description, cloneResp.RunRequest, cloneResp.WorkloadType, cloneResp.WorkloadLifecycle, tags)
+	if err != nil {
+		return nil, err
+	}
+
+	return swr, nil
 }

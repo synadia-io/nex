@@ -15,3 +15,4 @@ _test/workloads/counter/counter
 _test/nexlet_inmem/cmd/nexlet_inmem
 _test/webapp/derp
 _test/webapp/
+demo_only/
