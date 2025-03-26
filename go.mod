@@ -3,13 +3,13 @@ module github.com/synadia-io/nexlet.go
 go 1.24.0
 
 require (
-	github.com/nats-io/nats.go v1.39.1
+	github.com/nats-io/nats.go v1.40.1
 	github.com/nats-io/nkeys v0.4.10
-	github.com/synadia-labs/nex v0.0.0-20250313160405-c1be2835b64d
+	github.com/synadia-labs/nex v0.0.0-20250326161951-0bc49a8a093e
 )
 
 require (
-	disorder.dev/shandler v0.0.0-20250310145321-d44f17d3d807 // indirect
+	disorder.dev/shandler v0.0.0-20250324143720-5c3a7875bfd2 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect

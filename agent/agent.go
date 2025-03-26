@@ -15,7 +15,13 @@ type Agent interface {
 	QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error)
 	SetLameduck(before time.Duration) error
 	Ping() (*models.AgentSummary, error)
+}
+
+// Optional interface for agents that support ingressable workloads
+type AgentIngessWorkloads interface {
+	GetIngressData() (*models.AgentIngressData, error)
 	PingWorkload(workloadId string) bool
+	GetWorkloadExposedPorts(workloadId string) ([]int, error)
 }
 
 type AgentEventListener interface {
