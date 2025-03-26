@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_ingress_msg",
+  "title": "AgentIngressMsg",
+  "type": "object",
+  "properties": {
+    "workload_id": {
+      "type": "string",
+      "description": "ID of workload"
+    },
+    "upstream": {
+      "type": "string",
+      "description": "Upstream IP address that ingress should forward to"
+    },
+    "command": {
+      "$ref": "./agent-ingress-commands.json",
+      "description": "Command to execute"
+    }
+  },
+  "required": [
+    "workload_id",
+    "upstream",
+    "command"
+  ],
+  "additionalProperties": false
+}

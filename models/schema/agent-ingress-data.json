@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_ingress_data",
+  "title": "AgentIngressData",
+  "type": "object",
+  "properties": {
+    "host_machine_ip_addr": {
+      "type": "string",
+      "description": "IP address of the host machine (nex node)"
+    },
+    "ingress_reporting_subject": {
+      "type": "string",
+      "description": "NATS Subject Ingress messages will be published to"
+    }
+  },
+  "required": [
+    "host_machine_ip_addr",
+    "ingress_reporting_subject"
+  ],
+  "additionalProperties": false
+}

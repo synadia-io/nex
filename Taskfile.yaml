@@ -25,6 +25,8 @@ tasks:
         --schema-output=io.nats.nex.v2.agent_heartbeat=../api_agent.go 
         --schema-output=io.nats.nex.v2.agent_list_workloads_request=../api_agent.go
         --schema-output=io.nats.nex.v2.agent_list_workloads_response=../api_agent.go
+        --schema-output=io.nats.nex.v2.agent_ingress_data=../api_agent.go
+        --schema-output=io.nats.nex.v2.agent_ingress_msg=../api_agent.go
         --schema-output=io.nats.nex.v2.start_workload_request=../api_shared.go
         --schema-output=io.nats.nex.v2.start_workload_response=../api_shared.go
         --schema-output=io.nats.nex.v2.stop_workload_request=../api_shared.go

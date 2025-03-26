@@ -12,9 +12,9 @@ type AgentLameduckSetEvent struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AgentLameduckSetEvent) UnmarshalJSON(b []byte) error {
+func (j *AgentLameduckSetEvent) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["success"]; raw != nil && !ok {
@@ -22,7 +22,7 @@ func (j *AgentLameduckSetEvent) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AgentLameduckSetEvent
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AgentLameduckSetEvent(plain)
@@ -56,9 +56,9 @@ var enumValues_AgentStartedEventType = []interface{}{
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AgentStartedEventType) UnmarshalJSON(b []byte) error {
+func (j *AgentStartedEventType) UnmarshalJSON(value []byte) error {
 	var v string
-	if err := json.Unmarshal(b, &v); err != nil {
+	if err := json.Unmarshal(value, &v); err != nil {
 		return err
 	}
 	var ok bool
@@ -76,9 +76,9 @@ func (j *AgentStartedEventType) UnmarshalJSON(b []byte) error {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AgentStartedEvent) UnmarshalJSON(b []byte) error {
+func (j *AgentStartedEvent) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -95,7 +95,7 @@ func (j *AgentStartedEvent) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AgentStartedEvent
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AgentStartedEvent(plain)
@@ -120,9 +120,9 @@ type NexNodeStartedEvent struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NexNodeStartedEvent) UnmarshalJSON(b []byte) error {
+func (j *NexNodeStartedEvent) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -142,7 +142,7 @@ func (j *NexNodeStartedEvent) UnmarshalJSON(b []byte) error {
 	}
 	type Plain NexNodeStartedEvent
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = NexNodeStartedEvent(plain)
@@ -164,9 +164,9 @@ type WorkloadStartedEvent struct {
 type WorkloadStartedEventMetadata map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadStartedEvent) UnmarshalJSON(b []byte) error {
+func (j *WorkloadStartedEvent) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -177,7 +177,7 @@ func (j *WorkloadStartedEvent) UnmarshalJSON(b []byte) error {
 	}
 	type Plain WorkloadStartedEvent
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = WorkloadStartedEvent(plain)
@@ -210,9 +210,9 @@ type WorkloadStoppedEventError struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadStoppedEventError) UnmarshalJSON(b []byte) error {
+func (j *WorkloadStoppedEventError) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["code"]; raw != nil && !ok {
@@ -223,7 +223,7 @@ func (j *WorkloadStoppedEventError) UnmarshalJSON(b []byte) error {
 	}
 	type Plain WorkloadStoppedEventError
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = WorkloadStoppedEventError(plain)
@@ -234,9 +234,9 @@ func (j *WorkloadStoppedEventError) UnmarshalJSON(b []byte) error {
 type WorkloadStoppedEventMetadata map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadStoppedEvent) UnmarshalJSON(b []byte) error {
+func (j *WorkloadStoppedEvent) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -247,7 +247,7 @@ func (j *WorkloadStoppedEvent) UnmarshalJSON(b []byte) error {
 	}
 	type Plain WorkloadStoppedEvent
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = WorkloadStoppedEvent(plain)

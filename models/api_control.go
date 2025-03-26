@@ -17,9 +17,9 @@ type AuctionRequest struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionRequest) UnmarshalJSON(b []byte) error {
+func (j *AuctionRequest) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["agent_type"]; raw != nil && !ok {
@@ -33,7 +33,7 @@ func (j *AuctionRequest) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AuctionRequest
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AuctionRequest(plain)
@@ -55,9 +55,9 @@ type AuctionResponse struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionResponse) UnmarshalJSON(b []byte) error {
+func (j *AuctionResponse) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["bidder_id"]; raw != nil && !ok {
@@ -74,7 +74,7 @@ func (j *AuctionResponse) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AuctionResponse
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AuctionResponse(plain)
@@ -90,9 +90,9 @@ type CloneWorkloadRequest struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *CloneWorkloadRequest) UnmarshalJSON(b []byte) error {
+func (j *CloneWorkloadRequest) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["namespace"]; raw != nil && !ok {
@@ -103,7 +103,7 @@ func (j *CloneWorkloadRequest) UnmarshalJSON(b []byte) error {
 	}
 	type Plain CloneWorkloadRequest
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = CloneWorkloadRequest(plain)
@@ -139,9 +139,9 @@ type NodeInfoResponse struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodeInfoResponse) UnmarshalJSON(b []byte) error {
+func (j *NodeInfoResponse) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
@@ -161,7 +161,7 @@ func (j *NodeInfoResponse) UnmarshalJSON(b []byte) error {
 	}
 	type Plain NodeInfoResponse
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = NodeInfoResponse(plain)
@@ -176,9 +176,9 @@ type NodePingRequest struct {
 type NodePingRequestFilter map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodePingRequest) UnmarshalJSON(b []byte) error {
+func (j *NodePingRequest) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["filter"]; raw != nil && !ok {
@@ -186,7 +186,7 @@ func (j *NodePingRequest) UnmarshalJSON(b []byte) error {
 	}
 	type Plain NodePingRequest
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = NodePingRequest(plain)
@@ -217,9 +217,9 @@ type NodePingResponse struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodePingResponse) UnmarshalJSON(b []byte) error {
+func (j *NodePingResponse) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["agent_count"]; raw != nil && !ok {
@@ -245,7 +245,7 @@ func (j *NodePingResponse) UnmarshalJSON(b []byte) error {
 	}
 	type Plain NodePingResponse
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = NodePingResponse(plain)

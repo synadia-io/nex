@@ -17,9 +17,9 @@ type AgentHeartbeat struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AgentHeartbeat) UnmarshalJSON(b []byte) error {
+func (j *AgentHeartbeat) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["data"]; raw != nil && !ok {
@@ -33,10 +33,74 @@ func (j *AgentHeartbeat) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AgentHeartbeat
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AgentHeartbeat(plain)
+	return nil
+}
+
+type AgentIngressData struct {
+	// IP address of the host machine (nex node)
+	HostMachineIpAddr string `json:"host_machine_ip_addr"`
+
+	// NATS Subject Ingress messages will be published to
+	IngressReportingSubject string `json:"ingress_reporting_subject"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AgentIngressData) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["host_machine_ip_addr"]; raw != nil && !ok {
+		return fmt.Errorf("field host_machine_ip_addr in AgentIngressData: required")
+	}
+	if _, ok := raw["ingress_reporting_subject"]; raw != nil && !ok {
+		return fmt.Errorf("field ingress_reporting_subject in AgentIngressData: required")
+	}
+	type Plain AgentIngressData
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = AgentIngressData(plain)
+	return nil
+}
+
+type AgentIngressMsg struct {
+	// Command to execute
+	Command AgentIngressCommands `json:"command"`
+
+	// Upstream IP address that ingress should forward to
+	Upstream string `json:"upstream"`
+
+	// ID of workload
+	WorkloadId string `json:"workload_id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AgentIngressMsg) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["command"]; raw != nil && !ok {
+		return fmt.Errorf("field command in AgentIngressMsg: required")
+	}
+	if _, ok := raw["upstream"]; raw != nil && !ok {
+		return fmt.Errorf("field upstream in AgentIngressMsg: required")
+	}
+	if _, ok := raw["workload_id"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_id in AgentIngressMsg: required")
+	}
+	type Plain AgentIngressMsg
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = AgentIngressMsg(plain)
 	return nil
 }
 
@@ -49,9 +113,9 @@ type AgentListWorkloadsRequest struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AgentListWorkloadsRequest) UnmarshalJSON(b []byte) error {
+func (j *AgentListWorkloadsRequest) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["filter"]; raw != nil && !ok {
@@ -62,7 +126,7 @@ func (j *AgentListWorkloadsRequest) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AgentListWorkloadsRequest
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AgentListWorkloadsRequest(plain)
@@ -98,9 +162,9 @@ type RegisterAgentRequest struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterAgentRequest) UnmarshalJSON(b []byte) error {
+func (j *RegisterAgentRequest) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["description"]; raw != nil && !ok {
@@ -126,7 +190,7 @@ func (j *RegisterAgentRequest) UnmarshalJSON(b []byte) error {
 	}
 	type Plain RegisterAgentRequest
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = RegisterAgentRequest(plain)
@@ -153,9 +217,9 @@ type RegisterAgentResponse struct {
 type RegisterAgentResponseExistingState map[string]AgentStartWorkloadRequest
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterAgentResponse) UnmarshalJSON(b []byte) error {
+func (j *RegisterAgentResponse) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["connection_data"]; raw != nil && !ok {
@@ -175,7 +239,7 @@ func (j *RegisterAgentResponse) UnmarshalJSON(b []byte) error {
 	}
 	type Plain RegisterAgentResponse
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = RegisterAgentResponse(plain)
@@ -188,9 +252,9 @@ type RegisterRemoteAgentRequest struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterRemoteAgentRequest) UnmarshalJSON(b []byte) error {
+func (j *RegisterRemoteAgentRequest) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["public_signing_key"]; raw != nil && !ok {
@@ -198,7 +262,7 @@ func (j *RegisterRemoteAgentRequest) UnmarshalJSON(b []byte) error {
 	}
 	type Plain RegisterRemoteAgentRequest
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = RegisterRemoteAgentRequest(plain)
@@ -217,9 +281,9 @@ type RegisterRemoteAgentResponse struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterRemoteAgentResponse) UnmarshalJSON(b []byte) error {
+func (j *RegisterRemoteAgentResponse) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["assigned_agent_id"]; raw != nil && !ok {
@@ -230,7 +294,7 @@ func (j *RegisterRemoteAgentResponse) UnmarshalJSON(b []byte) error {
 	}
 	type Plain RegisterRemoteAgentResponse
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = RegisterRemoteAgentResponse(plain)
