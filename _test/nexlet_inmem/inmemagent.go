@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/synadia-io/nexlet.go/agent"
@@ -23,7 +24,7 @@ var (
 type inMemAgent struct {
 	name      string
 	version   string
-	workloads map[string][]inMemWorkload // map[namespace]workloads
+	workloads workloads
 	xPair     nkeys.KeyPair
 	startTime time.Time
 	runner    *agent.Runner
@@ -37,6 +38,11 @@ type inMemWorkload struct {
 	startRequest *models.StartWorkloadRequest
 }
 
+type workloads struct {
+	sync.RWMutex
+	state map[string][]inMemWorkload
+}
+
 func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 	xkp, err := nkeys.CreateCurveKeys()
 	if err != nil {
@@ -44,9 +50,11 @@ func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 	}
 
 	inmemAgent := &inMemAgent{
-		name:      agentName,
-		version:   VERSION,
-		workloads: make(map[string][]inMemWorkload),
+		name:    agentName,
+		version: VERSION,
+		workloads: workloads{
+			state: make(map[string][]inMemWorkload),
+		},
 		xPair:     xkp,
 		startTime: time.Now(),
 	}
@@ -92,7 +100,7 @@ func (a *inMemAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 	status := &models.AgentHeartbeat{
 		Data:          "In-Memory Nexlet",
 		State:         "running",
-		WorkloadCount: len(a.workloads),
+		WorkloadCount: len(a.workloads.state),
 	}
 
 	return status, nil
@@ -103,15 +111,18 @@ func (a *inMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 		slog.Info("restarting existing workload", slog.String("workloadId", workloadId))
 	}
 
-	if a.workloads[startRequest.Request.Namespace] == nil {
-		a.workloads[startRequest.Request.Namespace] = []inMemWorkload{}
+	a.workloads.Lock()
+	defer a.workloads.Unlock()
+
+	if a.workloads.state[startRequest.Request.Namespace] == nil {
+		a.workloads.state[startRequest.Request.Namespace] = []inMemWorkload{}
 	}
 
 	if startRequest.Request.Name == "" {
 		startRequest.Request.Name = workloadId
 	}
 
-	a.workloads[startRequest.Request.Namespace] = append(a.workloads[startRequest.Request.Namespace], inMemWorkload{
+	a.workloads.state[startRequest.Request.Namespace] = append(a.workloads.state[startRequest.Request.Namespace], inMemWorkload{
 		name:         startRequest.Request.Name,
 		id:           workloadId,
 		startTime:    time.Now(),
@@ -125,7 +136,10 @@ func (a *inMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 }
 
 func (a *inMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWorkloadRequest) error {
-	workloads, ok := a.workloads[stopRequest.Namespace]
+	a.workloads.Lock()
+	defer a.workloads.Unlock()
+
+	workloads, ok := a.workloads.state[stopRequest.Namespace]
 	if !ok {
 		return errors.New("namespace not found")
 	}
@@ -133,7 +147,7 @@ func (a *inMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 	for i, workload := range workloads {
 		if workload.id == workloadId {
 			workloads = append(workloads[:i], workloads[i+1:]...)
-			a.workloads[stopRequest.Namespace] = workloads
+			a.workloads.state[stopRequest.Namespace] = workloads
 			return nil
 		}
 	}
@@ -142,7 +156,10 @@ func (a *inMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 }
 
 func (a *inMemAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
-	workloads, ok := a.workloads[namespace]
+	a.workloads.RLock()
+	defer a.workloads.RUnlock()
+
+	workloads, ok := a.workloads.state[namespace]
 	if !ok {
 		return nil, errors.New("namespace not found")
 	}
@@ -175,15 +192,21 @@ func (a *inMemAgent) QueryWorkloads(namespace string, filter []string) (*models.
 }
 
 func (a *inMemAgent) SetLameduck(before time.Duration) error {
-	for k := range a.workloads {
-		delete(a.workloads, k)
+	a.workloads.Lock()
+	defer a.workloads.Unlock()
+
+	for k := range a.workloads.state {
+		delete(a.workloads.state, k)
 	}
 	return nil
 }
 
 func (a *inMemAgent) Ping() (*models.AgentSummary, error) {
+	a.workloads.RLock()
+	defer a.workloads.RUnlock()
+
 	workloadCount := 0
-	for _, workloads := range a.workloads {
+	for _, workloads := range a.workloads.state {
 		workloadCount += len(workloads)
 	}
 	return &models.AgentSummary{
@@ -197,7 +220,10 @@ func (a *inMemAgent) Ping() (*models.AgentSummary, error) {
 }
 
 func (a *inMemAgent) PingWorkload(inWorkloadId string) bool {
-	for _, workloads := range a.workloads {
+	a.workloads.RLock()
+	defer a.workloads.RUnlock()
+
+	for _, workloads := range a.workloads.state {
 		for _, workload := range workloads {
 			if workload.id == inWorkloadId {
 				return true
@@ -208,7 +234,10 @@ func (a *inMemAgent) PingWorkload(inWorkloadId string) bool {
 }
 
 func (a *inMemAgent) GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error) {
-	for _, workloads := range a.workloads {
+	a.workloads.RLock()
+	defer a.workloads.RUnlock()
+
+	for _, workloads := range a.workloads.state {
 		for _, workload := range workloads {
 			if workload.id == workloadId {
 				return workload.startRequest, nil

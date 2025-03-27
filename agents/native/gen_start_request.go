@@ -16,6 +16,9 @@ type StartRequest struct {
 	// encryptor
 	Environment StartRequestEnvironment `json:"environment,omitempty"`
 
+	// The port to expose
+	ExposePorts []int `json:"expose_ports,omitempty"`
+
 	// The URI of the workload
 	Uri string `json:"uri"`
 }
@@ -25,9 +28,9 @@ type StartRequest struct {
 type StartRequestEnvironment map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *StartRequest) UnmarshalJSON(b []byte) error {
+func (j *StartRequest) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["uri"]; raw != nil && !ok {
@@ -35,7 +38,7 @@ func (j *StartRequest) UnmarshalJSON(b []byte) error {
 	}
 	type Plain StartRequest
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = StartRequest(plain)

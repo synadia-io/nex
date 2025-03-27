@@ -7,22 +7,25 @@ replace github.com/synadia-labs/nex => ..
 require (
 	github.com/carlmjohnson/be v0.24.1
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
-	github.com/nats-io/nats-server/v2 v2.10.26
-	github.com/nats-io/nats.go v1.39.1
+	github.com/nats-io/nats.go v1.40.1
 	github.com/nats-io/nkeys v0.4.10
-	github.com/synadia-io/nexlet.go v0.0.0-20250227183554-a1a4a16b689d
-	github.com/synadia-labs/nex v0.0.0-20250228035640-1e2818c49471
-	golang.org/x/sys v0.30.0
+	github.com/synadia-io/nexlet.go v0.0.0-20250327030943-560b76a8cb04
+	github.com/synadia-labs/nex v0.0.0-20250326161951-0bc49a8a093e
+	golang.org/x/sys v0.31.0
 )
 
 require (
-	disorder.dev/shandler v0.0.0-20250212150133-c29daa0276fc // indirect
+	disorder.dev/shandler v0.0.0-20250324143720-5c3a7875bfd2 // indirect
 	github.com/atombender/go-jsonschema v0.17.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/charmbracelet/lipgloss v1.0.0 // indirect
+	github.com/charmbracelet/colorprofile v0.3.0 // indirect
+	github.com/charmbracelet/lipgloss v1.1.0 // indirect
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
+	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
+	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/goccy/go-yaml v1.12.0 // indirect
+	github.com/google/go-tpm v0.9.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -33,6 +36,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nats-io/jwt/v2 v2.7.3 // indirect
+	github.com/nats-io/nats-server/v2 v2.11.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -41,11 +45,12 @@ require (
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
-	golang.org/x/crypto v0.35.0 // indirect
+	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
-	golang.org/x/term v0.29.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
-	golang.org/x/time v0.10.0 // indirect
+	golang.org/x/term v0.30.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/time v0.11.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 )
 

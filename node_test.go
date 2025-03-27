@@ -151,14 +151,13 @@ func TestNodeStartStop(t *testing.T) {
 	cancel()
 	be.NilErr(t, nn.WaitForShutdown())
 
-	logs := []map[string]string{}
-
+	logs := []map[string]any{}
 	logLines := strings.Split(output.String(), "\n")
 	for i, line := range logLines {
 		if i == len(logLines)-1 { // this is an empty line
 			break
 		}
-		tLine := map[string]string{}
+		tLine := map[string]any{}
 		err = json.Unmarshal([]byte(line), &tLine)
 		be.NilErr(t, err)
 		logs = append(logs, tLine)
@@ -168,12 +167,12 @@ func TestNodeStartStop(t *testing.T) {
 	foundNodeStopLog := map[string]string{}
 
 	for _, log := range logs {
-		if log["msg"] == "Starting nex node" {
-			foundNodeStartLog = log
+		if logLine, ok := log["msg"].(string); ok && logLine == "Starting nex node" {
+			foundNodeStartLog = map[string]string{"msg": logLine}
 			continue
 		}
-		if log["msg"] == "nex node stopped" {
-			foundNodeStopLog = log
+		if logLine, ok := log["msg"].(string); ok && logLine == "nex node stopped" {
+			foundNodeStopLog = map[string]string{"msg": logLine, "uptime": log["uptime"].(string)}
 			continue
 		}
 	}

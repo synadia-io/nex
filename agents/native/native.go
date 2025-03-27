@@ -24,9 +24,11 @@ const (
 )
 
 var (
-	_                    agent.Agent = (*NativeAgent)(nil)
-	VERSION              string      = "0.0.0"
-	SUPPORTED_LIFECYCLES             = []models.WorkloadLifecycle{
+	_ agent.Agent                = (*NativeAgent)(nil)
+	_ agent.AgentIngessWorkloads = (*NativeAgent)(nil)
+
+	VERSION              string = "0.0.0"
+	SUPPORTED_LIFECYCLES        = []models.WorkloadLifecycle{
 		models.WorkloadLifecycleJob,
 		models.WorkloadLifecycleService,
 	}
@@ -179,7 +181,26 @@ func (a *NativeAgent) Ping() (*models.AgentSummary, error) {
 	}, nil
 }
 
+// AgentIngress Interface
 func (a *NativeAgent) PingWorkload(workloadId string) bool {
 	_, ok := a.state.Exists(workloadId)
 	return ok
+}
+
+func (a *NativeAgent) GetWorkloadExposedPorts(workloadId string) ([]int, error) {
+	swr, ok := a.state.Exists(workloadId)
+	if !ok {
+		return nil, errors.New("workload not found")
+	}
+	var sr StartRequest
+	err := json.Unmarshal([]byte(swr.RunRequest), &sr)
+	if err != nil {
+		return nil, err
+	}
+
+	if sr.ExposePorts == nil {
+		return []int{}, nil
+	}
+
+	return sr.ExposePorts, nil
 }

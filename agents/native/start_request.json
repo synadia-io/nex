@@ -25,6 +25,13 @@
     "description": {
       "type": "string",
       "description": "A description of the workload"
+    },
+    "expose_ports": {
+      "type": "array",
+      "description": "The port to expose",
+      "items": {
+        "type": "integer"
+      }
     }
   },
   "required": [
