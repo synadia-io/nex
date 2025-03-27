@@ -34,6 +34,10 @@ type Runner struct {
 	agent Agent
 	nc    *nats.Conn
 	micro micro.Service
+
+	// Ingress Settings
+	ingressHostMachineIpAddr string
+	ingressReportingSubject  string
 }
 
 type RunnerOpt func(*Runner) error
@@ -41,6 +45,14 @@ type RunnerOpt func(*Runner) error
 func WithLogger(logger *slog.Logger) RunnerOpt {
 	return func(a *Runner) error {
 		a.logger = logger
+		return nil
+	}
+}
+
+func WithIngressSettings(hostMachineIpAddr, ingressReportingSubject string) RunnerOpt {
+	return func(a *Runner) error {
+		a.ingressHostMachineIpAddr = hostMachineIpAddr
+		a.ingressReportingSubject = ingressReportingSubject
 		return nil
 	}
 }
@@ -336,9 +348,8 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 		}
 
 		if aiw, ok := a.agent.(AgentIngessWorkloads); ok {
-			data, err := aiw.GetIngressData()
-			if err != nil {
-				a.logger.Error("error getting ingress data", slog.Any("err", err))
+			if a.ingressHostMachineIpAddr == "" || a.ingressReportingSubject == "" {
+				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIpAddr), slog.String("reporting_subject", a.ingressReportingSubject))
 				return
 			}
 
@@ -350,7 +361,7 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 			for i, port := range ports {
 				ingressMsg := models.AgentIngressMsg{
 					WorkloadId: workloadId,
-					Upstream:   fmt.Sprintf("%s:%d", data.HostMachineIpAddr, port),
+					Upstream:   fmt.Sprintf("%s:%d", a.ingressHostMachineIpAddr, port),
 					Command:    "add",
 				}
 				ingressMsgB, err := json.Marshal(ingressMsg)
@@ -358,7 +369,7 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 					a.logger.Error("error marshalling ingress message", slog.Any("err", err))
 					return
 				}
-				err = a.nc.Publish(data.IngressReportingSubject, ingressMsgB)
+				err = a.nc.Publish(a.ingressReportingSubject, ingressMsgB)
 				if err != nil {
 					a.logger.Error("error publishing to update_caddy", slog.Any("err", err))
 				}
@@ -423,10 +434,9 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			}
 		}
 
-		if aiw, ok := a.agent.(AgentIngessWorkloads); ok {
-			data, err := aiw.GetIngressData()
-			if err != nil {
-				a.logger.Error("error getting ingress data", slog.Any("err", err))
+		if _, ok := a.agent.(AgentIngessWorkloads); ok {
+			if a.ingressHostMachineIpAddr == "" || a.ingressReportingSubject == "" {
+				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIpAddr), slog.String("reporting_subject", a.ingressReportingSubject))
 				return
 			}
 
@@ -439,7 +449,7 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 				a.logger.Error("error marshalling ingress message", slog.Any("err", err))
 				return
 			}
-			err = a.nc.Publish(data.IngressReportingSubject, ingressMsgB)
+			err = a.nc.Publish(a.ingressReportingSubject, ingressMsgB)
 			if err != nil {
 				a.logger.Error("error publishing to update_caddy", slog.Any("err", err))
 			}

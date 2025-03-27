@@ -19,7 +19,6 @@ type Agent interface {
 
 // Optional interface for agents that support ingressable workloads
 type AgentIngessWorkloads interface {
-	GetIngressData() (*models.AgentIngressData, error)
 	PingWorkload(workloadId string) bool
 	GetWorkloadExposedPorts(workloadId string) ([]int, error)
 }
