@@ -80,7 +80,7 @@ func cacheFile(uri *uri) (*ArtifactReference, error) {
 		Name:           filepath.Base(uri.path),
 		Tag:            uri.tag,
 		OriginalURI:    uri.schema + "://" + uri.path,
-		LocalCachePath: info.Name(),
+		LocalCachePath: uri.path,
 		Digest:         hex.EncodeToString(hasher.Sum(nil)),
 		Size:           int(info.Size()),
 	}, nil
