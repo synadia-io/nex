@@ -522,11 +522,16 @@ func (c CopyWorkload) Run(ctx context.Context, globals *Globals) error {
 	}
 
 	if c.StopOriginal {
-		// controller.UndeployWorkload(c.WorkloadId)
-		_ = 0 // need to stop c.WorkloadId here
+		_, err := controller.UndeployWorkload(globals.Namespace, c.WorkloadId)
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Printf("Workload successfully copied! New workloadId: %s\n", startResp.Id)
+	if c.StopOriginal {
+		fmt.Printf("Workload %s stopped\n", c.WorkloadId)
+	}
 	return nil
 }
 

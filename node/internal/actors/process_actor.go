@@ -138,8 +138,10 @@ func (a *processActor) SpawnOsProcess(ctx *goakt.ReceiveContext) {
 					a.state = models.WorkloadStateError
 				}
 			}
-			a.state = models.WorkloadStateError
-			a.retryCounter++
+			if a.state != models.WorkloadStateStopped {
+				a.state = models.WorkloadStateError
+				a.retryCounter++
+			}
 		}
 
 		if a.retryCounter == a.retryCount {
@@ -232,7 +234,7 @@ func (a *processActor) KillOsProcess() error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	for _ = range ticker.C {
+	for range ticker.C {
 		if !a.process.IsRunning() {
 			ticker.Stop()
 			a.logger.Debug("workload stopped gracefully", slog.String("id", a.id))
