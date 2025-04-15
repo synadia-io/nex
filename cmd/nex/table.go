@@ -69,17 +69,6 @@ func (u Up) Table() []table.Row {
 	}
 }
 
-func (p Preflight) Table() []table.Row {
-	return []table.Row{
-		{"Force Install", p.Force, reflect.TypeOf(p.Force).String()},
-		{"Yes", p.Yes, reflect.TypeOf(p.Yes).String()},
-		{"Generate Configuration File", p.GenConfig, reflect.TypeOf(p.GenConfig).String()},
-		{"Status", p.Status, reflect.TypeOf(p.Status).String()},
-		{"Install Version Override", p.InstallVersion, reflect.TypeOf(p.InstallVersion).String()},
-		{"Github PAT", p.GithubPAT, reflect.TypeOf(p.GithubPAT).String()},
-	}
-}
-
 func (l LameDuck) Table() []table.Row {
 	return []table.Row{
 		{"Node ID", l.NodeID, reflect.TypeOf(l.NodeID).String()},

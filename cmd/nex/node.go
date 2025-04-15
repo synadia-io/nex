@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -24,81 +23,10 @@ import (
 )
 
 type Node struct {
-	Up        Up        `cmd:"" help:"Bring a node up"`
-	Preflight Preflight `cmd:"" help:"Run a preflight check on a node" aliases:"init"`
-	LameDuck  LameDuck  `cmd:"" name:"lameduck" help:"Command a node to enter lame duck mode" aliases:"down"`
-	List      List      `cmd:"" aliases:"ls" help:"List running nodes"`
-	Info      Info      `cmd:"" help:"Provide information about a running node"`
-}
-
-// ----- Preflight Command -----
-type Preflight struct {
-	Force          bool   `optional:"" help:"Force the preflight check to run. All artifacts are (re-)installed"`
-	Yes            bool   `optional:"" short:"y" help:"Answer yes to all prompts"`
-	GenConfig      bool   `optional:"" help:"Creates a default configuration file in your current directory"`
-	Status         bool   `optional:"" help:"Check the status of the node requirements without installing anything"`
-	InstallVersion string `optional:"" help:"Bypasses checking 'latest' and installs a specific version of NEX.  Must be valid release tag in Github" placeholder:"v0.3.0"`
-	GithubPAT      string `optional:"" help:"GitHub Personal Access Token. Can be provided if rate limits are hit pulling data from Github" placeholder:"ghp_abc123..."`
-}
-
-func (Preflight) AfterApply(globals *Globals) error {
-	return checkVer(globals)
-}
-
-func (p Preflight) Validate() error {
-	var errs error
-	if p.InstallVersion != "" {
-		url := "https://api.github.com/repos/synadia-io/nex/releases"
-
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return err
-		}
-
-		if p.GithubPAT != "" {
-			req.Header.Set("Authorization", "token "+p.GithubPAT)
-		}
-
-		req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-		client := &http.Client{
-			Timeout: 5 * time.Second,
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("GitHub API request failed with status: %s", resp.Status)
-		}
-
-		type GitHubRelease struct {
-			TagName string `json:"tag_name"`
-		}
-		var releases []GitHubRelease
-		if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-			return err
-		}
-
-		for _, r := range releases {
-			if r.TagName == p.InstallVersion {
-				break
-			}
-		}
-		return fmt.Errorf("Did not find prefered install version in Github")
-	}
-
-	return errs
-}
-
-func (p Preflight) Run(ctx context.Context, globals *Globals) error {
-	if globals.Check {
-		return printTable("Node Preflight Configuration", append(globals.Table(), p.Table()...)...)
-	}
-	return nil
+	Up       Up       `cmd:"" help:"Bring a node up"`
+	LameDuck LameDuck `cmd:"" name:"lameduck" help:"Command a node to enter lame duck mode" aliases:"down"`
+	List     List     `cmd:"" aliases:"ls" help:"List running nodes"`
+	Info     Info     `cmd:"" help:"Provide information about a running node"`
 }
 
 // ----- LameDuck Command -----
