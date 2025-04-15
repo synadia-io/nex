@@ -4,28 +4,13 @@
   "title": "AgentPingResponse",
   "type": "object",
   "properties": {
-    "node_id": {
-      "type": "string",
-      "description": "The unique identifier of the node on which the agent is running"
-    },
-    "target_xkey": {
+    "agent_xkey": {
       "type": "string",
       "description": "The target agents xkey"
     },
     "version": {
       "type": "string",
       "description": "The target agents version"
-    },
-    "tags": {
-      "type": "object",
-      "properties": {
-        "tags": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      }
     },
     "uptime": {
       "type": "string",
@@ -34,39 +19,15 @@
     "running_workloads": {
       "type": "array",
       "items": {
-        "$ref": "#/definitions/WorkloadPingMachineSummary"
+        "$ref": "./shared-workload-summary.json"
       }
     }
   },
   "required": [
-    "node_id",
-    "target_xkey",
+    "agent_xkey",
     "version",
-    "tags",
     "uptime",
     "running_workloads"
   ],
-  "definitions": {
-    "WorkloadPingMachineSummary": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "namespace": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "namespace",
-        "name",
-        "type"
-      ]
-    }
-  },
   "additionalProperties": false
 }

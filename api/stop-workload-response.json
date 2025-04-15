@@ -7,9 +7,6 @@
     "id": {
       "type": "string"
     },
-    "issuer": {
-      "type": "string"
-    },
     "stopped": {
       "type": "boolean"
     },
@@ -19,7 +16,6 @@
   },
   "required": [
     "id",
-    "issuer",
     "stopped",
     "message"
   ],

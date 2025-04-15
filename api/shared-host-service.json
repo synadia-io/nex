@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "shared",
+  "title": "HostService",
   "type": "object",
   "properties": {
     "nats_url": {

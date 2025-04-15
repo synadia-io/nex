@@ -25,12 +25,12 @@ func NewControlApiClient(nc *nats.Conn, logger *slog.Logger) (*ControlAPIClient,
 	}, nil
 }
 
-func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]*nodegen.AuctionResponseJson, error) {
-	resp := []*nodegen.AuctionResponseJson{}
+func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]*nodegen.AuctionResponse, error) {
+	resp := []*nodegen.AuctionResponse{}
 	auctionRespInbox := nats.NewInbox()
 
 	s, err := c.nc.Subscribe(auctionRespInbox, func(m *nats.Msg) {
-		envelope := new(models.Envelope[nodegen.AuctionResponseJson])
+		envelope := new(models.Envelope[nodegen.AuctionResponse])
 		err := json.Unmarshal(m.Data, envelope)
 		if err != nil {
 			c.logger.Error("failed to unmarshal auction response", slog.Any("err", err), slog.String("data", string(m.Data)))
@@ -48,9 +48,9 @@ func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]
 		}
 	}()
 
-	req := nodegen.AuctionRequestJson{
+	req := nodegen.AuctionRequest{
 		AuctionId: nuid.New().Next(),
-		Tags: nodegen.AuctionRequestJsonTags{
+		Tags: nodegen.AuctionRequestTags{
 			Tags: tags,
 		},
 	}
@@ -68,12 +68,12 @@ func (c *ControlAPIClient) Auction(namespace string, tags map[string]string) ([]
 	return resp, nil
 }
 
-func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
-	resp := []*nodegen.NodePingResponseJson{}
+func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponse, error) {
+	resp := []*nodegen.NodePingResponse{}
 	pingRespInbox := nats.NewInbox()
 
 	s, err := c.nc.Subscribe(pingRespInbox, func(m *nats.Msg) {
-		envelope := new(models.Envelope[nodegen.NodePingResponseJson])
+		envelope := new(models.Envelope[nodegen.NodePingResponse])
 		err := json.Unmarshal(m.Data, envelope)
 		if err != nil {
 			c.logger.Debug("failed to unmarshal ping response", slog.Any("err", err), slog.String("data", string(m.Data)))
@@ -100,13 +100,13 @@ func (c *ControlAPIClient) Ping() ([]*nodegen.NodePingResponseJson, error) {
 	return resp, nil
 }
 
-func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJson, error) {
+func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponse, error) {
 	msg, err := c.nc.Request(models.DirectPingSubject(nodeId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.NodePingResponseJson])
+	envelope := new(models.Envelope[nodegen.NodePingResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -115,13 +115,13 @@ func (c *ControlAPIClient) DirectPing(nodeId string) (*nodegen.NodePingResponseJ
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) FindWorkload(namespace, workloadId string) (*nodegen.WorkloadPingResponseJson, error) {
+func (c *ControlAPIClient) FindWorkload(namespace, workloadId string) (*nodegen.WorkloadPingResponse, error) {
 	msg, err := c.nc.Request(models.WorkloadPingRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.WorkloadPingResponseJson])
+	envelope := new(models.Envelope[nodegen.WorkloadPingResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (c *ControlAPIClient) ListWorkloads(namespace string) ([]nodegen.WorkloadSu
 	return ret, nil
 }
 
-func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
+func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req nodegen.StartWorkloadRequest) (*nodegen.StartWorkloadResponse, error) {
 	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -172,7 +172,7 @@ func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.StartWorkloadResponseJson])
+	envelope := new(models.Envelope[nodegen.StartWorkloadResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -181,7 +181,7 @@ func (c *ControlAPIClient) AuctionDeployWorkload(namespace, bidderId string, req
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.StartWorkloadRequestJson) (*nodegen.StartWorkloadResponseJson, error) {
+func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.StartWorkloadRequest) (*nodegen.StartWorkloadResponse, error) {
 	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -192,7 +192,7 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.StartWorkloadResponseJson])
+	envelope := new(models.Envelope[nodegen.StartWorkloadResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -201,13 +201,13 @@ func (c *ControlAPIClient) DeployWorkload(namespace, nodeId string, req nodegen.
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) UndeployWorkload(namespace, workloadId string) (*nodegen.StopWorkloadResponseJson, error) {
+func (c *ControlAPIClient) UndeployWorkload(namespace, workloadId string) (*nodegen.StopWorkloadResponse, error) {
 	msg, err := c.nc.Request(models.UndeployRequestSubject(namespace, workloadId), nil, DefaultRequestTimeout)
 	if err != nil {
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.StopWorkloadResponseJson])
+	envelope := new(models.Envelope[nodegen.StopWorkloadResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -216,7 +216,7 @@ func (c *ControlAPIClient) UndeployWorkload(namespace, workloadId string) (*node
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) GetInfo(nodeId string, req nodegen.NodeInfoRequestJson) (*nodegen.NodeInfoResponseJson, error) {
+func (c *ControlAPIClient) GetInfo(nodeId string, req nodegen.NodeInfoRequest) (*nodegen.NodeInfoResponse, error) {
 	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -227,7 +227,7 @@ func (c *ControlAPIClient) GetInfo(nodeId string, req nodegen.NodeInfoRequestJso
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.NodeInfoResponseJson])
+	envelope := new(models.Envelope[nodegen.NodeInfoResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -236,8 +236,8 @@ func (c *ControlAPIClient) GetInfo(nodeId string, req nodegen.NodeInfoRequestJso
 	return &envelope.Data, nil
 }
 
-func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nodegen.LameduckResponseJson, error) {
-	req := nodegen.LameduckRequestJson{
+func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nodegen.LameduckResponse, error) {
+	req := nodegen.LameduckRequest{
 		Delay: delay.String(),
 	}
 
@@ -251,7 +251,7 @@ func (c *ControlAPIClient) SetLameDuck(nodeId string, delay time.Duration) (*nod
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.LameduckResponseJson])
+	envelope := new(models.Envelope[nodegen.LameduckResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err
@@ -302,8 +302,8 @@ func (c *ControlAPIClient) MonitorEvents(namespace, workloadId, eventType string
 	return ret, nil
 }
 
-func (c *ControlAPIClient) CopyWorkload(workloadId, namespace string, targetXkey string) (*nodegen.StartWorkloadRequestJson, error) {
-	req := &nodegen.CloneWorkloadRequestJson{
+func (c *ControlAPIClient) CopyWorkload(workloadId, namespace string, targetXkey string) (*nodegen.StartWorkloadRequest, error) {
+	req := &nodegen.CloneWorkloadRequest{
 		NewTargetXkey: targetXkey,
 	}
 
@@ -317,7 +317,7 @@ func (c *ControlAPIClient) CopyWorkload(workloadId, namespace string, targetXkey
 		return nil, err
 	}
 
-	envelope := new(models.Envelope[nodegen.CloneWorkloadResponseJson])
+	envelope := new(models.Envelope[nodegen.CloneWorkloadResponse])
 	err = json.Unmarshal(msg.Data, envelope)
 	if err != nil {
 		return nil, err

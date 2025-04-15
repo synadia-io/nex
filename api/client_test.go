@@ -183,7 +183,7 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 
 	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.AuctionDeployWorkload(models.NodeSystemNamespace, auctionResp[0].BidderId, gen.StartWorkloadRequestJson{
+	resp, err := control.AuctionDeployWorkload(models.NodeSystemNamespace, auctionResp[0].BidderId, gen.StartWorkloadRequest{
 		Description:     "Test Workload",
 		Namespace:       models.NodeSystemNamespace,
 		RetryCount:      3,
@@ -191,7 +191,7 @@ func TestAuctionDeployAndFindWorkload(t *testing.T) {
 		WorkloadName:    "testworkload",
 		WorkloadRuntype: "service",
 		WorkloadType:    "direct-start",
-		EncEnvironment: gen.SharedEncEnvJson{
+		EncEnvironment: gen.EncEnv{
 			Base64EncryptedEnv: base64.StdEncoding.EncodeToString(encEnv),
 			EncryptedBy:        tAPub,
 		},
@@ -255,7 +255,7 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 
 	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequestJson{
+	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequest{
 		Description:     "Test Workload",
 		Namespace:       models.NodeSystemNamespace,
 		RetryCount:      3,
@@ -263,7 +263,7 @@ func TestDirectDeployAndListWorkloads(t *testing.T) {
 		WorkloadName:    "testworkload",
 		WorkloadRuntype: "service",
 		WorkloadType:    "direct-start",
-		EncEnvironment: gen.SharedEncEnvJson{
+		EncEnvironment: gen.EncEnv{
 			Base64EncryptedEnv: base64.StdEncoding.EncodeToString(encEnv),
 			EncryptedBy:        tAPub,
 		},
@@ -328,7 +328,7 @@ func TestUndeployWorkload(t *testing.T) {
 
 	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequestJson{
+	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequest{
 		Description:     "Test Workload",
 		Namespace:       models.NodeSystemNamespace,
 		RetryCount:      3,
@@ -336,7 +336,7 @@ func TestUndeployWorkload(t *testing.T) {
 		WorkloadName:    "testworkload",
 		WorkloadRuntype: "service",
 		WorkloadType:    "direct-start",
-		EncEnvironment: gen.SharedEncEnvJson{
+		EncEnvironment: gen.EncEnv{
 			Base64EncryptedEnv: base64.StdEncoding.EncodeToString(encEnv),
 			EncryptedBy:        tAPub,
 		},
@@ -388,7 +388,7 @@ func TestGetNodeInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := control.GetInfo(test.Node1ServerPublicKey, gen.NodeInfoRequestJson{
+	resp, err := control.GetInfo(test.Node1ServerPublicKey, gen.NodeInfoRequest{
 		Namespace: models.NodeSystemNamespace,
 	})
 	be.NilErr(t, err)
@@ -432,7 +432,7 @@ func TestSetLameduck(t *testing.T) {
 	_, err = control.SetLameDuck(test.Node1ServerPublicKey, time.Second*3)
 	be.NilErr(t, err)
 
-	resp, err := control.GetInfo(test.Node1ServerPublicKey, gen.NodeInfoRequestJson{
+	resp, err := control.GetInfo(test.Node1ServerPublicKey, gen.NodeInfoRequest{
 		Namespace: models.NodeSystemNamespace,
 	})
 	be.NilErr(t, err)
@@ -487,7 +487,7 @@ func TestCopyWorkload(t *testing.T) {
 
 	binPath := test.BuildTestBinary(t, "../test/testdata/forever/main.go", workingDir)
 
-	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequestJson{
+	resp, err := control.DeployWorkload(models.NodeSystemNamespace, test.Node1ServerPublicKey, gen.StartWorkloadRequest{
 		Description:     "Test Workload",
 		Argv:            []string{"--arg1", "value1"},
 		Namespace:       models.NodeSystemNamespace,
@@ -496,7 +496,7 @@ func TestCopyWorkload(t *testing.T) {
 		WorkloadName:    "testworkload",
 		WorkloadRuntype: "service",
 		WorkloadType:    "direct-start",
-		EncEnvironment: gen.SharedEncEnvJson{
+		EncEnvironment: gen.EncEnv{
 			Base64EncryptedEnv: base64.StdEncoding.EncodeToString(encEnv),
 			EncryptedBy:        tAPub,
 		},

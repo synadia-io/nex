@@ -5,41 +5,113 @@ package api
 import "encoding/json"
 import "fmt"
 
-type HeartbeatAgentJson map[string]interface{}
+type AgentHeartbeat struct {
+	// Send additional data in heartbeat
+	Data string `json:"data"`
 
-type RegisterAgentRequestJson struct {
+	// The state of the agent. Must be of able to map to models.AgentState
+	State string `json:"state"`
+
+	// The number of agents running with workload count
+	WorkloadCount int `json:"workload_count"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AgentHeartbeat) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["data"]; raw != nil && !ok {
+		return fmt.Errorf("field data in AgentHeartbeat: required")
+	}
+	if _, ok := raw["state"]; raw != nil && !ok {
+		return fmt.Errorf("field state in AgentHeartbeat: required")
+	}
+	if _, ok := raw["workload_count"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_count in AgentHeartbeat: required")
+	}
+	type Plain AgentHeartbeat
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = AgentHeartbeat(plain)
+	return nil
+}
+
+type RegisterAgentRequest struct {
 	// A user friendly description of the agent
-	Description *string `json:"description,omitempty"`
+	Description string `json:"description"`
 
 	// The maximum number of workloads this agent can hold. 0 indicates unlimited
-	MaxWorkloads *float64 `json:"max_workloads,omitempty"`
+	MaxWorkloads float64 `json:"max_workloads"`
 
 	// Name of the agent
 	Name string `json:"name"`
+
+	// The public xkey of the agent. Node will encrypt environment with this key
+	PublicXkey string `json:"public_xkey"`
 
 	// Version of the agent
 	Version string `json:"version"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterAgentRequestJson) UnmarshalJSON(b []byte) error {
+func (j *RegisterAgentRequest) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
+	if _, ok := raw["description"]; raw != nil && !ok {
+		return fmt.Errorf("field description in RegisterAgentRequest: required")
+	}
+	if _, ok := raw["max_workloads"]; raw != nil && !ok {
+		return fmt.Errorf("field max_workloads in RegisterAgentRequest: required")
+	}
 	if _, ok := raw["name"]; raw != nil && !ok {
-		return fmt.Errorf("field name in RegisterAgentRequestJson: required")
+		return fmt.Errorf("field name in RegisterAgentRequest: required")
+	}
+	if _, ok := raw["public_xkey"]; raw != nil && !ok {
+		return fmt.Errorf("field public_xkey in RegisterAgentRequest: required")
 	}
 	if _, ok := raw["version"]; raw != nil && !ok {
-		return fmt.Errorf("field version in RegisterAgentRequestJson: required")
+		return fmt.Errorf("field version in RegisterAgentRequest: required")
 	}
-	type Plain RegisterAgentRequestJson
+	type Plain RegisterAgentRequest
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = RegisterAgentRequestJson(plain)
+	*j = RegisterAgentRequest(plain)
 	return nil
 }
 
-type RegisterAgentResponseJson map[string]interface{}
+type RegisterAgentResponse struct {
+	// A message indicating the result of the registration
+	Message string `json:"message"`
+
+	// Indicates if the agent was successfully registered
+	Success bool `json:"success"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RegisterAgentResponse) UnmarshalJSON(b []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["message"]; raw != nil && !ok {
+		return fmt.Errorf("field message in RegisterAgentResponse: required")
+	}
+	if _, ok := raw["success"]; raw != nil && !ok {
+		return fmt.Errorf("field success in RegisterAgentResponse: required")
+	}
+	type Plain RegisterAgentResponse
+	var plain Plain
+	if err := json.Unmarshal(b, &plain); err != nil {
+		return err
+	}
+	*j = RegisterAgentResponse(plain)
+	return nil
+}
