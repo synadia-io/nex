@@ -167,8 +167,8 @@ func TestNexNodeOptions(t *testing.T) {
 
 type auction struct{}
 
-func (a *auction) Auction(id, _type string, aTags, nTags map[string]string, l *slog.Logger) (*models.AuctionResponse, error) {
-	return nil, nil
+func (a *auction) Auction(namespace, _type string, aTags map[string]string) error {
+	return nil
 }
 
 type minter struct{}

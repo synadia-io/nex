@@ -1,7 +1,5 @@
 package models
 
-import "log/slog"
-
 type Auctioneer interface {
-	Auction(auctionId, agentType string, auctionTags, nodeTags map[string]string, logger *slog.Logger) (*AuctionResponse, error)
+	Auction(namespace, agentType string, auctionTags map[string]string) error
 }

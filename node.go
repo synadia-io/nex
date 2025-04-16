@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/internal/auctioneer"
 	"github.com/synadia-labs/nex/internal/credentials"
 	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
@@ -101,8 +100,9 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		embeddedRunners: make([]*sdk.Runner, 0),
 		localRunners:    make([]*internal.AgentProcess, 0),
 
-		minter: &credentials.FullAccessMinter{NatsServer: nats.DefaultURL},
-		state:  &state.NoState{},
+		minter:     &credentials.FullAccessMinter{NatsServer: nats.DefaultURL},
+		state:      &state.NoState{},
+		auctioneer: nil,
 
 		nodeKeypair:            kp,
 		nodeXKeypair:           xkp,
@@ -116,7 +116,6 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	}
 
 	n.regs = models.NewRegistrationList(n.logger)
-	n.auctioneer = &auctioneer.TagAuctioneer{Regs: n.regs, AuctionMap: n.auctionMap}
 
 	var errs error
 	for _, opt := range opts {

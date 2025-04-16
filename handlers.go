@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"disorder.dev/shandler"
 	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-labs/nex/models"
 
@@ -211,6 +212,10 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 
 func (n *NexNode) handleAuction() func(micro.Request) {
 	return func(r micro.Request) {
+		// $NEX.control.namespace.AUCTION
+		splitSub := strings.SplitN(r.Subject(), ".", 4)
+		namespace := splitSub[2]
+
 		req := new(models.AuctionRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
@@ -218,13 +223,39 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 			return
 		}
 
-		aResp, err := n.auctioneer.Auction(req.AuctionId, req.AgentType, req.Tags, n.tags, n.logger)
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to auction")
+		// If node doesnt have agent type, request is thrown away
+		_, reg, ok := n.regs.Find(req.AgentType)
+		if !ok {
+			n.logger.Log(n.ctx, shandler.LevelTrace, "no valid agents found for this workload", slog.String("agent_type", req.AgentType))
 			return
 		}
 
-		err = r.RespondJSON(aResp)
+		// If all auction tags aren't satisfied, request is thrown away
+		for k, v := range req.Tags {
+			if tV, ok := n.tags[k]; !ok || tV != v {
+				n.logger.Log(n.ctx, shandler.LevelTrace, "workload tag not satisfied during auction", slog.String("tag", k), slog.String("value", v))
+				return
+			}
+		}
+
+		if n.auctioneer != nil {
+			err = n.auctioneer.Auction(namespace, req.AgentType, req.Tags)
+			if err != nil {
+				n.logger.Error("auctioneer failed to pass auction", slog.Any("err", err))
+				return
+			}
+		}
+
+		bidderId := nuid.New().Next()
+		n.auctionMap.Put(bidderId, "", nil)
+
+		n.logger.Debug("responding to auction", slog.Any("auctionId", req.AuctionId))
+		err = r.RespondJSON(models.AuctionResponse{
+			BidderId:            bidderId,
+			Xkey:                reg.OriginalRequest.PublicXkey,
+			StartRequestSchema:  reg.OriginalRequest.StartRequestSchema,
+			SupportedLifecycles: reg.OriginalRequest.SupportedLifecycles,
+		})
 		if err != nil {
 			n.logger.Error("failed to respond to auction request", slog.Any("err", err))
 			return
