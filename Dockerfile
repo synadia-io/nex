@@ -4,6 +4,7 @@ FROM golang:latest AS builder
 ENV GOWORK=off
 ARG GOPRIVATE
 ENV GOPRIVATE=$GOPRIVATE
+ENV CGO_ENABLED=0
 
 RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client
 RUN git config --global url."git@github.com:".insteadOf "https://github.com/"
