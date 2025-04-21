@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -23,14 +22,10 @@ var exitCode int = 0
 func main() {
 	defer os.Exit(exitCode) //nolint
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 	go func() {
 		<-sig
-		cancel()
 	}()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -70,7 +65,7 @@ func main() {
 	}
 
 	// launch the agent
-	if err := myAgent.Run(ctx, agentId, models.NatsConnectionData{NatsUrl: natsUrl}); err != nil {
+	if err := myAgent.Run(agentId, models.NatsConnectionData{NatsUrl: natsUrl}); err != nil {
 		slog.Error(err.Error())
 		exitCode = 1
 		return
