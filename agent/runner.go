@@ -216,7 +216,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 		return errs
 	}
 
-	if regRetJson.ExistingState != nil {
+	if len(regRetJson.ExistingState) > 0 {
 		a.logger.Info("restoring existing state", slog.Int("num_workloads", len(regRetJson.ExistingState)))
 		for workloadId, startRequest := range regRetJson.ExistingState {
 			_, err = a.agent.StartWorkload(workloadId, &startRequest, true)
