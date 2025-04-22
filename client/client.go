@@ -14,6 +14,8 @@ import (
 	"github.com/synadia-labs/nex/models"
 )
 
+const defaultTimeout = 60 * time.Second
+
 type nexClient struct {
 	nc        *nats.Conn
 	namespace string
@@ -33,7 +35,7 @@ func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
 		return nil, err
 	}
 
-	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, 10*time.Second)
+	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, defaultTimeout)
 	if err != nil && !errors.Is(err, nats.ErrNoResponders) && !errors.Is(err, nats.ErrTimeout) {
 		return nil, err
 	}
@@ -199,7 +201,7 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 	}
 
 	// BUG: this is coming back empty and shouldnt be
-	_, err = n.nc.Request(models.UndeployRequestSubject(n.namespace, workloadId), reqB, 10*time.Second)
+	_, err = n.nc.Request(models.UndeployRequestSubject(n.namespace, workloadId), reqB, defaultTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +223,7 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
 	msgs, err := natsext.RequestMany(ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(2000*time.Millisecond))
@@ -270,7 +272,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
 	msgs, err := natsext.RequestMany(ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(2000*time.Millisecond))
