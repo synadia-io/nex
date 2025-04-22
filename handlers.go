@@ -59,7 +59,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 			State:      n.nodeState,
 		})
 		if err != nil {
-			n.logger.Error("failed to respond to node info request", slog.Any("err", err))
+			n.logger.Error("failed to respond to node info request", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -145,7 +145,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 			Success: true,
 		})
 		if err != nil {
-			n.logger.Error("failed to respond to lameduck request", slog.Any("err", err))
+			n.logger.Error("failed to respond to lameduck request", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -204,7 +204,7 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 			Version:        VERSION,
 		})
 		if err != nil {
-			n.logger.Error("failed to respond to node info request", slog.Any("err", err))
+			n.logger.Error("failed to respond to node info request", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -241,7 +241,7 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 		if n.auctioneer != nil {
 			err = n.auctioneer.Auction(namespace, req.AgentType, req.Tags)
 			if err != nil {
-				n.logger.Error("auctioneer failed to pass auction", slog.Any("err", err))
+				n.logger.Error("auctioneer failed to pass auction", slog.String("err", err.Error()))
 				return
 			}
 		}
@@ -257,7 +257,7 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 			SupportedLifecycles: reg.OriginalRequest.SupportedLifecycles,
 		})
 		if err != nil {
-			n.logger.Error("failed to respond to auction request", slog.Any("err", err))
+			n.logger.Error("failed to respond to auction request", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -336,13 +336,13 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 
 		err = r.Respond(auctionDeploy.Data)
 		if err != nil {
-			n.logger.Error("failed to respond to auction deploy workload request", slog.Any("err", err))
+			n.logger.Error("failed to respond to auction deploy workload request", slog.String("err", err.Error()))
 			return
 		}
 
 		err = n.state.StoreWorkload(workloadId, *req)
 		if err != nil {
-			n.logger.Warn("failed to store node state", slog.Any("err", err))
+			n.logger.Warn("failed to store node state", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -382,20 +382,20 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 
 		err = r.Respond(stopWorkload.Data)
 		if err != nil {
-			n.logger.Error("failed to respond to stop workload request", slog.Any("err", err))
+			n.logger.Error("failed to respond to stop workload request", slog.String("err", err.Error()))
 			return
 		}
 
 		ret := new(models.StopWorkloadResponse)
 		err = json.Unmarshal(stopWorkload.Data, ret)
 		if err != nil {
-			n.logger.Error("failed to unmarshal stop workload response", slog.Any("err", err))
+			n.logger.Error("failed to unmarshal stop workload response", slog.String("err", err.Error()))
 			return
 		}
 
 		err = n.state.RemoveWorkload(ret.WorkloadType, workloadId)
 		if err != nil {
-			n.logger.Warn("failed to delete node state", slog.Any("err", err))
+			n.logger.Warn("failed to delete node state", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -428,7 +428,7 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 
 		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadId), r.Data(), time.Second*3)
 		if err != nil {
-			n.logger.Debug("failed to find workload request", slog.Any("err", err))
+			n.logger.Debug("failed to find workload request", slog.String("err", err.Error()))
 			return
 		}
 
@@ -438,7 +438,7 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 
 		err = r.Respond(getWorkload.Data)
 		if err != nil {
-			n.logger.Error("failed to respond to clone workload request", slog.Any("err", err))
+			n.logger.Error("failed to respond to clone workload request", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -480,7 +480,7 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 			}
 			err = r.Error("100", "failed to publish query workloads request", respB)
 			if err != nil {
-				n.logger.Error("failed to send micro request error message", slog.Any("err", err))
+				n.logger.Error("failed to send micro request error message", slog.String("err", err.Error()))
 			}
 			return
 		}
@@ -506,7 +506,7 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 
 		err = r.Respond(respB)
 		if err != nil {
-			n.logger.Error("failed to respond to namespace ping request", slog.Any("err", err))
+			n.logger.Error("failed to respond to namespace ping request", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -590,14 +590,14 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 
 		agentState, err := n.state.GetStateByAgent(registrationRequest.RegisterType)
 		if err != nil {
-			n.logger.Warn("failed to get agent state", slog.Any("err", err))
+			n.logger.Warn("failed to get agent state", slog.String("err", err.Error()))
 		}
 
 		state := models.RegisterAgentResponseExistingState{}
 		for workloadId, swr := range agentState {
 			natsConn, err := n.minter.Mint(models.WorkloadCred, swr.Namespace, workloadId)
 			if err != nil {
-				n.logger.Warn("failed to mint workload nats connection", slog.Any("err", err), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadId))
+				n.logger.Warn("failed to mint workload nats connection", slog.String("err", err.Error()), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadId))
 				continue
 			}
 			aswr := models.AgentStartWorkloadRequest{
@@ -614,7 +614,7 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 			ExistingState:  state,
 		})
 		if err != nil {
-			n.logger.Error("failed to respond to register local agent request", slog.Any("err", err))
+			n.logger.Error("failed to respond to register local agent request", slog.String("err", err.Error()))
 			return
 		}
 		n.logger.Info("agent registered", slog.String("name", registrationRequest.Name), slog.String("type", registrationRequest.RegisterType), slog.String("agent_id", agentId))
@@ -657,7 +657,7 @@ func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 
 		err = r.RespondJSON(ret)
 		if err != nil {
-			n.logger.Error("failed to respond to register remote agent request", slog.Any("err", err))
+			n.logger.Error("failed to respond to register remote agent request", slog.String("err", err.Error()))
 			return
 		}
 	}
@@ -665,10 +665,10 @@ func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 
 func (n *NexNode) handlerError(r micro.Request, err error, code, msg string) {
 	if msg != "" {
-		n.logger.Error(msg, slog.Any("err", err))
+		n.logger.Error(msg, slog.String("err", err.Error()))
 	}
 	err = r.Error(code, msg, []byte(err.Error()))
 	if err != nil {
-		n.logger.Error("failed to send micro request error message", slog.Any("err", err))
+		n.logger.Error("failed to send micro request error message", slog.String("err", err.Error()))
 	}
 }

@@ -241,7 +241,7 @@ func (n *NexNode) Start() error {
 		Type:  "io.synadia.nex.event.nexnode_started",
 	})
 	if err != nil {
-		n.logger.Error("failed to emit nex started event", slog.Any("err", err))
+		n.logger.Error("failed to emit nex started event", slog.String("err", err.Error()))
 	}
 
 	for _, e := range n.service.Info().Endpoints {
@@ -411,7 +411,7 @@ func (n *NexNode) enterLameduck(delay time.Duration) {
 		time.Sleep(delay)
 		err := n.Shutdown()
 		if err != nil {
-			n.logger.Error("failed to shutdown nex node", slog.Any("err", err))
+			n.logger.Error("failed to shutdown nex node", slog.String("err", err.Error()))
 		}
 	}()
 }

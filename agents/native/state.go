@@ -118,7 +118,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 			nats.UserJWTAndSeed(req.WorkloadCreds.NatsUserJwt, req.WorkloadCreds.NatsUserSeed),
 			nats.Name("artifact_fetcher-"+workloadId))
 		if err != nil {
-			slog.Error("error connecting to nats", slog.Any("err", err))
+			slog.Error("error connecting to nats", slog.String("err", err.Error()))
 			return err
 		}
 	}
@@ -201,7 +201,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 
 			err = n.AddWorkload(namespace, workloadId, req)
 			if err != nil {
-				slog.Error("error restarting workload", slog.Any("err", err))
+				slog.Error("error restarting workload", slog.String("err", err.Error()))
 			}
 		}(namespace, workloadId, req)
 
@@ -234,7 +234,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 				}
 
 				if err != nil {
-					slog.Error("error stopping process; attempting to cancel context", slog.Any("err", err))
+					slog.Error("error stopping process; attempting to cancel context", slog.String("err", err.Error()))
 					w.cancel()
 					n.Lock()
 					delete(n.workloads[namespace], workloadId)
@@ -251,7 +251,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 					case <-timeout:
 						slog.Warn("timeout exceeded waiting for workload to exit; attempting kill", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
 						if err := w.Process.Kill(); err != nil {
-							slog.Error("Error killing process", slog.Any("err", err))
+							slog.Error("Error killing process", slog.String("err", err.Error()))
 							w.cancel()
 						}
 						n.Lock()
@@ -261,7 +261,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 					case <-ticker.C:
 						if err := w.Process.Signal(syscall.Signal(0)); err != nil {
 							if err := n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: workloadId}); err != nil {
-								slog.Error("error emitting workload stopped event", slog.Any("err", err))
+								slog.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 							}
 							n.Lock()
 							delete(n.workloads[namespace], workloadId)
@@ -290,7 +290,7 @@ func (n *nexletState) SetLameduckMode(before time.Duration) error {
 				process.SetState(models.WorkloadStateStopping)
 				err := internal.StopProcess(process.Process)
 				if err != nil {
-					slog.Error("error stopping process; cancelling context", slog.Any("err", err))
+					slog.Error("error stopping process; cancelling context", slog.String("err", err.Error()))
 					process.cancel()
 				} else {
 					timeout := time.After(before)
@@ -311,7 +311,7 @@ func (n *nexletState) SetLameduckMode(before time.Duration) error {
 							// Check if the process still exists
 							if err := process.Process.Signal(syscall.Signal(0)); err != nil {
 								if err := n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: id}); err != nil {
-									slog.Error("error emitting workload stopped event", slog.Any("err", err))
+									slog.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 								}
 								wg.Done()
 								return

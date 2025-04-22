@@ -90,7 +90,7 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 
 			state, err := cmd.Process.Wait()
 			if err != nil {
-				a.logger.Error("Process exited with error", slog.Int("process", ap.Process.Pid), slog.Any("err", err))
+				a.logger.Error("Process exited with error", slog.Int("process", ap.Process.Pid), slog.String("err", err.Error()))
 			} else if state != nil && ap.state != models.AgentStateStopping || ap.state != models.AgentStateLameduck {
 				a.logger.Warn("Process unexpectedly exited with state", slog.Any("state", state), slog.Int("process", ap.Process.Pid))
 			}
