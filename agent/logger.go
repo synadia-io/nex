@@ -67,7 +67,7 @@ func (l agentLogCapture) Write(p []byte) (n int, err error) {
 
 	err = l.nc.PublishMsg(msg)
 	if err != nil {
-		slog.Error("Failed to publish log message to nats", slog.Any("err", err), slog.Any("workload", l.workloadId))
+		slog.Error("Failed to publish log message to nats", slog.String("err", err.Error()), slog.Any("workload", l.workloadId))
 	}
 	return len(p), nil
 }

@@ -155,17 +155,17 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 		for range time.Tick(time.Second * 10) {
 			hb, err := a.agent.Heartbeat()
 			if err != nil {
-				a.logger.Warn("error generating heartbeat", slog.Any("err", err))
+				a.logger.Warn("error generating heartbeat", slog.String("err", err.Error()))
 				continue
 			}
 			hbB, err := json.Marshal(hb)
 			if err != nil {
-				a.logger.Warn("error marshalling heartbeat", slog.Any("err", err))
+				a.logger.Warn("error marshalling heartbeat", slog.String("err", err.Error()))
 				continue
 			}
 			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.agentId), hbB)
 			if err != nil {
-				a.logger.Warn("error publishing heartbeat", slog.Any("err", err))
+				a.logger.Warn("error publishing heartbeat", slog.String("err", err.Error()))
 				continue
 			}
 		}
@@ -221,7 +221,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 		for workloadId, startRequest := range regRetJson.ExistingState {
 			_, err = a.agent.StartWorkload(workloadId, &startRequest, true)
 			if err != nil {
-				a.logger.Error("error restoring existing state", slog.String("workload_id", workloadId), slog.Any("err", err))
+				a.logger.Error("error restoring existing state", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
 			}
 		}
 	}
@@ -264,7 +264,7 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 		go func() {
 			ret, err := tFunc(m.Data)
 			if err != nil {
-				a.logger.Error("error running trigger function", slog.Any("err", err))
+				a.logger.Error("error running trigger function", slog.String("err", err.Error()))
 			}
 			if m.Reply != "" { // empty if orginal trigger was a publish and not request
 				msg := &nats.Msg{
@@ -274,7 +274,7 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 				}
 				err = a.nc.PublishMsg(msg)
 				if err != nil {
-					a.logger.Error("error responding to trigger", slog.Any("err", err))
+					a.logger.Error("error responding to trigger", slog.String("err", err.Error()))
 				}
 			}
 		}()
@@ -292,12 +292,12 @@ func (a *Runner) RegisterTriggerWithAgent(namespace, workloadId string, tFunc fu
 		go func() {
 			ret, err := tFunc(m.Data)
 			if err != nil {
-				a.logger.Error("error running trigger function", slog.Any("err", err))
+				a.logger.Error("error running trigger function", slog.String("err", err.Error()))
 			}
 			if m.Reply != "" { // empty if orginal trigger was a publish and not request
 				err = a.nc.Publish(m.Reply, ret)
 				if err != nil {
-					a.logger.Error("error responding to trigger", slog.Any("err", err))
+					a.logger.Error("error responding to trigger", slog.String("err", err.Error()))
 				}
 			}
 		}()
@@ -319,30 +319,30 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 		req := new(models.AgentStartWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			a.logger.Error("error unmarshalling start workload request", slog.Any("err", err), slog.String("data", string(r.Data())))
+			a.logger.Error("error unmarshalling start workload request", slog.String("err", err.Error()), slog.String("data", string(r.Data())))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 			return
 		}
 
 		startResp, err := a.agent.StartWorkload(workloadId, req, false)
 		if err != nil {
-			a.logger.Error("failed to start workload", slog.Any("err", err))
+			a.logger.Error("failed to start workload", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 			return
 		}
 
 		err = r.RespondJSON(startResp)
 		if err != nil {
-			a.logger.Error("error responding to start workload request", slog.Any("err", err))
+			a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 			return
 		}
@@ -355,7 +355,7 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 
 			ports, err := aiw.GetWorkloadExposedPorts(workloadId)
 			if err != nil {
-				a.logger.Error("error getting exposed ports", slog.Any("err", err))
+				a.logger.Error("error getting exposed ports", slog.String("err", err.Error()))
 			}
 
 			for i, port := range ports {
@@ -366,12 +366,12 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 				}
 				ingressMsgB, err := json.Marshal(ingressMsg)
 				if err != nil {
-					a.logger.Error("error marshalling ingress message", slog.Any("err", err))
+					a.logger.Error("error marshalling ingress message", slog.String("err", err.Error()))
 					return
 				}
 				err = a.nc.Publish(a.ingressReportingSubject, ingressMsgB)
 				if err != nil {
-					a.logger.Error("error publishing to update_caddy", slog.Any("err", err))
+					a.logger.Error("error publishing to update_caddy", slog.String("err", err.Error()))
 				}
 
 				if i == 0 {
@@ -392,10 +392,10 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 		req := new(models.StopWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			a.logger.Error("error unmarshalling stop workload request", slog.Any("err", err))
+			a.logger.Error("error unmarshalling stop workload request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 
@@ -404,10 +404,10 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			return
 		}
 		if err != nil {
-			a.logger.Error("error stopping workload request", slog.Any("err", err))
+			a.logger.Error("error stopping workload request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 
@@ -420,17 +420,17 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 
 		err = r.RespondJSON(ret)
 		if err != nil {
-			a.logger.Error("error responding to stop workload request", slog.Any("err", err))
+			a.logger.Error("error responding to stop workload request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 
 		if sub, ok := a.triggers[workloadId]; ok {
 			err := sub.Unsubscribe()
 			if err != nil {
-				a.logger.Error("error unsubscribing trigger", slog.Any("err", err))
+				a.logger.Error("error unsubscribing trigger", slog.String("err", err.Error()))
 			}
 		}
 
@@ -446,12 +446,12 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			}
 			ingressMsgB, err := json.Marshal(ingressMsg)
 			if err != nil {
-				a.logger.Error("error marshalling ingress message", slog.Any("err", err))
+				a.logger.Error("error marshalling ingress message", slog.String("err", err.Error()))
 				return
 			}
 			err = a.nc.Publish(a.ingressReportingSubject, ingressMsgB)
 			if err != nil {
-				a.logger.Error("error publishing to update_caddy", slog.Any("err", err))
+				a.logger.Error("error publishing to update_caddy", slog.String("err", err.Error()))
 			}
 
 		}
@@ -470,17 +470,17 @@ func (a *Runner) handleGetWorkload() func(r micro.Request) {
 			return
 		}
 		if err != nil {
-			a.logger.Error("error getting workload", slog.Any("err", err))
+			a.logger.Error("error getting workload", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to get workload request", slog.Any("err", err))
+				a.logger.Error("error responding to get workload request", slog.String("err", err.Error()))
 			}
 			return
 		}
 
 		err = r.RespondJSON(startRequest)
 		if err != nil {
-			a.logger.Error("error responding to get workload request", slog.Any("err", err))
+			a.logger.Error("error responding to get workload request", slog.String("err", err.Error()))
 		}
 	}
 }
@@ -492,25 +492,25 @@ func (a *Runner) handleQueryWorkloads() func(micro.Request) {
 
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			a.logger.Error("error unmarshalling query workloads request", slog.Any("err", err))
+			a.logger.Error("error unmarshalling query workloads request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 
 		wl, err := a.agent.QueryWorkloads(req.Namespace, req.Filter)
 		if err != nil {
-			a.logger.Error("error querying workloads", slog.Any("err", err))
+			a.logger.Error("error querying workloads", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 
 		err = r.RespondJSON(wl)
 		if err != nil {
-			a.logger.Error("error responding to query workloads request", slog.Any("err", err))
+			a.logger.Error("error responding to query workloads request", slog.String("err", err.Error()))
 		}
 	}
 }
@@ -520,17 +520,17 @@ func (a *Runner) handleSetLameduck() func(micro.Request) {
 		req := new(models.LameduckRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			a.logger.Error("error unmarshalling set lameduck request", slog.Any("err", err))
+			a.logger.Error("error unmarshalling set lameduck request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 			err = r.RespondJSON(models.LameduckResponse{Success: false})
 			if err != nil {
-				a.logger.Error("error responding to set lameduck request", slog.Any("err", err))
+				a.logger.Error("error responding to set lameduck request", slog.String("err", err.Error()))
 				err = r.Error("100", err.Error(), nil)
 				if err != nil {
-					a.logger.Error("error responding to start workload request", slog.Any("err", err))
+					a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 				}
 			}
 			return
@@ -538,17 +538,17 @@ func (a *Runner) handleSetLameduck() func(micro.Request) {
 
 		delay, err := time.ParseDuration(req.Delay)
 		if err != nil {
-			a.logger.Error("error parsing delay", slog.Any("err", err))
+			a.logger.Error("error parsing delay", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 			err = r.RespondJSON(models.LameduckResponse{Success: false})
 			if err != nil {
-				a.logger.Error("error responding to set lameduck request", slog.Any("err", err))
+				a.logger.Error("error responding to set lameduck request", slog.String("err", err.Error()))
 				err = r.Error("100", err.Error(), nil)
 				if err != nil {
-					a.logger.Error("error responding to start workload request", slog.Any("err", err))
+					a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 				}
 			}
 			return
@@ -556,17 +556,17 @@ func (a *Runner) handleSetLameduck() func(micro.Request) {
 
 		err = a.agent.SetLameduck(delay)
 		if err != nil {
-			a.logger.Error("error setting lameduck", slog.Any("err", err))
+			a.logger.Error("error setting lameduck", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 			err = r.RespondJSON(models.LameduckResponse{Success: false})
 			if err != nil {
-				a.logger.Error("error responding to set lameduck request", slog.Any("err", err))
+				a.logger.Error("error responding to set lameduck request", slog.String("err", err.Error()))
 				err = r.Error("100", err.Error(), nil)
 				if err != nil {
-					a.logger.Error("error responding to start workload request", slog.Any("err", err))
+					a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 				}
 			}
 			return
@@ -574,10 +574,10 @@ func (a *Runner) handleSetLameduck() func(micro.Request) {
 
 		err = r.RespondJSON(models.LameduckResponse{Success: true})
 		if err != nil {
-			a.logger.Error("error responding to set lameduck request", slog.Any("err", err))
+			a.logger.Error("error responding to set lameduck request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 	}
@@ -587,10 +587,10 @@ func (a *Runner) handlePing() func(micro.Request) {
 	return func(r micro.Request) {
 		resp, err := a.agent.Ping()
 		if err != nil {
-			a.logger.Error("error pinging agent", slog.Any("err", err))
+			a.logger.Error("error pinging agent", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 
@@ -599,10 +599,10 @@ func (a *Runner) handlePing() func(micro.Request) {
 
 		err = r.RespondJSON(resp, micro.WithHeaders(micro.Headers(h)))
 		if err != nil {
-			a.logger.Error("error responding to ping agent request", slog.Any("err", err))
+			a.logger.Error("error responding to ping agent request", slog.String("err", err.Error()))
 			err = r.Error("100", err.Error(), nil)
 			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.Any("err", err))
+				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
 			}
 		}
 	}
@@ -627,7 +627,7 @@ func (a *Runner) handleDiscoverWorkload() func(micro.Request) {
 
 		err := r.Respond(fmt.Appendf([]byte{}, `{"node_id":"%s"}`, a.nodeId))
 		if err != nil {
-			a.logger.Error("error responding to workload ping", slog.Any("err", err))
+			a.logger.Error("error responding to workload ping", slog.String("err", err.Error()))
 		}
 	}
 }
