@@ -355,7 +355,7 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 		tW.Style().Title.Align = text.AlignCenter
 		tW.Style().Format.Header = text.FormatDefault
 
-		tW.AppendHeader(table.Row{"Nexus", "ID (* = Lameduck Mode)", "Name", "Uptime", "State", "Running Agents"})
+		tW.AppendHeader(table.Row{"Nexus", "ID (* = Lameduck Mode)", "Name", "Version", "Uptime", "State", "Running Agents"})
 		for _, nInfo := range resp {
 			nexus, ok := nInfo.Tags[models.TagNexus]
 			if !ok {
@@ -372,7 +372,7 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 				id = id + "*"
 			}
 
-			tW.AppendRow(table.Row{nexus, id, name, nInfo.Uptime, nInfo.State, nInfo.AgentCount})
+			tW.AppendRow(table.Row{nexus, id, name, nInfo.Version, nInfo.Uptime, nInfo.State, nInfo.AgentCount})
 		}
 
 		tW.SortBy([]table.SortBy{
