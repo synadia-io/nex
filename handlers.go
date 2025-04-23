@@ -54,7 +54,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 			NodeId:     pubKey,
 			Tags:       n.tags,
 			Uptime:     time.Since(n.startTime).String(),
-			Version:    VERSION,
+			Version:    n.version,
 			Xkey:       pubXKey,
 			State:      n.nodeState,
 		})
@@ -201,7 +201,7 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 			Xkey:           pubXKey,
 			Tags:           n.tags,
 			Uptime:         time.Since(n.startTime).String(),
-			Version:        VERSION,
+			Version:        n.version,
 		})
 		if err != nil {
 			n.logger.Error("failed to respond to node info request", slog.String("err", err.Error()))

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/synadia-labs/nex/models"
 
@@ -15,7 +14,7 @@ import (
 var (
 	VERSION   = "0.0.0"
 	COMMIT    = "development"
-	BUILDDATE = time.Now().Format(time.DateTime)
+	BUILDDATE = "unknown"
 )
 
 type NexCLI struct {
@@ -32,8 +31,13 @@ func main() {
 	}
 	userResourcePath := filepath.Join(userConfigPath, "nex")
 
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, "VERSION", VERSION)     //nolint
+	ctx = context.WithValue(ctx, "COMMIT", COMMIT)       //nolint
+	ctx = context.WithValue(ctx, "BUILDDATE", BUILDDATE) //nolint
+
 	nex := new(NexCLI)
-	ctx := kong.Parse(nex,
+	kctx := kong.Parse(nex,
 		kong.Name("nex"),
 		kong.Description("The NATS Execution Engine\n"+banner),
 		kong.UsageOnError(),
@@ -45,11 +49,11 @@ func main() {
 			"defaultResourcePath": userResourcePath,
 			"adminNamespace":      models.NodeSystemNamespace,
 		},
-		kong.BindTo(context.Background(), (*context.Context)(nil)),
+		kong.BindTo(ctx, (*context.Context)(nil)),
 		kong.Bind(&nex.Globals),
 	)
 
-	err = ctx.Run()
+	err = kctx.Run()
 	if err != nil {
 		fmt.Println("error: ", err.Error())
 	}

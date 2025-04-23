@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"runtime"
@@ -24,15 +25,15 @@ import (
 	sdk "github.com/synadia-io/nexlet.go/agent"
 )
 
-const (
-	VERSION = "0.0.0"
-)
-
 type (
 	NexNodeOption func(*NexNode) error
 	NexNode       struct {
 		ctx       context.Context
 		cancel    context.CancelFunc
+		version   string
+		commit    string
+		builddate string
+
 		logger    *slog.Logger
 		startTime time.Time
 
@@ -84,6 +85,10 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 
 	n := &NexNode{
 		ctx:       context.Background(),
+		version:   "0.0.0",
+		commit:    "development",
+		builddate: "unknown",
+
 		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		startTime: time.Time{},
 
@@ -159,9 +164,24 @@ func (n *NexNode) Start() error {
 		return err
 	}
 
+	version, ok := n.ctx.Value("VERSION").(string)
+	if ok {
+		n.version = version
+	}
+	commit, ok := n.ctx.Value("COMMIT").(string)
+	if ok {
+		n.commit = commit
+	}
+	builddate, ok := n.ctx.Value("BUILDDATE").(string)
+	if ok {
+		n.builddate = builddate
+	}
+
 	n.startTime = time.Now()
 	n.logger.Info("Starting nex node",
-		slog.String("version", VERSION),
+		slog.String("version", n.version),
+		slog.String("commit", n.commit),
+		slog.String("build_date", n.builddate),
 		slog.String("node_id", pubKey),
 		slog.String("name", n.name),
 		slog.String("nexus", n.nexus),
@@ -201,8 +221,9 @@ func (n *NexNode) Start() error {
 	}
 
 	n.service, err = micro.AddService(n.nc, micro.Config{
-		Name:    "nexnode",
-		Version: VERSION,
+		Name:        "nexnode",
+		Version:     n.version,
+		Description: fmt.Sprintf("Commit: %s | Build date: %s", n.commit, n.builddate),
 	})
 	if err != nil {
 		return err
