@@ -287,6 +287,25 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 	return nil
 }
 
+// This is used to unregister a trigger that was registered with the workload
+// If a workload is stopped via successful StopWorkloadRequest, the trigger will be unregistered automatically
+// If the workload fails to start inside a nexlet, use this function to clean up any unused triggers
+func (a *Runner) UnregisterTrigger(workloadId string) error {
+	sub, ok := a.triggers[workloadId]
+	if !ok {
+		a.logger.Debug("attempted to unregister a non-existent trigger", slog.String("workload_id", workloadId))
+		return nil
+	}
+
+	err := sub.Unsubscribe()
+	if err != nil {
+		return fmt.Errorf("failed to unsubscribe trigger for workload %s: %w", workloadId, err)
+	}
+
+	delete(a.triggers, workloadId)
+	return nil
+}
+
 func (a *Runner) RegisterTriggerWithAgent(namespace, workloadId string, tFunc func([]byte) ([]byte, error)) error {
 	sub, err := a.nc.Subscribe(fmt.Sprintf("%s.%s.%s.TRIGGER", models.WorkloadAPIPrefix, namespace, workloadId), func(m *nats.Msg) {
 		go func() {
@@ -400,7 +419,7 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 		}
 
 		err = a.agent.StopWorkload(workloadId, req)
-		if err != nil && err.Error() == "workload not found" { // TODO: this is a hack for native
+		if err != nil && err.Error() == "workload not found" { // TODO: this is a hack for native, podman, deno
 			return
 		}
 		if err != nil {
@@ -427,11 +446,9 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			}
 		}
 
-		if sub, ok := a.triggers[workloadId]; ok {
-			err := sub.Unsubscribe()
-			if err != nil {
-				a.logger.Error("error unsubscribing trigger", slog.String("err", err.Error()))
-			}
+		err = a.UnregisterTrigger(workloadId)
+		if err != nil {
+			a.logger.Error("error unsubscribing trigger", slog.String("err", err.Error()))
 		}
 
 		if _, ok := a.agent.(AgentIngessWorkloads); ok {
