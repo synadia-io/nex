@@ -375,6 +375,12 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 		}
 
 		stopWorkload, err := n.nc.Request(models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), time.Second*5)
+		// If none of the agents on this node have the workload, we will get a timeout
+		// this is expected and we should just return and not log an error
+		if errors.Is(err, nats.ErrTimeout) {
+			n.logger.Debug("node does not have workload")
+			return
+		}
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish stop workload request")
 			return
@@ -667,7 +673,21 @@ func (n *NexNode) handlerError(r micro.Request, err error, code, msg string) {
 	if msg != "" {
 		n.logger.Error(msg, slog.String("err", err.Error()))
 	}
-	err = r.Error(code, msg, []byte(err.Error()))
+
+	errMsg := struct {
+		Error string `json:"error"`
+	}{
+		Error: err.Error(),
+	}
+
+	errMsgB, err := json.Marshal(errMsg)
+	if err != nil {
+		n.logger.Error("failed to marshal error message", slog.String("err", err.Error()))
+		errMsgB = []byte(`{}`)
+	}
+
+	// TODO: look into how to preserve original error as output by the logger
+	err = r.Error(code, msg, errMsgB)
 	if err != nil {
 		n.logger.Error("failed to send micro request error message", slog.String("err", err.Error()))
 	}
