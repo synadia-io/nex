@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/synadia-labs/nex/models"
 
 	"github.com/nats-io/nats.go"
@@ -26,6 +28,8 @@ type Runner struct {
 	registerType string // this is used in the --type field for workloads
 	version      string
 	logger       *slog.Logger
+	metrics      bool
+	metricsPort  int
 
 	nodeId   string
 	agentId  string
@@ -45,6 +49,19 @@ type RunnerOpt func(*Runner) error
 func WithLogger(logger *slog.Logger) RunnerOpt {
 	return func(a *Runner) error {
 		a.logger = logger
+		return nil
+	}
+}
+
+// WithMetrics enables the prometheus metrics endpoint
+// at http://localhost:<promPort>/metrics
+// Default port: 9095
+func WithPrometheusMetrics(promPort int) RunnerOpt {
+	return func(a *Runner) error {
+		if promPort > 0 && promPort <= 65535 {
+			a.metricsPort = promPort
+		}
+		a.metrics = true
 		return nil
 	}
 }
@@ -79,6 +96,8 @@ func NewRunner(ctx context.Context, nodeId string, na Agent, opts ...RunnerOpt) 
 		registerType: "default",
 		version:      "0.0.0",
 		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		metrics:      false,
+		metricsPort:  9095,
 
 		nodeId:   nodeId,
 		agent:    na,
@@ -103,6 +122,16 @@ func (a *Runner) GetLogger(workloadId, namespace string, lType LogType) io.Write
 }
 
 func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
+	if a.metrics {
+		go func() {
+			http.Handle("/metrics", promhttp.Handler())
+			err := http.ListenAndServe(fmt.Sprintf(":%d", a.metricsPort), nil)
+			if err != nil {
+				a.logger.Error("failed to start metrics server", slog.String("err", err.Error()), slog.String("agent_id", agentId))
+			}
+		}()
+	}
+
 	var err error
 	a.agentId = agentId
 
