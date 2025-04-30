@@ -144,6 +144,10 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 			RootAccountKey: n.issuerAcct,
 			SigningSeed:    n.signingKey,
 		}
+	} else if n.nc != nil {
+		n.minter = &credentials.FullAccessMinter{
+			NatsServer: n.nc.ConnectedUrl(),
+		}
 	}
 
 	n.ctx, n.cancel = context.WithCancel(n.ctx)
