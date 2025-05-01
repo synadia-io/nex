@@ -20,6 +20,7 @@ import (
 	"github.com/synadia-labs/nex"
 	"github.com/synadia-labs/nex/agents/native"
 	"github.com/synadia-labs/nex/client"
+	"github.com/synadia-labs/nex/internal/credentials"
 	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 )
@@ -179,6 +180,21 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 			return err
 		}
 		opts = append(opts, nex.WithInternalNatsServer(natsOpts))
+	}
+
+	if u.SigningKey != "" && u.RootAccountKey != "" {
+		minter := &credentials.SigningKeyMinter{
+			NodeId:         nodePub,
+			NatsServer:     nc.ConnectedUrl(),
+			RootAccountKey: u.RootAccountKey,
+			SigningSeed:    u.SigningKey,
+		}
+		opts = append(opts, nex.WithMinter(minter))
+	} else {
+		minter := &credentials.FullAccessMinter{
+			NatsServer: nc.ConnectedUrl(),
+		}
+		opts = append(opts, nex.WithMinter(minter))
 	}
 
 	for _, agent := range u.Agents {

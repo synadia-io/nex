@@ -132,24 +132,6 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		return nil, errs
 	}
 
-	pubKey, err := n.nodeKeypair.PublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	if n.signingKey != "" && n.nc != nil {
-		n.minter = &credentials.SigningKeyMinter{
-			NodeId:         pubKey,
-			NatsServer:     n.nc.ConnectedUrl(),
-			RootAccountKey: n.issuerAcct,
-			SigningSeed:    n.signingKey,
-		}
-	} else if n.nc != nil {
-		n.minter = &credentials.FullAccessMinter{
-			NatsServer: n.nc.ConnectedUrl(),
-		}
-	}
-
 	n.ctx, n.cancel = context.WithCancel(n.ctx)
 	n.tags[models.TagNexus] = n.nexus
 	n.tags[models.TagNodeName] = n.name
