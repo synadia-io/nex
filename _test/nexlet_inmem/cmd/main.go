@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-labs/nex/models"
@@ -31,8 +33,16 @@ func main() {
 		cancel()
 	}()
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
+	showTestLogsEnv, err := strconv.ParseBool(os.Getenv("NEX_TEST_LOGS"))
+	if err != nil {
+		showTestLogsEnv = false
+	}
+	logger := slog.New(slog.NewTextHandler(func() io.Writer {
+		if showTestLogsEnv {
+			return os.Stdout
+		}
+		return io.Discard
+	}(), &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	agentId, ok := os.LookupEnv("NEX_AGENT_ASSIGNED_ID")
 	if !ok {

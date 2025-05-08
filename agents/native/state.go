@@ -75,7 +75,7 @@ func (n *nexletState) GetNamespaceWorkloadList(ns string) (*models.AgentListWork
 
 	ret := new(models.AgentListWorkloadsResponse)
 	namespace, ok := n.workloads[ns]
-	if !ok {
+	if !ok || len(namespace) == 0 {
 		return ret, nil
 	}
 
@@ -88,7 +88,7 @@ func (n *nexletState) GetNamespaceWorkloadList(ns string) (*models.AgentListWork
 			StartTime:         w.StartedAt.Format(time.RFC3339),
 			WorkloadLifecycle: string(w.StartRequest.WorkloadLifecycle),
 			WorkloadState:     w.GetState(),
-			WorkloadType:      NEXLET_NAME,
+			WorkloadType:      NEXLET_REGISTER_TYPE,
 			Tags:              w.StartRequest.Tags,
 		}
 		*ret = append(*ret, ws)

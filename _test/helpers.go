@@ -6,12 +6,14 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/synadia-io/nexlet.go/agent"
 	"github.com/synadia-labs/nex"
 	testminter "github.com/synadia-labs/nex/_test/minter"
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
@@ -64,12 +66,22 @@ func StartNatsServer(t testing.TB, workDir string) *server.Server {
 	return server
 }
 
-func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, state bool) []*nex.NexNode {
+func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, state bool, runners ...*agent.Runner) []*nex.NexNode {
 	t.Helper()
+
+	showTestLogsEnv, err := strconv.ParseBool(os.Getenv("NEX_TEST_LOGS"))
+	if err != nil {
+		showTestLogsEnv = false
+	}
 
 	ret := make([]*nex.NexNode, size)
 	for i := 0; i < size; i++ {
-		logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		logger := slog.New(slog.NewTextHandler(func() io.Writer {
+			if showTestLogsEnv {
+				return os.Stdout
+			}
+			return io.Discard
+		}(), &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 		nc, err := nats.Connect(natsUrl)
 		be.NilErr(t, err)
@@ -98,7 +110,11 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 			nex.WithTag("foo", "bar"),
 		}
 
-		if !debugNodeNoRunner {
+		for _, runner := range runners {
+			opts = append(opts, nex.WithAgentRunner(runner))
+		}
+
+		if len(runners) == 0 {
 			runner, err := inmem.NewInMemAgent(pubKey, logger)
 			be.NilErr(t, err)
 			opts = append(opts, nex.WithAgentRunner(runner))

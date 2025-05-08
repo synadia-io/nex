@@ -98,6 +98,10 @@ func CloneWorkloadRequestSubject(inNS, inWorkloadID string) string {
 	return fmt.Sprintf("%s.%s.CLONE.%s", ControlAPIPrefix, inNS, inWorkloadID)
 }
 
+func GetAgentIdByNameSubject(inNodeId string) string {
+	return fmt.Sprintf("%s.%s.AGENTID.%s", ControlAPIPrefix, NodeSystemNamespace, inNodeId)
+}
+
 // Subscribe Subjects
 func AuctionSubscribeSubject() string {
 	// $NEX.control.namespace.AUCTION

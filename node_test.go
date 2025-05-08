@@ -145,7 +145,7 @@ func TestNodeStartStop(t *testing.T) {
 	}
 
 	be.Equal(t, 1, nn.agentCount())
-	be.Equal(t, 19, nc.NumSubscriptions())
+	be.Equal(t, 20, nc.NumSubscriptions())
 	be.Equal(t, models.NodeStateRunning, nn.nodeState)
 
 	cancel()

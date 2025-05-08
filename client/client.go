@@ -103,7 +103,7 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 	var errs error
 	resp := []*models.NodePingResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
-		if err == nil {
+		if err == nil && m.Data != nil && string(m.Data) != "null" {
 			t := new(models.NodePingResponse)
 			err = json.Unmarshal(m.Data, t)
 			if err == nil {
@@ -200,16 +200,40 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 		return nil, err
 	}
 
-	// BUG: this is coming back empty and shouldnt be
-	_, err = n.nc.Request(models.UndeployRequestSubject(n.namespace, workloadId), reqB, defaultTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(500*time.Millisecond))
 	if err != nil {
-		return nil, err
+		return &models.StopWorkloadResponse{
+			Id:           workloadId,
+			Message:      err.Error(),
+			Stopped:      false,
+			WorkloadType: "",
+		}, nil
 	}
 
-	return &models.StopWorkloadResponse{
-		Id:      workloadId,
-		Stopped: true,
-	}, nil
+	ret := &models.StopWorkloadResponse{
+		Id:           workloadId,
+		Message:      string(models.GenericErrorsWorkloadNotFound),
+		Stopped:      false,
+		WorkloadType: "",
+	}
+
+	msgs(func(m *nats.Msg, e error) bool {
+		if e == nil && m.Data != nil && string(m.Data) != "null" {
+			var swresp models.StopWorkloadResponse
+			err = json.Unmarshal(m.Data, &swresp)
+			if err == nil {
+				if swresp.Stopped {
+					_ = json.Unmarshal(m.Data, ret)
+					return false
+				}
+			}
+		}
+		return true
+	})
+
+	return ret, nil
 }
 
 func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloadsResponse, error) {
@@ -237,10 +261,10 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 	var errs error
 	resp := []*models.AgentListWorkloadsResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
-		if err == nil {
+		if err == nil && m.Data != nil && string(m.Data) != "null" {
 			t := new(models.AgentListWorkloadsResponse)
 			err = json.Unmarshal(m.Data, t)
-			if err == nil {
+			if err == nil && len(*t) > 0 {
 				resp = append(resp, t)
 			}
 		}

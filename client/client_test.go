@@ -41,7 +41,7 @@ func TestNexClient_User(t *testing.T) {
 		}
 	}()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
@@ -343,6 +343,123 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			}
 
 			be.Equal(t, 2, totalCount)
+
+			for _, node := range nexNodes {
+				be.NilErr(t, node.Shutdown())
+			}
+		})
+	}
+}
+
+func TestNexClient_StopWorkloadDNE(t *testing.T) {
+	nodeSize := []struct {
+		name string
+		size int
+	}{
+		{"OneNodeNexus", 1},
+		{"ThreeNodeNexus", 3},
+		{"FiveNodeNexus", 5},
+	}
+
+	for _, tt := range nodeSize {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workDir := t.TempDir()
+			server := _test.StartNatsServer(t, workDir)
+			defer func() {
+				for server.NumClients() == 0 {
+					server.Shutdown()
+					return
+				}
+			}()
+
+			nc, err := nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+
+			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), tt.size, false)
+			be.Equal(t, tt.size, len(nexNodes))
+
+			nc, err = nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			client := NewClient(nc, "user")
+			be.Nonzero(t, client)
+
+			str, err := client.StopWorkload("abc123")
+			be.NilErr(t, err)
+
+			be.False(t, str.Stopped)
+			be.Equal(t, "", str.WorkloadType)
+			be.Equal(t, "abc123", str.Id)
+			be.Equal(t, string(models.GenericErrorsWorkloadNotFound), str.Message)
+
+			for _, node := range nexNodes {
+				be.NilErr(t, node.Shutdown())
+			}
+		})
+	}
+}
+
+func TestNexClient_StopWorkload(t *testing.T) {
+	nodeSize := []struct {
+		name string
+		size int
+	}{
+		{"OneNodeNexus", 1},
+		{"ThreeNodeNexus", 3},
+		{"FiveNodeNexus", 5},
+	}
+
+	for _, tt := range nodeSize {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workDir := t.TempDir()
+			server := _test.StartNatsServer(t, workDir)
+			defer func() {
+				for server.NumClients() == 0 {
+					server.Shutdown()
+					return
+				}
+			}()
+
+			nc, err := nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+
+			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), tt.size, false)
+			be.Equal(t, tt.size, len(nexNodes))
+
+			nc, err = nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			client := NewClient(nc, "user")
+			be.Nonzero(t, client)
+
+			ar, err := client.Auction("inmem", map[string]string{})
+			be.NilErr(t, err)
+			be.Equal(t, tt.size, len(ar))
+
+			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			be.NilErr(t, err)
+
+			time.Sleep(250 * time.Millisecond)
+
+			str, err := client.StopWorkload(swr.Id)
+			be.NilErr(t, err)
+
+			be.True(t, str.Stopped)
+			be.Equal(t, "inmem", str.WorkloadType)
+			be.Equal(t, swr.Id, str.Id)
+			be.Zero(t, str.Message)
 
 			for _, node := range nexNodes {
 				be.NilErr(t, node.Shutdown())

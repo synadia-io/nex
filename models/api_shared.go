@@ -149,6 +149,36 @@ func (j *EncEnv) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type GenericErrors string
+
+const GenericErrorsNamespaceNotFound GenericErrors = "namespace not found"
+const GenericErrorsWorkloadNotFound GenericErrors = "workload not found"
+
+var enumValues_GenericErrors = []interface{}{
+	"workload not found",
+	"namespace not found",
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *GenericErrors) UnmarshalJSON(value []byte) error {
+	var v string
+	if err := json.Unmarshal(value, &v); err != nil {
+		return err
+	}
+	var ok bool
+	for _, expected := range enumValues_GenericErrors {
+		if reflect.DeepEqual(v, expected) {
+			ok = true
+			break
+		}
+	}
+	if !ok {
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_GenericErrors, v)
+	}
+	*j = GenericErrors(v)
+	return nil
+}
+
 type LameduckRequest struct {
 	// Time delay before lameduck mode is set
 	Delay string `json:"delay"`

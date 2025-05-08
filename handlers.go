@@ -374,28 +374,41 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		stopWorkload, err := n.nc.Request(models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), time.Second*5)
-		// If none of the agents on this node have the workload, we will get a timeout
-		// this is expected and we should just return and not log an error
-		if errors.Is(err, nats.ErrTimeout) {
-			n.logger.Debug("node does not have workload")
-			return
-		}
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to publish stop workload request")
-			return
+		ret := &models.StopWorkloadResponse{
+			Id:           workloadId,
+			Message:      string(models.GenericErrorsWorkloadNotFound),
+			Stopped:      false,
+			WorkloadType: "",
 		}
 
-		err = r.Respond(stopWorkload.Data)
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), natsext.RequestManyStall(500*time.Millisecond))
+		if err != nil {
+			err = r.RespondJSON(ret)
+			if err != nil {
+				n.logger.Error("failed to respond to stop workload request", slog.String("err", err.Error()))
+				return
+			}
+		}
+
+		msgs(func(m *nats.Msg, e error) bool {
+			if e == nil && m.Data != nil && string(m.Data) != "null" {
+				var swresp models.StopWorkloadResponse
+				err = json.Unmarshal(m.Data, &swresp)
+				if err == nil {
+					if swresp.Stopped {
+						_ = json.Unmarshal(m.Data, ret)
+						return false
+					}
+				}
+			}
+			return true
+		})
+
+		err = r.RespondJSON(ret)
 		if err != nil {
 			n.logger.Error("failed to respond to stop workload request", slog.String("err", err.Error()))
-			return
-		}
-
-		ret := new(models.StopWorkloadResponse)
-		err = json.Unmarshal(stopWorkload.Data, ret)
-		if err != nil {
-			n.logger.Error("failed to unmarshal stop workload response", slog.String("err", err.Error()))
 			return
 		}
 
@@ -664,6 +677,26 @@ func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 		err = r.RespondJSON(ret)
 		if err != nil {
 			n.logger.Error("failed to respond to register remote agent request", slog.String("err", err.Error()))
+			return
+		}
+	}
+}
+
+func (n *NexNode) handleGetAgentIdByName() func(micro.Request) {
+	return func(r micro.Request) {
+		agentName := string(r.Data())
+		if agentName == "" {
+			_ = r.Respond([]byte{})
+			return
+		}
+		agentId, _, found := n.regs.Find(agentName)
+		if !found {
+			_ = r.Respond([]byte{})
+			return
+		}
+		err := r.Respond([]byte(agentId))
+		if err != nil {
+			n.logger.Error("failed to respond to get agent id by name request", slog.String("err", err.Error()))
 			return
 		}
 	}

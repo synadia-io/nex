@@ -221,6 +221,7 @@ func (n *NexNode) Start() error {
 	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIdByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// System only agent endpoints
 	if n.allowAgentRegistration {
 		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.RegisterRemoteAgentSubject()), micro.WithEndpointQueueGroup(n.nexus)))
@@ -326,6 +327,8 @@ func (n *NexNode) Start() error {
 			}
 		}
 	}()
+
+	time.Sleep(time.Second) // allow for local registrations to finish
 
 	if n.regs.Count() == 0 {
 		n.logger.Warn("nex node started without any agents")
