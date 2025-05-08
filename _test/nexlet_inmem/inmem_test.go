@@ -1,6 +1,8 @@
 package inmem
 
 import (
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -42,6 +44,7 @@ func newInmemAgent(t testing.TB, withState bool) *InMemAgent {
 		},
 		XPair:     kp,
 		StartTime: time.Now(),
+		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 }
 

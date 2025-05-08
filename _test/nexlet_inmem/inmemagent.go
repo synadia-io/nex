@@ -155,7 +155,7 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 	workloads, ok := a.Workloads.State[stopRequest.Namespace]
 	if !ok {
 		fmt.Printf("no workloads found for namespace %s", stopRequest.Namespace)
-		return errors.New("workload not found")
+		return errors.New(string(models.GenericErrorsNamespaceNotFound))
 	}
 
 	for i, workload := range workloads {
@@ -171,7 +171,7 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 		}
 	}
 
-	return errors.New("workload not found")
+	return errors.New(string(models.GenericErrorsWorkloadNotFound))
 }
 
 func (a *InMemAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
@@ -270,5 +270,5 @@ func (a *InMemAgent) GetWorkload(workloadId, targetXkey string) (*models.StartWo
 			}
 		}
 	}
-	return nil, errors.New("workload not found")
+	return nil, errors.New(string(models.GenericErrorsWorkloadNotFound))
 }
