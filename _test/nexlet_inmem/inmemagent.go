@@ -31,7 +31,7 @@ type InMemAgent struct {
 	StartTime time.Time
 	Runner    *agent.Runner
 
-	logger *slog.Logger
+	Logger *slog.Logger
 }
 
 type InMemWorkload struct {
@@ -61,7 +61,7 @@ func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 		},
 		XPair:     xkp,
 		StartTime: time.Now(),
-		logger:    logger,
+		Logger:    logger,
 	}
 
 	opts := []agent.RunnerOpt{
@@ -115,7 +115,7 @@ func (a *InMemAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 }
 
 func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
-	a.logger.Debug("StartWorkload received", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
+	a.Logger.Debug("StartWorkload received", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
 
 	if existing {
 		slog.Info("restarting existing workload", slog.String("workloadId", workloadId))
@@ -139,7 +139,7 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 		startRequest: &startRequest.Request,
 	})
 
-	a.logger.Debug("StartWorkload successful")
+	a.Logger.Debug("StartWorkload successful")
 	return &models.StartWorkloadResponse{
 		Id:   workloadId,
 		Name: startRequest.Request.Name,
@@ -147,7 +147,7 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 }
 
 func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWorkloadRequest) error {
-	a.logger.Debug("StopWorkload received", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
+	a.Logger.Debug("StopWorkload received", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
 
 	a.Workloads.Lock()
 	defer a.Workloads.Unlock()
@@ -166,7 +166,7 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 			} else {
 				a.Workloads.State[stopRequest.Namespace] = workloads
 			}
-			a.logger.Debug("StopWorkload successful", slog.String("workloadId", workloadId))
+			a.Logger.Debug("StopWorkload successful", slog.String("workloadId", workloadId))
 			return nil
 		}
 	}
@@ -175,13 +175,13 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 }
 
 func (a *InMemAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
-	a.logger.Debug("QueryWorkloads received", slog.String("namespace", namespace), slog.String("filter", strings.Join(filter, ",")))
+	a.Logger.Debug("QueryWorkloads received", slog.String("namespace", namespace), slog.String("filter", strings.Join(filter, ",")))
 	a.Workloads.RLock()
 	defer a.Workloads.RUnlock()
 
 	workloads, ok := a.Workloads.State[namespace]
 	if !ok {
-		a.logger.Debug("namespace not found", slog.String("namespace", namespace))
+		a.Logger.Debug("namespace not found", slog.String("namespace", namespace))
 		return &models.AgentListWorkloadsResponse{}, nil
 	}
 
@@ -209,12 +209,12 @@ func (a *InMemAgent) QueryWorkloads(namespace string, filter []string) (*models.
 		resp = filteredResp
 	}
 
-	a.logger.Debug("QueryWorkloads successful", slog.String("namespace", namespace), slog.String("filter", strings.Join(filter, ",")))
+	a.Logger.Debug("QueryWorkloads successful", slog.String("namespace", namespace), slog.String("filter", strings.Join(filter, ",")))
 	return &resp, nil
 }
 
 func (a *InMemAgent) SetLameduck(before time.Duration) error {
-	a.logger.Debug("SetLameduck received", slog.Duration("before", before))
+	a.Logger.Debug("SetLameduck received", slog.Duration("before", before))
 
 	a.Workloads.Lock()
 	defer a.Workloads.Unlock()
@@ -223,7 +223,7 @@ func (a *InMemAgent) SetLameduck(before time.Duration) error {
 		delete(a.Workloads.State, k)
 	}
 
-	a.logger.Debug("SetLameduck successful")
+	a.Logger.Debug("SetLameduck successful")
 	return nil
 }
 
