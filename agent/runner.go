@@ -113,6 +113,13 @@ func NewRunner(ctx context.Context, nodeId string, na Agent, opts ...RunnerOpt) 
 	return a, nil
 }
 
+func (a *Runner) ServiceIsRunning() bool {
+	if a.micro == nil {
+		return false
+	}
+	return !a.micro.Stopped()
+}
+
 func (a *Runner) String() string {
 	return fmt.Sprintf("%s-%s", a.registerType, a.name)
 }
@@ -437,33 +444,30 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 5)
 		workloadId := splitSub[4]
 
+		ret := models.StopWorkloadResponse{
+			Id:           workloadId,
+			WorkloadType: a.registerType,
+			Stopped:      true,
+			Message:      "",
+		}
+
 		req := new(models.StopWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
 			a.logger.Error("error unmarshalling stop workload request", slog.String("err", err.Error()))
-			err = r.Error("100", err.Error(), nil)
-			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
-			}
+			ret.Stopped = false
+			ret.Message = string(models.GenericErrorsWorkloadNotFound)
+			handlerError(a.logger, r, err, "100", ret)
+			return
 		}
 
 		err = a.agent.StopWorkload(workloadId, req)
-		if err != nil && err.Error() == "workload not found" { // TODO: this is a hack for native, podman, deno
-			return
-		}
 		if err != nil {
-			a.logger.Error("error stopping workload request", slog.String("err", err.Error()))
-			err = r.Error("100", err.Error(), nil)
-			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
-			}
-		}
-
-		ret := models.StopWorkloadResponse{
-			Id:           workloadId,
-			Message:      "Success",
-			Stopped:      true,
-			WorkloadType: a.registerType,
+			a.logger.Debug("failed to stop workload", slog.String("err", err.Error()))
+			ret.Stopped = false
+			ret.Message = string(models.GenericErrorsWorkloadNotFound)
+			handlerError(a.logger, r, err, "100", ret)
+			return
 		}
 
 		err = r.RespondJSON(ret)
@@ -686,5 +690,17 @@ func (a *Runner) handleReceivedEvent() func(micro.Request) {
 			return
 		}
 		aE.EventListener(r.Data())
+	}
+}
+
+func handlerError[T models.StopWorkloadResponse | models.StartWorkloadResponse](logger *slog.Logger, r micro.Request, e error, code string, payload T) {
+	payload_b, err := json.Marshal(payload)
+	if err != nil {
+		logger.Error("error marshalling payload", slog.String("err", err.Error()))
+	}
+
+	err = r.Error(code, e.Error(), payload_b)
+	if err != nil {
+		logger.Error("failed to send micro request error message", slog.String("err", err.Error()))
 	}
 }
