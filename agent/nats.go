@@ -12,6 +12,7 @@ func configureNatsConnection(connData models.NatsConnectionData) (*nats.Conn, er
 
 	opts := []nats.Option{
 		nats.Name(connData.ConnName),
+		nats.MaxReconnects(-1),
 	}
 
 	if connData.TlsCert != "" && connData.TlsKey != "" {
