@@ -22,6 +22,7 @@ func TestRunnerConstructor(t *testing.T) {
 
 		nodeId:   "abc123",
 		agent:    nil,
+		agentId:  "default",
 		triggers: make(map[string]*nats.Subscription),
 	}
 

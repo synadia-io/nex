@@ -101,6 +101,7 @@ func NewRunner(ctx context.Context, nodeId string, na Agent, opts ...RunnerOpt) 
 
 		nodeId:   nodeId,
 		agent:    na,
+		agentId:  "default",
 		triggers: make(map[string]*nats.Subscription),
 	}
 
@@ -374,31 +375,28 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 		req := new(models.AgentStartWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			a.logger.Error("error unmarshalling start workload request", slog.String("err", err.Error()), slog.String("data", string(r.Data())))
-			err = r.Error("100", err.Error(), nil)
-			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
-			}
+			handlerError(a.logger, r, err, "100", models.StartWorkloadResponse{
+				Id:   workloadId,
+				Name: req.Request.Name,
+			})
 			return
 		}
 
 		startResp, err := a.agent.StartWorkload(workloadId, req, false)
 		if err != nil {
-			a.logger.Error("failed to start workload", slog.String("err", err.Error()))
-			err = r.Error("100", err.Error(), nil)
-			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
-			}
+			handlerError(a.logger, r, err, "100", models.StartWorkloadResponse{
+				Id:   workloadId,
+				Name: req.Request.Name,
+			})
 			return
 		}
 
 		err = r.RespondJSON(startResp)
 		if err != nil {
-			a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
-			err = r.Error("100", err.Error(), nil)
-			if err != nil {
-				a.logger.Error("error responding to start workload request", slog.String("err", err.Error()))
-			}
+			handlerError(a.logger, r, err, "100", models.StartWorkloadResponse{
+				Id:   workloadId,
+				Name: req.Request.Name,
+			})
 			return
 		}
 
@@ -694,6 +692,8 @@ func (a *Runner) handleReceivedEvent() func(micro.Request) {
 }
 
 func handlerError[T models.StopWorkloadResponse | models.StartWorkloadResponse](logger *slog.Logger, r micro.Request, e error, code string, payload T) {
+	logger.Error("error handling micro request", slog.String("err", e.Error()), slog.String("code", code))
+
 	payload_b, err := json.Marshal(payload)
 	if err != nil {
 		logger.Error("error marshalling payload", slog.String("err", err.Error()))
