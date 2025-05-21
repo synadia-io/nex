@@ -25,6 +25,7 @@ var (
 
 type InMemAgent struct {
 	Name      string
+	Nexus     string
 	Version   string
 	Workloads Workloads
 	XPair     nkeys.KeyPair
@@ -47,7 +48,7 @@ type Workloads struct {
 	State map[string][]InMemWorkload
 }
 
-func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
+func NewInMemAgent(nexus, nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 	xkp, err := nkeys.CreateCurveKeys()
 	if err != nil {
 		return nil, err
@@ -55,6 +56,7 @@ func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 
 	inmemAgent := &InMemAgent{
 		Name:    agentName,
+		Nexus:   nexus,
 		Version: VERSION,
 		Workloads: Workloads{
 			State: make(map[string][]InMemWorkload),
@@ -72,7 +74,7 @@ func NewInMemAgent(nodeId string, logger *slog.Logger) (*agent.Runner, error) {
 		return nil, errors.New("node id is not a valid public server key")
 	}
 
-	inmemAgent.Runner, err = agent.NewRunner(context.Background(), nodeId, inmemAgent, opts...)
+	inmemAgent.Runner, err = agent.NewRunner(context.Background(), nexus, nodeId, inmemAgent, opts...)
 	if err != nil {
 		return nil, err
 	}

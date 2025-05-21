@@ -116,7 +116,7 @@ func TestNodeStartStop(t *testing.T) {
 	pub, err := kp.PublicKey()
 	be.NilErr(t, err)
 
-	r, err := inmem.NewInMemAgent(pub, logger)
+	r, err := inmem.NewInMemAgent("nexus", pub, logger)
 	be.NilErr(t, err)
 
 	nn, err := NewNexNode(
@@ -312,7 +312,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	pub, err := kp.PublicKey()
 	be.NilErr(t, err)
 
-	r, err := inmem.NewInMemAgent(pub, logger)
+	r, err := inmem.NewInMemAgent("nexus", pub, logger)
 	be.NilErr(t, err)
 
 	nn, err := NewNexNode(

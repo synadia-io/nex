@@ -265,10 +265,9 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 
 func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 	return func(r micro.Request) {
-		// $NEX.control.namespace.ADEPLOY.bidid
-		splitSub := strings.SplitN(r.Subject(), ".", 5)
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		namespace := splitSub[2]
-		bidId := splitSub[4]
+		bidId := splitSub[5]
 
 		if !n.auctionMap.Exists(bidId) {
 			// not this nodes bidder id (or it expired), throw away request
@@ -350,11 +349,9 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 
 func (n *NexNode) handleStopWorkload() func(micro.Request) {
 	return func(r micro.Request) {
-		// $NEX.control.system.UNDEPLOY.m3hNxFzennTGa0PLJxNKYk
-		// $NEX.control.namespace.UNDEPLOY.workloadid
-		splitSub := strings.SplitN(r.Subject(), ".", 5)
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		namespace := splitSub[2]
-		workloadId := splitSub[4]
+		workloadId := splitSub[5]
 
 		req := new(models.StopWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
@@ -422,10 +419,9 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 
 func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 	return func(r micro.Request) {
-		// $NEX.control.namespace.CLONE.workloadid
-		splitSub := strings.SplitN(r.Subject(), ".", 5)
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		namespace := splitSub[2]
-		workloadId := splitSub[4]
+		workloadId := splitSub[5]
 
 		req := new(models.CloneWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
@@ -544,9 +540,8 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 
 func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 	return func(r micro.Request) {
-		// return fmt.Sprintf("%s.%s.REGISTER.%s", AgentAPIPrefix, inAgentId, inNodeId)
-		splitSub := strings.SplitN(r.Subject(), ".", 5)
-		agentId := splitSub[2]
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
+		agentId := splitSub[5]
 
 		registrationRequest := new(models.RegisterAgentRequest)
 		err := json.Unmarshal(r.Data(), registrationRequest)

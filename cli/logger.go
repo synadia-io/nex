@@ -91,8 +91,8 @@ func configureLogger(globals *Globals, nc *nats.Conn, serverPublicKey string, sh
 		}
 	}
 	if slices.Contains(globals.Target, "nats") && nc != nil {
-		natsLogSubject := fmt.Sprintf("%s.%s.%s.stdout", models.LogAPIPrefix, models.NodeSystemNamespace, serverPublicKey)
-		natsErrLogSubject := fmt.Sprintf("%s.%s.%s.stderr", models.LogAPIPrefix, models.NodeSystemNamespace, serverPublicKey)
+		natsLogSubject := fmt.Sprintf("%s.%s.stdout", models.LogAPIPrefix(models.NodeSystemNamespace), serverPublicKey)
+		natsErrLogSubject := fmt.Sprintf("%s.%s.stderr", models.LogAPIPrefix(models.NodeSystemNamespace), serverPublicKey)
 		stdoutWriters = append(stdoutWriters, NewNatsLogger(nc, natsLogSubject))
 		stderrWriters = append(stderrWriters, NewNatsLogger(nc, natsErrLogSubject))
 	}

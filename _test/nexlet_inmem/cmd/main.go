@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"io"
 	"log/slog"
 	"os"
@@ -20,10 +21,14 @@ var (
 	BUILDDATE string = ""
 )
 
-var exitCode int = 1
+var (
+	exitCode int = 1
+	nexus        = flag.String("nexus", "nexus", "Nexus name to use for the agent")
+)
 
 func main() {
 	defer os.Exit(exitCode) //nolint
+	flag.Parse()
 
 	actx, cancel := context.WithCancel(context.Background())
 	sig := make(chan os.Signal, 1)
@@ -66,7 +71,7 @@ func main() {
 		return
 	}
 
-	myAgent, err := inmem.NewInMemAgent(nodeId, logger)
+	myAgent, err := inmem.NewInMemAgent(*nexus, nodeId, logger)
 	if err != nil {
 		slog.Error(err.Error())
 		return

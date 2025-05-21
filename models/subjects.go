@@ -4,131 +4,130 @@ import "fmt"
 
 const (
 	NodeSystemNamespace = "system"
-
-	ControlAPIPrefix  = "$NEX.control"
-	LogAPIPrefix      = "$NEX.logs"
-	EventAPIPrefix    = "$NEX.events"
-	AgentAPIPrefix    = "$NEX.agent"
-	WorkloadAPIPrefix = "$NEX.workload"
 )
 
-// System only agent subjects
-func StartAgentSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.START.%s", AgentAPIPrefix, NodeSystemNamespace, inNodeId)
-}
+var (
+	// Services
+	ControlAPIPrefix = func(ns string) string { return fmt.Sprintf("$NEX.SVC.%s.control", ns) }
+	AgentAPIPrefix   = func(ns string) string { return fmt.Sprintf("$NEX.SVC.%s.agent", ns) }
 
-func StopAgentSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.STOP.%s", AgentAPIPrefix, NodeSystemNamespace, inNodeId)
-}
+	// Feeds
+	LogAPIPrefix     = func(ns string) string { return fmt.Sprintf("$NEX.FEED.%s.logs", ns) }
+	MetricsAPIPrefix = func(ns string) string { return fmt.Sprintf("$NEX.FEED.%s.metrics", ns) }
+	EventAPIPrefix   = func(ns string) string { return fmt.Sprintf("$NEX.FEED.%s.events", ns) }
+)
 
-func RegisterRemoteAgentSubject() string {
-	return fmt.Sprintf("%s.%s.REGISTER", AgentAPIPrefix, NodeSystemNamespace)
-}
-
-func RegisterLocalAgentSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.REGISTER.%s", AgentAPIPrefix, NodeSystemNamespace, inNodeId)
-}
-
+// $NEX.SVC.system.events.nodeid
 func EmitSystemEventSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.%s", EventAPIPrefix, NodeSystemNamespace, inNodeId)
+	return fmt.Sprintf("%s.%s", EventAPIPrefix(NodeSystemNamespace), inNodeId)
 }
 
-// System only subjects
+// $NEX.SVC.namespace.control.PING
 func PingRequestSubject(inNamespace string) string {
-	return fmt.Sprintf("%s.%s.PING", ControlAPIPrefix, inNamespace)
+	return fmt.Sprintf("%s.PING", ControlAPIPrefix(inNamespace))
 }
 
+// $NEX.SVC.system.control.PING
 func PingSubscribeSubject() string {
-	return fmt.Sprintf("%s.%s.PING", ControlAPIPrefix, NodeSystemNamespace)
+	return fmt.Sprintf("%s.PING", ControlAPIPrefix(NodeSystemNamespace))
 }
 
+// $NEX.SVC.system.control.HEARTBEAT.nodeid
 func NodeEmitHeartbeatSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.HEARTBEAT.%s", ControlAPIPrefix, NodeSystemNamespace, inNodeId)
+	return fmt.Sprintf("%s.HEARTBEAT.%s", ControlAPIPrefix(NodeSystemNamespace), inNodeId)
 }
 
-func DirectDeploySubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.DDEPLOY.%s", ControlAPIPrefix, NodeSystemNamespace, inNodeId)
-}
-
+// $NEX.SVC.namespace.control.LAMEDUCK.nodeid
 func LameduckRequestSubject(inNamespace, inNodeId string) string {
-	return fmt.Sprintf("%s.%s.LAMEDUCK.%s", ControlAPIPrefix, inNamespace, inNodeId)
+	return fmt.Sprintf("%s.LAMEDUCK.%s", ControlAPIPrefix(inNamespace), inNodeId)
 }
 
+// $NEX.SVC.system.control.LAMEDUCK.nodeid
 func LameduckSubscribeSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.LAMEDUCK.%s", ControlAPIPrefix, NodeSystemNamespace, inNodeId)
+	return fmt.Sprintf("%s.LAMEDUCK.%s", ControlAPIPrefix(NodeSystemNamespace), inNodeId)
 }
 
+// $NEX.SVC.namespace.control.PING.nodeid
 func DirectPingRequestSubject(inNamespace, inNodeId string) string {
-	return fmt.Sprintf("%s.%s.PING.%s", ControlAPIPrefix, inNamespace, inNodeId)
+	return fmt.Sprintf("%s.PING.%s", ControlAPIPrefix(inNamespace), inNodeId)
 }
 
+// $NEX.SVC.system.control.PING.nodeid
 func DirectPingSubscribeSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.PING.%s", ControlAPIPrefix, NodeSystemNamespace, inNodeId)
+	return fmt.Sprintf("%s.PING.%s", ControlAPIPrefix(NodeSystemNamespace), inNodeId)
 }
 
+// $NEX.SVC.namespace.control.INFO.nodeid
 func NodeInfoRequestSubject(inNamespace, inNodeId string) string {
-	return fmt.Sprintf("%s.%s.INFO.%s", ControlAPIPrefix, inNamespace, inNodeId)
+	return fmt.Sprintf("%s.INFO.%s", ControlAPIPrefix(inNamespace), inNodeId)
 }
 
+// $NEX.SVC.system.control.INFO.nodeid
 func NodeInfoSubscribeSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.INFO.%s", ControlAPIPrefix, NodeSystemNamespace, inNodeId)
+	return fmt.Sprintf("%s.INFO.%s", ControlAPIPrefix(NodeSystemNamespace), inNodeId)
 }
 
+// $NEX.SVC.namespace.control.WPING
 func NamespacePingRequestSubject(inNS string) string {
-	return fmt.Sprintf("%s.%s.WPING", ControlAPIPrefix, inNS)
+	return fmt.Sprintf("%s.WPING", ControlAPIPrefix(inNS))
 }
 
+// $NEX.SVC.namespace.control.WPING.workloadid
 func WorkloadPingRequestSubject(inNS, inWorkload string) string {
-	return fmt.Sprintf("%s.%s.WPING.%s", ControlAPIPrefix, inNS, inWorkload)
+	return fmt.Sprintf("%s.WPING.%s", ControlAPIPrefix(inNS), inWorkload)
 }
 
+// $NEX.SVC.namespace.control.AUCTION
 func AuctionRequestSubject(inNS string) string {
-	return fmt.Sprintf("%s.%s.AUCTION", ControlAPIPrefix, inNS)
+	return fmt.Sprintf("%s.AUCTION", ControlAPIPrefix(inNS))
 }
 
+// $NEX.SVC.namespace.control.ADEPLOY.bidid
 func AuctionDeployRequestSubject(inNS, inBidId string) string {
-	return fmt.Sprintf("%s.%s.ADEPLOY.%s", ControlAPIPrefix, inNS, inBidId)
+	return fmt.Sprintf("%s.ADEPLOY.%s", ControlAPIPrefix(inNS), inBidId)
 }
 
+// $NEX.SVC.namespace.control.UNDEPLOY.workloadid
 func UndeployRequestSubject(inNS, inWorkloadID string) string {
-	return fmt.Sprintf("%s.%s.UNDEPLOY.%s", ControlAPIPrefix, inNS, inWorkloadID)
+	return fmt.Sprintf("%s.UNDEPLOY.%s", ControlAPIPrefix(inNS), inWorkloadID)
 }
 
+// $NEX.SVC.namespace.control.CLONE.workloadid
 func CloneWorkloadRequestSubject(inNS, inWorkloadID string) string {
-	return fmt.Sprintf("%s.%s.CLONE.%s", ControlAPIPrefix, inNS, inWorkloadID)
+	return fmt.Sprintf("%s.CLONE.%s", ControlAPIPrefix(inNS), inWorkloadID)
 }
 
+// $NEX.SVC.system.control.AGENTID.nodeid
 func GetAgentIdByNameSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s.AGENTID.%s", ControlAPIPrefix, NodeSystemNamespace, inNodeId)
+	return fmt.Sprintf("%s.AGENTID.%s", ControlAPIPrefix(SystemNamespace), inNodeId)
 }
 
-// Subscribe Subjects
+// $NEX.SVC.*.control.AUCTION
 func AuctionSubscribeSubject() string {
-	// $NEX.control.namespace.AUCTION
-	return ControlAPIPrefix + ".*.AUCTION"
+	return fmt.Sprintf("%s.AUCTION", ControlAPIPrefix("*"))
 }
 
+// $NEX.SVC.*.control.UNDEPLOY.workloadid
 func UndeploySubscribeSubject() string {
-	// $NEX.control.namespace.UNDEPLOY.workloadid
-	return ControlAPIPrefix + ".*.UNDEPLOY.*"
+	return fmt.Sprintf("%s.UNDEPLOY.*", ControlAPIPrefix("*"))
 }
 
+// $NEX.SVC.*.control.ADEPLOY.bidid
 func AuctionDeploySubscribeSubject() string {
-	// $NEX.control.namespace.ADEPLOY.bidid
-	return ControlAPIPrefix + ".*.ADEPLOY.*"
+	return fmt.Sprintf("%s.ADEPLOY.*", ControlAPIPrefix("*"))
 }
 
+// $NEX.SVC.*.control.CLONE.workloadid
 func CloneWorkloadSubscribeSubject() string {
-	// $NEX.control.namespace.CLONE.workloadid
-	return ControlAPIPrefix + ".*.CLONE.*"
+	return fmt.Sprintf("%s.CLONE.*", ControlAPIPrefix("*"))
 }
 
+// $NEX.SVC.*.control.WPING
 func NamespacePingSubscribeSubject() string {
-	// $NEX.control.namespace.WPING
-	return ControlAPIPrefix + ".*.WPING"
+	return fmt.Sprintf("%s.WPING", ControlAPIPrefix("*"))
 }
 
+// $NEX.SVC.*.control.WPING.workloadid
 func WorkloadPingSubscribeSubject() string {
-	// $NEX.control.namespace.WPING.workloadid
-	return ControlAPIPrefix + ".*.WPING.*"
+	return fmt.Sprintf("%s.WPING.*", ControlAPIPrefix("*"))
 }

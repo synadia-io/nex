@@ -115,7 +115,7 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 		}
 
 		if len(runners) == 0 {
-			runner, err := inmem.NewInMemAgent(pubKey, logger)
+			runner, err := inmem.NewInMemAgent("testnexus", pubKey, logger)
 			be.NilErr(t, err)
 			opts = append(opts, nex.WithAgentRunner(runner))
 		}

@@ -22,6 +22,7 @@ func TestSigningKeyMinter_MintRegister(t *testing.T) {
 
 	m := SigningKeyMinter{
 		NodeId:         kpPub,
+		Nexus:          "nexus",
 		NatsServer:     "nats://localhost:4222",
 		RootAccountKey: SigningKeyAccount,
 		SigningSeed:    SigningKey,
@@ -54,7 +55,7 @@ func TestSigningKeyMinter_Mint(t *testing.T) {
 		id    string
 		perms jwt.Permissions
 	}{
-		{"Agent Cred", models.AgentCred, "", "agentId", AgentClaims("agentId", kpPub)},
+		{"Agent Cred", models.AgentCred, "", "agentId", AgentClaims("agentId", kpPub, "nexus")},
 		{"Workload Cred", models.WorkloadCred, "user", "workloadId", WorkloadClaims("user", "workloadId")},
 	}
 
@@ -62,6 +63,7 @@ func TestSigningKeyMinter_Mint(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := SigningKeyMinter{
 				NodeId:         kpPub,
+				Nexus:          "nexus",
 				NatsServer:     "nats://localhost:4222",
 				RootAccountKey: SigningKeyAccount,
 				SigningSeed:    SigningKey,

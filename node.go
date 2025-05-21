@@ -224,7 +224,7 @@ func (n *NexNode) Start() error {
 	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIdByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// System only agent endpoints
 	if n.allowAgentRegistration {
-		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.RegisterRemoteAgentSubject()), micro.WithEndpointQueueGroup(n.nexus)))
+		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIRemoteRegisterSubscribeSubject()), micro.WithEndpointQueueGroup(n.nexus)))
 		// errs = errors.Join(errs, n.service.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 		// errs = errors.Join(errs, n.service.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	}

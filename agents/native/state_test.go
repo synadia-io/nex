@@ -22,7 +22,7 @@ func MockRunner(t testing.TB) (*agent.Runner, error) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	return agent.NewRunner(context.TODO(), "", nil, agent.WithLogger(logger))
+	return agent.NewRunner(context.TODO(), "nexus", "", nil, agent.WithLogger(logger))
 }
 
 func TestNexletState(t *testing.T) {

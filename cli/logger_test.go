@@ -49,7 +49,7 @@ func TestConfigureLogger(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	_, err = nc.Subscribe(fmt.Sprintf("%s.>", models.LogAPIPrefix), func(m *nats.Msg) {
+	_, err = nc.Subscribe(models.LogAPIPrefix(models.SystemNamespace)+".>", func(m *nats.Msg) {
 		switch strings.Contains(m.Subject, "stderr") {
 		case true:
 			be.Equal(t, fmt.Sprintf("%s [ERR] error\n", today), string(m.Data))
