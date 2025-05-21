@@ -36,6 +36,7 @@ var (
 
 type NativeAgent struct {
 	ctx       context.Context
+	logger    *slog.Logger
 	xkp       nkeys.KeyPair
 	startTime time.Time
 
@@ -46,9 +47,7 @@ type NativeAgent struct {
 
 //go:generate go tool github.com/atombender/go-jsonschema --struct-name-from-title --package native --tags json --output gen_start_request.go start_request.json
 func NewNativeWorkloadRunner(ctx context.Context, nodeId string, logger *slog.Logger) (*agent.Runner, error) {
-	slog.SetDefault(logger)
-
-	da, err := newNativeWorkloadAgent(ctx, nodeId, logger)
+	da, err := newNativeWorkloadAgent(ctx, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -66,11 +65,11 @@ func NewNativeWorkloadRunner(ctx context.Context, nodeId string, logger *slog.Lo
 		return nil, err
 	}
 
-	da.state = newNexletState(da.ctx, da.runner)
+	da.state = newNexletState(da.ctx, logger, da.runner)
 	return da.runner, nil
 }
 
-func newNativeWorkloadAgent(ctx context.Context, nodeId string, logger *slog.Logger) (*NativeAgent, error) {
+func newNativeWorkloadAgent(ctx context.Context, logger *slog.Logger) (*NativeAgent, error) {
 	xkp, err := nkeys.CreateCurveKeys()
 	if err != nil {
 		return nil, err
@@ -78,6 +77,7 @@ func newNativeWorkloadAgent(ctx context.Context, nodeId string, logger *slog.Log
 
 	da := &NativeAgent{
 		ctx:        ctx,
+		logger:     logger,
 		xkp:        xkp,
 		startTime:  time.Now(),
 		state:      new(nexletState),
@@ -132,7 +132,7 @@ func (a *NativeAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 }
 
 func (a *NativeAgent) StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
-	slog.Debug("start workload request received", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
+	a.logger.Debug("start workload request received", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
 
 	if req.Request.Name == "" {
 		seed := time.Now().UTC().UnixNano()

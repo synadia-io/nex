@@ -19,43 +19,6 @@ import (
 	"github.com/synadia-labs/nex/models"
 )
 
-// func startNexus(t testing.TB, ctx context.Context, natsUrl string, size int) {
-// 	t.Helper()
-//
-// 	nex := func(num int) NexCLI {
-// 		return NexCLI{
-// 			Globals: Globals{
-// 				Namespace: "system",
-// 				GlobalNats: GlobalNats{
-// 					NatsServers: []string{natsUrl},
-// 				},
-// 				// GlobalLogger: GlobalLogger{
-// 				// 	Target:   []string{"std"},
-// 				// 	LogLevel: "debug",
-// 				// },
-// 			},
-// 			Node: Node{
-// 				Up: Up{
-// 					Agents:             []AgentConfig{},
-// 					DisableNativeStart: true,
-// 					NodeName:           fmt.Sprintf("testnexus-%d", num),
-// 					NexusName:          "testnexus",
-// 					ResourceDir:        t.TempDir(),
-// 					Tags:               map[string]string{},
-// 				},
-// 			},
-// 		}
-// 	}
-//
-// 	for i := 0; i < size; i++ {
-// 		go func() {
-// 			n := nex(i)
-// 			err := n.Node.Up.Run(ctx, &n.Globals)
-// 			be.NilErr(t, err)
-// 		}()
-// 	}
-// }
-
 func TestNodeCommandDefaults(t *testing.T) {
 	nex := NexCLI{
 		Globals: Globals{},

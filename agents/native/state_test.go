@@ -21,7 +21,6 @@ func MockRunner(t testing.TB) (*agent.Runner, error) {
 	t.Helper()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	slog.SetDefault(logger)
 
 	return agent.NewRunner(context.TODO(), "", nil, agent.WithLogger(logger))
 }
@@ -45,6 +44,7 @@ func TestNexletState(t *testing.T) {
 	ns := nexletState{
 		Mutex:     sync.Mutex{},
 		ctx:       context.Background(),
+		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		runner:    mockRunner,
 		status:    "starting",
 		workloads: map[string]NativeProcesses{},
@@ -64,7 +64,7 @@ func TestNexletState(t *testing.T) {
 					Description:       "sleeper",
 					Name:              "sleeper",
 					Namespace:         "derp",
-					RunRequest:        fmt.Sprintf(`{"uri":"%s","args":["10"]}`, fmt.Sprintf("file://%s", sleepPath)),
+					RunRequest:        fmt.Sprintf(`{"uri":"%s","argv":["10"]}`, fmt.Sprintf("file://%s", sleepPath)),
 					WorkloadLifecycle: "service",
 					WorkloadType:      "native",
 				},

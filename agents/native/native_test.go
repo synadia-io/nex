@@ -21,7 +21,7 @@ func TestNewNativeRunner(t *testing.T) {
 
 func TestNewWorkloadAgent(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	na, err := newNativeWorkloadAgent(context.Background(), _test.Node1Pub, logger)
+	na, err := newNativeWorkloadAgent(context.Background(), logger)
 	be.NilErr(t, err)
 	be.Nonzero(t, na)
 

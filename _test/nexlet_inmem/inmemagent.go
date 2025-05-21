@@ -118,7 +118,7 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 	a.Logger.Debug("StartWorkload received", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
 
 	if existing {
-		slog.Info("restarting existing workload", slog.String("workloadId", workloadId))
+		a.Logger.Info("restarting existing workload", slog.String("workloadId", workloadId))
 	}
 
 	a.Workloads.Lock()
@@ -140,6 +140,14 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 	})
 
 	a.Logger.Debug("StartWorkload successful")
+	err := a.Runner.EmitEvent(models.WorkloadStartedEvent{
+		Id:        workloadId,
+		Metadata:  models.WorkloadStartedEventMetadata{},
+		Namespace: startRequest.Request.Namespace,
+	})
+	if err != nil {
+		a.Logger.Error("failed to emit workload started event", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
+	}
 	return &models.StartWorkloadResponse{
 		Id:   workloadId,
 		Name: startRequest.Request.Name,
@@ -167,6 +175,14 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 				a.Workloads.State[stopRequest.Namespace] = workloads
 			}
 			a.Logger.Debug("StopWorkload successful", slog.String("workloadId", workloadId))
+			err := a.Runner.EmitEvent(models.WorkloadStoppedEvent{
+				Id:        workloadId,
+				Metadata:  models.WorkloadStoppedEventMetadata{},
+				Namespace: stopRequest.Namespace,
+			})
+			if err != nil {
+				a.Logger.Error("failed to emit workload stopped event", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
+			}
 			return nil
 		}
 	}

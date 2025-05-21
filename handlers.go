@@ -334,7 +334,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		err = r.Respond(auctionDeploy.Data)
+		err = r.Respond(auctionDeploy.Data, micro.WithHeaders(micro.Headers(auctionDeploy.Header)))
 		if err != nil {
 			n.logger.Error("failed to respond to auction deploy workload request", slog.String("err", err.Error()))
 			return

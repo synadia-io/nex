@@ -103,12 +103,12 @@ func TestNodeStartStop(t *testing.T) {
 		}
 	}()
 
-	output := new(bytes.Buffer)
-	logger := slog.New(slog.NewJSONHandler(output, nil))
-
 	nc, err := nats.Connect(s.ClientURL())
 	be.NilErr(t, err)
 	defer nc.Close()
+
+	output := new(bytes.Buffer)
+	logger := slog.New(slog.NewJSONHandler(output, nil))
 
 	kp, err := nkeys.CreateServer()
 	be.NilErr(t, err)

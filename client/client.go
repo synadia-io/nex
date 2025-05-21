@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
 	"github.com/synadia-io/orbit.go/natsext"
@@ -179,6 +180,10 @@ func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, 
 	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, time.Minute)
 	if err != nil {
 		return nil, err
+	}
+
+	if startResponseMsg.Header.Get(micro.ErrorCodeHeader) != "" {
+		return nil, errors.New("Failed to start workload: " + startResponseMsg.Header.Get(micro.ErrorHeader))
 	}
 
 	startResponse := new(models.StartWorkloadResponse)
