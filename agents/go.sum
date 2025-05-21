@@ -107,10 +107,8 @@ github.com/spf13/pflag v1.0.5/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An
 github.com/stretchr/testify v0.0.0-20161117074351-18a02ba4a312/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
-github.com/synadia-io/nexlet.go v0.0.0-20250520135848-3e7d2ef7183e h1:AJyNWcCmuH4S0PlJrcuWvnb7xuBvldltSeoMovTitd4=
-github.com/synadia-io/nexlet.go v0.0.0-20250520135848-3e7d2ef7183e/go.mod h1:pWjpcax3FyjDCc13zlflXtmBuRTPJJSPONy2jMPhiqE=
-github.com/synadia-io/nexlet.go v0.0.0-20250521172651-6438fccc5bf9 h1:2lksIftJPa/+o4zbcK3bCW/5prdd21j/MZjMlL2qF2g=
-github.com/synadia-io/nexlet.go v0.0.0-20250521172651-6438fccc5bf9/go.mod h1:pWjpcax3FyjDCc13zlflXtmBuRTPJJSPONy2jMPhiqE=
+github.com/synadia-io/nexlet.go v0.0.0-20250521210422-5535f1dfac21 h1:aJRCdxwCuwR/gkUY1kT3L0oKvCJFFol1t1h5WicOKMw=
+github.com/synadia-io/nexlet.go v0.0.0-20250521210422-5535f1dfac21/go.mod h1:g3HoWp0sPz8niM3OXR3Po4/IBnMfMVcsws7vBEI5CFE=
 github.com/synadia-io/orbit.go/natsext v0.1.1 h1:ujoNs8vQtez640kkgXotSUZj2+GmsmqgjMKnJOLSE6s=
 github.com/synadia-io/orbit.go/natsext v0.1.1/go.mod h1:TbK/ch5qjAMr9HuCF+Guyws92rpWfotFarOuVjfJIv8=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
