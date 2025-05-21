@@ -21,12 +21,13 @@ func TestRunnerConstructor(t *testing.T) {
 		metricsPort:  9095,
 
 		nodeId:   "abc123",
+		nexus:    "xyz890",
 		agent:    nil,
 		agentId:  "default",
 		triggers: make(map[string]*nats.Subscription),
 	}
 
-	b, err := NewRunner(context.Background(), "abc123", nil)
+	b, err := NewRunner(context.Background(), "xyz890", "abc123", nil)
 	be.NilErr(t, err)
 
 	be.DeepEqual(t, a, b)

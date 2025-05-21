@@ -33,6 +33,7 @@ func TestRunningRunner(t *testing.T) {
 
 	inmemNexlet := &inmem.InMemAgent{
 		Name:    "inmem",
+		Nexus:   "nexus",
 		Version: "0.0.0-test",
 		Workloads: inmem.Workloads{
 			State: make(map[string][]inmem.InMemWorkload),
@@ -42,7 +43,7 @@ func TestRunningRunner(t *testing.T) {
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	runner, err := agent.NewRunner(context.Background(), _test.Node1Pub, inmemNexlet)
+	runner, err := agent.NewRunner(context.Background(), "nexus", _test.Node1Pub, inmemNexlet)
 	be.NilErr(t, err)
 
 	inmemNexlet.Runner = runner

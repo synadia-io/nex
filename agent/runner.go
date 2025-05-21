@@ -32,6 +32,7 @@ type Runner struct {
 	metricsPort  int
 
 	nodeId   string
+	nexus    string
 	agentId  string
 	triggers map[string]*nats.Subscription
 
@@ -75,7 +76,7 @@ func WithIngressSettings(hostMachineIpAddr, ingressReportingSubject string) Runn
 }
 
 func RemoteAgentInit(nc *nats.Conn, pubKey string) (*models.RegisterRemoteAgentResponse, error) {
-	regResp, err := nc.Request(models.RegisterRemoteAgentSubject(), fmt.Appendf([]byte{}, `{"public_signing_key":"%s"}`, pubKey), time.Second*3)
+	regResp, err := nc.Request(models.AgentAPIRemoteRegisterRequestSubject(pubKey), []byte("{}"), time.Second*3)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +90,7 @@ func RemoteAgentInit(nc *nats.Conn, pubKey string) (*models.RegisterRemoteAgentR
 	return &resp, nil
 }
 
-func NewRunner(ctx context.Context, nodeId string, na Agent, opts ...RunnerOpt) (*Runner, error) {
+func NewRunner(ctx context.Context, nexus, nodeId string, na Agent, opts ...RunnerOpt) (*Runner, error) {
 	a := &Runner{
 		ctx:          ctx,
 		name:         "default",
@@ -100,6 +101,7 @@ func NewRunner(ctx context.Context, nodeId string, na Agent, opts ...RunnerOpt) 
 		metricsPort:  9095,
 
 		nodeId:   nodeId,
+		nexus:    nexus,
 		agent:    na,
 		agentId:  "default",
 		triggers: make(map[string]*nats.Subscription),
@@ -200,7 +202,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 				a.logger.Warn("error marshalling heartbeat", slog.String("err", err.Error()))
 				continue
 			}
-			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.agentId), hbB)
+			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.nodeId, a.agentId), hbB)
 			if err != nil {
 				a.logger.Warn("error publishing heartbeat", slog.String("err", err.Error()))
 				continue
@@ -235,7 +237,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 	}
 
 	if _, ok := a.agent.(AgentIngessWorkloads); ok {
-		endpoints = append(endpoints, endpoint{Name: "WorkloadDiscovery", Subject: models.AgentAPIPingWorkloadSubscribeSubject(), Handler: a.handleDiscoverWorkload()})
+		endpoints = append(endpoints, endpoint{Name: "WorkloadDiscovery", Subject: models.AgentAPIPingWorkloadSubscribeSubject(a.nexus), Handler: a.handleDiscoverWorkload()})
 	}
 
 	if _, ok := a.agent.(AgentEventListener); ok {
@@ -343,34 +345,10 @@ func (a *Runner) UnregisterTrigger(workloadId string) error {
 	return nil
 }
 
-func (a *Runner) RegisterTriggerWithAgent(namespace, workloadId string, tFunc func([]byte) ([]byte, error)) error {
-	sub, err := a.nc.Subscribe(fmt.Sprintf("%s.%s.%s.TRIGGER", models.WorkloadAPIPrefix, namespace, workloadId), func(m *nats.Msg) {
-		go func() {
-			ret, err := tFunc(m.Data)
-			if err != nil {
-				a.logger.Error("error running trigger function", slog.String("err", err.Error()))
-			}
-			if m.Reply != "" { // empty if orginal trigger was a publish and not request
-				err = a.nc.Publish(m.Reply, ret)
-				if err != nil {
-					a.logger.Error("error responding to trigger", slog.String("err", err.Error()))
-				}
-			}
-		}()
-	})
-	if err != nil {
-		return err
-	}
-
-	a.triggers[workloadId] = sub
-	return nil
-}
-
 func (a *Runner) handleStartWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
-		// $NEX.agent.<namespace>.<agentid>.STARTWORKLOAD.<workloadid>
-		splitSub := strings.SplitN(r.Subject(), ".", 6)
-		workloadId := splitSub[5]
+		splitSub := strings.SplitN(r.Subject(), ".", 7)
+		workloadId := splitSub[6]
 
 		req := new(models.AgentStartWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
@@ -437,10 +415,8 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 
 func (a *Runner) handleStopWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
-		// return fmt.Sprintf("%s.%s.STOPWORKLOAD.*", inNodeId, AgentAPIPrefix)
-		// $NEX.agent.<nodeid>.STOPWORKLOAD.workloadId
-		splitSub := strings.SplitN(r.Subject(), ".", 5)
-		workloadId := splitSub[4]
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
+		workloadId := splitSub[5]
 
 		ret := models.StopWorkloadResponse{
 			Id:           workloadId,
@@ -508,9 +484,8 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 
 func (a *Runner) handleGetWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
-		// $NEX.agent.<nodeid>.GETWORKLOAD.workloadId
-		splitSub := strings.SplitN(r.Subject(), ".", 5)
-		workloadId := splitSub[4]
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
+		workloadId := splitSub[5]
 
 		// TODO: implement message with xkey
 		startRequest, err := a.agent.GetWorkload(workloadId, "")
