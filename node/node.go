@@ -209,11 +209,12 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	nn.actorSystem, err = goakt.NewActorSystem("nexnode",
 		goakt.WithLogger(logger.NewSlog(nn.options.Logger.Handler().WithGroup("actor_system"))),
 		goakt.WithPassivationDisabled(),
+		// TODO: we can now add these as extensions to the actor system and use them inside the actors
+		// TODO: (jordan): Kindly let me know and I will be glad to add them as a PR.
 		// In the non-v2 version of goakt, these functions were supported.
 		// TODO: figure out why they're gone or how we can plug in our own impls
 		// goakt.WithTelemetry(telemetry),
 		// goakt.WithTracing(),
-		// goakt.WithSupervisorDirective(restartDirective),
 		goakt.WithActorInitMaxRetries(3))
 	if err != nil {
 		return err
@@ -237,6 +238,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		actors.AgentSupervisorActorName,
 		actors.CreateAgentSupervisor(*nn.options),
 		goakt.WithSupervisor(supervisor),
+		goakt.WithRelocationDisabled(), // TODO: revisit this because I assume this is agent and we don't want to recreate it in a cluster mode
 	)
 	if err != nil {
 		return err
@@ -254,6 +256,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.InternalNatsServerActorName, inats,
 		goakt.WithSupervisor(supervisor),
+		goakt.WithRelocationDisabled(), // TODO: revisit this because I assume this is agent and we don't want to recreate it in a cluster mode
 	)
 	if err != nil {
 		return err
@@ -266,6 +269,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.HostServicesActorName, actors.CreateHostServices(nn.options.HostServiceOptions),
 		goakt.WithSupervisor(supervisor),
+		goakt.WithRelocationDisabled(), // TODO: revisit this because I assume this is agent and we don't want to recreate it in a cluster mode
 	)
 	if err != nil {
 		return err
@@ -279,6 +283,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	if !nn.options.DisableDirectStart {
 		_, err = agentSuper.SpawnChild(nn.ctx, models.DirectStartActorName, actors.CreateDirectStartAgent(nn.ctx, nn.nc, pk, *nn.options, nn.options.Logger.WithGroup(models.DirectStartActorName), nn),
 			goakt.WithSupervisor(supervisor),
+			goakt.WithRelocationDisabled(), // TODO: revisit this because I assume this is agent and we don't want to recreate it in a cluster mode
 		)
 		if err != nil {
 			return err
@@ -288,6 +293,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 		// This map lookup works because the agent name is identical to the workload type
 		_, err := agentSuper.SpawnChild(nn.ctx, agent.Name, actors.CreateExternalAgent(nn.options.Logger.WithGroup(agent.Name), allCreds[agent.Name], agent),
 			goakt.WithSupervisor(supervisor),
+			goakt.WithRelocationDisabled(), // TODO: revisit this because I assume this is agent and we don't want to recreate it in a cluster mode
 		)
 		if err != nil {
 			return err
@@ -297,6 +303,7 @@ func (nn *nexNode) initializeSupervisionTree() error {
 	_, err = nn.actorSystem.Spawn(nn.ctx, actors.ControlAPIActorName,
 		actors.CreateControlAPI(nn.nc, nn.options.Logger, pk, nn),
 		goakt.WithSupervisor(supervisor),
+		goakt.WithRelocationDisabled(), // TODO: revisit this because I assume this is agent and we don't want to recreate it in a cluster mode
 	)
 	if err != nil {
 		return err
@@ -375,7 +382,9 @@ func (nn *nexNode) Auction(auctionId string, agentType []string, tags map[string
 		Status:     make(map[string]int32),
 	}
 
-	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	// since we only care about the PID it means that the actor can be found locally
+	// TODO: revert this code to ActorOf when we are in cluster mode
+	agentSuper, err := nn.actorSystem.LocalActor(actors.AgentSupervisorActorName)
 	if err != nil {
 		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
 		return nil, err
@@ -437,7 +446,9 @@ func (nn *nexNode) Ping() (*actorproto.PingNodeResponse, error) {
 		RunningAgents: make(map[string]int32),
 	}
 
-	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	// since we only care about the PID it means that the actor can be found locally
+	// TODO: revert this code to ActorOf when we are in cluster mode
+	agentSuper, err := nn.actorSystem.LocalActor(actors.AgentSupervisorActorName)
 	if err != nil {
 		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
 		return nil, err
@@ -480,7 +491,9 @@ func (nn *nexNode) GetInfo(namespace string) (*actorproto.NodeInfo, error) {
 		Version: VERSION,
 	}
 
-	_, agentSuper, err := nn.actorSystem.ActorOf(nn.ctx, actors.AgentSupervisorActorName)
+	// since we only care about the PID it means that the actor can be found locally
+	// TODO: revert this code to ActorOf when we are in cluster mode
+	agentSuper, err := nn.actorSystem.LocalActor(actors.AgentSupervisorActorName)
 	if err != nil {
 		nn.options.Logger.Error("Failed to get agent supervisor", slog.Any("err", err))
 		return nil, err

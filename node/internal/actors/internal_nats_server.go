@@ -14,9 +14,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
+
+	"github.com/synadia-io/nex/models"
 )
 
 const (
@@ -93,11 +94,11 @@ func (ns *InternalNatsServer) CredentialsMap() map[string]AgentCredential {
 	return out
 }
 
-func (ns *InternalNatsServer) PreStart(ctx context.Context) error {
+func (ns *InternalNatsServer) PreStart(*goakt.Context) error {
 	return nil
 }
 
-func (s *InternalNatsServer) PostStop(ctx context.Context) error {
+func (s *InternalNatsServer) PostStop(*goakt.Context) error {
 	return nil
 }
 

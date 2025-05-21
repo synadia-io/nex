@@ -21,15 +21,13 @@ type AuctionRequestJson struct {
 // must satisfy ALL tags
 type AuctionRequestJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AuctionRequestJsonTagsTags `json:"tags,omitempty"`
+	Tags map[string]string `json:"tags,omitempty"`
 }
 
-type AuctionRequestJsonTagsTags map[string]string
-
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionRequestJson) UnmarshalJSON(b []byte) error {
+func (j *AuctionRequestJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["auction_id"]; raw != nil && !ok {
@@ -40,7 +38,7 @@ func (j *AuctionRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AuctionRequestJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AuctionRequestJson(plain)
@@ -70,22 +68,18 @@ type AuctionResponseJson struct {
 // The number of agents running and their workload counts
 type AuctionResponseJsonStatus struct {
 	// Status corresponds to the JSON schema field "status".
-	Status AuctionResponseJsonStatusStatus `json:"status,omitempty"`
+	Status map[string]int `json:"status,omitempty"`
 }
-
-type AuctionResponseJsonStatusStatus map[string]int
 
 type AuctionResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AuctionResponseJsonTagsTags `json:"tags,omitempty"`
+	Tags map[string]string `json:"tags,omitempty"`
 }
 
-type AuctionResponseJsonTagsTags map[string]string
-
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AuctionResponseJson) UnmarshalJSON(b []byte) error {
+func (j *AuctionResponseJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["bidder_id"]; raw != nil && !ok {
@@ -108,7 +102,7 @@ func (j *AuctionResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AuctionResponseJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AuctionResponseJson(plain)
@@ -121,9 +115,9 @@ type CloneWorkloadRequestJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *CloneWorkloadRequestJson) UnmarshalJSON(b []byte) error {
+func (j *CloneWorkloadRequestJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["new_target_xkey"]; raw != nil && !ok {
@@ -131,7 +125,7 @@ func (j *CloneWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain CloneWorkloadRequestJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = CloneWorkloadRequestJson(plain)
@@ -152,9 +146,9 @@ type NodeInfoRequestJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodeInfoRequestJson) UnmarshalJSON(b []byte) error {
+func (j *NodeInfoRequestJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["namespace"]; raw != nil && !ok {
@@ -162,7 +156,7 @@ func (j *NodeInfoRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain NodeInfoRequestJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = NodeInfoRequestJson(plain)
@@ -191,15 +185,13 @@ type NodeInfoResponseJson struct {
 
 type NodeInfoResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodeInfoResponseJsonTagsTags `json:"tags,omitempty"`
+	Tags map[string]string `json:"tags,omitempty"`
 }
 
-type NodeInfoResponseJsonTagsTags map[string]string
-
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodeInfoResponseJson) UnmarshalJSON(b []byte) error {
+func (j *NodeInfoResponseJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
@@ -222,7 +214,7 @@ func (j *NodeInfoResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain NodeInfoResponseJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = NodeInfoResponseJson(plain)
@@ -252,22 +244,18 @@ type NodePingResponseJson struct {
 // The number of agents running with workload count
 type NodePingResponseJsonRunningAgents struct {
 	// Status corresponds to the JSON schema field "status".
-	Status NodePingResponseJsonRunningAgentsStatus `json:"status,omitempty"`
+	Status map[string]int `json:"status,omitempty"`
 }
-
-type NodePingResponseJsonRunningAgentsStatus map[string]int
 
 type NodePingResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags NodePingResponseJsonTagsTags `json:"tags,omitempty"`
+	Tags map[string]string `json:"tags,omitempty"`
 }
 
-type NodePingResponseJsonTagsTags map[string]string
-
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *NodePingResponseJson) UnmarshalJSON(b []byte) error {
+func (j *NodePingResponseJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
@@ -290,7 +278,7 @@ func (j *NodePingResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain NodePingResponseJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = NodePingResponseJson(plain)
@@ -321,9 +309,9 @@ type WorkloadSummary struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadSummary) UnmarshalJSON(b []byte) error {
+func (j *WorkloadSummary) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -349,7 +337,7 @@ func (j *WorkloadSummary) UnmarshalJSON(b []byte) error {
 	}
 	type Plain WorkloadSummary
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = WorkloadSummary(plain)

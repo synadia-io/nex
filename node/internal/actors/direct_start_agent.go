@@ -12,12 +12,13 @@ import (
 	"disorder.dev/shandler"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nuid"
-	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/synadia-io/nex/models"
 
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
@@ -44,11 +45,11 @@ type DirectStartAgent struct {
 	stateCallback StateCallback
 }
 
-func (a *DirectStartAgent) PreStart(ctx context.Context) error {
+func (a *DirectStartAgent) PreStart(*goakt.Context) error {
 	return nil
 }
 
-func (a *DirectStartAgent) PostStop(ctx context.Context) error {
+func (a *DirectStartAgent) PostStop(*goakt.Context) error {
 	start := time.Now()
 	ticker := time.NewTicker(time.Second)
 	for a.self.ChildrenCount() != 0 {

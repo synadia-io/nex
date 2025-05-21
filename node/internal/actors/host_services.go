@@ -1,12 +1,11 @@
 package actors
 
 import (
-	"context"
-
-	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
 	"github.com/tochemey/goakt/v3/log"
+
+	"github.com/synadia-io/nex/models"
 )
 
 const HostServicesActorName = "host_services"
@@ -20,11 +19,11 @@ type HostServicesServer struct {
 	logger  log.Logger
 }
 
-func (s *HostServicesServer) PreStart(ctx context.Context) error {
+func (s *HostServicesServer) PreStart(*goakt.Context) error {
 	return nil
 }
 
-func (s *HostServicesServer) PostStop(ctx context.Context) error {
+func (s *HostServicesServer) PostStop(*goakt.Context) error {
 	return nil
 }
 

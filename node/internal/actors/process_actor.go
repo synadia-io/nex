@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nex/models"
-	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 	goakt "github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/synadia-io/nex/models"
+
+	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
 const (
@@ -74,11 +76,11 @@ func newProcessActor(ctx context.Context, logger *slog.Logger, nc *nats.Conn, m 
 	return ret, nil
 }
 
-func (a *processActor) PreStart(ctx context.Context) error {
+func (a *processActor) PreStart(*goakt.Context) error {
 	return nil
 }
 
-func (a *processActor) PostStop(ctx context.Context) error {
+func (a *processActor) PostStop(*goakt.Context) error {
 	a.logger.Debug("Actor stopped", slog.String("id", a.id))
 	return nil
 }
@@ -232,7 +234,7 @@ func (a *processActor) KillOsProcess() error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	for _ = range ticker.C {
+	for range ticker.C {
 		if !a.process.IsRunning() {
 			ticker.Stop()
 			a.logger.Debug("workload stopped gracefully", slog.String("id", a.id))

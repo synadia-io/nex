@@ -95,11 +95,11 @@ func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, node
 	return api
 }
 
-func (a *ControlAPI) PreStart(ctx context.Context) error {
+func (a *ControlAPI) PreStart(*goakt.Context) error {
 	return nil
 }
 
-func (a *ControlAPI) PostStop(ctx context.Context) error {
+func (a *ControlAPI) PostStop(*goakt.Context) error {
 	return nil
 }
 

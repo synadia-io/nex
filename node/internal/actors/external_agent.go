@@ -1,12 +1,12 @@
 package actors
 
 import (
-	"context"
 	"log/slog"
 
-	"github.com/synadia-io/nex/models"
 	goakt "github.com/tochemey/goakt/v3/actor"
 	"github.com/tochemey/goakt/v3/goaktpb"
+
+	"github.com/synadia-io/nex/models"
 
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
@@ -25,11 +25,11 @@ func CreateExternalAgent(logger *slog.Logger, creds AgentCredential, agentOption
 	}
 }
 
-func (a *ExternalAgent) PreStart(ctx context.Context) error {
+func (a *ExternalAgent) PreStart(*goakt.Context) error {
 	return nil
 }
 
-func (a *ExternalAgent) PostStop(ctx context.Context) error {
+func (a *ExternalAgent) PostStop(*goakt.Context) error {
 	return nil
 }
 

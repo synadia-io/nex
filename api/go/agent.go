@@ -5,8 +5,6 @@ package api
 import "encoding/json"
 import "fmt"
 
-type HeartbeatAgentJson map[string]interface{}
-
 type RegisterAgentRequestJson struct {
 	// A user friendly description of the agent
 	Description *string `json:"description,omitempty"`
@@ -22,9 +20,9 @@ type RegisterAgentRequestJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterAgentRequestJson) UnmarshalJSON(b []byte) error {
+func (j *RegisterAgentRequestJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["name"]; raw != nil && !ok {
@@ -35,11 +33,9 @@ func (j *RegisterAgentRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain RegisterAgentRequestJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = RegisterAgentRequestJson(plain)
 	return nil
 }
-
-type RegisterAgentResponseJson map[string]interface{}

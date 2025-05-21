@@ -27,15 +27,13 @@ type AgentPingResponseJson struct {
 
 type AgentPingResponseJsonTags struct {
 	// Tags corresponds to the JSON schema field "tags".
-	Tags AgentPingResponseJsonTagsTags `json:"tags,omitempty"`
+	Tags map[string]string `json:"tags,omitempty"`
 }
 
-type AgentPingResponseJsonTagsTags map[string]string
-
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *AgentPingResponseJson) UnmarshalJSON(b []byte) error {
+func (j *AgentPingResponseJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["node_id"]; raw != nil && !ok {
@@ -58,7 +56,7 @@ func (j *AgentPingResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain AgentPingResponseJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = AgentPingResponseJson(plain)
@@ -71,9 +69,9 @@ type LameduckRequestJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *LameduckRequestJson) UnmarshalJSON(b []byte) error {
+func (j *LameduckRequestJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["delay"]; raw != nil && !ok {
@@ -81,7 +79,7 @@ func (j *LameduckRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain LameduckRequestJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = LameduckRequestJson(plain)
@@ -94,9 +92,9 @@ type LameduckResponseJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *LameduckResponseJson) UnmarshalJSON(b []byte) error {
+func (j *LameduckResponseJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["success"]; raw != nil && !ok {
@@ -104,7 +102,7 @@ func (j *LameduckResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain LameduckResponseJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = LameduckResponseJson(plain)
@@ -120,9 +118,9 @@ type SharedEncEnvJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *SharedEncEnvJson) UnmarshalJSON(b []byte) error {
+func (j *SharedEncEnvJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["base64_encrypted_env"]; raw != nil && !ok {
@@ -133,7 +131,7 @@ func (j *SharedEncEnvJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain SharedEncEnvJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = SharedEncEnvJson(plain)
@@ -152,9 +150,9 @@ type SharedHostServiceJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *SharedHostServiceJson) UnmarshalJSON(b []byte) error {
+func (j *SharedHostServiceJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["nats_url"]; raw != nil && !ok {
@@ -168,7 +166,7 @@ func (j *SharedHostServiceJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain SharedHostServiceJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = SharedHostServiceJson(plain)
@@ -227,9 +225,9 @@ type StartWorkloadRequestJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
+func (j *StartWorkloadRequestJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["argv"]; raw != nil && !ok {
@@ -282,7 +280,7 @@ func (j *StartWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain StartWorkloadRequestJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = StartWorkloadRequestJson(plain)
@@ -307,9 +305,9 @@ type StartWorkloadResponseJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *StartWorkloadResponseJson) UnmarshalJSON(b []byte) error {
+func (j *StartWorkloadResponseJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -329,7 +327,7 @@ func (j *StartWorkloadResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain StartWorkloadResponseJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = StartWorkloadResponseJson(plain)
@@ -345,9 +343,9 @@ type StopWorkloadRequestJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *StopWorkloadRequestJson) UnmarshalJSON(b []byte) error {
+func (j *StopWorkloadRequestJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["namespace"]; raw != nil && !ok {
@@ -358,7 +356,7 @@ func (j *StopWorkloadRequestJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain StopWorkloadRequestJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = StopWorkloadRequestJson(plain)
@@ -380,9 +378,9 @@ type StopWorkloadResponseJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *StopWorkloadResponseJson) UnmarshalJSON(b []byte) error {
+func (j *StopWorkloadResponseJson) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -399,7 +397,7 @@ func (j *StopWorkloadResponseJson) UnmarshalJSON(b []byte) error {
 	}
 	type Plain StopWorkloadResponseJson
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = StopWorkloadResponseJson(plain)
@@ -441,9 +439,9 @@ type WorkloadPingMachineSummary struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *WorkloadPingMachineSummary) UnmarshalJSON(b []byte) error {
+func (j *WorkloadPingMachineSummary) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -457,7 +455,7 @@ func (j *WorkloadPingMachineSummary) UnmarshalJSON(b []byte) error {
 	}
 	type Plain WorkloadPingMachineSummary
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = WorkloadPingMachineSummary(plain)
@@ -470,9 +468,9 @@ type WorkloadPingResponseJson struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *Workload) UnmarshalJSON(b []byte) error {
+func (j *Workload) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
-	if err := json.Unmarshal(b, &raw); err != nil {
+	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
 	}
 	if _, ok := raw["id"]; raw != nil && !ok {
@@ -498,7 +496,7 @@ func (j *Workload) UnmarshalJSON(b []byte) error {
 	}
 	type Plain Workload
 	var plain Plain
-	if err := json.Unmarshal(b, &plain); err != nil {
+	if err := json.Unmarshal(value, &plain); err != nil {
 		return err
 	}
 	*j = Workload(plain)
