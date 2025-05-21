@@ -14,12 +14,13 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
-	goakt "github.com/tochemey/goakt/v2/actors"
-	"github.com/tochemey/goakt/v2/goaktpb"
+	goakt "github.com/tochemey/goakt/v3/actor"
+	"github.com/tochemey/goakt/v3/goaktpb"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	nodegen "github.com/synadia-io/nex/api/go"
 	"github.com/synadia-io/nex/models"
+
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 
@@ -94,11 +95,11 @@ func CreateControlAPI(nc *nats.Conn, logger *slog.Logger, publicKey string, node
 	return api
 }
 
-func (a *ControlAPI) PreStart(ctx context.Context) error {
+func (a *ControlAPI) PreStart(*goakt.Context) error {
 	return nil
 }
 
-func (a *ControlAPI) PostStop(ctx context.Context) error {
+func (a *ControlAPI) PostStop(*goakt.Context) error {
 	return nil
 }
 

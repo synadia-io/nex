@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"disorder.dev/shandler"
-	"github.com/tochemey/goakt/v2/log"
+	"github.com/tochemey/goakt/v3/log"
 )
 
 // DefaultSlogLogger represents the default Log to use

@@ -11,10 +11,11 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/tochemey/goakt/v2/log"
-	"github.com/tochemey/goakt/v2/testkit"
+	"github.com/tochemey/goakt/v3/log"
+	"github.com/tochemey/goakt/v3/testkit"
 
 	"github.com/synadia-io/nex/models"
+
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
 

@@ -5,10 +5,10 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/tochemey/goakt/v2/goaktpb"
+	goakt "github.com/tochemey/goakt/v3/actor"
+	"github.com/tochemey/goakt/v3/goaktpb"
 
 	"github.com/synadia-io/nex/models"
-	goakt "github.com/tochemey/goakt/v2/actors"
 
 	actorproto "github.com/synadia-io/nex/node/internal/actors/pb"
 )
@@ -30,11 +30,11 @@ type AgentSupervisor struct {
 	nodeOptions models.NodeOptions
 }
 
-func (s *AgentSupervisor) PreStart(ctx context.Context) error {
+func (s *AgentSupervisor) PreStart(ctx *goakt.Context) error {
 	return nil
 }
 
-func (s *AgentSupervisor) PostStop(ctx context.Context) error {
+func (s *AgentSupervisor) PostStop(*goakt.Context) error {
 	s.logger.Debug("Agent supervisor stopped")
 	return nil
 }
