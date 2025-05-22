@@ -18,7 +18,6 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
-	"github.com/nats-io/nuid"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -246,7 +245,7 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 			}
 		}
 
-		bidderId := nuid.New().Next()
+		bidderId := n.idgen.Generate(nil)
 		n.auctionMap.Put(bidderId, "", nil)
 
 		n.logger.Debug("responding to auction", slog.Any("auctionId", req.AuctionId))
@@ -310,7 +309,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		workloadId := nuid.New().Next()
+		workloadId := n.idgen.Generate(req)
 		wlNatsConn, err := n.minter.Mint(models.WorkloadCred, namespace, workloadId)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to mint workload nats connection")
@@ -644,7 +643,7 @@ func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 			return
 		}
 
-		agentId := nuid.New().Next()
+		agentId := n.idgen.Generate(nil)
 		err = n.regs.New(agentId, models.ReqTypeRemoteAgent, req.PublicSigningKey)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to register remote agent")

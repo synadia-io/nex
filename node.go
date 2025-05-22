@@ -13,6 +13,7 @@ import (
 
 	"github.com/synadia-labs/nex/internal"
 	"github.com/synadia-labs/nex/internal/credentials"
+	"github.com/synadia-labs/nex/internal/idgen"
 	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 
@@ -21,7 +22,6 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nuid"
 	sdk "github.com/synadia-io/nexlet.go/agent"
 )
 
@@ -60,6 +60,7 @@ type (
 		minter     models.CredVendor
 		state      models.NexNodeState
 		auctioneer models.Auctioneer
+		idgen      models.IDGen
 
 		regs *models.Regs
 
@@ -108,6 +109,7 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		minter:     &credentials.FullAccessMinter{NatsServer: nats.DefaultURL},
 		state:      &state.NoState{},
 		auctioneer: nil,
+		idgen:      idgen.NewNuidGen(),
 
 		nodeKeypair:            kp,
 		nodeXKeypair:           xkp,
@@ -260,9 +262,6 @@ func (n *NexNode) Start() error {
 		}
 	}
 
-	// start embedded agent runners
-	assignedAgentId := nuid.New()
-
 	startedRunners := []*sdk.Runner{}
 	for _, runner := range n.embeddedRunners {
 		if _, _, ok := n.regs.Find(runner.String()); ok {
@@ -270,7 +269,7 @@ func (n *NexNode) Start() error {
 			continue
 		}
 
-		id := assignedAgentId.Next()
+		id := n.idgen.Generate(nil)
 		err = n.regs.New(id, models.RegTypeEmbeddedAgent, "")
 		if err != nil {
 			n.logger.Error("failed to register agent", slog.String("agent_name", runner.String()), slog.String("err", err.Error()))
@@ -297,7 +296,7 @@ func (n *NexNode) Start() error {
 	// start local agents
 	for _, agentProcess := range n.localRunners {
 		agentProcess.HostNode = pubKey
-		agentProcess.Id = assignedAgentId.Next()
+		agentProcess.Id = n.idgen.Generate(nil)
 		connData, err := n.minter.MintRegister(agentProcess.Id, pubKey)
 		if err != nil {
 			n.logger.Error("failed to mint register", slog.String("err", err.Error()))

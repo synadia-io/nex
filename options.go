@@ -138,3 +138,10 @@ func WithAuctioneer(a models.Auctioneer) NexNodeOption {
 		return nil
 	}
 }
+
+func WithIdGenerator(a models.IDGen) NexNodeOption {
+	return func(n *NexNode) error {
+		n.idgen = a
+		return nil
+	}
+}
