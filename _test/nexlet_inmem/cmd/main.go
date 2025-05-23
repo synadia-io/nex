@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nexlet.go/utils"
 
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
 )
@@ -55,12 +55,6 @@ func main() {
 		return
 	}
 
-	natsUrl, ok := os.LookupEnv("NEX_AGENT_NATS_URL")
-	if !ok {
-		slog.Error("NEX_AGENT_NATS_URL is required")
-		return
-	}
-
 	nodeId, ok := os.LookupEnv("NEX_AGENT_NODE_ID")
 	if !ok {
 		slog.Error("NEX_AGENT_NODE_ID is required")
@@ -77,8 +71,14 @@ func main() {
 		return
 	}
 
+	natsConnData, err := utils.NatsConnDataFromEnv()
+	if err != nil {
+		slog.Error(err.Error())
+		return
+	}
+
 	// launch the agent
-	if err := myAgent.Run(agentId, models.NatsConnectionData{NatsUrl: natsUrl}); err != nil {
+	if err := myAgent.Run(agentId, *natsConnData); err != nil {
 		slog.Error(err.Error())
 		return
 	}

@@ -46,8 +46,10 @@ type (
 		Tags                   map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 		State                  string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
 		InternalNatsServerConf string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
-		SigningKey             string            `name:"signing-key" help:"Seed key for signing" placeholder:"SASIGNINGKEY..."`
-		RootAccountKey         string            `name:"root-account-key" help:"Public key for root account" placeholder:"AAMYACCOUNT..."`
+		IssuerSigningKey       string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key" help:"SIGNING KEY | Seed key for signing" placeholder:"SASIGNINGKEY..."`
+		IssuerRootAccountKey   string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key-root-account" help:"SIGNING KEY | Public key for root account" placeholder:"AAMYACCOUNT..."`
+		IssuerNkey             string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey" help:"NKEY | User Nkey used in credential vendor" placeholder:"UMYNKEY..."`
+		IssuerNkeySeed         string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey-seed" help:"NKEY | User Nkey Seed Used in credential vendor" placeholder:"SUMYNKEYSEED..."`
 	}
 	Info struct {
 		NodeID string `arg:"node-id" required:"" help:"Node ID to query" placeholder:"NBTAFHAKW..."`
@@ -76,12 +78,20 @@ func (u Up) Validate() error {
 		}
 	}
 
-	if u.SigningKey != "" && u.RootAccountKey == "" {
+	if u.IssuerSigningKey != "" && u.IssuerRootAccountKey == "" {
 		errs = errors.Join(errs, errors.New("root-account-key must be provided if signing-key is provided"))
 	}
 
-	if u.RootAccountKey != "" && u.SigningKey == "" {
+	if u.IssuerRootAccountKey != "" && u.IssuerSigningKey == "" {
 		errs = errors.Join(errs, errors.New("signing-key must be provided if root-account-key is provided"))
+	}
+
+	if u.IssuerNkey != "" && u.IssuerNkeySeed == "" {
+		errs = errors.Join(errs, errors.New("nkey-seed must be provided if nkey is provided"))
+	}
+
+	if u.IssuerNkeySeed != "" && u.IssuerNkey == "" {
+		errs = errors.Join(errs, errors.New("nkey must be provided if nkey-seed is provided"))
 	}
 
 	if u.NodeXKeySeed != "" {
@@ -182,15 +192,24 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		opts = append(opts, nex.WithInternalNatsServer(natsOpts))
 	}
 
-	if u.SigningKey != "" && u.RootAccountKey != "" {
+	switch {
+	case u.IssuerSigningKey != "" && u.IssuerRootAccountKey != "":
 		minter := &credentials.SigningKeyMinter{
 			NodeId:         nodePub,
+			Nexus:          u.NexusName,
 			NatsServer:     nc.ConnectedUrl(),
-			RootAccountKey: u.RootAccountKey,
-			SigningSeed:    u.SigningKey,
+			RootAccountKey: u.IssuerRootAccountKey,
+			SigningSeed:    u.IssuerSigningKey,
 		}
 		opts = append(opts, nex.WithMinter(minter))
-	} else {
+	case u.IssuerNkey != "":
+		minter := &credentials.NkeyMinter{
+			NatsServer: nc.ConnectedUrl(),
+			NkeyCred:   u.IssuerNkey,
+			NkeySeed:   u.IssuerNkeySeed,
+		}
+		opts = append(opts, nex.WithMinter(minter))
+	default:
 		minter := &credentials.FullAccessMinter{
 			NatsServer: nc.ConnectedUrl(),
 		}
@@ -207,10 +226,6 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 
 	for k, v := range u.Tags {
 		opts = append(opts, nex.WithTag(k, v))
-	}
-
-	if u.SigningKey != "" && u.RootAccountKey != "" {
-		opts = append(opts, nex.WithSigningKey(u.SigningKey, u.RootAccountKey))
 	}
 
 	nex, err := nex.NewNexNode(opts...)

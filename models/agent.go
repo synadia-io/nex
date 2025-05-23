@@ -13,7 +13,9 @@ type Agent struct {
 	// process *os.Process
 }
 
-type AgentState string
+type (
+	AgentState string
+)
 
 const (
 	DirectStartActorName = "direct-start"
@@ -32,9 +34,9 @@ func AgentAPIEmitEventSubject(inAgentId, eventType string) string {
 	return fmt.Sprintf("%s.%s", EventAPIPrefix(inAgentId), strings.ToUpper(eventType))
 }
 
-// $NEX.SVC.namespace.logs.workloadid
+// $NEX.SVC.namespace.logs.workloadid.{stdout|stderr}
 func AgentEmitLogSubject(inNamespace, inWorkloadId string) string {
-	return fmt.Sprintf("%s.%s", LogAPIPrefix(inNamespace), inWorkloadId)
+	return fmt.Sprintf("%s.%s.*", LogAPIPrefix(inNamespace), inWorkloadId)
 }
 
 // $NEX.SVC.nodeid.agent.LREGISTER.*

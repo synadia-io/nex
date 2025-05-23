@@ -5,6 +5,7 @@ import (
 
 	"github.com/nats-io/jsm.go/natscontext"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 )
 
 func configureNatsConnection(cfg *Globals) (*nats.Conn, error) {
@@ -44,8 +45,14 @@ func configureNatsConnection(cfg *Globals) (*nats.Conn, error) {
 		opts = append(opts, nats.UserCredentials(cfg.NatsCredentialsFile))
 	case cfg.NatsUserSeed != "" && cfg.NatsUserJWT != "": // Use seed + jwt
 		opts = append(opts, nats.UserJWTAndSeed(cfg.NatsUserJWT, cfg.NatsUserSeed))
-	case cfg.NatsUserNkey != "": // User nkey
-		opts = append(opts, nats.Nkey(cfg.NatsUserNkey, nats.GetDefaultOptions().SignatureCB))
+	case cfg.NatsUserNkey != "" && cfg.NatsUserSeed != "": // User nkey
+		opts = append(opts, nats.Nkey(cfg.NatsUserNkey, func(nonce []byte) ([]byte, error) {
+			kp, err := nkeys.FromSeed([]byte(cfg.NatsUserSeed))
+			if err != nil {
+				return nil, err
+			}
+			return kp.Sign(nonce)
+		}))
 	case cfg.NatsUser != "" && cfg.NatsUserPassword != "": // Use user + password
 		opts = append(opts, nats.UserInfo(cfg.NatsUser, cfg.NatsUserPassword))
 	}

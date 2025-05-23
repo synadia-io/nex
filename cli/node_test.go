@@ -45,8 +45,8 @@ func TestNodeCommandDefaults(t *testing.T) {
 		be.DeepEqual(t, map[string]string(nil), nex.Node.Up.Tags)
 		be.Zero(t, nex.Node.Up.State)
 		be.Zero(t, nex.Node.Up.InternalNatsServerConf)
-		be.Zero(t, nex.Node.Up.SigningKey)
-		be.Zero(t, nex.Node.Up.RootAccountKey)
+		be.Zero(t, nex.Node.Up.IssuerSigningKey)
+		be.Zero(t, nex.Node.Up.IssuerRootAccountKey)
 	})
 
 	t.Run("InfoCommand", func(t *testing.T) {

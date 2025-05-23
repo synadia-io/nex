@@ -9,8 +9,8 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.42.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/synadia-io/nexlet.go v0.0.0-20250521210422-5535f1dfac21
-	github.com/synadia-labs/nex v0.0.0-20250521210010-f875c771a190
+	github.com/synadia-io/nexlet.go v0.0.0-20250523194151-04cfe8ac19e5
+	github.com/synadia-labs/nex v0.0.0-20250522175812-587037bb31e1
 	golang.org/x/sys v0.33.0
 )
 
@@ -39,7 +39,7 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/jwt/v2 v2.7.4 // indirect
-	github.com/nats-io/nats-server/v2 v2.11.3 // indirect
+	github.com/nats-io/nats-server/v2 v2.11.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
@@ -48,7 +48,7 @@ require (
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sanity-io/litter v1.5.5 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
