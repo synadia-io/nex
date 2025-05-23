@@ -2,6 +2,7 @@ package agent
 
 import (
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-labs/nex/models"
 )
 
@@ -28,8 +29,14 @@ func configureNatsConnection(connData models.NatsConnectionData) (*nats.Conn, er
 	switch {
 	case connData.NatsUserSeed != "" && connData.NatsUserJwt != "": // Use seed + jwt
 		opts = append(opts, nats.UserJWTAndSeed(connData.NatsUserJwt, connData.NatsUserSeed))
-	case connData.NatsUserNkey != "": // User nkey
-		opts = append(opts, nats.Nkey(connData.NatsUserNkey, nats.GetDefaultOptions().SignatureCB))
+	case connData.NatsUserNkey != "" && connData.NatsUserSeed != "": // User nkey
+		opts = append(opts, nats.Nkey(connData.NatsUserNkey, func(nonce []byte) ([]byte, error) {
+			kp, err := nkeys.FromSeed([]byte(connData.NatsUserSeed))
+			if err != nil {
+				return nil, err
+			}
+			return kp.Sign(nonce)
+		}))
 	case connData.NatsUserName != "" && connData.NatsUserPassword != "": // Use user + password
 		opts = append(opts, nats.UserInfo(connData.NatsUserName, connData.NatsUserPassword))
 	}
