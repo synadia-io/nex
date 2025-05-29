@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nexlet.go v0.0.0-20250529133005-30d050e3784f
+	github.com/synadia-io/nexlet.go v0.0.0-20250529152014-3f3872d34894
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	golang.org/x/sys v0.33.0
 )
