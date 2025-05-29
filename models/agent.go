@@ -40,23 +40,23 @@ func AgentEmitLogSubject(inNamespace, inWorkloadId string) string {
 }
 
 // $NEX.SVC.nodeid.agent.LREGISTER.*
-func AgentAPILocalRegisterSubscribeSubject(inNodeId string) string {
+func AgentAPIRegisterSubscribeSubject(inNodeId string) string {
 	return fmt.Sprintf("%s.LREGISTER.*", AgentAPIPrefix(inNodeId))
 }
 
 // $NEX.SVC.nodeid.agent.LREGISTER.agentid
-func AgentAPILocalRegisterRequestSubject(inAgentId, inNodeId string) string {
+func AgentAPIRegisterRequestSubject(inAgentId, inNodeId string) string {
 	return fmt.Sprintf("%s.LREGISTER.%s", AgentAPIPrefix(inNodeId), inAgentId)
 }
 
 // $NEX.SVC.*.agent.RREGISTER
-func AgentAPIRemoteRegisterSubscribeSubject() string {
-	return fmt.Sprintf("%s.RREGISTER.*", AgentAPIPrefix("*"))
+func AgentAPIInitRemoteRegisterSubscribeSubject(nexus string) string {
+	return fmt.Sprintf("%s.RREGISTER.*", AgentAPIPrefix(nexus))
 }
 
 // $NEX.SVC.signingKey.agent.RREGISTER
-func AgentAPIRemoteRegisterRequestSubject(inSigningKey string) string {
-	return fmt.Sprintf("%s.RREGISTER", AgentAPIPrefix(inSigningKey))
+func AgentAPIInitRemoteRegisterRequestSubject(nexus, inSigningKey string) string {
+	return fmt.Sprintf("%s.RREGISTER.%s", AgentAPIPrefix(nexus), inSigningKey)
 }
 
 // $NEX.SVC.nodeid.agent.HEARTBEAT.agentId

@@ -145,3 +145,10 @@ func WithIdGenerator(a models.IDGen) NexNodeOption {
 		return nil
 	}
 }
+
+func WithAgentRegistrar(a models.AgentRegistrar) NexNodeOption {
+	return func(n *NexNode) error {
+		n.aregistrar = a
+		return nil
+	}
+}

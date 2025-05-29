@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/synadia-labs/nex/internal"
+	"github.com/synadia-labs/nex/internal/aregistrar"
 	"github.com/synadia-labs/nex/internal/credentials"
 	"github.com/synadia-labs/nex/internal/idgen"
 	"github.com/synadia-labs/nex/internal/state"
@@ -61,6 +62,7 @@ type (
 		state      models.NexNodeState
 		auctioneer models.Auctioneer
 		idgen      models.IDGen
+		aregistrar models.AgentRegistrar
 
 		regs *models.Regs
 
@@ -110,6 +112,7 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		state:      &state.NoState{},
 		auctioneer: nil,
 		idgen:      idgen.NewNuidGen(),
+		aregistrar: &aregistrar.AllowAllRegistrar{},
 
 		nodeKeypair:            kp,
 		nodeXKeypair:           xkp,
@@ -226,11 +229,11 @@ func (n *NexNode) Start() error {
 	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIdByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// System only agent endpoints
 	if n.allowAgentRegistration {
-		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIRemoteRegisterSubscribeSubject()), micro.WithEndpointQueueGroup(n.nexus)))
+		errs = errors.Join(errs, n.service.AddEndpoint("InitRegisterRemoteAgent", micro.HandlerFunc(n.handleInitRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIInitRemoteRegisterSubscribeSubject(n.nexus)), micro.WithEndpointQueueGroup(n.nexus)))
 		// errs = errors.Join(errs, n.service.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 		// errs = errors.Join(errs, n.service.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	}
-	errs = errors.Join(errs, n.service.AddEndpoint("RegisterLocalAgent", micro.HandlerFunc(n.handleRegisterLocalAgent()), micro.WithEndpointSubject(models.AgentAPILocalRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("RegisterAgent", micro.HandlerFunc(n.handleRegisterAgent()), micro.WithEndpointSubject(models.AgentAPIRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// User endpoints
 	errs = errors.Join(errs, n.service.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))

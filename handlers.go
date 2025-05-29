@@ -537,7 +537,7 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 // 	}
 // }
 
-func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
+func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 	return func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		agentId := splitSub[5]
@@ -551,6 +551,12 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 
 		if registrationRequest.RegisterType == "" {
 			n.handlerError(r, errors.New("register_type is required"), "100", "register_type is required")
+			return
+		}
+
+		err = n.aregistrar.RegisterAgent(registrationRequest)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed agent registrar check")
 			return
 		}
 
@@ -634,12 +640,18 @@ func (n *NexNode) handleRegisterLocalAgent() func(micro.Request) {
 	}
 }
 
-func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
+func (n *NexNode) handleInitRegisterRemoteAgent() func(micro.Request) {
 	return func(r micro.Request) {
 		req := new(models.RegisterRemoteAgentRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to unmarshal register remote agent request")
+			return
+		}
+
+		err = n.aregistrar.RegisterRemoteInit(req)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed agent registrar check")
 			return
 		}
 
