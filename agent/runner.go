@@ -75,8 +75,17 @@ func WithIngressSettings(hostMachineIpAddr, ingressReportingSubject string) Runn
 	}
 }
 
-func RemoteAgentInit(nc *nats.Conn, pubKey string) (*models.RegisterRemoteAgentResponse, error) {
-	regResp, err := nc.Request(models.AgentAPIRemoteRegisterRequestSubject(pubKey), []byte("{}"), time.Second*3)
+func RemoteAgentInit(nc *nats.Conn, nexus, pubKey string) (*models.RegisterRemoteAgentResponse, error) {
+	req := models.RegisterRemoteAgentRequest{
+		PublicSigningKey: pubKey,
+	}
+
+	req_b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	regResp, err := nc.Request(models.AgentAPIInitRemoteRegisterRequestSubject(nexus, pubKey), req_b, time.Second*3)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +176,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 
 	var regRet *nats.Msg
 
-	regRet, err = a.nc.Request(models.AgentAPILocalRegisterRequestSubject(agentId, a.nodeId), registerB, time.Second*3)
+	regRet, err = a.nc.Request(models.AgentAPIRegisterRequestSubject(agentId, a.nodeId), registerB, time.Second*3)
 	if err != nil {
 		return err
 	}

@@ -7,7 +7,7 @@ require (
 	github.com/nats-io/nats.go v1.42.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/prometheus/client_golang v1.22.0
-	github.com/synadia-labs/nex v0.0.0-20250522175812-587037bb31e1
+	github.com/synadia-labs/nex v0.0.0-20250529151533-3dcf41d82ead
 )
 
 require (
@@ -29,7 +29,7 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nats-io/jwt/v2 v2.7.4 // indirect
-	github.com/nats-io/nats-server/v2 v2.11.3 // indirect
+	github.com/nats-io/nats-server/v2 v2.11.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.64.0 // indirect
