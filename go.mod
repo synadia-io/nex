@@ -1,17 +1,17 @@
 module github.com/synadia-io/nex
 
-go 1.23.0
+go 1.24.0
 
 require (
 	disorder.dev/shandler v0.0.0-20241210223030-b024af991a50
 	github.com/carlmjohnson/be v0.23.2
-	github.com/nats-io/nats-server/v2 v2.11.3
+	github.com/nats-io/nats-server/v2 v2.11.4
 	github.com/nats-io/nats.go v1.42.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/stretchr/testify v1.10.0
-	github.com/tochemey/goakt/v3 v3.4.4
+	github.com/tochemey/goakt/v3 v3.5.0
 	golang.org/x/sys v0.33.0
 	google.golang.org/protobuf v1.36.6
 	oras.land/oras-go/v2 v2.5.0
@@ -64,7 +64,7 @@ require (
 	github.com/panjf2000/ants/v2 v2.11.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/redis/go-redis/v9 v9.8.0 // indirect
+	github.com/redis/go-redis/v9 v9.9.0 // indirect
 	github.com/reugn/go-quartz v0.14.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
@@ -72,15 +72,16 @@ require (
 	github.com/tidwall/btree v1.7.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/redcon v1.6.2 // indirect
-	github.com/tochemey/olric v0.2.2 // indirect
+	github.com/tochemey/olric v0.2.3 // indirect
+	github.com/travisjeffery/go-dynaport v1.0.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.akshayshah.org/connectproto v0.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.opentelemetry.io/otel v1.35.0 // indirect
-	go.opentelemetry.io/otel/metric v1.35.0 // indirect
-	go.opentelemetry.io/otel/trace v1.35.0 // indirect
+	go.opentelemetry.io/otel v1.36.0 // indirect
+	go.opentelemetry.io/otel/metric v1.36.0 // indirect
+	go.opentelemetry.io/otel/trace v1.36.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
