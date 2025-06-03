@@ -7,11 +7,11 @@ require (
 	github.com/carlmjohnson/be v0.24.1
 	github.com/nats-io/jwt/v2 v2.7.4
 	github.com/nats-io/nats-server/v2 v2.11.4
-	github.com/nats-io/nats.go v1.42.0
+	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nexlet.go v0.0.0-20250529152014-3f3872d34894
+	github.com/synadia-io/nexlet.go v0.0.0-20250603182712-71afef8ebea7
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	golang.org/x/sys v0.33.0
 )

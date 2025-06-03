@@ -194,8 +194,8 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 	n.logger.Debug("running binary", slog.Any("binary", ar.OriginalURI), slog.Any("args", startReq.Argv))
 	cmd := exec.CommandContext(poisonPill, ar.LocalCachePath, startReq.Argv...)
 	cmd.Env = env
-	cmd.Stdout = n.runner.GetLogger(workloadId, namespace, agent.LogTypeStdout)
-	cmd.Stderr = n.runner.GetLogger(workloadId, namespace, agent.LogTypeStderr)
+	cmd.Stdout = n.runner.GetLogger(workloadId, namespace, models.LogOutStdout)
+	cmd.Stderr = n.runner.GetLogger(workloadId, namespace, models.LogOutStderr)
 	cmd.SysProcAttr = internal.SysProcAttr()
 
 	if err := cmd.Start(); err != nil {

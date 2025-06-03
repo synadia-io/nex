@@ -15,6 +15,7 @@ type Agent struct {
 
 type (
 	AgentState string
+	LogOut     string
 )
 
 const (
@@ -27,16 +28,25 @@ const (
 	AgentStateStopping AgentState = "stopping"
 	AgentStateLameduck AgentState = "lameduck"
 	AgentStateError    AgentState = "error"
+
+	LogOutStdout  LogOut = "stdout"
+	LogOutStderr  LogOut = "stderr"
+	LogOutMetrics LogOut = "metrics"
 )
 
-// $NEX.SVC.agentid.event.TYPE
+// $NEX.FEED.agentid.event.TYPE
 func AgentAPIEmitEventSubject(inAgentId, eventType string) string {
 	return fmt.Sprintf("%s.%s", EventAPIPrefix(inAgentId), strings.ToUpper(eventType))
 }
 
-// $NEX.SVC.namespace.logs.workloadid.{stdout|stderr}
-func AgentEmitLogSubject(inNamespace, inWorkloadId string) string {
-	return fmt.Sprintf("%s.%s.*", LogAPIPrefix(inNamespace), inWorkloadId)
+// $NEX.FEED.namespace.logs.workloadid.{stdout|stderr}
+func AgentEmitLogSubject(inNamespace, inWorkloadId string, out LogOut) string {
+	return fmt.Sprintf("%s.%s.%s", LogAPIPrefix(inNamespace), inWorkloadId, string(out))
+}
+
+// $NEX.FEED.namespace.metrics.workloadid
+func AgentEmitMetricsSubject(inNamespace, inWorkloadId string) string {
+	return fmt.Sprintf("%s.%s", MetricsAPIPrefix(inNamespace), inWorkloadId)
 }
 
 // $NEX.SVC.nodeid.agent.LREGISTER.*
