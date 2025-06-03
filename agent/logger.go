@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"fmt"
 	"log/slog"
 	"strings"
 
@@ -11,36 +10,17 @@ import (
 
 type LogType int
 
-func (lt LogType) String() string {
-	switch lt {
-	case LogTypeStdout:
-		return "stdout"
-	case LogTypeStderr:
-		return "stderr"
-	case LogTypeMetrics:
-		return "metrics"
-	default:
-		return "unknown"
-	}
-}
-
-const (
-	LogTypeStdout LogType = iota
-	LogTypeStderr
-	LogTypeMetrics
-)
-
 type agentLogCapture struct {
 	nc         *nats.Conn
 	logger     *slog.Logger
-	logType    LogType
+	logType    models.LogOut
 	agentId    string
 	workloadId string
 	namespace  string
 }
 
 func NewAgentLogCapture(
-	nc *nats.Conn, logger *slog.Logger, logType LogType, agentId string, workloadId string, namespace string,
+	nc *nats.Conn, logger *slog.Logger, logType models.LogOut, agentId string, workloadId string, namespace string,
 ) *agentLogCapture {
 	return &agentLogCapture{
 		nc:         nc,
@@ -53,14 +33,18 @@ func NewAgentLogCapture(
 }
 
 func (l agentLogCapture) Write(p []byte) (n int, err error) {
+	var msg *nats.Msg
 	switch l.logType {
-	case LogTypeStdout:
+	case models.LogOutStdout:
 		l.logger.WithGroup("workload").With("agent", l.agentId).With("workload", l.workloadId).Info(strings.ReplaceAll(string(p), "\n", "\\n"))
-	case LogTypeStderr:
+		msg = nats.NewMsg(models.AgentEmitLogSubject(l.namespace, l.workloadId, models.LogOutStdout))
+	case models.LogOutStderr:
 		l.logger.WithGroup("workload").With("agent", l.agentId).With("workload", l.workloadId).Error(strings.ReplaceAll(string(p), "\n", "\\n"))
+		msg = nats.NewMsg(models.AgentEmitLogSubject(l.namespace, l.workloadId, models.LogOutStderr))
+	case models.LogOutMetrics:
+		msg = nats.NewMsg(models.AgentEmitMetricsSubject(l.namespace, l.workloadId))
 	}
 
-	msg := nats.NewMsg(fmt.Sprintf("%s.%s", models.AgentEmitLogSubject(l.namespace, l.workloadId), l.logType.String()))
 	msg.Header.Add(models.NexGroupMetaKey, "") // TODO: add group label
 	msg.Header.Add(models.NexNamespaceMetaKey, l.namespace)
 	msg.Data = p

@@ -4,10 +4,10 @@ go 1.24.0
 
 require (
 	github.com/carlmjohnson/be v0.24.1
-	github.com/nats-io/nats.go v1.42.0
+	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/prometheus/client_golang v1.22.0
-	github.com/synadia-labs/nex v0.0.0-20250529151533-3dcf41d82ead
+	github.com/synadia-labs/nex v0.0.0-20250603183322-4fae1ac7b312
 )
 
 require (

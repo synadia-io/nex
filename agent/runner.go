@@ -136,7 +136,7 @@ func (a *Runner) String() string {
 	return fmt.Sprintf("%s-%s", a.registerType, a.name)
 }
 
-func (a *Runner) GetLogger(workloadId, namespace string, lType LogType) io.Writer {
+func (a *Runner) GetLogger(workloadId, namespace string, lType models.LogOut) io.Writer {
 	return NewAgentLogCapture(a.nc, slog.Default(), lType, a.agentId, workloadId, namespace)
 }
 
