@@ -250,7 +250,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 	}
 
 	if _, ok := a.agent.(AgentEventListener); ok {
-		endpoints = append(endpoints, endpoint{Name: "EventListener", Subject: fmt.Sprintf("$NEX.agent.%s.EVENT", a.agentId), Handler: a.handleReceivedEvent()})
+		endpoints = append(endpoints, endpoint{Name: "EventListener", Subject: models.EventAPIPrefix(a.agentId), Handler: a.handleReceivedEvent()})
 	}
 
 	var errs error
