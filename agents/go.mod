@@ -9,8 +9,8 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/synadia-io/nexlet.go v0.0.0-20250603183554-b02b210e28cb
-	github.com/synadia-labs/nex v0.0.0-20250603183322-4fae1ac7b312
+	github.com/synadia-io/nexlet.go v0.0.0-20250605180054-3d6fb72429be
+	github.com/synadia-labs/nex v0.0.0-20250603184808-7351a8d19e91
 	golang.org/x/sys v0.33.0
 )
 
@@ -56,8 +56,8 @@ require (
 	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
 	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
-	golang.org/x/time v0.11.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 )
