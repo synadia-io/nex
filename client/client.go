@@ -15,15 +15,29 @@ import (
 	"github.com/synadia-labs/nex/models"
 )
 
-const defaultTimeout = 60 * time.Second
+const (
+	defaultTimeout = 60 * time.Second
+	defaultStall   = 2 * time.Second
+)
 
 type nexClient struct {
+	ctx       context.Context
+	cancel    context.CancelFunc
 	nc        *nats.Conn
 	namespace string
 }
 
-func NewClient(nc *nats.Conn, namespace string) *nexClient {
+func NewClient(ctx context.Context, nc *nats.Conn, namespace string) *nexClient {
+	var cancel context.CancelFunc
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, ok := ctx.Deadline(); !ok {
+		ctx, cancel = context.WithTimeoutCause(ctx, defaultTimeout, errors.New("default nex client timeout exceeded"))
+	}
 	return &nexClient{
+		ctx:       ctx,
+		cancel:    cancel,
 		nc:        nc,
 		namespace: namespace,
 	}
@@ -91,9 +105,7 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	msgs, err := natsext.RequestMany(ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(500*time.Millisecond))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(defaultStall))
 	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) {
 		return []*models.NodePingResponse{}, nil
 	}
@@ -130,9 +142,7 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	msgs, err := natsext.RequestMany(ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(500*time.Millisecond))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(defaultStall))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return []*models.AuctionResponse{}, nil
 	}
@@ -205,9 +215,7 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	msgs, err := natsext.RequestMany(ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(500*time.Millisecond))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(defaultStall))
 	if err != nil {
 		return &models.StopWorkloadResponse{
 			Id:           workloadId,
@@ -252,10 +260,7 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	msgs, err := natsext.RequestMany(ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(2000*time.Millisecond))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(defaultStall))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return []*models.AgentListWorkloadsResponse{}, nil
 	}
@@ -301,10 +306,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	msgs, err := natsext.RequestMany(ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(2000*time.Millisecond))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(defaultStall))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return nil, errors.New("workload not found")
 	}

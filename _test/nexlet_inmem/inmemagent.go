@@ -3,7 +3,6 @@ package inmem
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"slices"
 	"strings"
@@ -164,7 +163,6 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 
 	workloads, ok := a.Workloads.State[stopRequest.Namespace]
 	if !ok {
-		fmt.Printf("no workloads found for namespace %s", stopRequest.Namespace)
 		return errors.New(string(models.GenericErrorsNamespaceNotFound))
 	}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,7 +58,7 @@ type (
 	}
 )
 
-func (r *StartWorkload) Run(globals *Globals) error {
+func (r *StartWorkload) Run(ctx context.Context, globals *Globals) error {
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
@@ -67,7 +68,7 @@ func (r *StartWorkload) Run(globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	client := client.NewClient(nc, globals.Namespace)
+	client := client.NewClient(ctx, nc, globals.Namespace)
 
 	// if 'Nexfile' is located in the current directory, use it
 	if r.WorkloadNexfile == nil {
@@ -183,7 +184,7 @@ func (r *StartWorkload) Validate() error {
 	return errs
 }
 
-func (s *StopWorkload) Run(globals *Globals) error {
+func (s *StopWorkload) Run(ctx context.Context, globals *Globals) error {
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
@@ -193,7 +194,7 @@ func (s *StopWorkload) Run(globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	stopResponse, err := client.NewClient(nc, globals.Namespace).StopWorkload(s.WorkloadId)
+	stopResponse, err := client.NewClient(ctx, nc, globals.Namespace).StopWorkload(s.WorkloadId)
 	if err != nil {
 		return err
 	}
@@ -211,7 +212,7 @@ func (s *StopWorkload) Run(globals *Globals) error {
 	return nil
 }
 
-func (r *ListWorkload) Run(globals *Globals) error {
+func (r *ListWorkload) Run(ctx context.Context, globals *Globals) error {
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
@@ -221,7 +222,7 @@ func (r *ListWorkload) Run(globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	resp, err := client.NewClient(nc, globals.Namespace).ListWorkloads(r.Filter)
+	resp, err := client.NewClient(ctx, nc, globals.Namespace).ListWorkloads(r.Filter)
 	if err != nil {
 		return err
 	}
@@ -280,7 +281,7 @@ func (r *ListWorkload) Run(globals *Globals) error {
 	return nil
 }
 
-func (r *CloneWorkload) Run(globals *Globals) error {
+func (r *CloneWorkload) Run(ctx context.Context, globals *Globals) error {
 	nc, err := configureNatsConnection(globals)
 	if err != nil {
 		return err
@@ -288,7 +289,7 @@ func (r *CloneWorkload) Run(globals *Globals) error {
 	if nc == nil {
 		return errors.New("no NATS connection available")
 	}
-	nexClient := client.NewClient(nc, globals.Namespace)
+	nexClient := client.NewClient(ctx, nc, globals.Namespace)
 	resp, err := nexClient.CloneWorkload(r.WorkloadId, r.AuctionTags)
 	if err != nil {
 		return err

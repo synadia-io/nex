@@ -1,7 +1,6 @@
 package nex
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -95,12 +94,9 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
 		// TODO: Adds agentid to lameduck response
 		var errs error
-		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPISetLameduckSubject(pubKey), ldReqB, natsext.RequestManyStall(500*time.Millisecond))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPISetLameduckSubject(pubKey), ldReqB, natsext.RequestManyMaxMessages(n.regs.Count()))
 		if err == nil {
 			msgs(func(m *nats.Msg, err error) bool {
 				if err == nil {
@@ -135,7 +131,6 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 		if errs != nil {
 			n.logger.Error("error gathering agent responses", slog.Any("errs", errs))
 		}
-
 		n.enterLameduck(delay)
 
 		n.logger.Info("node entering lameduck mode", slog.Any("shutdown_at", time.Now().Add(delay).Format(time.DateTime)))
@@ -163,12 +158,9 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 			return
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-
 		var errs error
 		as := models.AgentSummaries{}
-		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPIPingAllSubject(pubKey), nil, natsext.RequestManyStall(500*time.Millisecond))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIPingAllSubject(pubKey), nil, natsext.RequestManyMaxMessages(n.regs.Count()))
 		if err == nil {
 			msgs(func(m *nats.Msg, err error) bool {
 				if err == nil {
@@ -377,9 +369,7 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			WorkloadType: "",
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), natsext.RequestManyStall(500*time.Millisecond))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), natsext.RequestManyMaxMessages(n.regs.Count()))
 		if err != nil {
 			err = r.RespondJSON(ret)
 			if err != nil {
@@ -483,9 +473,7 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 		}
 
 		resp := models.AgentListWorkloadsResponse{}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		msgs, err := natsext.RequestMany(ctx, n.nc, models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), natsext.RequestManyStall(1000*time.Millisecond))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), natsext.RequestManyMaxMessages(n.regs.Count()))
 		if err != nil {
 			respB, err := json.Marshal(resp)
 			if err != nil {

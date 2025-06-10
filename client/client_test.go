@@ -24,7 +24,7 @@ func TestNewNexClient(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client := NewClient(nc, "test")
+	client := NewClient(context.Background(), nc, "test")
 	be.Nonzero(t, client)
 
 	be.DeepEqual(t, nc, client.nc)
@@ -51,7 +51,7 @@ func TestNexClient_User(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client := NewClient(nc, "user")
+	client := NewClient(context.Background(), nc, "user")
 	be.Nonzero(t, client)
 
 	ar, err := client.Auction("inmem", map[string]string{})
@@ -109,7 +109,7 @@ func TestNexClient_System(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(nc, models.SystemNamespace)
+			client := NewClient(context.Background(), nc, models.SystemNamespace)
 			be.Nonzero(t, client)
 
 			info, err := client.GetNodeInfo(_test.Node1Pub)
@@ -157,7 +157,7 @@ func TestNexClient_SystemAsUser(t *testing.T) {
 	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
 	be.Equal(t, 1, len(nexNodes))
 
-	client := NewClient(nc, "user")
+	client := NewClient(context.Background(), nc, "user")
 	be.Nonzero(t, client)
 
 	_, err = client.GetNodeInfo(_test.Node1Pub)
@@ -209,7 +209,7 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(nc, "user")
+			client := NewClient(context.Background(), nc, "user")
 			be.Nonzero(t, client)
 
 			ar, err := client.Auction("inmem", map[string]string{})
@@ -265,7 +265,7 @@ func TestNexClient_List_NoNodes(t *testing.T) {
 
 	for _, ns := range tt {
 		t.Run("As:"+ns, func(t *testing.T) {
-			client := NewClient(nc, models.SystemNamespace)
+			client := NewClient(context.Background(), nc, models.SystemNamespace)
 			be.Nonzero(t, client)
 
 			t.Run("ListNodes", func(t *testing.T) {
@@ -319,7 +319,7 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(nc, "user")
+			client := NewClient(context.Background(), nc, "user")
 			be.Nonzero(t, client)
 
 			ar, err := client.Auction("inmem", map[string]string{})
@@ -387,7 +387,7 @@ func TestNexClient_StopWorkloadDNE(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(nc, "user")
+			client := NewClient(context.Background(), nc, "user")
 			be.Nonzero(t, client)
 
 			str, err := client.StopWorkload("abc123")
@@ -441,7 +441,7 @@ func TestNexClient_StopWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(nc, "user")
+			client := NewClient(context.Background(), nc, "user")
 			be.Nonzero(t, client)
 
 			ar, err := client.Auction("inmem", map[string]string{})

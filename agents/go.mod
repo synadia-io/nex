@@ -10,7 +10,7 @@ require (
 	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/synadia-io/nexlet.go v0.0.0-20250605180054-3d6fb72429be
-	github.com/synadia-labs/nex v0.0.0-20250603184808-7351a8d19e91
+	github.com/synadia-labs/nex v0.0.0-20250605181646-8939e7d10df7
 	golang.org/x/sys v0.33.0
 )
 
@@ -53,7 +53,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
-	golang.org/x/crypto v0.38.0 // indirect
+	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c // indirect
 	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/text v0.26.0 // indirect

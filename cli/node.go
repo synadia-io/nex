@@ -265,7 +265,7 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	infoResponse, err := client.NewClient(nc, globals.Namespace).GetNodeInfo(i.NodeID)
+	infoResponse, err := client.NewClient(ctx, nc, globals.Namespace).GetNodeInfo(i.NodeID)
 	if err != nil {
 		return err
 	}
@@ -331,7 +331,7 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	ldr, err := client.NewClient(nc, globals.Namespace).SetLameduck(l.NodeID, l.Delay)
+	ldr, err := client.NewClient(ctx, nc, globals.Namespace).SetLameduck(l.NodeID, l.Delay)
 	if err != nil {
 		return err
 	}
@@ -364,7 +364,7 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	resp, err := client.NewClient(nc, globals.Namespace).ListNodes(l.Filter)
+	resp, err := client.NewClient(ctx, nc, globals.Namespace).ListNodes(l.Filter)
 	if err != nil {
 		return err
 	}

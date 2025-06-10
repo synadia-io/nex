@@ -326,7 +326,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	)
 	be.NilErr(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	go func() {
