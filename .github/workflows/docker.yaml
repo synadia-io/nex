@@ -1,16 +1,24 @@
 name: Build Multi-Arch Docker Image
 
 on:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ main ]
-  pull_request:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
 
 env:
-  GOPRIVATE: github.com/synadia-io/nexlet.go
+  GOPRIVATE: github.com/synadia-io,github.com/ConnectEverything,github.com/synadia-labs
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
 
     steps:
     - name: Checkout source
@@ -32,21 +40,49 @@ jobs:
         ssh-add ~/.ssh/id_ed25519
         ssh-keyscan github.com >> ~/.ssh/known_hosts
 
+    - name: lowercase github.repository
+      run: |
+        echo "IMAGE_NAME=${GITHUB_REPOSITORY@L}" >> ${GITHUB_ENV}
+
     - name: Log in to GitHub Container Registry (GHCR)
-      if: github.ref == 'refs/heads/main'
       uses: docker/login-action@v3
       with:
         registry: ghcr.io
         username: jordan-rash
         password: ${{ secrets.DOCKER_PUSH }}
 
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ vars.AWS_NAS_PROD_ECR_PUSH_ROLE }}
+        aws-region: ${{ vars.AWS_NAS_PROD_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ghcr.io/${{ env.IMAGE_NAME }}
+          ${{ steps.login-ecr.outputs.registry }}/nex
+        tags: |
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+          type=ref,event=branch
+          type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') && !contains(github.ref, '-rc') }}
+
     - name: Build and optionally push multi-arch image
       uses: docker/build-push-action@v5
       with:
         context: .
         file: ./Dockerfile
-        push: ${{ github.ref == 'refs/heads/main' }}
-        tags: ghcr.io/${{ github.repository }}:latest
+        push: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
         platforms: linux/amd64,linux/arm64
         build-args: |
           GOPRIVATE=${{ env.GOPRIVATE }}
