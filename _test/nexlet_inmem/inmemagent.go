@@ -142,9 +142,10 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 
 	a.Logger.Debug("StartWorkload successful")
 	err := a.Runner.EmitEvent(models.WorkloadStartedEvent{
-		Id:        workloadId,
-		Metadata:  models.WorkloadStartedEventMetadata{},
-		Namespace: startRequest.Request.Namespace,
+		Id:           workloadId,
+		Metadata:     models.WorkloadStartedEventMetadata{},
+		Namespace:    startRequest.Request.Namespace,
+		WorkloadType: a.Name,
 	})
 	if err != nil {
 		a.Logger.Error("failed to emit workload started event", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
@@ -176,9 +177,10 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 			}
 			a.Logger.Debug("StopWorkload successful", slog.String("workloadId", workloadId))
 			err := a.Runner.EmitEvent(models.WorkloadStoppedEvent{
-				Id:        workloadId,
-				Metadata:  models.WorkloadStoppedEventMetadata{},
-				Namespace: stopRequest.Namespace,
+				Id:           workloadId,
+				Metadata:     models.WorkloadStoppedEventMetadata{},
+				Namespace:    stopRequest.Namespace,
+				WorkloadType: a.Name,
 			})
 			if err != nil {
 				a.Logger.Error("failed to emit workload stopped event", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))

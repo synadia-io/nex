@@ -222,8 +222,9 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 				n.Unlock()
 
 				wsr := models.WorkloadStoppedEvent{
-					Id:        workloadId,
-					Namespace: namespace,
+					Id:           workloadId,
+					Namespace:    namespace,
+					WorkloadType: NEXLET_REGISTER_TYPE,
 				}
 
 				if pState.ExitCode() != 0 {
@@ -251,7 +252,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 	n.logger.Debug("workload created", slog.String("namespace", namespace), slog.String("workloadId", workloadId), slog.Bool("restart", n.workloads[namespace][workloadId].Restarts > 0))
 	n.Unlock()
 
-	if err := n.runner.EmitEvent(models.WorkloadStartedEvent{Id: workloadId, Namespace: namespace}); err != nil {
+	if err := n.runner.EmitEvent(models.WorkloadStartedEvent{Id: workloadId, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
 		n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 	}
 	return nil
@@ -293,8 +294,9 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 		defer ticker.Stop()
 
 		wse := models.WorkloadStoppedEvent{
-			Id:        workloadId,
-			Namespace: namespace,
+			Id:           workloadId,
+			Namespace:    namespace,
+			WorkloadType: NEXLET_REGISTER_TYPE,
 		}
 
 	timerLoop:
@@ -338,7 +340,7 @@ func (n *nexletState) SetLameduckMode(before time.Duration) error {
 	defer n.Unlock()
 
 	var wg sync.WaitGroup
-	for _, processes := range n.workloads {
+	for namespace, processes := range n.workloads {
 		wg.Add(len(processes))
 		for id, process := range processes {
 			go func() {
@@ -365,7 +367,7 @@ func (n *nexletState) SetLameduckMode(before time.Duration) error {
 						case <-ticker.C:
 							// Check if the process still exists
 							if err := process.Process.Signal(syscall.Signal(0)); err != nil {
-								if err := n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: id}); err != nil {
+								if err := n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: id, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
 									n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 								}
 								wg.Done()

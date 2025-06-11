@@ -158,6 +158,9 @@ type WorkloadStartedEvent struct {
 
 	// The namespace of the workload
 	Namespace string `json:"namespace"`
+
+	// The type of the workload, e.g., 'container', 'javascript', etc
+	WorkloadType string `json:"workload_type"`
 }
 
 // The metadata of the workload
@@ -174,6 +177,9 @@ func (j *WorkloadStartedEvent) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["namespace"]; raw != nil && !ok {
 		return fmt.Errorf("field namespace in WorkloadStartedEvent: required")
+	}
+	if _, ok := raw["workload_type"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_type in WorkloadStartedEvent: required")
 	}
 	type Plain WorkloadStartedEvent
 	var plain Plain
@@ -197,6 +203,9 @@ type WorkloadStoppedEvent struct {
 
 	// The namespace of the workload
 	Namespace string `json:"namespace"`
+
+	// The type of the workload, e.g., 'container', 'javascript', etc
+	WorkloadType string `json:"workload_type"`
 }
 
 // The error that caused the workload to stop; nil if the workload stopped
@@ -244,6 +253,9 @@ func (j *WorkloadStoppedEvent) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["namespace"]; raw != nil && !ok {
 		return fmt.Errorf("field namespace in WorkloadStoppedEvent: required")
+	}
+	if _, ok := raw["workload_type"]; raw != nil && !ok {
+		return fmt.Errorf("field workload_type in WorkloadStoppedEvent: required")
 	}
 	type Plain WorkloadStoppedEvent
 	var plain Plain

@@ -12,6 +12,10 @@
       "type": "string",
       "description": "The namespace of the workload"
     },
+    "workload_type" : {
+      "type": "string",
+      "description": "The type of the workload, e.g., 'container', 'javascript', etc"
+    },
     "metadata": {
       "type": "object",
       "description": "The metadata of the workload",
@@ -40,6 +44,7 @@
   },
   "required": [
     "id",
-    "namespace"
+    "namespace",
+    "workload_type"
   ]
 }
