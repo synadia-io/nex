@@ -306,15 +306,16 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, err
 	}
 
+	genericNotFoundError := errors.New(string(models.GenericErrorsWorkloadNotFound))
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(defaultStall))
 	if errors.Is(err, nats.ErrNoResponders) {
-		return nil, errors.New("workload not found")
+		return nil, genericNotFoundError
 	}
 	if err != nil {
-		return nil, errors.New("workload not found")
+		return nil, genericNotFoundError
 	}
 	if errors.Is(err, nats.ErrTimeout) {
-		return nil, errors.New("workload not found")
+		return nil, genericNotFoundError
 	}
 
 	var cloneResp *models.StartWorkloadRequest
@@ -329,7 +330,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 	})
 
 	if cloneResp == nil {
-		return nil, errors.New("workload not found")
+		return nil, errors.New(string(models.GenericErrorsWorkloadNotFound))
 	}
 
 	aucResp, err := n.Auction(cloneResp.WorkloadType, tags)

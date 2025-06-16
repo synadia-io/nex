@@ -261,8 +261,9 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 	np := n.getWorkload(namespace, workloadId)
 	if np == nil {
-		n.logger.Error("workload not found", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
-		return errors.New("workload not found")
+		errStr := string(models.GenericErrorsWorkloadNotFound)
+		n.logger.Error(errStr, slog.String("workloadId", workloadId), slog.String("namespace", namespace))
+		return errors.New(errStr)
 	}
 
 	go func(w *NativeProcess) {

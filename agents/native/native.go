@@ -159,7 +159,7 @@ func (a *NativeAgent) GetWorkload(workloadId, targetXkey string) (*models.StartW
 	if wl, ok := a.state.Exists(workloadId); ok {
 		return wl, nil
 	}
-	return nil, errors.New("workload not found")
+	return nil, errors.New(string(models.GenericErrorsWorkloadNotFound))
 }
 
 func (a *NativeAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
@@ -190,7 +190,7 @@ func (a *NativeAgent) PingWorkload(workloadId string) bool {
 func (a *NativeAgent) GetWorkloadExposedPorts(workloadId string) ([]int, error) {
 	swr, ok := a.state.Exists(workloadId)
 	if !ok {
-		return nil, errors.New("workload not found")
+		return nil, errors.New(string(models.GenericErrorsWorkloadNotFound))
 	}
 	var sr StartRequest
 	err := json.Unmarshal([]byte(swr.RunRequest), &sr)

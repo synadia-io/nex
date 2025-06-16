@@ -436,7 +436,7 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 			return
 		}
 
-		if getWorkload.Header.Get("Nats-Service-Error") == "workload not found" {
+		if getWorkload.Header.Get("Nats-Service-Error") == string(models.GenericErrorsWorkloadNotFound) {
 			return
 		}
 
