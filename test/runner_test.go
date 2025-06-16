@@ -110,7 +110,7 @@ func TestRunningRunner(t *testing.T) {
 					WorkloadType:      "inmem",
 				},
 				WorkloadCreds: models.NatsConnectionData{
-					NatsUrl: s.ClientURL(),
+					NatsServers: []string{s.ClientURL()},
 				},
 			}
 			swr_b, err := json.Marshal(swr)

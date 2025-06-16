@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"strings"
+
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-labs/nex/models"
@@ -41,11 +43,11 @@ func configureNatsConnection(connData models.NatsConnectionData) (*nats.Conn, er
 		opts = append(opts, nats.UserInfo(connData.NatsUserName, connData.NatsUserPassword))
 	}
 
-	if connData.NatsUrl == "" {
-		connData.NatsUrl = nats.DefaultURL
+	if len(connData.NatsServers) == 0 {
+		connData.NatsServers = []string{nats.DefaultURL}
 	}
 
-	nc, err := nats.Connect(connData.NatsUrl, opts...)
+	nc, err := nats.Connect(strings.Join(connData.NatsServers, ","), opts...)
 	if err != nil {
 		return nil, err
 	}

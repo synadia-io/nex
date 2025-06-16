@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/synadia-labs/nex/models"
 
@@ -13,10 +14,11 @@ import (
 
 func NatsConnDataFromEnv() (*models.NatsConnectionData, error) {
 	natsConnData := new(models.NatsConnectionData)
-	var ok bool
-	natsConnData.NatsUrl, ok = os.LookupEnv("NEX_AGENT_NATS_URL")
+	natsServers, ok := os.LookupEnv("NEX_AGENT_NATS_SERVERS")
 	if !ok {
-		return nil, errors.New("NEX_AGENT_NATS_URL is required")
+		return nil, errors.New("NEX_AGENT_NATS_SERVERS is required")
+	} else {
+		natsConnData.NatsServers = strings.Split(natsServers, ",")
 	}
 
 	if b64Jwt, ok := os.LookupEnv("NEX_AGENT_NATS_B64_JWT"); ok {
