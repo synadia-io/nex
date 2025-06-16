@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/synadia-labs/nex/internal"
@@ -66,10 +67,11 @@ type (
 
 		regs *models.Regs
 
-		nc      *nats.Conn
-		service micro.Service
-		jsCtx   jetstream.JetStream
-		server  *server.Server
+		nc          *nats.Conn
+		service     micro.Service
+		jsCtx       jetstream.JetStream
+		server      *server.Server
+		serverCreds *models.NatsConnectionData
 
 		nodeShutdown chan struct{}
 	}
@@ -108,7 +110,7 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		embeddedRunners: make([]*sdk.Runner, 0),
 		localRunners:    make([]*internal.AgentProcess, 0),
 
-		minter:     &credentials.FullAccessMinter{NatsServer: nats.DefaultURL},
+		minter:     &credentials.FullAccessMinter{NatsServers: []string{nats.DefaultURL}},
 		state:      &state.NoState{},
 		auctioneer: nil,
 		idgen:      idgen.NewNuidGen(),
@@ -168,17 +170,6 @@ func (n *NexNode) Start() error {
 		n.builddate = builddate
 	}
 
-	n.startTime = time.Now()
-	n.logger.Info("Starting nex node",
-		slog.String("version", n.version),
-		slog.String("commit", n.commit),
-		slog.String("build_date", n.builddate),
-		slog.String("node_id", pubKey),
-		slog.String("name", n.name),
-		slog.String("nexus", n.nexus),
-		slog.String("nats_server", n.nc.ConnectedUrl()),
-		slog.String("start_time", n.startTime.Format(time.RFC3339)))
-
 	if n.server != nil {
 		n.server.Start()
 		n.logger.Info("Using internal nats server", slog.String("url", n.server.ClientURL()))
@@ -194,7 +185,7 @@ func (n *NexNode) Start() error {
 
 	if n.nc == nil {
 		if n.server != nil {
-			n.nc, err = nats.Connect(n.server.ClientURL())
+			n.nc, err = configureNatsConnection(n.serverCreds)
 			if err != nil {
 				return err
 			}
@@ -205,6 +196,17 @@ func (n *NexNode) Start() error {
 			}
 		}
 	}
+
+	n.startTime = time.Now()
+	n.logger.Info("Starting nex node",
+		slog.String("version", n.version),
+		slog.String("commit", n.commit),
+		slog.String("build_date", n.builddate),
+		slog.String("node_id", pubKey),
+		slog.String("name", n.name),
+		slog.String("nexus", n.nexus),
+		slog.String("nats_server", n.nc.ConnectedUrl()),
+		slog.String("start_time", n.startTime.Format(time.RFC3339)))
 
 	n.jsCtx, err = jetstream.New(n.nc)
 	if err != nil {
@@ -426,4 +428,51 @@ func (n *NexNode) enterLameduck(delay time.Duration) {
 			n.logger.Error("failed to shutdown nex node", slog.String("err", err.Error()))
 		}
 	}()
+}
+
+func configureNatsConnection(connData *models.NatsConnectionData) (*nats.Conn, error) {
+	if connData.ConnName == "" {
+		connData.ConnName = "nexnode"
+	}
+
+	opts := []nats.Option{
+		nats.Name(connData.ConnName),
+		nats.MaxReconnects(-1),
+	}
+
+	if connData.TlsCert != "" && connData.TlsKey != "" {
+		opts = append(opts, nats.ClientCert(connData.TlsCert, connData.TlsKey))
+	}
+	if connData.TlsCa != "" {
+		opts = append(opts, nats.RootCAs(connData.TlsCa))
+	}
+	if connData.TlsFirst {
+		opts = append(opts, nats.TLSHandshakeFirst())
+	}
+
+	switch {
+	case connData.NatsUserSeed != "" && connData.NatsUserJwt != "": // Use seed + jwt
+		opts = append(opts, nats.UserJWTAndSeed(connData.NatsUserJwt, connData.NatsUserSeed))
+	case connData.NatsUserNkey != "" && connData.NatsUserSeed != "": // User nkey
+		opts = append(opts, nats.Nkey(connData.NatsUserNkey, func(nonce []byte) ([]byte, error) {
+			kp, err := nkeys.FromSeed([]byte(connData.NatsUserSeed))
+			if err != nil {
+				return nil, err
+			}
+			return kp.Sign(nonce)
+		}))
+	case connData.NatsUserName != "" && connData.NatsUserPassword != "": // Use user + password
+		opts = append(opts, nats.UserInfo(connData.NatsUserName, connData.NatsUserPassword))
+	}
+
+	if len(connData.NatsServers) == 0 {
+		connData.NatsServers = []string{nats.DefaultURL}
+	}
+
+	nc, err := nats.Connect(strings.Join(connData.NatsServers, ","), opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return nc, nil
 }

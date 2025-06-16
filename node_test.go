@@ -77,7 +77,7 @@ func TestNodeOptions(t *testing.T) {
 		assertion func(*testing.T, *NexNode)
 	}{
 		{"WithContext", WithContext(context.WithValue(context.Background(), "foo", "bar")), func(t *testing.T, n *NexNode) { be.Equal(t, "bar", n.ctx.Value("foo")) }}, //nolint
-		{"WithInternalLogger", WithInternalNatsServer(&server.Options{Host: "1.2.3.4", Port: 10001}), func(t *testing.T, n *NexNode) { be.Equal(t, "nats://1.2.3.4:10001", n.server.ClientURL()) }},
+		{"WithInternalLogger", WithInternalNatsServer(&server.Options{Host: "1.2.3.4", Port: 10001}, &models.NatsConnectionData{}), func(t *testing.T, n *NexNode) { be.Equal(t, "nats://1.2.3.4:10001", n.server.ClientURL()) }},
 		{"WithNodeKeyPair", WithNodeKeyPair(kp), func(t *testing.T, n *NexNode) { be.Equal(t, kp, n.nodeKeypair) }},
 		{"WithNodeXKeyPair", WithNodeXKeyPair(xkp), func(t *testing.T, n *NexNode) { be.Equal(t, xkp, n.nodeXKeypair) }},
 		{"WithState", WithState(&state.NoState{}), func(t *testing.T, n *NexNode) { be.Nonzero(t, n.state) }},
@@ -125,7 +125,7 @@ func TestNodeStartStop(t *testing.T) {
 		WithNodeKeyPair(kp),
 		WithAgentRunner(r),
 		WithMinter(&tminter.TestMinter{
-			NatsServer: s.ClientURL(),
+			NatsServers: []string{s.ClientURL()},
 		}),
 	)
 	be.NilErr(t, err)
@@ -321,7 +321,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 		WithNodeKeyPair(kp),
 		WithAgentRunner(r),
 		WithMinter(&tminter.TestMinter{
-			NatsServer: s.ClientURL(),
+			NatsServers: []string{s.ClientURL()},
 		}),
 	)
 	be.NilErr(t, err)

@@ -7,8 +7,12 @@
     "conn_name": {
       "type": "string"
     },
-    "nats_url": {
-      "type": "string"
+    "nats_servers": {
+      "type": "array",
+      "description": "List of NATS Server URLs",
+      "items": {
+        "type": "string"
+      }
     },
     "tls_cert": {
       "type": "string"
@@ -44,7 +48,7 @@
   },
   "required": [
     "conn_name",
-    "nats_url",
+    "nats_servers",
     "tls_cert",
     "tls_key",
     "tls_ca",

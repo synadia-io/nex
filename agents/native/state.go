@@ -161,7 +161,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 
 	var nc *nats.Conn
 	if strings.HasPrefix(startReq.Uri, "nats://") {
-		nc, err = nats.Connect(req.WorkloadCreds.NatsUrl,
+		nc, err = nats.Connect(strings.Join(req.WorkloadCreds.NatsServers, ","),
 			nats.UserJWTAndSeed(req.WorkloadCreds.NatsUserJwt, req.WorkloadCreds.NatsUserSeed),
 			nats.Name("artifact_fetcher-"+workloadId))
 		if err != nil {
@@ -186,7 +186,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 	}
 
 	env = append(env, []string{
-		"NEX_WORKLOAD_NATS_URL=" + req.WorkloadCreds.NatsUrl,
+		"NEX_WORKLOAD_NATS_SERVERS=" + strings.Join(req.WorkloadCreds.NatsServers, ","),
 		"NEX_WORKLOAD_NATS_NKEY=" + req.WorkloadCreds.NatsUserSeed,
 		"NEX_WORKLOAD_NATS_B64_JWT=" + base64.StdEncoding.EncodeToString([]byte(req.WorkloadCreds.NatsUserJwt)),
 	}...)

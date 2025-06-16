@@ -57,7 +57,7 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 			}
 
 			env = append(env, []string{
-				"NEX_AGENT_NATS_URL=" + regCreds.NatsUrl,
+				"NEX_AGENT_NATS_SERVERS=" + strings.Join(regCreds.NatsServers, ","),
 				"NEX_AGENT_NATS_USER_SEED=" + regCreds.NatsUserSeed,
 				"NEX_AGENT_NATS_B64_JWT=" + base64.StdEncoding.EncodeToString([]byte(regCreds.NatsUserJwt)),
 				"NEX_AGENT_NATS_USER=" + regCreds.NatsUserName,

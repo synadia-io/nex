@@ -69,7 +69,7 @@ func TestNexletState(t *testing.T) {
 					WorkloadType:      "native",
 				},
 				WorkloadCreds: models.NatsConnectionData{
-					NatsUrl: s.ClientURL(),
+					NatsServers: []string{s.ClientURL()},
 				},
 			},
 		},
@@ -85,7 +85,7 @@ func TestNexletState(t *testing.T) {
 					WorkloadType:      "native",
 				},
 				WorkloadCreds: models.NatsConnectionData{
-					NatsUrl: s.ClientURL(),
+					NatsServers: []string{s.ClientURL()},
 				},
 			},
 		},

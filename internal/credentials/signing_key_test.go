@@ -23,13 +23,13 @@ func TestSigningKeyMinter_MintRegister(t *testing.T) {
 	m := SigningKeyMinter{
 		NodeId:         kpPub,
 		Nexus:          "nexus",
-		NatsServer:     "nats://localhost:4222",
+		NatsServers:    []string{"nats://localhost:4222"},
 		RootAccountKey: SigningKeyAccount,
 		SigningSeed:    SigningKey,
 	}
 	connData, err := m.MintRegister("agentId", "nodeId")
 	be.NilErr(t, err)
-	be.Equal(t, "nats://localhost:4222", connData.NatsUrl)
+	be.Equal(t, "nats://localhost:4222", connData.NatsServers[0])
 	be.Nonzero(t, connData.NatsUserSeed)
 
 	claims, err := jwt.DecodeUserClaims(connData.NatsUserJwt)
@@ -64,13 +64,13 @@ func TestSigningKeyMinter_Mint(t *testing.T) {
 			m := SigningKeyMinter{
 				NodeId:         kpPub,
 				Nexus:          "nexus",
-				NatsServer:     "nats://localhost:4222",
+				NatsServers:    []string{"nats://localhost:4222"},
 				RootAccountKey: SigningKeyAccount,
 				SigningSeed:    SigningKey,
 			}
 			connData, err := m.Mint(tc.t, tc.ns, tc.id)
 			be.NilErr(t, err)
-			be.Equal(t, "nats://localhost:4222", connData.NatsUrl)
+			be.Equal(t, "nats://localhost:4222", connData.NatsServers[0])
 			be.Nonzero(t, connData.NatsUserSeed)
 
 			claims, err := jwt.DecodeUserClaims(connData.NatsUserJwt)

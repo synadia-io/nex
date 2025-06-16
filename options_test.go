@@ -73,7 +73,7 @@ func TestNexNodeOptions(t *testing.T) {
 			Port: -1,
 		}
 		nn, err := NewNexNode(
-			WithInternalNatsServer(opts),
+			WithInternalNatsServer(opts, &models.NatsConnectionData{}),
 		)
 		be.NilErr(t, err)
 

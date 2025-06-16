@@ -32,7 +32,7 @@ NKEYs are sensitive and should be treated as secrets.
 
 type SigningKeyMinter struct {
 	NodeId         string
-	NatsServer     string
+	NatsServers    []string
 	Nexus          string
 	RootAccountKey string
 	SigningSeed    string
@@ -45,7 +45,7 @@ func (m *SigningKeyMinter) MintRegister(agentId, nodeId string) (*models.NatsCon
 	}
 
 	ret := new(models.NatsConnectionData)
-	ret.NatsUrl = m.NatsServer
+	ret.NatsServers = m.NatsServers
 
 	kp, err := nkeys.CreateUser()
 	if err != nil {
@@ -88,7 +88,7 @@ func (m *SigningKeyMinter) Mint(typ models.CredType, namespace, id string) (*mod
 	}
 
 	ret := new(models.NatsConnectionData)
-	ret.NatsUrl = m.NatsServer
+	ret.NatsServers = m.NatsServers
 
 	kp, err := nkeys.CreateUser()
 	if err != nil {

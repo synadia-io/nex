@@ -98,7 +98,7 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 		pubKey, err := kp.PublicKey()
 		be.NilErr(t, err)
 
-		minter := testminter.TestMinter{NatsServer: nc.ConnectedUrl()}
+		minter := testminter.TestMinter{NatsServers: []string{nc.ConnectedUrl()}}
 
 		opts := []nex.NexNodeOption{
 			nex.WithNodeName(fmt.Sprintf("testnexus-%d", i+1)),

@@ -52,8 +52,9 @@ func WithNatsConn(nc *nats.Conn) NexNodeOption {
 	}
 }
 
-func WithInternalNatsServer(opts *server.Options) NexNodeOption {
+func WithInternalNatsServer(opts *server.Options, creds *models.NatsConnectionData) NexNodeOption {
 	return func(n *NexNode) error {
+		n.serverCreds = creds
 		var err error
 		n.server, err = server.NewServer(opts)
 		return err

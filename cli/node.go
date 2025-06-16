@@ -15,6 +15,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 	"github.com/nats-io/natscli/columns"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-labs/nex"
@@ -108,9 +109,14 @@ func (u Up) Validate() error {
 }
 
 func (u Up) Run(ctx context.Context, globals *Globals) error {
-	nc, err := configureNatsConnection(globals)
-	if err != nil {
-		return err
+	var err error
+	var nc *nats.Conn
+
+	if u.InternalNatsServerConf == "" {
+		nc, err = configureNatsConnection(globals)
+		if err != nil {
+			return err
+		}
 	}
 
 	if nc == nil && u.InternalNatsServerConf == "" {
@@ -189,7 +195,20 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		if err != nil {
 			return err
 		}
-		opts = append(opts, nex.WithInternalNatsServer(natsOpts))
+		opts = append(opts, nex.WithInternalNatsServer(natsOpts,
+			&models.NatsConnectionData{
+				NatsServers:      globals.NatsServers,
+				NatsUserSeed:     globals.NatsUserSeed,
+				NatsUserJwt:      globals.NatsUserJWT,
+				NatsUserName:     globals.NatsUser,
+				NatsUserPassword: globals.NatsUserPassword,
+				NatsUserNkey:     globals.NatsUserNkey,
+				TlsCa:            globals.NatsTLSCA,
+				TlsCert:          globals.NatsTLSCert,
+				TlsFirst:         globals.NatsTLSFirst,
+				TlsKey:           globals.NatsTLSKey,
+			},
+		))
 	}
 
 	switch {
@@ -197,21 +216,21 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		minter := &credentials.SigningKeyMinter{
 			NodeId:         nodePub,
 			Nexus:          u.NexusName,
-			NatsServer:     nc.ConnectedUrl(),
+			NatsServers:    globals.NatsServers,
 			RootAccountKey: u.IssuerRootAccountKey,
 			SigningSeed:    u.IssuerSigningKey,
 		}
 		opts = append(opts, nex.WithMinter(minter))
 	case u.IssuerNkey != "":
 		minter := &credentials.NkeyMinter{
-			NatsServer: nc.ConnectedUrl(),
-			NkeyCred:   u.IssuerNkey,
-			NkeySeed:   u.IssuerNkeySeed,
+			NatsServers: globals.NatsServers,
+			NkeyCred:    u.IssuerNkey,
+			NkeySeed:    u.IssuerNkeySeed,
 		}
 		opts = append(opts, nex.WithMinter(minter))
 	default:
 		minter := &credentials.FullAccessMinter{
-			NatsServer: nc.ConnectedUrl(),
+			NatsServers: globals.NatsServers,
 		}
 		opts = append(opts, nex.WithMinter(minter))
 	}

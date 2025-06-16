@@ -235,8 +235,8 @@ type NatsConnectionData struct {
 	// ConnName corresponds to the JSON schema field "conn_name".
 	ConnName string `json:"conn_name"`
 
-	// NatsUrl corresponds to the JSON schema field "nats_url".
-	NatsUrl string `json:"nats_url"`
+	// List of NATS Server URLs
+	NatsServers []string `json:"nats_servers"`
 
 	// JWT for nats user, used with Seed
 	NatsUserJwt string `json:"nats_user_jwt"`
@@ -275,8 +275,8 @@ func (j *NatsConnectionData) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["conn_name"]; raw != nil && !ok {
 		return fmt.Errorf("field conn_name in NatsConnectionData: required")
 	}
-	if _, ok := raw["nats_url"]; raw != nil && !ok {
-		return fmt.Errorf("field nats_url in NatsConnectionData: required")
+	if _, ok := raw["nats_servers"]; raw != nil && !ok {
+		return fmt.Errorf("field nats_servers in NatsConnectionData: required")
 	}
 	if _, ok := raw["nats_user_jwt"]; raw != nil && !ok {
 		return fmt.Errorf("field nats_user_jwt in NatsConnectionData: required")

@@ -13,20 +13,20 @@ const (
 )
 
 func TestNkeyMinter_MintRegister(t *testing.T) {
-	m := NkeyMinter{NatsServer: "nats://localhost:4222", NkeyCred: USER_NKEY}
+	m := NkeyMinter{NatsServers: []string{"nats://localhost:4222"}, NkeyCred: USER_NKEY}
 	connData, err := m.MintRegister("agentId", "nodeId")
 	be.NilErr(t, err)
-	be.Equal(t, "nats://localhost:4222", connData.NatsUrl)
+	be.Equal(t, "nats://localhost:4222", connData.NatsServers[0])
 	be.Equal(t, USER_NKEY, connData.NatsUserNkey)
 	be.Zero(t, connData.NatsUserJwt)
 	be.Zero(t, connData.NatsUserSeed)
 }
 
 func TestNkeyMinter_Mint(t *testing.T) {
-	m := NkeyMinter{NatsServer: "nats://localhost:4222", NkeyCred: USER_NKEY}
+	m := NkeyMinter{NatsServers: []string{"nats://localhost:4222"}, NkeyCred: USER_NKEY}
 	connData, err := m.Mint(models.AgentCred, "namespace", "id")
 	be.NilErr(t, err)
-	be.Equal(t, "nats://localhost:4222", connData.NatsUrl)
+	be.Equal(t, "nats://localhost:4222", connData.NatsServers[0])
 	be.Equal(t, USER_NKEY, connData.NatsUserNkey)
 	be.Zero(t, connData.NatsUserJwt)
 	be.Zero(t, connData.NatsUserSeed)
