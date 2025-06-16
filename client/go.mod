@@ -12,7 +12,7 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/synadia-io/orbit.go/natsext v0.1.1
-	github.com/synadia-labs/nex v0.0.0-20250605181646-8939e7d10df7
+	github.com/synadia-labs/nex v0.0.0-20250616212700-2296e47efa6b
 )
 
 require (
@@ -41,7 +41,7 @@ require (
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
-	github.com/synadia-io/nexlet.go v0.0.0-20250616204135-82bd46e07bd8 // indirect
+	github.com/synadia-io/nexlet.go v0.0.0-20250616213009-1c61a848fd30 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
