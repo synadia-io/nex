@@ -303,9 +303,9 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		tW.Style().Format.Header = text.FormatDefault
 		tW.SetTitle("Running Agents")
 
-		tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "State", "Supported Lifecycles", "Running Workloads"})
+		tW.AppendHeader(table.Row{"Id", "Name", "Workload Type", "Start Time", "State", "Supported Lifecycles", "Running Workloads"})
 		for aId, aInfo := range infoResponse.AgentSummaries {
-			tW.AppendRow(table.Row{aId, aInfo.Name, aInfo.StartTime, aInfo.State, aInfo.SupportedLifecycles, aInfo.WorkloadCount})
+			tW.AppendRow(table.Row{aId, aInfo.Name, aInfo.Type, aInfo.StartTime, aInfo.State, aInfo.SupportedLifecycles, aInfo.WorkloadCount})
 		}
 
 		tW.SortBy([]table.SortBy{

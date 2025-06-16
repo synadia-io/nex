@@ -255,6 +255,7 @@ func (a *InMemAgent) Ping() (*models.AgentSummary, error) {
 	}
 	return &models.AgentSummary{
 		Name:                a.Name,
+		Type:                a.Name,
 		StartTime:           a.StartTime.String(),
 		State:               "running",
 		SupportedLifecycles: "service,job,function",

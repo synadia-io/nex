@@ -80,6 +80,9 @@ type AgentSummary struct {
 	// The lifecycle types supported by the agent
 	SupportedLifecycles string `json:"supported_lifecycles"`
 
+	// The registration type of the agent
+	Type string `json:"type"`
+
 	// The version of the agent
 	Version string `json:"version"`
 
@@ -104,6 +107,9 @@ func (j *AgentSummary) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["supported_lifecycles"]; raw != nil && !ok {
 		return fmt.Errorf("field supported_lifecycles in AgentSummary: required")
+	}
+	if _, ok := raw["type"]; raw != nil && !ok {
+		return fmt.Errorf("field type in AgentSummary: required")
 	}
 	if _, ok := raw["version"]; raw != nil && !ok {
 		return fmt.Errorf("field version in AgentSummary: required")

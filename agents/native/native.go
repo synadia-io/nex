@@ -173,6 +173,7 @@ func (a *NativeAgent) SetLameduck(before time.Duration) error {
 func (a *NativeAgent) Ping() (*models.AgentSummary, error) {
 	return &models.AgentSummary{
 		Name:                NEXLET_NAME,
+		Type:                NEXLET_REGISTER_TYPE,
 		StartTime:           a.startTime.Format(time.RFC3339),
 		State:               string(models.AgentStateRunning),
 		SupportedLifecycles: "job,service",
