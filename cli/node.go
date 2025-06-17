@@ -195,20 +195,43 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		if err != nil {
 			return err
 		}
-		opts = append(opts, nex.WithInternalNatsServer(natsOpts,
-			&models.NatsConnectionData{
-				NatsServers:      globals.NatsServers,
-				NatsUserSeed:     globals.NatsUserSeed,
-				NatsUserJwt:      globals.NatsUserJWT,
-				NatsUserName:     globals.NatsUser,
-				NatsUserPassword: globals.NatsUserPassword,
-				NatsUserNkey:     globals.NatsUserNkey,
-				TlsCa:            globals.NatsTLSCA,
-				TlsCert:          globals.NatsTLSCert,
-				TlsFirst:         globals.NatsTLSFirst,
-				TlsKey:           globals.NatsTLSKey,
-			},
-		))
+
+		connData := &models.NatsConnectionData{
+			NatsServers:      globals.NatsServers,
+			NatsUserSeed:     globals.NatsUserSeed,
+			NatsUserJwt:      globals.NatsUserJWT,
+			NatsUserName:     globals.NatsUser,
+			NatsUserPassword: globals.NatsUserPassword,
+			NatsUserNkey:     globals.NatsUserNkey,
+			TlsCa:            globals.NatsTLSCA,
+			TlsCert:          globals.NatsTLSCert,
+			TlsFirst:         globals.NatsTLSFirst,
+			TlsKey:           globals.NatsTLSKey,
+		}
+
+		if globals.NatsCredentialsFile != "" {
+			decoratedCreds, err := os.ReadFile(globals.NatsCredentialsFile)
+			if err != nil {
+				return fmt.Errorf("failed to read NATS credentials file: %w", err)
+			}
+
+			connData.NatsUserJwt, err = nkeys.ParseDecoratedJWT(decoratedCreds)
+			if err != nil {
+				return fmt.Errorf("failed to parse NATS credentials file: %w", err)
+			}
+			kp, err := nkeys.ParseDecoratedNKey(decoratedCreds)
+			if err != nil {
+				return fmt.Errorf("failed to parse NATS credentials file: %w", err)
+			}
+			seed, err := kp.Seed()
+			if err != nil {
+				return fmt.Errorf("failed to get seed from NATS credentials file: %w", err)
+			}
+
+			connData.NatsUserSeed = string(seed)
+		}
+
+		opts = append(opts, nex.WithInternalNatsServer(natsOpts, connData))
 	}
 
 	switch {

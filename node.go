@@ -171,6 +171,7 @@ func (n *NexNode) Start() error {
 	}
 
 	if n.server != nil {
+		n.server.ConfigureLogger()
 		n.server.Start()
 		n.logger.Info("Using internal nats server", slog.String("url", n.server.ClientURL()))
 
