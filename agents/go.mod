@@ -9,8 +9,8 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/synadia-io/nexlet.go v0.0.0-20250618152256-707f4ad2d581
-	github.com/synadia-labs/nex v0.0.0-20250616212700-2296e47efa6b
+	github.com/synadia-io/nexlet.go v0.0.0-20250618180625-ad1fda014680
+	github.com/synadia-labs/nex v0.0.0-20250618153244-5b72343bea6e
 	golang.org/x/sys v0.33.0
 )
 
@@ -22,7 +22,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.3.1 // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
-	github.com/charmbracelet/x/ansi v0.9.2 // indirect
+	github.com/charmbracelet/x/ansi v0.9.3 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/fatih/color v1.17.0 // indirect

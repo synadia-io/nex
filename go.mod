@@ -11,7 +11,7 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nexlet.go v0.0.0-20250618152256-707f4ad2d581
+	github.com/synadia-io/nexlet.go v0.0.0-20250618180625-ad1fda014680
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	golang.org/x/sys v0.33.0
 )
@@ -22,7 +22,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.3.1 // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
-	github.com/charmbracelet/x/ansi v0.9.2 // indirect
+	github.com/charmbracelet/x/ansi v0.9.3 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/google/go-tpm v0.9.5 // indirect
