@@ -52,7 +52,7 @@ require (
 	github.com/prometheus/common v0.64.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/synadia-io/nexlet.go v0.0.0-20250616213009-1c61a848fd30 // indirect
+	github.com/synadia-io/nexlet.go v0.0.0-20250618152256-707f4ad2d581 // indirect
 	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.39.0 // indirect
