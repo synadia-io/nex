@@ -307,7 +307,15 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	infoResponse, err := client.NewClient(ctx, nc, globals.Namespace).GetNodeInfo(i.NodeID)
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	infoResponse, err := nexClient.GetNodeInfo(i.NodeID)
 	if err != nil {
 		return err
 	}
@@ -373,7 +381,15 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	ldr, err := client.NewClient(ctx, nc, globals.Namespace).SetLameduck(l.NodeID, l.Delay)
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	ldr, err := nexClient.SetLameduck(l.NodeID, l.Delay)
 	if err != nil {
 		return err
 	}
@@ -406,7 +422,15 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	resp, err := client.NewClient(ctx, nc, globals.Namespace).ListNodes(l.Filter)
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	resp, err := nexClient.ListNodes(l.Filter)
 	if err != nil {
 		return err
 	}

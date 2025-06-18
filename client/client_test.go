@@ -24,11 +24,44 @@ func TestNewNexClient(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client := NewClient(context.Background(), nc, "test")
+	client, err := NewClient(context.Background(), nc, "test")
+	be.NilErr(t, err)
 	be.Nonzero(t, client)
 
 	be.DeepEqual(t, nc, client.nc)
 	be.Equal(t, "test", client.namespace)
+}
+
+func TestNewNexClientWithOptions(t *testing.T) {
+	server := _test.StartNatsServer(t, t.TempDir())
+	defer func() {
+		for server.NumClients() == 0 {
+			server.Shutdown()
+			return
+		}
+	}()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	customTimeout := 30 * time.Second
+	customStall := 5 * time.Second
+	customStartTimeout := 2 * time.Minute
+
+	client, err := NewClient(context.Background(), nc, "test",
+		WithDefaultTimeout(customTimeout),
+		WithAuctionTimeout(customTimeout),
+		WithStartWorkloadTimeout(customStartTimeout),
+		WithRequestManyStall(customStall),
+	)
+	be.NilErr(t, err)
+	be.Nonzero(t, client)
+
+	be.Equal(t, customTimeout, client.defaultTimeout)
+	be.Equal(t, customTimeout, client.auctionTimeout)
+	be.Equal(t, customStartTimeout, client.startWorkloadTimeout)
+	be.Equal(t, customStall, client.requestManyStall)
 }
 
 func TestNexClient_User(t *testing.T) {
@@ -51,7 +84,8 @@ func TestNexClient_User(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client := NewClient(context.Background(), nc, "user")
+	client, err := NewClient(context.Background(), nc, "user")
+	be.NilErr(t, err)
 	be.Nonzero(t, client)
 
 	ar, err := client.Auction("inmem", map[string]string{})
@@ -109,7 +143,8 @@ func TestNexClient_System(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(context.Background(), nc, models.SystemNamespace)
+			client, err := NewClient(context.Background(), nc, models.SystemNamespace)
+			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
 			info, err := client.GetNodeInfo(_test.Node1Pub)
@@ -157,7 +192,8 @@ func TestNexClient_SystemAsUser(t *testing.T) {
 	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
 	be.Equal(t, 1, len(nexNodes))
 
-	client := NewClient(context.Background(), nc, "user")
+	client, err := NewClient(context.Background(), nc, "user")
+	be.NilErr(t, err)
 	be.Nonzero(t, client)
 
 	_, err = client.GetNodeInfo(_test.Node1Pub)
@@ -209,7 +245,8 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(context.Background(), nc, "user")
+			client, err := NewClient(context.Background(), nc, "user")
+			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
 			ar, err := client.Auction("inmem", map[string]string{})
@@ -265,7 +302,8 @@ func TestNexClient_List_NoNodes(t *testing.T) {
 
 	for _, ns := range tt {
 		t.Run("As:"+ns, func(t *testing.T) {
-			client := NewClient(context.Background(), nc, models.SystemNamespace)
+			client, err := NewClient(context.Background(), nc, models.SystemNamespace)
+			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
 			t.Run("ListNodes", func(t *testing.T) {
@@ -319,7 +357,8 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(context.Background(), nc, "user")
+			client, err := NewClient(context.Background(), nc, "user")
+			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
 			ar, err := client.Auction("inmem", map[string]string{})
@@ -387,7 +426,8 @@ func TestNexClient_StopWorkloadDNE(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(context.Background(), nc, "user")
+			client, err := NewClient(context.Background(), nc, "user")
+			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
 			str, err := client.StopWorkload("abc123")
@@ -441,7 +481,8 @@ func TestNexClient_StopWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client := NewClient(context.Background(), nc, "user")
+			client, err := NewClient(context.Background(), nc, "user")
+			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
 			ar, err := client.Auction("inmem", map[string]string{})

@@ -25,22 +25,45 @@ type nexClient struct {
 	cancel    context.CancelFunc
 	nc        *nats.Conn
 	namespace string
+
+	// timeout configurations
+	defaultTimeout       time.Duration
+	auctionTimeout       time.Duration
+	startWorkloadTimeout time.Duration
+	requestManyStall     time.Duration
 }
 
-func NewClient(ctx context.Context, nc *nats.Conn, namespace string) *nexClient {
+func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...ClientOption) (*nexClient, error) {
 	var cancel context.CancelFunc
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if _, ok := ctx.Deadline(); !ok {
-		ctx, cancel = context.WithTimeoutCause(ctx, defaultTimeout, errors.New("default nex client timeout exceeded"))
-	}
-	return &nexClient{
-		ctx:       ctx,
-		cancel:    cancel,
+
+	client := &nexClient{
 		nc:        nc,
 		namespace: namespace,
+		// Set default timeout values
+		defaultTimeout:       defaultTimeout,
+		auctionTimeout:       defaultTimeout,
+		startWorkloadTimeout: time.Minute,
+		requestManyStall:     defaultStall,
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		if err := opt(client); err != nil {
+			return nil, err
+		}
+	}
+
+	// Set context timeout using configured default timeout
+	if _, ok := ctx.Deadline(); !ok {
+		ctx, cancel = context.WithTimeoutCause(ctx, client.defaultTimeout, errors.New("default nex client timeout exceeded"))
+	}
+	client.ctx = ctx
+	client.cancel = cancel
+
+	return client, nil
 }
 
 func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error) {
@@ -50,7 +73,7 @@ func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
 		return nil, err
 	}
 
-	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, defaultTimeout)
+	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, n.defaultTimeout)
 	if err != nil && !errors.Is(err, nats.ErrNoResponders) && !errors.Is(err, nats.ErrTimeout) {
 		return nil, err
 	}
@@ -78,7 +101,7 @@ func (n *nexClient) SetLameduck(nodeId string, delay time.Duration) (*models.Lam
 		return nil, err
 	}
 
-	respMsg, err := n.nc.Request(models.LameduckRequestSubject(n.namespace, nodeId), reqB, 3*time.Second)
+	respMsg, err := n.nc.Request(models.LameduckRequestSubject(n.namespace, nodeId), reqB, n.defaultTimeout)
 	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
 		return nil, err
 	}
@@ -105,7 +128,7 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 		return nil, err
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(defaultStall))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
 	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) {
 		return []*models.NodePingResponse{}, nil
 	}
@@ -142,7 +165,7 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 		return nil, err
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(defaultStall))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(n.requestManyStall))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return []*models.AuctionResponse{}, nil
 	}
@@ -187,7 +210,7 @@ func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, 
 		return nil, err
 	}
 
-	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, time.Minute)
+	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, n.startWorkloadTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +238,7 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 		return nil, err
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(defaultStall))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(n.requestManyStall))
 	if err != nil {
 		return &models.StopWorkloadResponse{
 			Id:           workloadId,
@@ -260,7 +283,7 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 		return nil, err
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(defaultStall))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return []*models.AgentListWorkloadsResponse{}, nil
 	}
@@ -307,7 +330,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 	}
 
 	genericNotFoundError := errors.New(string(models.GenericErrorsWorkloadNotFound))
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(defaultStall))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(n.requestManyStall))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return nil, genericNotFoundError
 	}

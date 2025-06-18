@@ -68,7 +68,14 @@ func (r *StartWorkload) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	client := client.NewClient(ctx, nc, globals.Namespace)
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	client, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
 
 	// if 'Nexfile' is located in the current directory, use it
 	if r.WorkloadNexfile == nil {
@@ -194,7 +201,15 @@ func (s *StopWorkload) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	stopResponse, err := client.NewClient(ctx, nc, globals.Namespace).StopWorkload(s.WorkloadId)
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	stopResponse, err := nexClient.StopWorkload(s.WorkloadId)
 	if err != nil {
 		return err
 	}
@@ -222,7 +237,15 @@ func (r *ListWorkload) Run(ctx context.Context, globals *Globals) error {
 		return errors.New("no NATS connection available")
 	}
 
-	resp, err := client.NewClient(ctx, nc, globals.Namespace).ListWorkloads(r.Filter)
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	resp, err := nexClient.ListWorkloads(r.Filter)
 	if err != nil {
 		return err
 	}
@@ -289,7 +312,14 @@ func (r *CloneWorkload) Run(ctx context.Context, globals *Globals) error {
 	if nc == nil {
 		return errors.New("no NATS connection available")
 	}
-	nexClient := client.NewClient(ctx, nc, globals.Namespace)
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
 	resp, err := nexClient.CloneWorkload(r.WorkloadId, r.AuctionTags)
 	if err != nil {
 		return err
