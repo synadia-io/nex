@@ -34,7 +34,7 @@ type Runner struct {
 	nodeId   string
 	nexus    string
 	agentId  string
-	triggers map[string]*nats.Subscription
+	triggers map[string]*triggerResources
 
 	agent Agent
 	nc    *nats.Conn
@@ -43,6 +43,11 @@ type Runner struct {
 	// Ingress Settings
 	ingressHostMachineIpAddr string
 	ingressReportingSubject  string
+}
+
+type triggerResources struct {
+	nc  *nats.Conn
+	sub *nats.Subscription
 }
 
 type RunnerOpt func(*Runner) error
@@ -113,7 +118,7 @@ func NewRunner(ctx context.Context, nexus, nodeId string, na Agent, opts ...Runn
 		nexus:    nexus,
 		agent:    na,
 		agentId:  "default",
-		triggers: make(map[string]*nats.Subscription),
+		triggers: make(map[string]*triggerResources),
 	}
 
 	for _, opt := range opts {
@@ -303,12 +308,15 @@ func (a *Runner) EmitEvent(event any) error {
 }
 
 func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConnData *models.NatsConnectionData, tFunc func([]byte) ([]byte, error)) error {
-	nc, err := configureNatsConnection(*workloadConnData)
+	tr := new(triggerResources)
+
+	var err error
+	tr.nc, err = configureNatsConnection(*workloadConnData)
 	if err != nil {
 		return err
 	}
 
-	sub, err := nc.Subscribe(triggerSubject, func(m *nats.Msg) {
+	tr.sub, err = tr.nc.Subscribe(triggerSubject, func(m *nats.Msg) {
 		go func() {
 			ret, err := tFunc(m.Data)
 			if err != nil {
@@ -331,7 +339,7 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 		return err
 	}
 
-	a.triggers[workloadId] = sub
+	a.triggers[workloadId] = tr
 	return nil
 }
 
@@ -339,15 +347,20 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 // If a workload is stopped via successful StopWorkloadRequest, the trigger will be unregistered automatically
 // If the workload fails to start inside a nexlet, use this function to clean up any unused triggers
 func (a *Runner) UnregisterTrigger(workloadId string) error {
-	sub, ok := a.triggers[workloadId]
+	tr, ok := a.triggers[workloadId]
 	if !ok {
 		a.logger.Debug("attempted to unregister a non-existent trigger", slog.String("workload_id", workloadId))
 		return nil
 	}
 
-	err := sub.Unsubscribe()
+	err := tr.sub.Unsubscribe()
 	if err != nil {
-		return fmt.Errorf("failed to unsubscribe trigger for workload %s: %w", workloadId, err)
+		a.logger.Error("failed to unsubscribe trigger", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
+	}
+
+	err = tr.nc.Drain()
+	if err != nil {
+		a.logger.Error("failed to drain trigger connection", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
 	}
 
 	delete(a.triggers, workloadId)

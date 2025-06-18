@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/carlmjohnson/be"
-	"github.com/nats-io/nats.go"
 )
 
 func TestRunnerConstructor(t *testing.T) {
@@ -24,7 +23,7 @@ func TestRunnerConstructor(t *testing.T) {
 		nexus:    "xyz890",
 		agent:    nil,
 		agentId:  "default",
-		triggers: make(map[string]*nats.Subscription),
+		triggers: make(map[string]*triggerResources),
 	}
 
 	b, err := NewRunner(context.Background(), "xyz890", "abc123", nil)
