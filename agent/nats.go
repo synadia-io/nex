@@ -2,6 +2,7 @@ package agent
 
 import (
 	"strings"
+	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
@@ -16,6 +17,7 @@ func configureNatsConnection(connData models.NatsConnectionData) (*nats.Conn, er
 	opts := []nats.Option{
 		nats.Name(connData.ConnName),
 		nats.MaxReconnects(-1),
+		nats.Timeout(10 * time.Second),
 	}
 
 	if connData.TlsCert != "" && connData.TlsKey != "" {
