@@ -271,12 +271,14 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 
 	if len(regRetJson.ExistingState) > 0 {
 		a.logger.Info("restoring existing state", slog.Int("num_workloads", len(regRetJson.ExistingState)))
-		for workloadId, startRequest := range regRetJson.ExistingState {
-			_, err = a.agent.StartWorkload(workloadId, &startRequest, true)
-			if err != nil {
-				a.logger.Error("error restoring existing state", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
+		go func(eState models.RegisterAgentResponseExistingState) {
+			for workloadId, startRequest := range eState {
+				_, err = a.agent.StartWorkload(workloadId, &startRequest, true)
+				if err != nil {
+					a.logger.Error("error restoring existing state", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
+				}
 			}
-		}
+		}(regRetJson.ExistingState)
 	}
 
 	return nil
