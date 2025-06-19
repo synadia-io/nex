@@ -17,6 +17,7 @@ import (
 	"github.com/synadia-labs/nex"
 	testminter "github.com/synadia-labs/nex/_test/minter"
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
+	iState "github.com/synadia-labs/nex/internal/state"
 )
 
 func init() {
@@ -108,6 +109,12 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 			nex.WithMinter(&minter),
 			nex.WithLogger(logger),
 			nex.WithTag("foo", "bar"),
+		}
+
+		if state {
+			sKV, err := iState.NewNatsKVState(nc, fmt.Sprintf("nex-%s", pubKey), logger)
+			be.NilErr(t, err)
+			opts = append(opts, nex.WithState(sKV))
 		}
 
 		for _, runner := range runners {
