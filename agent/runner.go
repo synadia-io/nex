@@ -181,7 +181,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 
 	var regRet *nats.Msg
 
-	regRet, err = a.nc.Request(models.AgentAPIRegisterRequestSubject(agentId, a.nodeId), registerB, time.Second*3)
+	regRet, err = a.nc.Request(models.AgentAPIRegisterRequestSubject(agentId, a.nodeId), registerB, time.Minute)
 	if err != nil {
 		return err
 	}
@@ -325,11 +325,12 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 				a.logger.Error("error running trigger function", slog.String("err", err.Error()))
 			}
 			if m.Reply != "" { // empty if original trigger was a publish and not request
-				err := m.RespondMsg(&nats.Msg{
+				msg := &nats.Msg{
 					Subject: m.Reply,
 					Header:  nats.Header{"workload_id": []string{workloadId}},
 					Data:    ret,
-				})
+				}
+				err = tr.nc.PublishMsg(msg)
 				if err != nil {
 					a.logger.Error("error responding to trigger", slog.String("err", err.Error()))
 				}
