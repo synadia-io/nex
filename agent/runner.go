@@ -320,19 +320,19 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 
 	tr.sub, err = tr.nc.Subscribe(triggerSubject, func(m *nats.Msg) {
 		go func() {
-			ret, err := tFunc(m.Data)
-			if err != nil {
-				a.logger.Error("error running trigger function", slog.String("err", err.Error()))
+			ret, funcError := tFunc(m.Data)
+			if funcError != nil {
+				a.logger.Error("error running trigger function", slog.String("err", funcError.Error()))
 			}
 			if m.Reply != "" { // empty if original trigger was a publish and not request
 				msg := &nats.Msg{
 					Subject: m.Reply,
-					Header:  nats.Header{"workload_id": []string{workloadId}},
+					Header:  nats.Header{"workload_id": []string{workloadId}, "error": []string{funcError.Error()}},
 					Data:    ret,
 				}
-				err = tr.nc.PublishMsg(msg)
-				if err != nil {
-					a.logger.Error("error responding to trigger", slog.String("err", err.Error()))
+				pubErr := tr.nc.PublishMsg(msg)
+				if pubErr != nil {
+					a.logger.Error("error responding to trigger", slog.String("err", pubErr.Error()))
 				}
 			}
 		}()
