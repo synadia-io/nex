@@ -4,11 +4,15 @@ dist/
 cli/nex
 
 cli/_configs/
+_examples/operator_mode/nsc/nsc.json
 
 go.work*
 cli/go.work*
 client/go.work*
 agents/go.work*
+
+# any creds used for testing
+**/*.creds
 
 # test binaries
 _test/workloads/counter/counter

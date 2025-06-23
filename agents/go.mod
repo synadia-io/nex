@@ -9,8 +9,8 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/synadia-io/nexlet.go v0.0.0-20250618180625-ad1fda014680
-	github.com/synadia-labs/nex v0.0.0-20250618153244-5b72343bea6e
+	github.com/synadia-io/nexlet.go v0.0.0-20250623144114-4e9800d66bb7
+	github.com/synadia-labs/nex v0.0.0-20250619043318-55bb4a5bb374
 	golang.org/x/sys v0.33.0
 )
 
@@ -44,7 +44,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.64.0 // indirect
+	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sanity-io/litter v1.5.5 // indirect
