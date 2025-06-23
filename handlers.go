@@ -560,7 +560,9 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 		}
 
 		fileLocation := filepath.Join(os.TempDir(), fmt.Sprintf("%d.json", rand.Intn(1_000_000)))
-		defer os.RemoveAll(fileLocation)
+		defer func() {
+			_ = os.RemoveAll(fileLocation)
+		}()
 
 		c := jsonschema.NewCompiler()
 		if err := c.AddResource(fileLocation, rawSchema); err != nil {

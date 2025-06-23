@@ -78,7 +78,7 @@ func TestNewAgentBadBinary(t *testing.T) {
 	be.NilErr(t, err)
 	err = os.Chmod(fakeBinary.Name(), 0755)
 	be.NilErr(t, err)
-	fakeBinary.Close()
+	_ = fakeBinary.Close()
 
 	regs := models.NewRegistrationList(logger)
 	ap := &AgentProcess{

@@ -36,10 +36,10 @@ func TestSigningKeyMinter_MintRegister(t *testing.T) {
 	be.NilErr(t, err)
 
 	genClaims := AgentRegistrationClaims("agentId", "nodeId")
-	be.AllEqual(t, genClaims.Pub.Allow, claims.Permissions.Pub.Allow)
-	be.AllEqual(t, genClaims.Pub.Deny, claims.Permissions.Pub.Deny)
-	be.AllEqual(t, genClaims.Sub.Allow, claims.Permissions.Sub.Allow)
-	be.AllEqual(t, genClaims.Sub.Deny, claims.Permissions.Sub.Deny)
+	be.AllEqual(t, genClaims.Pub.Allow, claims.Pub.Allow)
+	be.AllEqual(t, genClaims.Pub.Deny, claims.Pub.Deny)
+	be.AllEqual(t, genClaims.Sub.Allow, claims.Sub.Allow)
+	be.AllEqual(t, genClaims.Sub.Deny, claims.Sub.Deny)
 }
 
 func TestSigningKeyMinter_Mint(t *testing.T) {
@@ -76,10 +76,10 @@ func TestSigningKeyMinter_Mint(t *testing.T) {
 			claims, err := jwt.DecodeUserClaims(connData.NatsUserJwt)
 			be.NilErr(t, err)
 
-			be.AllEqual(t, tc.perms.Pub.Allow, claims.Permissions.Pub.Allow)
-			be.AllEqual(t, tc.perms.Pub.Deny, claims.Permissions.Pub.Deny)
-			be.AllEqual(t, tc.perms.Sub.Allow, claims.Permissions.Sub.Allow)
-			be.AllEqual(t, tc.perms.Sub.Deny, claims.Permissions.Sub.Deny)
+			be.AllEqual(t, tc.perms.Pub.Allow, claims.Pub.Allow)
+			be.AllEqual(t, tc.perms.Pub.Deny, claims.Pub.Deny)
+			be.AllEqual(t, tc.perms.Sub.Allow, claims.Sub.Allow)
+			be.AllEqual(t, tc.perms.Sub.Deny, claims.Sub.Deny)
 		})
 	}
 }
