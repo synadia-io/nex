@@ -325,9 +325,13 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 				a.logger.Error("error running trigger function", slog.String("err", funcError.Error()))
 			}
 			if m.Reply != "" { // empty if original trigger was a publish and not request
+				nHeader := nats.Header{"workload_id": []string{workloadId}}
+				if funcError != nil {
+					nHeader["error"] = []string{funcError.Error()}
+				}
 				msg := &nats.Msg{
 					Subject: m.Reply,
-					Header:  nats.Header{"workload_id": []string{workloadId}, "error": []string{funcError.Error()}},
+					Header:  nHeader,
 					Data:    ret,
 				}
 				pubErr := tr.nc.PublishMsg(msg)
