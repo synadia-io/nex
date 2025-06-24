@@ -55,6 +55,6 @@ func main() {
 
 	err = kctx.Run()
 	if err != nil {
-		fmt.Println("error: ", err.Error())
+		fmt.Println("error:", err.Error())
 	}
 }

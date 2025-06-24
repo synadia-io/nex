@@ -31,7 +31,7 @@ type GlobalLogger struct {
 }
 
 type GlobalNats struct {
-	NatsContext         string        `name:"context" placeholder:"default" help:"NATS context to use for connection; takes priority"`
+	NatsContext         string        `name:"context" placeholder:"<context>" help:"NATS context to use for connection; takes priority"`
 	NatsServers         []string      `name:"servers" short:"s" help:"NATS servers to connect to" placeholder:"nats://127.0.0.1:4222"`
 	NatsUserNkey        string        `name:"nkey" help:"User NKEY file for single-key auth"`
 	NatsUserSeed        string        `name:"seed" help:"Seed for user credentials" placeholder:"SUNEXSEED..."`
