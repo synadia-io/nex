@@ -185,18 +185,13 @@ func (n *NexNode) Start() error {
 		}
 	}
 
-	if n.nc == nil {
-		if n.server != nil {
-			n.nc, err = configureNatsConnection(n.serverCreds)
-			if err != nil {
-				return err
-			}
-		} else {
-			n.nc, err = nats.Connect(nats.DefaultURL)
-			if err != nil {
-				return err
-			}
+	if n.nc == nil && n.server != nil {
+		n.nc, err = configureNatsConnection(n.serverCreds)
+		if err != nil {
+			return err
 		}
+	} else if n.nc == nil {
+		return errors.New("nats connection is not set; please provide a valid nats connection or an internal nats server")
 	}
 
 	n.startTime = time.Now()

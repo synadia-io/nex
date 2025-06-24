@@ -150,6 +150,18 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 	if err != nil {
 		a.Logger.Error("failed to emit workload started event", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
 	}
+
+	if startRequest.Request.WorkloadLifecycle == models.WorkloadLifecycleFunction {
+		err = a.Runner.RegisterTrigger(workloadId, workloadId, &startRequest.WorkloadCreds, func(_ []byte) ([]byte, error) {
+			a.Logger.Debug("Function trigger invoked", slog.String("workloadId", workloadId))
+			return []byte("Function executed successfully"), nil
+		})
+		if err != nil {
+			a.Logger.Error("failed to register function trigger", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name), slog.Any("error", err))
+			return nil, err
+		}
+	}
+
 	return &models.StartWorkloadResponse{
 		Id:   workloadId,
 		Name: startRequest.Request.Name,
@@ -185,6 +197,16 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 			if err != nil {
 				a.Logger.Error("failed to emit workload stopped event", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
 			}
+
+			if workload.startRequest.WorkloadLifecycle == models.WorkloadLifecycleFunction {
+				err := a.Runner.UnregisterTrigger(workloadId)
+				if err != nil {
+					a.Logger.Error("failed to unregister function trigger", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace), slog.Any("error", err))
+				} else {
+					a.Logger.Debug("Function trigger unregistered successfully", slog.String("workloadId", workloadId))
+				}
+			}
+
 			return nil
 		}
 	}
