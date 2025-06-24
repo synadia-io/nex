@@ -285,10 +285,93 @@ func TestNodeLameduckHandler(t *testing.T) {
 	ldResp, err := nc.Request(models.LameduckRequestSubject(models.SystemNamespace, pub), reqB, time.Second*3)
 	be.NilErr(t, err)
 
-	be.NilErr(t, nn.WaitForShutdown()) // in this test, the lameduck command should shut down the node
+	err = nn.WaitForShutdown() // in this test, the lameduck command should shut down the node
+	be.Equal(t, models.ErrLameduckShutdown, err)
 
 	resp := models.LameduckResponse{}
 	be.NilErr(t, json.Unmarshal(ldResp.Data, &resp))
+	be.True(t, resp.Success)
+}
+
+func TestNodeShutdownExitCodes(t *testing.T) {
+	t.Run("normal shutdown returns nil", func(t *testing.T) {
+		s := startNatsServer(t)
+		defer s.Shutdown()
+
+		nc, err := nats.Connect(s.ClientURL())
+		be.NilErr(t, err)
+		defer nc.Close()
+
+		kp, err := nkeys.CreateServer()
+		be.NilErr(t, err)
+
+		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+		nn, err := NewNexNode(
+			WithNatsConn(nc),
+			WithLogger(logger),
+			WithNodeKeyPair(kp),
+		)
+		be.NilErr(t, err)
+
+		be.NilErr(t, nn.Start())
+
+		for !nn.IsReady() {
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		// Normal shutdown
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			be.NilErr(t, nn.Shutdown())
+		}()
+
+		err = nn.WaitForShutdown()
+		be.NilErr(t, err) // Normal shutdown should return nil
+	})
+
+	t.Run("lameduck shutdown returns ErrLameduckShutdown", func(t *testing.T) {
+		s := startNatsServer(t)
+		defer s.Shutdown()
+
+		nc, err := nats.Connect(s.ClientURL())
+		be.NilErr(t, err)
+		defer nc.Close()
+
+		kp, err := nkeys.CreateServer()
+		be.NilErr(t, err)
+
+		pub, err := kp.PublicKey()
+		be.NilErr(t, err)
+
+		logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+		nn, err := NewNexNode(
+			WithNatsConn(nc),
+			WithLogger(logger),
+			WithNodeKeyPair(kp),
+		)
+		be.NilErr(t, err)
+
+		be.NilErr(t, nn.Start())
+
+		for !nn.IsReady() {
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		// Trigger lameduck
+		req := models.LameduckRequest{
+			Delay: "100ms",
+		}
+		reqB, err := json.Marshal(req)
+		be.NilErr(t, err)
+
+		_, err = nc.Request(models.LameduckRequestSubject(models.SystemNamespace, pub), reqB, time.Second)
+		be.NilErr(t, err)
+
+		err = nn.WaitForShutdown()
+		be.Equal(t, models.ErrLameduckShutdown, err) // Lameduck shutdown should return specific error
+	})
 }
 
 func TestNodeDeployCloneUndeploy(t *testing.T) {

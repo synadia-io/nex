@@ -74,6 +74,7 @@ type (
 		serverCreds *models.NatsConnectionData
 
 		nodeShutdown chan struct{}
+		shutdownDueToLameduck bool
 	}
 )
 
@@ -354,6 +355,9 @@ func (n *NexNode) Shutdown() error {
 		return nil
 	}
 
+	if n.nodeState == models.NodeStateLameduck {
+		n.shutdownDueToLameduck = true
+	}
 	n.nodeState = models.NodeStateStopping
 
 	var err error
@@ -404,7 +408,12 @@ func (n *NexNode) Shutdown() error {
 
 	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
 
-	n.nodeShutdown <- struct{}{}
+	// Non-blocking send to avoid hanging if channel is already full
+	select {
+	case n.nodeShutdown <- struct{}{}:
+	default:
+		// Channel already has a shutdown signal, ignore
+	}
 	return nil
 }
 
@@ -415,6 +424,9 @@ func (n *NexNode) WaitForShutdown() error {
 			n.logger.Warn("shutdown by context cancellation")
 			return n.Shutdown()
 		case <-n.nodeShutdown: // shutdown by command, recommended
+			if n.shutdownDueToLameduck {
+				return models.ErrLameduckShutdown
+			}
 			return nil
 		}
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,7 +55,7 @@ func main() {
 	)
 
 	err = kctx.Run()
-	if err != nil {
+	if err != nil && !errors.Is(err, models.ErrLameduckShutdown) {
 		fmt.Println("error:", err.Error())
 	}
 }

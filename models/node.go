@@ -1,5 +1,9 @@
 package models
 
+import "errors"
+
+var ErrLameduckShutdown error = errors.New("node shutdown due to lameduck mode")
+
 const (
 	SystemNamespace = "system"
 
