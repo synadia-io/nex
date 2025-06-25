@@ -239,7 +239,63 @@ func TestNodeInfoHandler(t *testing.T) {
 	be.Equal(t, "false", resp.Tags["nex.lameduck"])
 }
 
-func TestNodeLameduckHandler(t *testing.T) {
+func TestNodeLameduckHandlerWithTag(t *testing.T) {
+	s := startNatsServer(t)
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	kp, err := nkeys.CreateServer()
+	be.NilErr(t, err)
+
+	pub, err := kp.PublicKey()
+	be.NilErr(t, err)
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	nn, err := NewNexNode(
+		WithNatsConn(nc),
+		WithLogger(logger),
+		WithNodeKeyPair(kp),
+		WithTag("foo", "bar"),
+	)
+	be.NilErr(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	go func() {
+		<-ctx.Done()
+		be.NilErr(t, nn.Shutdown())
+	}()
+
+	be.NilErr(t, nn.Start())
+
+	for !nn.IsReady() {
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	req := models.LameduckRequest{
+		Delay: "0s",
+		Tag:   map[string]string{"foo": "bar"},
+	}
+	reqB, err := json.Marshal(req)
+	be.NilErr(t, err)
+
+	ldResp, err := nc.Request(models.LameduckRequestSubject(models.SystemNamespace, pub), reqB, time.Second*3)
+	be.NilErr(t, err)
+
+	resp := models.LameduckResponse{}
+	be.NilErr(t, json.Unmarshal(ldResp.Data, &resp))
+	be.True(t, resp.Success)
+
+	be.Equal(t, models.ErrLameduckShutdown, nn.WaitForShutdown())
+	be.NilErr(t, nn.Shutdown())
+}
+
+func TestNodeLameduckHandlerWithoutTag(t *testing.T) {
 	s := startNatsServer(t)
 	defer s.Shutdown()
 
@@ -278,19 +334,16 @@ func TestNodeLameduckHandler(t *testing.T) {
 
 	req := models.LameduckRequest{
 		Delay: "0s",
+		Tag:   map[string]string{"foo": "bar"},
 	}
 	reqB, err := json.Marshal(req)
 	be.NilErr(t, err)
 
 	ldResp, err := nc.Request(models.LameduckRequestSubject(models.SystemNamespace, pub), reqB, time.Second*3)
-	be.NilErr(t, err)
+	be.Equal(t, nats.ErrTimeout, err)
+	be.Zero(t, ldResp)
 
-	err = nn.WaitForShutdown() // in this test, the lameduck command should shut down the node
-	be.Equal(t, models.ErrLameduckShutdown, err)
-
-	resp := models.LameduckResponse{}
-	be.NilErr(t, json.Unmarshal(ldResp.Data, &resp))
-	be.True(t, resp.Success)
+	be.NilErr(t, nn.Shutdown())
 }
 
 func TestNodeShutdownExitCodes(t *testing.T) {

@@ -91,9 +91,10 @@ func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
 	return infoResponse, nil
 }
 
-func (n *nexClient) SetLameduck(nodeId string, delay time.Duration) (*models.LameduckResponse, error) {
+func (n *nexClient) SetLameduck(nodeId string, delay time.Duration, tag map[string]string) (*models.LameduckResponse, error) {
 	req := &models.LameduckRequest{
 		Delay: delay.String(),
+		Tag:   tag,
 	}
 
 	reqB, err := json.Marshal(req)

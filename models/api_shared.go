@@ -188,7 +188,13 @@ func (j *GenericErrors) UnmarshalJSON(value []byte) error {
 type LameduckRequest struct {
 	// Time delay before lameduck mode is set
 	Delay string `json:"delay"`
+
+	// Tag to satisfy on node before lameduck mode is set
+	Tag LameduckRequestTag `json:"tag,omitempty"`
 }
+
+// Tag to satisfy on node before lameduck mode is set
+type LameduckRequestTag map[string]string
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (j *LameduckRequest) UnmarshalJSON(value []byte) error {
@@ -209,6 +215,9 @@ func (j *LameduckRequest) UnmarshalJSON(value []byte) error {
 }
 
 type LameduckResponse struct {
+	// Optional message on the lameduck response
+	Message string `json:"message"`
+
 	// Indicates lameduck mode successfully set
 	Success bool `json:"success"`
 }
@@ -218,6 +227,9 @@ func (j *LameduckResponse) UnmarshalJSON(value []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(value, &raw); err != nil {
 		return err
+	}
+	if _, ok := raw["message"]; raw != nil && !ok {
+		return fmt.Errorf("field message in LameduckResponse: required")
 	}
 	if _, ok := raw["success"]; raw != nil && !ok {
 		return fmt.Errorf("field success in LameduckResponse: required")

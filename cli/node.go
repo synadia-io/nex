@@ -57,7 +57,7 @@ type (
 	}
 	LameDuck struct {
 		Delay  time.Duration     `name:"delay" help:"Delay before stopping workloads.  Allows for user to migrate workloads" default:"1m"`
-		Label  map[string]string `name:"label" help:"Put all nodes with label in lameduck.  Only 1 label allowed" placeholder:"nex.nexus=mynexus"`
+		Tag    map[string]string `name:"tag" help:"Put all nodes with tag in lameduck.  Only 1 tag allowed" placeholder:"nex.nexus=mynexus"`
 		NodeID string            `name:"node-id" arg:"" help:"Node ID to command into lame duck mode" placeholder:"NBTAFHAKW..."`
 	}
 	List struct {
@@ -389,7 +389,7 @@ func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
 	if err != nil {
 		return err
 	}
-	ldr, err := nexClient.SetLameduck(l.NodeID, l.Delay)
+	ldr, err := nexClient.SetLameduck(l.NodeID, l.Delay, l.Tag)
 	if err != nil {
 		return err
 	}

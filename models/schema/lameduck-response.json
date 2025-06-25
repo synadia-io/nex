@@ -7,8 +7,12 @@
     "success": {
       "type": "boolean",
       "description": "Indicates lameduck mode successfully set"
+    },
+    "message": {
+      "type": "string",
+      "description": "Optional message on the lameduck response"
     }
   },
-  "required": ["success"],
+  "required": ["success", "message"],
   "additionalProperties": false
 }

@@ -156,7 +156,7 @@ func TestNexClient_System(t *testing.T) {
 			be.Equal(t, 1, len(nodes))
 			be.Equal(t, _test.Node1Pub, nodes[0].NodeId)
 
-			ldr, err := client.SetLameduck(_test.Node1Pub, 0)
+			ldr, err := client.SetLameduck(_test.Node1Pub, 0, nil)
 			be.NilErr(t, err)
 			be.True(t, ldr.Success)
 			time.Sleep(250 * time.Millisecond)
@@ -204,7 +204,7 @@ func TestNexClient_SystemAsUser(t *testing.T) {
 	//	be.Equal(t, "no nodes found", err.Error())
 	be.Equal(t, 0, len(nodes))
 
-	ldresp, err := client.SetLameduck(_test.Node1Pub, 0)
+	ldresp, err := client.SetLameduck(_test.Node1Pub, 0, nil)
 	be.NilErr(t, err)
 	be.False(t, ldresp.Success)
 

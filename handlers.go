@@ -72,20 +72,30 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 			return
 		}
 
-		delay, err := time.ParseDuration(req.Delay)
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to parse lameduck delay")
-			return
-		}
-
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to get public key from keypair")
 			return
 		}
 
+		if req.Tag != nil {
+			for k, v := range req.Tag {
+				if tV, ok := n.tags[k]; !ok || tV != v {
+					n.logger.Debug("workload tag not satisfied during lameduck", slog.String("node_id", pubKey), slog.String("tag", k), slog.String("value", v))
+					return
+				}
+			}
+		}
+
+		delay, err := time.ParseDuration(req.Delay)
+		if err != nil {
+			n.handlerError(r, err, "100", "failed to parse lameduck delay")
+			return
+		}
+
 		ldReq := models.LameduckRequest{
 			Delay: delay.String(),
+			Tag:   req.Tag,
 		}
 
 		ldReqB, err := json.Marshal(ldReq)
@@ -137,6 +147,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 		n.tags[models.TagLameDuck] = "true"
 		err = r.RespondJSON(models.LameduckResponse{
 			Success: true,
+			Message: fmt.Sprintf("node entering lameduck mode, will shutdown at %s", time.Now().Add(delay).Format(time.DateTime)),
 		})
 		if err != nil {
 			n.logger.Error("failed to respond to lameduck request", slog.String("err", err.Error()))

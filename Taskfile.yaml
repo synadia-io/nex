@@ -5,10 +5,6 @@ env:
   GOWORK: off
 
 tasks:
-  install-godeps:
-    cmds:
-      - go install github.com/atombender/go-jsonschema@latest
-
 
   install-deps: 
     deps: [install-godeps, install-protoc]
@@ -16,7 +12,7 @@ tasks:
   gen-schema:
     dir: models/schema
     cmds:
-      - go-jsonschema --struct-name-from-title
+      - go tool github.com/atombender/go-jsonschema --struct-name-from-title
         --package models --tags json
         --schema-output=io.nats.nex.v2.agent_register_request=../api_agent.go
         --schema-output=io.nats.nex.v2.agent_register_response=../api_agent.go
@@ -53,7 +49,7 @@ tasks:
   gen-native-schema:
     dir: agents/native
     cmds:
-      - go-jsonschema --struct-name-from-title
+      - go tool github.com/atombender/go-jsonschema --struct-name-from-title
         --package native --tags json
         --schema-output=gen=./gen_start_request.go
         *.json

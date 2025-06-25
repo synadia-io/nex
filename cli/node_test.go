@@ -61,7 +61,7 @@ func TestNodeCommandDefaults(t *testing.T) {
 		be.NilErr(t, err)
 
 		be.True(t, nkeys.IsValidPublicServerKey(nex.Node.LameDuck.NodeID))
-		be.DeepEqual(t, map[string]string(nil), nex.Node.LameDuck.Label)
+		be.DeepEqual(t, map[string]string(nil), nex.Node.LameDuck.Tag)
 		be.Equal(t, "1m0s", nex.Node.LameDuck.Delay.String())
 	})
 

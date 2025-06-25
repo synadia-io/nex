@@ -7,6 +7,13 @@
     "delay": {
       "type": "string",
       "description": "Time delay before lameduck mode is set"
+    },
+    "tag": {
+      "type": "object",
+      "description": "Tag to satisfy on node before lameduck mode is set",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "required": ["delay"],

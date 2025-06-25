@@ -12,7 +12,7 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/synadia-io/orbit.go/natsext v0.1.1
-	github.com/synadia-labs/nex v0.0.0-20250624164046-0cf978095e4d
+	github.com/synadia-labs/nex v0.0.0-20250624184914-b0eb918a6505
 )
 
 require (
