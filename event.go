@@ -11,6 +11,8 @@ import (
 
 type NexNodeEvent interface {
 	*models.NexNodeStartedEvent |
+		*models.NexNodeStoppedEvent |
+		*models.NexNodeLameduckSetEvent |
 		*models.AgentStartedEvent |
 		*models.AgentLameduckSetEvent
 }

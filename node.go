@@ -73,7 +73,7 @@ type (
 		server      *server.Server
 		serverCreds *models.NatsConnectionData
 
-		nodeShutdown chan struct{}
+		nodeShutdown          chan struct{}
 		shutdownDueToLameduck bool
 	}
 )
@@ -401,14 +401,36 @@ func (n *NexNode) Shutdown() error {
 		}
 	}
 
-	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
-
 	// Non-blocking send to avoid hanging if channel is already full
 	select {
 	case n.nodeShutdown <- struct{}{}:
 	default:
 		// Channel already has a shutdown signal, ignore
 	}
+
+	pubKey, err := n.nodeKeypair.PublicKey()
+	if err != nil {
+		n.logger.Error("failed to get node public key", slog.String("err", err.Error()))
+	}
+
+	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
+	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStoppedEvent{Id: pubKey})
+	if err != nil {
+		n.logger.Error("failed to emit nex stopped event", slog.String("err", err.Error()))
+	}
+
+	if n.nc != nil {
+		n.logger.Debug("closing nats connection", slog.String("url", n.nc.ConnectedUrl()))
+		err = n.nc.Drain()
+		if err != nil {
+			n.logger.Error("failed to drain nats connection", slog.String("err", err.Error()))
+		}
+	}
+	if n.server != nil {
+		n.logger.Debug("stopping internal nats server", slog.String("url", n.server.ClientURL()))
+		n.server.Shutdown()
+	}
+
 	return nil
 }
 
@@ -429,6 +451,7 @@ func (n *NexNode) WaitForShutdown() error {
 
 func (n *NexNode) enterLameduck(delay time.Duration) {
 	n.nodeState = models.NodeStateLameduck
+
 	go func() {
 		time.Sleep(delay)
 		err := n.Shutdown()
@@ -436,6 +459,17 @@ func (n *NexNode) enterLameduck(delay time.Duration) {
 			n.logger.Error("failed to shutdown nex node", slog.String("err", err.Error()))
 		}
 	}()
+	pubKey, err := n.nodeKeypair.PublicKey()
+	if err != nil {
+		n.logger.Error("failed to get node public key", slog.String("err", err.Error()))
+	}
+	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeLameduckSetEvent{
+		Id:   pubKey,
+		Time: time.Now().Add(delay),
+	})
+	if err != nil {
+		n.logger.Error("failed to emit lameduck event", slog.String("err", err.Error()))
+	}
 }
 
 func configureNatsConnection(connData *models.NatsConnectionData) (*nats.Conn, error) {

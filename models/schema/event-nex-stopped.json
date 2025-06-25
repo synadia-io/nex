@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "io.synadia.nex.event.nexnode_lameduck",
+  "title": "NexNodeStoppedEvent",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "The unique identifier of the nex node"
+    }
+  },
+  "required": [
+    "id"
+  ]
+}

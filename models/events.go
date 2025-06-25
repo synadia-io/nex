@@ -5,6 +5,7 @@ package models
 import "encoding/json"
 import "fmt"
 import "reflect"
+import "time"
 
 type AgentLameduckSetEvent struct {
 	// Indicates if the lameduck setting was successful
@@ -102,6 +103,35 @@ func (j *AgentStartedEvent) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type NexNodeLameduckSetEvent struct {
+	// The unique identifier of the nex node
+	Id string `json:"id"`
+
+	// The time when the shutdown will begin
+	Time time.Time `json:"time"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *NexNodeLameduckSetEvent) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in NexNodeLameduckSetEvent: required")
+	}
+	if _, ok := raw["time"]; raw != nil && !ok {
+		return fmt.Errorf("field time in NexNodeLameduckSetEvent: required")
+	}
+	type Plain NexNodeLameduckSetEvent
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = NexNodeLameduckSetEvent(plain)
+	return nil
+}
+
 type NexNodeStartedEvent struct {
 	// The unique identifier of the nex node
 	Id string `json:"id"`
@@ -146,6 +176,29 @@ func (j *NexNodeStartedEvent) UnmarshalJSON(value []byte) error {
 		return err
 	}
 	*j = NexNodeStartedEvent(plain)
+	return nil
+}
+
+type NexNodeStoppedEvent struct {
+	// The unique identifier of the nex node
+	Id string `json:"id"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *NexNodeStoppedEvent) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in NexNodeStoppedEvent: required")
+	}
+	type Plain NexNodeStoppedEvent
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = NexNodeStoppedEvent(plain)
 	return nil
 }
 
