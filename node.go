@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/synadia-labs/nex/internal"
@@ -74,6 +75,7 @@ type (
 		serverCreds *models.NatsConnectionData
 
 		nodeShutdown          chan struct{}
+		shutdownMu            sync.RWMutex
 		shutdownDueToLameduck bool
 	}
 )
@@ -351,7 +353,9 @@ func (n *NexNode) Shutdown() error {
 	}
 
 	if n.nodeState == models.NodeStateLameduck {
+		n.shutdownMu.Lock()
 		n.shutdownDueToLameduck = true
+		n.shutdownMu.Unlock()
 	}
 	n.nodeState = models.NodeStateStopping
 
@@ -394,43 +398,37 @@ func (n *NexNode) Shutdown() error {
 	if err != nil {
 		n.logger.Error("failed to stop micro service", slog.String("err", err.Error()))
 	}
-	if !n.nc.IsClosed() {
-		err = n.nc.Drain()
-		if err != nil {
-			n.logger.Error("failed to drain nats connection", slog.String("err", err.Error()))
-		}
-	}
-
-	// Non-blocking send to avoid hanging if channel is already full
-	select {
-	case n.nodeShutdown <- struct{}{}:
-	default:
-		// Channel already has a shutdown signal, ignore
-	}
 
 	pubKey, err := n.nodeKeypair.PublicKey()
 	if err != nil {
 		n.logger.Error("failed to get node public key", slog.String("err", err.Error()))
 	}
 
-	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
 	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStoppedEvent{Id: pubKey})
 	if err != nil {
 		n.logger.Error("failed to emit nex stopped event", slog.String("err", err.Error()))
 	}
 
-	if n.nc != nil {
-		n.logger.Debug("closing nats connection", slog.String("url", n.nc.ConnectedUrl()))
+	if n.nc != nil && !n.nc.IsClosed() {
 		err = n.nc.Drain()
 		if err != nil {
 			n.logger.Error("failed to drain nats connection", slog.String("err", err.Error()))
 		}
 	}
+
 	if n.server != nil {
 		n.logger.Debug("stopping internal nats server", slog.String("url", n.server.ClientURL()))
 		n.server.Shutdown()
 	}
 
+	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
+	
+	// Non-blocking send to avoid hanging if channel is already full
+	select {
+	case n.nodeShutdown <- struct{}{}:
+	default:
+		// Channel already has a shutdown signal, ignore
+	}
 	return nil
 }
 
@@ -441,7 +439,10 @@ func (n *NexNode) WaitForShutdown() error {
 			n.logger.Warn("shutdown by context cancellation")
 			return n.Shutdown()
 		case <-n.nodeShutdown: // shutdown by command, recommended
-			if n.shutdownDueToLameduck {
+			n.shutdownMu.RLock()
+			wasLameduck := n.shutdownDueToLameduck
+			n.shutdownMu.RUnlock()
+			if wasLameduck {
 				return models.ErrLameduckShutdown
 			}
 			return nil
