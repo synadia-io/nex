@@ -17,11 +17,6 @@ var (
 	EventAPIPrefix   = func(ns string) string { return fmt.Sprintf("$NEX.FEED.%s.events", ns) }
 )
 
-// $NEX.SVC.system.events.nodeid
-func EmitSystemEventSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.%s", EventAPIPrefix(NodeSystemNamespace), inNodeId)
-}
-
 // $NEX.SVC.namespace.control.PING
 func PingRequestSubject(inNamespace string) string {
 	return fmt.Sprintf("%s.PING", ControlAPIPrefix(inNamespace))
