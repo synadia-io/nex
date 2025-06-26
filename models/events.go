@@ -37,9 +37,6 @@ type AgentStartedEvent struct {
 	// The name of the agent
 	Name string `json:"name"`
 
-	// The public xkey of the agent
-	PublicXkey string `json:"public_xkey"`
-
 	// The type of the agent
 	Type AgentStartedEventType `json:"type"`
 }
@@ -87,9 +84,6 @@ func (j *AgentStartedEvent) UnmarshalJSON(value []byte) error {
 	}
 	if _, ok := raw["name"]; raw != nil && !ok {
 		return fmt.Errorf("field name in AgentStartedEvent: required")
-	}
-	if _, ok := raw["public_xkey"]; raw != nil && !ok {
-		return fmt.Errorf("field public_xkey in AgentStartedEvent: required")
 	}
 	if _, ok := raw["type"]; raw != nil && !ok {
 		return fmt.Errorf("field type in AgentStartedEvent: required")

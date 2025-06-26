@@ -20,16 +20,11 @@
         "local",
         "remote"
       ]
-    },
-    "public_xkey": {
-      "type": "string",
-      "description": "The public xkey of the agent"
     }
   },
   "required": [
     "id",
     "name",
-    "type",
-    "public_xkey"
+    "type"
   ]
 }

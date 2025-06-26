@@ -292,6 +292,16 @@ func (n *NexNode) Start() error {
 			n.regs.Remove(id)
 			continue
 		}
+
+		err = emitSystemEvent(n.nc, n.nodeKeypair, &models.AgentStartedEvent{
+			Id:   id,
+			Name: runner.String(),
+			Type: models.AgentStartedEventTypeEmbedded,
+		})
+		if err != nil {
+			n.logger.Error("failed to emit agent started event", slog.String("err", err.Error()), slog.String("agent_name", runner.String()))
+		}
+
 		n.logger.Info("starting embedded agent", slog.String("agent_name", runner.String()))
 		startedRunners = append(startedRunners, runner)
 	}
@@ -436,7 +446,7 @@ func (n *NexNode) Shutdown() error {
 	}
 
 	n.logger.Info("nex node stopped", slog.String("uptime", time.Since(n.startTime).String()))
-	
+
 	// Non-blocking send to avoid hanging if channel is already full
 	select {
 	case n.nodeShutdown <- struct{}{}:
