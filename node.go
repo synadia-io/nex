@@ -391,6 +391,20 @@ func (n *NexNode) Shutdown() error {
 					break
 				}
 			}
+			err = emitSystemEvent(n.nc, n.nodeKeypair, &models.AgentStoppedEvent{
+				Id:        agent.Id,
+				Name:      agent.OriginalRequest.Name,
+				Timestamp: time.Now(),
+				Reason: func() string {
+					if n.shutdownDueToLameduck {
+						return "lameduck mode"
+					}
+					return "shutdown"
+				}(),
+			})
+			if err != nil {
+				n.logger.Error("failed to emit agent stopped event", slog.String("err", err.Error()), slog.String("agent_id", agent.Id), slog.String("agent_name", agent.OriginalRequest.Name))
+			}
 		}
 	}
 

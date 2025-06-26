@@ -2,6 +2,7 @@ package nex
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/synadia-labs/nex/models"
 
@@ -14,6 +15,7 @@ type NexNodeEvent interface {
 		*models.NexNodeStoppedEvent |
 		*models.NexNodeLameduckSetEvent |
 		*models.AgentStartedEvent |
+		*models.AgentStoppedEvent |
 		*models.AgentLameduckSetEvent
 }
 
@@ -28,5 +30,5 @@ func emitSystemEvent[T NexNodeEvent](nc *nats.Conn, kp nkeys.KeyPair, in T) erro
 		return err
 	}
 
-	return nc.Publish(models.EmitSystemEventSubject(pubKey), inB)
+	return nc.Publish(fmt.Sprintf("%s.%s", models.EmitSystemEventSubject(pubKey), in), inB)
 }

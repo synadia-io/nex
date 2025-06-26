@@ -103,6 +103,47 @@ func (j *AgentStartedEvent) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type AgentStoppedEvent struct {
+	// The unique identifier of the nex agent
+	Id string `json:"id"`
+
+	// The name of the agent
+	Name string `json:"name"`
+
+	// The reason why the agent stopped
+	Reason string `json:"reason"`
+
+	// The timestamp when the agent stopped
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *AgentStoppedEvent) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in AgentStoppedEvent: required")
+	}
+	if _, ok := raw["name"]; raw != nil && !ok {
+		return fmt.Errorf("field name in AgentStoppedEvent: required")
+	}
+	if _, ok := raw["reason"]; raw != nil && !ok {
+		return fmt.Errorf("field reason in AgentStoppedEvent: required")
+	}
+	if _, ok := raw["timestamp"]; raw != nil && !ok {
+		return fmt.Errorf("field timestamp in AgentStoppedEvent: required")
+	}
+	type Plain AgentStoppedEvent
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = AgentStoppedEvent(plain)
+	return nil
+}
+
 type NexNodeLameduckSetEvent struct {
 	// The unique identifier of the nex node
 	Id string `json:"id"`

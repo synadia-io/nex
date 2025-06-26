@@ -43,6 +43,7 @@ tasks:
         --schema-output=io.synadia.nex.event.nexnode_lameduck=../events.go
         --schema-output=io.synadia.nex.event.nexnode_stopped=../events.go
         --schema-output=io.synadia.nex.event.agent_started=../events.go
+        --schema-output=io.synadia.nex.event.agent_stopped=../events.go
         --schema-output=io.synadia.nex.event.agent_lameduckset=../events.go
         --schema-output=io.synadia.nex.event.workload_started=../events.go
         --schema-output=io.synadia.nex.event.workload_stopped=../events.go
