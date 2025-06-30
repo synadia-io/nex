@@ -14,15 +14,15 @@ require (
 	github.com/carlmjohnson/be v0.24.1
 	github.com/jedib0t/go-pretty/v6 v6.6.7
 	github.com/nats-io/jsm.go v0.2.3
-	github.com/nats-io/nats-server/v2 v2.11.4
+	github.com/nats-io/nats-server/v2 v2.11.5
 	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/natscli v0.2.3
 	github.com/nats-io/nkeys v0.4.11
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.10.0
-	github.com/synadia-labs/nex v0.0.0-20250624184914-b0eb918a6505
-	github.com/synadia-labs/nex/agents v0.0.0-20250624184914-b0eb918a6505
-	github.com/synadia-labs/nex/client v0.0.0-20250624184914-b0eb918a6505
+	github.com/synadia-labs/nex v0.0.0-20250630130603-202c42e47611
+	github.com/synadia-labs/nex/agents v0.0.0-20250630130603-202c42e47611
+	github.com/synadia-labs/nex/client v0.0.0-20250630130603-202c42e47611
 )
 
 require (
@@ -52,7 +52,7 @@ require (
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/synadia-io/nexlet.go v0.0.0-20250627212653-2aa28e9f08cc // indirect
+	github.com/synadia-io/nexlet.go v0.0.0-20250630131412-424291de6e24 // indirect
 	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.39.0 // indirect

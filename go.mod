@@ -6,12 +6,12 @@ require (
 	disorder.dev/shandler v0.0.0-20250411134702-523d18ddef40
 	github.com/carlmjohnson/be v0.24.1
 	github.com/nats-io/jwt/v2 v2.7.4
-	github.com/nats-io/nats-server/v2 v2.11.4
+	github.com/nats-io/nats-server/v2 v2.11.5
 	github.com/nats-io/nats.go v1.43.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nexlet.go v0.0.0-20250627212653-2aa28e9f08cc
+	github.com/synadia-io/nexlet.go v0.0.0-20250630131412-424291de6e24
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	github.com/synadia-labs/nex/client v0.0.0-20250624164046-0cf978095e4d
 	golang.org/x/sys v0.33.0
