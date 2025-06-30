@@ -17,6 +17,7 @@ import (
 	"github.com/synadia-labs/nex/internal/aregistrar"
 	"github.com/synadia-labs/nex/internal/credentials"
 	"github.com/synadia-labs/nex/internal/idgen"
+	secretstore "github.com/synadia-labs/nex/internal/secret_store"
 	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 
@@ -60,11 +61,12 @@ type (
 		localRunners []*internal.AgentProcess
 		agentWatcher *internal.AgentWatcher
 
-		minter     models.CredVendor
-		state      models.NexNodeState
-		auctioneer models.Auctioneer
-		idgen      models.IDGen
-		aregistrar models.AgentRegistrar
+		minter      models.CredVendor
+		state       models.NexNodeState
+		auctioneer  models.Auctioneer
+		idgen       models.IDGen
+		aregistrar  models.AgentRegistrar
+		secretStore models.SecretStore
 
 		regs *models.Regs
 
@@ -113,11 +115,12 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		embeddedRunners: make([]*sdk.Runner, 0),
 		localRunners:    make([]*internal.AgentProcess, 0),
 
-		minter:     &credentials.FullAccessMinter{NatsServers: []string{nats.DefaultURL}},
-		state:      &state.NoState{},
-		auctioneer: nil,
-		idgen:      idgen.NewNuidGen(),
-		aregistrar: &aregistrar.AllowAllRegistrar{},
+		minter:      &credentials.FullAccessMinter{NatsServers: []string{nats.DefaultURL}},
+		state:       &state.NoState{},
+		auctioneer:  nil,
+		idgen:       idgen.NewNuidGen(),
+		aregistrar:  &aregistrar.AllowAllRegistrar{},
+		secretStore: &secretstore.NoStore{},
 
 		nodeKeypair:            kp,
 		nodeXKeypair:           xkp,

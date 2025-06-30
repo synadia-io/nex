@@ -153,3 +153,10 @@ func WithAgentRegistrar(a models.AgentRegistrar) NexNodeOption {
 		return nil
 	}
 }
+
+func WithSecretStore(s models.SecretStore) NexNodeOption {
+	return func(n *NexNode) error {
+		n.secretStore = s
+		return nil
+	}
+}

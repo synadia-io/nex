@@ -182,7 +182,32 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 
 	env := []string{}
 	for k, v := range startReq.Environment {
-		env = append(env, k+"="+v)
+		if secretKey, found := strings.CutPrefix(v, models.NexSecretPrefix); found {
+			secretValue, err := n.runner.GetNamespaceSecret(namespace, secretKey)
+			if err != nil {
+				n.logger.Error("error retrieving secret", slog.String("err", err.Error()), slog.String("secret_key", secretKey), slog.String("namespace", namespace))
+				n.Unlock()
+				return err
+			}
+			env = append(env, k+"="+string(secretValue))
+		} else {
+			env = append(env, k+"="+v)
+		}
+	}
+
+	argv := []string{}
+	for _, v := range startReq.Argv {
+		if secretKey, found := strings.CutPrefix(v, models.NexSecretPrefix); found {
+			secretValue, err := n.runner.GetNamespaceSecret(namespace, secretKey)
+			if err != nil {
+				n.logger.Error("error retrieving secret", slog.String("err", err.Error()), slog.String("secret_key", secretKey), slog.String("namespace", namespace))
+				n.Unlock()
+				return err
+			}
+			argv = append(argv, string(secretValue))
+		} else {
+			argv = append(argv, v)
+		}
 	}
 
 	env = append(env, []string{
@@ -192,7 +217,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 	}...)
 
 	n.logger.Debug("running binary", slog.Any("binary", ar.OriginalURI), slog.Any("args", startReq.Argv))
-	cmd := exec.CommandContext(poisonPill, ar.LocalCachePath, startReq.Argv...)
+	cmd := exec.CommandContext(poisonPill, ar.LocalCachePath, argv...)
 	cmd.Env = env
 	cmd.Stdout = n.runner.GetLogger(workloadId, namespace, models.LogOutStdout)
 	cmd.Stderr = n.runner.GetLogger(workloadId, namespace, models.LogOutStderr)

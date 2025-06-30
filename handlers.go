@@ -110,8 +110,8 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 		if err == nil {
 			msgs(func(m *nats.Msg, err error) bool {
 				if err == nil {
-					agentId := m.Header.Get("agentId")
-					if agentId == "" {
+					agentID := m.Header.Get("agentId")
+					if agentID == "" {
 						errs = errors.Join(errs, errors.New("failed to get agentId from header"))
 						return true
 					}
