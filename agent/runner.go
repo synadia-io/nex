@@ -31,17 +31,19 @@ type Runner struct {
 	metrics      bool
 	metricsPort  int
 
-	nodeId   string
+	nodeID   string
 	nexus    string
-	agentId  string
+	agentID  string
 	triggers map[string]*triggerResources
 
 	agent Agent
 	nc    *nats.Conn
 	micro micro.Service
 
+	secretStore models.SecretStore
+
 	// Ingress Settings
-	ingressHostMachineIpAddr string
+	ingressHostMachineIPAddr string
 	ingressReportingSubject  string
 }
 
@@ -59,7 +61,16 @@ func WithLogger(logger *slog.Logger) RunnerOpt {
 	}
 }
 
-// WithMetrics enables the prometheus metrics endpoint
+// WithSecretStore gives the agent access to pull secrets
+// from a pre-configured secret store.
+func WithSecretStore(secretStore models.SecretStore) RunnerOpt {
+	return func(a *Runner) error {
+		a.secretStore = secretStore
+		return nil
+	}
+}
+
+// WithPrometheusMetrics enables the prometheus metrics endpoint
 // at http://localhost:<promPort>/metrics
 // Default port: 9095
 func WithPrometheusMetrics(promPort int) RunnerOpt {
@@ -72,9 +83,9 @@ func WithPrometheusMetrics(promPort int) RunnerOpt {
 	}
 }
 
-func WithIngressSettings(hostMachineIpAddr, ingressReportingSubject string) RunnerOpt {
+func WithIngressSettings(hostMachineIPAddr, ingressReportingSubject string) RunnerOpt {
 	return func(a *Runner) error {
-		a.ingressHostMachineIpAddr = hostMachineIpAddr
+		a.ingressHostMachineIPAddr = hostMachineIPAddr
 		a.ingressReportingSubject = ingressReportingSubject
 		return nil
 	}
@@ -85,12 +96,12 @@ func RemoteAgentInit(nc *nats.Conn, nexus, pubKey string) (*models.RegisterRemot
 		PublicSigningKey: pubKey,
 	}
 
-	req_b, err := json.Marshal(req)
+	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	regResp, err := nc.Request(models.AgentAPIInitRemoteRegisterRequestSubject(nexus, pubKey), req_b, time.Second*3)
+	regResp, err := nc.Request(models.AgentAPIInitRemoteRegisterRequestSubject(nexus, pubKey), reqB, time.Second*3)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +115,7 @@ func RemoteAgentInit(nc *nats.Conn, nexus, pubKey string) (*models.RegisterRemot
 	return &resp, nil
 }
 
-func NewRunner(ctx context.Context, nexus, nodeId string, na Agent, opts ...RunnerOpt) (*Runner, error) {
+func NewRunner(ctx context.Context, nexus, nodeID string, na Agent, opts ...RunnerOpt) (*Runner, error) {
 	a := &Runner{
 		ctx:          ctx,
 		name:         "default",
@@ -114,11 +125,13 @@ func NewRunner(ctx context.Context, nexus, nodeId string, na Agent, opts ...Runn
 		metrics:      false,
 		metricsPort:  9095,
 
-		nodeId:   nodeId,
+		nodeID:   nodeID,
 		nexus:    nexus,
 		agent:    na,
-		agentId:  "default",
+		agentID:  "default",
 		triggers: make(map[string]*triggerResources),
+
+		secretStore: nil,
 	}
 
 	for _, opt := range opts {
@@ -141,23 +154,23 @@ func (a *Runner) String() string {
 	return fmt.Sprintf("%s-%s", a.registerType, a.name)
 }
 
-func (a *Runner) GetLogger(workloadId, namespace string, lType models.LogOut) io.Writer {
-	return NewAgentLogCapture(a.nc, slog.Default(), lType, a.agentId, workloadId, namespace)
+func (a *Runner) GetLogger(workloadID, namespace string, lType models.LogOut) io.Writer {
+	return NewAgentLogCapture(a.nc, slog.Default(), lType, a.agentID, workloadID, namespace)
 }
 
-func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
+func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 	if a.metrics {
 		go func() {
 			http.Handle("/metrics", promhttp.Handler())
 			err := http.ListenAndServe(fmt.Sprintf(":%d", a.metricsPort), nil)
 			if err != nil {
-				a.logger.Error("failed to start metrics server", slog.String("err", err.Error()), slog.String("agent_id", agentId))
+				a.logger.Error("failed to start metrics server", slog.String("err", err.Error()), slog.String("agent_id", agentID))
 			}
 		}()
 	}
 
 	var err error
-	a.agentId = agentId
+	a.agentID = agentID
 
 	a.nc, err = configureNatsConnection(connData)
 	if err != nil {
@@ -181,24 +194,24 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 
 	var regRet *nats.Msg
 
-	regRet, err = a.nc.Request(models.AgentAPIRegisterRequestSubject(agentId, a.nodeId), registerB, time.Minute)
+	regRet, err = a.nc.Request(models.AgentAPIRegisterRequestSubject(agentID, a.nodeID), registerB, time.Minute)
 	if err != nil {
 		return err
 	}
 
-	var regRetJson models.RegisterAgentResponse
-	err = json.Unmarshal(regRet.Data, &regRetJson)
+	var regRetJSON models.RegisterAgentResponse
+	err = json.Unmarshal(regRet.Data, &regRetJSON)
 	if err != nil {
 		return err
 	}
 
 	a.nc.Close()
 
-	if !regRetJson.Success {
-		return errors.New("agent registration failed: " + regRetJson.Message)
+	if !regRetJSON.Success {
+		return errors.New("agent registration failed: " + regRetJSON.Message)
 	}
 
-	a.nc, err = configureNatsConnection(regRetJson.ConnectionData)
+	a.nc, err = configureNatsConnection(regRetJSON.ConnectionData)
 	if err != nil {
 		return err
 	}
@@ -216,7 +229,7 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 				a.logger.Warn("error marshalling heartbeat", slog.String("err", err.Error()))
 				continue
 			}
-			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.nodeId, a.agentId), hbB)
+			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.nodeID, a.agentID), hbB)
 			if err != nil {
 				a.logger.Warn("error publishing heartbeat", slog.String("err", err.Error()))
 				continue
@@ -240,14 +253,14 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 
 	// Start subscriptions to the host
 	endpoints := []endpoint{
-		{Name: "StartWorkload", Subject: models.AgentAPIStartWorkloadSubscribeSubject(a.nodeId, a.agentId), Handler: a.handleStartWorkload()},
-		{Name: "StopWorkload", Subject: models.AgentAPIStopWorkloadSubscribeSubject(a.nodeId), Handler: a.handleStopWorkload()},
-		{Name: "GetWorkload", Subject: models.AgentAPIGetWorkloadSubscribeSubject(a.nodeId), Handler: a.handleGetWorkload()},
-		{Name: "QueryWorkloads", Subject: models.AgentAPIQueryWorkloadsSubject(a.nodeId), Handler: a.handleQueryWorkloads()},
+		{Name: "StartWorkload", Subject: models.AgentAPIStartWorkloadSubscribeSubject(a.nodeID, a.agentID), Handler: a.handleStartWorkload()},
+		{Name: "StopWorkload", Subject: models.AgentAPIStopWorkloadSubscribeSubject(a.nodeID), Handler: a.handleStopWorkload()},
+		{Name: "GetWorkload", Subject: models.AgentAPIGetWorkloadSubscribeSubject(a.nodeID), Handler: a.handleGetWorkload()},
+		{Name: "QueryWorkloads", Subject: models.AgentAPIQueryWorkloadsSubject(a.nodeID), Handler: a.handleQueryWorkloads()},
 		// System only endpoints
-		{Name: "PingAgent", Subject: models.AgentAPIPingSubject(a.nodeId, a.agentId), Handler: a.handlePing()},
-		{Name: "PingAllAgents", Subject: models.AgentAPIPingAllSubject(a.nodeId), Handler: a.handlePing()},
-		{Name: "SetLameduck", Subject: models.AgentAPISetLameduckSubject(a.nodeId), Handler: a.handleSetLameduck()},
+		{Name: "PingAgent", Subject: models.AgentAPIPingSubject(a.nodeID, a.agentID), Handler: a.handlePing()},
+		{Name: "PingAllAgents", Subject: models.AgentAPIPingAllSubject(a.nodeID), Handler: a.handlePing()},
+		{Name: "SetLameduck", Subject: models.AgentAPISetLameduckSubject(a.nodeID), Handler: a.handleSetLameduck()},
 	}
 
 	if _, ok := a.agent.(AgentIngessWorkloads); ok {
@@ -255,12 +268,12 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 	}
 
 	if _, ok := a.agent.(AgentEventListener); ok {
-		endpoints = append(endpoints, endpoint{Name: "EventListener", Subject: models.EventAPIPrefix(a.agentId), Handler: a.handleReceivedEvent()})
+		endpoints = append(endpoints, endpoint{Name: "EventListener", Subject: models.EventAPIPrefix(a.agentID), Handler: a.handleReceivedEvent()})
 	}
 
 	var errs error
 	for _, ep := range endpoints {
-		err := a.micro.AddEndpoint(ep.Name, ep.Handler, micro.WithEndpointSubject(ep.Subject), micro.WithEndpointQueueGroup(agentId))
+		err := a.micro.AddEndpoint(ep.Name, ep.Handler, micro.WithEndpointSubject(ep.Subject), micro.WithEndpointQueueGroup(agentID))
 		if err != nil {
 			errs = errors.Join(errs, err)
 		}
@@ -269,16 +282,16 @@ func (a *Runner) Run(agentId string, connData models.NatsConnectionData) error {
 		return errs
 	}
 
-	if len(regRetJson.ExistingState) > 0 {
-		a.logger.Info("restoring existing state", slog.Int("num_workloads", len(regRetJson.ExistingState)))
+	if len(regRetJSON.ExistingState) > 0 {
+		a.logger.Info("restoring existing state", slog.Int("num_workloads", len(regRetJSON.ExistingState)))
 		go func(eState models.RegisterAgentResponseExistingState) {
-			for workloadId, startRequest := range eState {
-				_, err = a.agent.StartWorkload(workloadId, &startRequest, true)
+			for workloadID, startRequest := range eState {
+				_, err = a.agent.StartWorkload(workloadID, &startRequest, true)
 				if err != nil {
-					a.logger.Error("error restoring existing state", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
+					a.logger.Error("error restoring existing state", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
 				}
 			}
-		}(regRetJson.ExistingState)
+		}(regRetJSON.ExistingState)
 	}
 
 	return nil
@@ -288,11 +301,20 @@ func (a *Runner) Shutdown() error {
 	return a.micro.Stop()
 }
 
+func (a *Runner) GetNamespaceSecret(namespace, secretKey string) ([]byte, error) {
+	if a.secretStore == nil {
+		return nil, errors.New("secret store not configured")
+	}
+
+	return a.secretStore.GetSecret(namespace, secretKey)
+}
+
 func (a *Runner) EmitEvent(event any) error {
 	var eventB []byte
 	var err error
 	var eventType string
 
+	// FIX: nex has stringer implementation for events, use that instead
 	switch event.(type) {
 	case models.WorkloadStartedEvent:
 		eventType = "WorkloadStarted"
@@ -306,10 +328,10 @@ func (a *Runner) EmitEvent(event any) error {
 	if err != nil {
 		return err
 	}
-	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentId, eventType), eventB)
+	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentID, eventType), eventB)
 }
 
-func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConnData *models.NatsConnectionData, tFunc func([]byte) ([]byte, error)) error {
+func (a *Runner) RegisterTrigger(workloadID, triggerSubject string, workloadConnData *models.NatsConnectionData, tFunc func([]byte) ([]byte, error)) error {
 	tr := new(triggerResources)
 
 	var err error
@@ -325,7 +347,7 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 				a.logger.Error("error running trigger function", slog.String("err", funcError.Error()))
 			}
 			if m.Reply != "" { // empty if original trigger was a publish and not request
-				nHeader := nats.Header{"workload_id": []string{workloadId}}
+				nHeader := nats.Header{"workload_id": []string{workloadID}}
 				if funcError != nil {
 					nHeader["error"] = []string{funcError.Error()}
 				}
@@ -345,53 +367,53 @@ func (a *Runner) RegisterTrigger(workloadId, triggerSubject string, workloadConn
 		return err
 	}
 
-	a.triggers[workloadId] = tr
+	a.triggers[workloadID] = tr
 	return nil
 }
 
-// This is used to unregister a trigger that was registered with the workload
+// UnregisterTrigger is used to unregister a trigger that was registered with the workload
 // If a workload is stopped via successful StopWorkloadRequest, the trigger will be unregistered automatically
 // If the workload fails to start inside a nexlet, use this function to clean up any unused triggers
-func (a *Runner) UnregisterTrigger(workloadId string) error {
-	tr, ok := a.triggers[workloadId]
+func (a *Runner) UnregisterTrigger(workloadID string) error {
+	tr, ok := a.triggers[workloadID]
 	if !ok {
-		a.logger.Debug("attempted to unregister a non-existent trigger", slog.String("workload_id", workloadId))
+		a.logger.Debug("attempted to unregister a non-existent trigger", slog.String("workload_id", workloadID))
 		return nil
 	}
 
 	err := tr.sub.Unsubscribe()
 	if err != nil {
-		a.logger.Error("failed to unsubscribe trigger", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
+		a.logger.Error("failed to unsubscribe trigger", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
 	}
 
 	err = tr.nc.Drain()
 	if err != nil {
-		a.logger.Error("failed to drain trigger connection", slog.String("workload_id", workloadId), slog.String("err", err.Error()))
+		a.logger.Error("failed to drain trigger connection", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
 	}
 
-	delete(a.triggers, workloadId)
+	delete(a.triggers, workloadID)
 	return nil
 }
 
 func (a *Runner) handleStartWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 7)
-		workloadId := splitSub[6]
+		workloadID := splitSub[6]
 
 		req := new(models.AgentStartWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
 			handlerError(a.logger, r, err, "100", models.StartWorkloadResponse{
-				Id:   workloadId,
+				Id:   workloadID,
 				Name: req.Request.Name,
 			})
 			return
 		}
 
-		startResp, err := a.agent.StartWorkload(workloadId, req, false)
+		startResp, err := a.agent.StartWorkload(workloadID, req, false)
 		if err != nil {
 			handlerError(a.logger, r, err, "100", models.StartWorkloadResponse{
-				Id:   workloadId,
+				Id:   workloadID,
 				Name: req.Request.Name,
 			})
 			return
@@ -400,27 +422,27 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 		err = r.RespondJSON(startResp)
 		if err != nil {
 			handlerError(a.logger, r, err, "100", models.StartWorkloadResponse{
-				Id:   workloadId,
+				Id:   workloadID,
 				Name: req.Request.Name,
 			})
 			return
 		}
 
 		if aiw, ok := a.agent.(AgentIngessWorkloads); ok {
-			if a.ingressHostMachineIpAddr == "" || a.ingressReportingSubject == "" {
-				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIpAddr), slog.String("reporting_subject", a.ingressReportingSubject))
+			if a.ingressHostMachineIPAddr == "" || a.ingressReportingSubject == "" {
+				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIPAddr), slog.String("reporting_subject", a.ingressReportingSubject))
 				return
 			}
 
-			ports, err := aiw.GetWorkloadExposedPorts(workloadId)
+			ports, err := aiw.GetWorkloadExposedPorts(workloadID)
 			if err != nil {
 				a.logger.Error("error getting exposed ports", slog.String("err", err.Error()))
 			}
 
 			for i, port := range ports {
 				ingressMsg := models.AgentIngressMsg{
-					WorkloadId: workloadId,
-					Upstream:   fmt.Sprintf("%s:%d", a.ingressHostMachineIpAddr, port),
+					WorkloadId: workloadID,
+					Upstream:   fmt.Sprintf("%s:%d", a.ingressHostMachineIPAddr, port),
 					Command:    "add",
 				}
 				ingressMsgB, err := json.Marshal(ingressMsg)
@@ -444,10 +466,10 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 func (a *Runner) handleStopWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
-		workloadId := splitSub[5]
+		workloadID := splitSub[5]
 
 		ret := models.StopWorkloadResponse{
-			Id:           workloadId,
+			Id:           workloadID,
 			WorkloadType: a.registerType,
 			Stopped:      true,
 			Message:      "",
@@ -463,7 +485,7 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			return
 		}
 
-		err = a.agent.StopWorkload(workloadId, req)
+		err = a.agent.StopWorkload(workloadID, req)
 		if err != nil {
 			a.logger.Debug("failed to stop workload", slog.String("err", err.Error()))
 			ret.Stopped = false
@@ -481,19 +503,19 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			}
 		}
 
-		err = a.UnregisterTrigger(workloadId)
+		err = a.UnregisterTrigger(workloadID)
 		if err != nil {
 			a.logger.Error("error unsubscribing trigger", slog.String("err", err.Error()))
 		}
 
 		if _, ok := a.agent.(AgentIngessWorkloads); ok {
-			if a.ingressHostMachineIpAddr == "" || a.ingressReportingSubject == "" {
-				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIpAddr), slog.String("reporting_subject", a.ingressReportingSubject))
+			if a.ingressHostMachineIPAddr == "" || a.ingressReportingSubject == "" {
+				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIPAddr), slog.String("reporting_subject", a.ingressReportingSubject))
 				return
 			}
 
 			ingressMsg := models.AgentIngressMsg{
-				WorkloadId: workloadId,
+				WorkloadId: workloadID,
 				Command:    "remove",
 			}
 			ingressMsgB, err := json.Marshal(ingressMsg)
@@ -513,10 +535,10 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 func (a *Runner) handleGetWorkload() func(r micro.Request) {
 	return func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
-		workloadId := splitSub[5]
+		workloadID := splitSub[5]
 
 		// TODO: implement message with xkey
-		startRequest, err := a.agent.GetWorkload(workloadId, "")
+		startRequest, err := a.agent.GetWorkload(workloadID, "")
 		if err != nil && err.Error() == "workload not found" {
 			return
 		}
@@ -646,7 +668,7 @@ func (a *Runner) handlePing() func(micro.Request) {
 		}
 
 		h := make(map[string][]string)
-		h["agentId"] = []string{a.agentId}
+		h["agentId"] = []string{a.agentID}
 
 		err = r.RespondJSON(resp, micro.WithHeaders(micro.Headers(h)))
 		if err != nil {
@@ -669,14 +691,14 @@ func (a *Runner) handleDiscoverWorkload() func(micro.Request) {
 
 		//$NEX.agent.PINGWORKLOAD.<workloadid>
 		subSplit := strings.SplitN(r.Subject(), ".", 4)
-		workloadId := subSplit[3]
+		workloadID := subSplit[3]
 
-		found := ingressAgent.PingWorkload(workloadId)
+		found := ingressAgent.PingWorkload(workloadID)
 		if !found {
 			return
 		}
 
-		err := r.Respond(fmt.Appendf([]byte{}, `{"node_id":"%s"}`, a.nodeId))
+		err := r.Respond(fmt.Appendf([]byte{}, `{"node_id":"%s"}`, a.nodeID))
 		if err != nil {
 			a.logger.Error("error responding to workload ping", slog.String("err", err.Error()))
 		}
@@ -697,13 +719,13 @@ func (a *Runner) handleReceivedEvent() func(micro.Request) {
 func handlerError[T models.StopWorkloadResponse | models.StartWorkloadResponse](logger *slog.Logger, r micro.Request, e error, code string, payload T) {
 	logger.Debug("error handling micro request", slog.String("err", e.Error()), slog.String("code", code))
 
-	payload_b, err := json.Marshal(payload)
+	payloadB, err := json.Marshal(payload)
 	if err != nil {
 		logger.Error("error marshalling payload", slog.String("err", err.Error()))
-		payload_b = []byte{}
+		payloadB = []byte{}
 	}
 
-	err = r.Error(code, e.Error(), payload_b)
+	err = r.Error(code, e.Error(), payloadB)
 	if err != nil {
 		logger.Error("failed to send micro request error message", slog.String("err", err.Error()))
 	}

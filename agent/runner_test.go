@@ -19,10 +19,10 @@ func TestRunnerConstructor(t *testing.T) {
 		metrics:      false,
 		metricsPort:  9095,
 
-		nodeId:   "abc123",
+		nodeID:   "abc123",
 		nexus:    "xyz890",
 		agent:    nil,
-		agentId:  "default",
+		agentID:  "default",
 		triggers: make(map[string]*triggerResources),
 	}
 

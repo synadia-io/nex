@@ -1,3 +1,4 @@
+// Package agent defines the interface for an agent that interacts with a workload management system.
 package agent
 
 import (
@@ -9,18 +10,18 @@ import (
 type Agent interface {
 	Register() (*models.RegisterAgentRequest, error)
 	Heartbeat() (*models.AgentHeartbeat, error)
-	StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error)
-	StopWorkload(workloadId string, req *models.StopWorkloadRequest) error
-	GetWorkload(workloadId, targetXkey string) (*models.StartWorkloadRequest, error)
+	StartWorkload(workloadID string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error)
+	StopWorkload(workloadID string, req *models.StopWorkloadRequest) error
+	GetWorkload(workloadID, targetXkey string) (*models.StartWorkloadRequest, error)
 	QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error)
 	SetLameduck(before time.Duration) error
 	Ping() (*models.AgentSummary, error)
 }
 
-// Optional interface for agents that support ingressable workloads
+// AgentIngessWorkloads Optional interface for agents that support ingressable workloads
 type AgentIngessWorkloads interface {
-	PingWorkload(workloadId string) bool
-	GetWorkloadExposedPorts(workloadId string) ([]int, error)
+	PingWorkload(workloadID string) bool
+	GetWorkloadExposedPorts(workloadID string) ([]int, error)
 }
 
 type AgentEventListener interface {
