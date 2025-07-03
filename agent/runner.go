@@ -174,13 +174,13 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 
 	a.nc, err = configureNatsConnection(connData)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to configure nats connection: %w", err)
 	}
 
 	// Register the agent
 	register, err := a.agent.Register()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed agent registration: %w", err)
 	}
 
 	a.name = register.Name
@@ -189,20 +189,20 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 
 	registerB, err := json.Marshal(register)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to serialize agent registration data: %w", err)
 	}
 
 	var regRet *nats.Msg
 
 	regRet, err = a.nc.Request(models.AgentAPIRegisterRequestSubject(agentID, a.nodeID), registerB, time.Minute)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to send agent registration request to node %s: %w", a.nodeID, err)
 	}
 
 	var regRetJSON models.RegisterAgentResponse
 	err = json.Unmarshal(regRet.Data, &regRetJSON)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to deserialize agent registration response: %w", err)
 	}
 
 	a.nc.Close()
@@ -242,7 +242,7 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 		Version: a.version,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create agent microservice: %w", err)
 	}
 
 	type endpoint struct {
@@ -273,13 +273,14 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 
 	var errs error
 	for _, ep := range endpoints {
-		err := a.micro.AddEndpoint(ep.Name, ep.Handler, micro.WithEndpointSubject(ep.Subject), micro.WithEndpointQueueGroup(agentID))
-		if err != nil {
-			errs = errors.Join(errs, err)
+		aerr := a.micro.AddEndpoint(ep.Name, ep.Handler, micro.WithEndpointSubject(ep.Subject), micro.WithEndpointQueueGroup(agentID))
+		if aerr != nil {
+			a.logger.Error("error adding micro endpoint", slog.String("agent_id", agentID), slog.String("endpoint_name", ep.Name), slog.String("endpoint_subject", ep.Subject), slog.String("err", aerr.Error()))
+			errs = errors.Join(errs, fmt.Errorf("failed to add micro endpoint %s: %w ", ep.Name, aerr))
 		}
 	}
 	if errs != nil {
-		return errs
+		return fmt.Errorf("failed to add agent micro endpoints: %w", err)
 	}
 
 	if len(regRetJSON.ExistingState) > 0 {
