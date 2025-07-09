@@ -68,7 +68,7 @@ func (a *AgentWatcher) New(regs *models.Regs, ap *AgentProcess, regCreds *models
 			}...)
 
 			// Start the process
-			cmd := exec.Command(fPath, ap.Config.Argv...)
+			cmd := exec.CommandContext(a.ctx, fPath, ap.Config.Argv...)
 			cmd.Env = env
 			cmd.Stdout = agentLogCapture{logger: a.logger.WithGroup(info.Name()).With("agent_id", ap.Id), stderr: false}
 			cmd.Stderr = agentLogCapture{logger: a.logger.WithGroup(info.Name()).With("agent_id", ap.Id), stderr: true}
