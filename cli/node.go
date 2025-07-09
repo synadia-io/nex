@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"slices"
@@ -152,6 +153,10 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 	nodePub, err := nodeKeyPair.PublicKey()
 	if err != nil {
 		return err
+	}
+
+	if u.NodeName == "" {
+		u.NodeName = fmt.Sprintf("nex-node-%d", rand.Intn(10_000))
 	}
 
 	logger := configureLogger(globals, nc, nodePub, u.ShowWorkloadLogs)
