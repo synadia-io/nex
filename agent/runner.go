@@ -98,18 +98,18 @@ func RemoteAgentInit(nc *nats.Conn, nexus, pubKey string) (*models.RegisterRemot
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal remote agent registration request: %w", err)
 	}
 
 	regResp, err := nc.Request(models.AgentAPIInitRemoteRegisterRequestSubject(nexus, pubKey), reqB, time.Second*3)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to send remote agent registration request: %w", err)
 	}
 
 	var resp models.RegisterRemoteAgentResponse
 	err = json.Unmarshal(regResp.Data, &resp)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal remote agent registration response: %w", err)
 	}
 
 	return &resp, nil
@@ -136,7 +136,7 @@ func NewRunner(ctx context.Context, nexus, nodeID string, na Agent, opts ...Runn
 
 	for _, opt := range opts {
 		if err := opt(a); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to apply runner option: %w", err)
 		}
 	}
 
@@ -174,7 +174,7 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 
 	a.nc, err = configureNatsConnection(connData)
 	if err != nil {
-		return fmt.Errorf("failed to configure nats connection: %w", err)
+		return fmt.Errorf("runner failed to configure initial NATS connection: %w", err)
 	}
 
 	// Register the agent
@@ -189,7 +189,7 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 
 	registerB, err := json.Marshal(register)
 	if err != nil {
-		return fmt.Errorf("failed to serialize agent registration data: %w", err)
+		return fmt.Errorf("failed to marshal registration request: %w", err)
 	}
 
 	var regRet *nats.Msg
@@ -202,7 +202,7 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 	var regRetJSON models.RegisterAgentResponse
 	err = json.Unmarshal(regRet.Data, &regRetJSON)
 	if err != nil {
-		return fmt.Errorf("failed to deserialize agent registration response: %w", err)
+		return fmt.Errorf("failed to unmarshal agent registration response: %w", err)
 	}
 
 	a.nc.Close()
@@ -213,7 +213,7 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 
 	a.nc, err = configureNatsConnection(regRetJSON.ConnectionData)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to configure NATS connection with registration response data: %w", err)
 	}
 
 	// Start agent heartbeat
@@ -242,7 +242,7 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 		Version: a.version,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create agent microservice: %w", err)
+		return fmt.Errorf("failed to create agent micro service: %w", err)
 	}
 
 	type endpoint struct {
@@ -327,7 +327,7 @@ func (a *Runner) EmitEvent(event any) error {
 
 	eventB, err = json.Marshal(event)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal event: %w", err)
 	}
 	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentID, eventType), eventB)
 }
@@ -338,7 +338,7 @@ func (a *Runner) RegisterTrigger(workloadID, triggerSubject string, workloadConn
 	var err error
 	tr.nc, err = configureNatsConnection(*workloadConnData)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to configure trigger NATS connection: %w", err)
 	}
 
 	tr.sub, err = tr.nc.Subscribe(triggerSubject, func(m *nats.Msg) {
@@ -365,7 +365,7 @@ func (a *Runner) RegisterTrigger(workloadID, triggerSubject string, workloadConn
 		}()
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to subscribe to trigger subject %s: %w", triggerSubject, err)
 	}
 
 	a.triggers[workloadID] = tr
