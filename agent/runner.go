@@ -44,7 +44,6 @@ type Runner struct {
 
 	// Ingress Settings
 	ingressHostMachineIPAddr string
-	ingressReportingSubject  string
 }
 
 type triggerResources struct {
@@ -83,10 +82,9 @@ func WithPrometheusMetrics(promPort int) RunnerOpt {
 	}
 }
 
-func WithIngressSettings(hostMachineIPAddr, ingressReportingSubject string) RunnerOpt {
+func WithIngressSettings(hostMachineIPAddr string) RunnerOpt {
 	return func(a *Runner) error {
 		a.ingressHostMachineIPAddr = hostMachineIPAddr
-		a.ingressReportingSubject = ingressReportingSubject
 		return nil
 	}
 }
@@ -429,12 +427,7 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 			return
 		}
 
-		if aiw, ok := a.agent.(AgentIngessWorkloads); ok {
-			if a.ingressHostMachineIPAddr == "" || a.ingressReportingSubject == "" {
-				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIPAddr), slog.String("reporting_subject", a.ingressReportingSubject))
-				return
-			}
-
+		if aiw, ok := a.agent.(AgentIngessWorkloads); ok && a.ingressHostMachineIPAddr != "" {
 			ports, err := aiw.GetWorkloadExposedPorts(workloadID)
 			if err != nil {
 				a.logger.Error("error getting exposed ports", slog.String("err", err.Error()))
@@ -444,14 +437,14 @@ func (a *Runner) handleStartWorkload() func(r micro.Request) {
 				ingressMsg := models.AgentIngressMsg{
 					WorkloadId: workloadID,
 					Upstream:   fmt.Sprintf("%s:%d", a.ingressHostMachineIPAddr, port),
-					Command:    "add",
+					Command:    models.AgentIngressCommandsAdd,
 				}
 				ingressMsgB, err := json.Marshal(ingressMsg)
 				if err != nil {
 					a.logger.Error("error marshalling ingress message", slog.String("err", err.Error()))
 					return
 				}
-				err = a.nc.Publish(a.ingressReportingSubject, ingressMsgB)
+				err = a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentID, "INGRESS"), ingressMsgB)
 				if err != nil {
 					a.logger.Error("error publishing to update_caddy", slog.String("err", err.Error()))
 				}
@@ -509,22 +502,18 @@ func (a *Runner) handleStopWorkload() func(r micro.Request) {
 			a.logger.Error("error unsubscribing trigger", slog.String("err", err.Error()))
 		}
 
-		if _, ok := a.agent.(AgentIngessWorkloads); ok {
-			if a.ingressHostMachineIPAddr == "" || a.ingressReportingSubject == "" {
-				a.logger.Warn("ingress data requested but not provided; settings missing", slog.String("host_machine_ip_addr", a.ingressHostMachineIPAddr), slog.String("reporting_subject", a.ingressReportingSubject))
-				return
-			}
+		if _, ok := a.agent.(AgentIngessWorkloads); ok && a.ingressHostMachineIPAddr != "" {
 
 			ingressMsg := models.AgentIngressMsg{
 				WorkloadId: workloadID,
-				Command:    "remove",
+				Command:    models.AgentIngressCommandsRemove,
 			}
 			ingressMsgB, err := json.Marshal(ingressMsg)
 			if err != nil {
 				a.logger.Error("error marshalling ingress message", slog.String("err", err.Error()))
 				return
 			}
-			err = a.nc.Publish(a.ingressReportingSubject, ingressMsgB)
+			err = a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentID, "INGRESS"), ingressMsgB)
 			if err != nil {
 				a.logger.Error("error publishing to update_caddy", slog.String("err", err.Error()))
 			}
