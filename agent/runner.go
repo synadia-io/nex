@@ -679,9 +679,9 @@ func (a *Runner) handleDiscoverWorkload() func(micro.Request) {
 			return
 		}
 
-		//$NEX.agent.PINGWORKLOAD.<workloadid>
-		subSplit := strings.SplitN(r.Subject(), ".", 4)
-		workloadID := subSplit[3]
+		//$NEX.SVC.<nexus>.agent.PINGWORKLOAD.<workload_id>
+		subSplit := strings.SplitN(r.Subject(), ".", 6)
+		workloadID := subSplit[5]
 
 		found := ingressAgent.PingWorkload(workloadID)
 		if !found {
