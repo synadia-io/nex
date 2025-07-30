@@ -1,4 +1,6 @@
 name: Lint | Test | Build
+permissions:
+  contents: read
 
 on:
   pull_request:
