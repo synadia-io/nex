@@ -2,7 +2,6 @@ package nex
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 	"github.com/synadia-labs/nex/internal"
 	"github.com/synadia-labs/nex/internal/aregistrar"
 	"github.com/synadia-labs/nex/internal/credentials"
+	"github.com/synadia-labs/nex/internal/emitter"
 	"github.com/synadia-labs/nex/internal/idgen"
 	secretstore "github.com/synadia-labs/nex/internal/secret_store"
 	"github.com/synadia-labs/nex/internal/state"
@@ -41,8 +41,8 @@ type (
 		logger    *slog.Logger
 		startTime time.Time
 
-		allowAgentRegistration bool
-		auctionMap             *internal.TTLMap
+		allowRemoteAgentRegistration bool
+		auctionMap                   *internal.TTLMap
 
 		nodeKeypair  nkeys.KeyPair
 		nodeXKeypair nkeys.KeyPair
@@ -55,11 +55,15 @@ type (
 		tags      map[string]string
 		nodeState models.NodeState
 
+		agentRestartLimit int
 		// Embedded agents
 		embeddedRunners []*sdk.Runner
 		// Config based agents
 		localRunners []*internal.AgentProcess
 		agentWatcher *internal.AgentWatcher
+
+		// List of active agents
+		registeredAgents *internal.AgentRegistrations
 
 		minter      models.CredVendor
 		state       models.NexNodeState
@@ -67,8 +71,6 @@ type (
 		idgen       models.IDGen
 		aregistrar  models.AgentRegistrar
 		secretStore models.SecretStore
-
-		regs *models.Regs
 
 		nc          *nats.Conn
 		service     micro.Service
@@ -80,6 +82,13 @@ type (
 		shutdownMu            sync.RWMutex
 		shutdownDueToLameduck bool
 	}
+)
+
+const (
+	defaultNexNodeName           = "nexnode"
+	defaultNexNodeNexus          = "nexus"
+	defaultAuctionTTLMapDuration = time.Second * 10
+	defaultAgentWatcherRestarts  = 3
 )
 
 func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
@@ -102,8 +111,8 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 		startTime: time.Time{},
 
-		name:  "nexnode",
-		nexus: "nexus",
+		name:  defaultNexNodeName,
+		nexus: defaultNexNodeNexus,
 		tags: map[string]string{
 			models.TagOS:       runtime.GOOS,
 			models.TagArch:     runtime.GOARCH,
@@ -112,8 +121,9 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		},
 		nodeState: models.NodeStateStarting,
 
-		embeddedRunners: make([]*sdk.Runner, 0),
-		localRunners:    make([]*internal.AgentProcess, 0),
+		agentRestartLimit: defaultAgentWatcherRestarts,
+		embeddedRunners:   make([]*sdk.Runner, 0),
+		localRunners:      make([]*internal.AgentProcess, 0),
 
 		minter:      &credentials.FullAccessMinter{NatsServers: []string{nats.DefaultURL}},
 		state:       &state.NoState{},
@@ -122,18 +132,18 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		aregistrar:  &aregistrar.AllowAllRegistrar{},
 		secretStore: &secretstore.NoStore{},
 
-		nodeKeypair:            kp,
-		nodeXKeypair:           xkp,
-		allowAgentRegistration: false,
-		auctionMap:             internal.NewTTLMap(time.Second * 10),
+		nodeKeypair:                  kp,
+		nodeXKeypair:                 xkp,
+		allowRemoteAgentRegistration: false,
+		auctionMap:                   internal.NewTTLMap(defaultAuctionTTLMapDuration),
+
+		registeredAgents: internal.NewAgentRegistrations(),
 
 		nc:     nil,
 		server: nil,
 
 		nodeShutdown: make(chan struct{}, 1),
 	}
-
-	n.regs = models.NewRegistrationList(n.logger)
 
 	var errs error
 	for _, opt := range opts {
@@ -148,13 +158,12 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	n.ctx, n.cancel = context.WithCancel(n.ctx)
 	n.tags[models.TagNexus] = n.nexus
 	n.tags[models.TagNodeName] = n.name
-	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.logger.WithGroup("agent-watcher"), 3)
+
+	var agentsStartedWg sync.WaitGroup
+	agentsStartedWg.Add(len(n.embeddedRunners) + len(n.localRunners))
+	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.agentRestartLimit, &agentsStartedWg)
 
 	return n, nil
-}
-
-func (n *NexNode) agentCount() int {
-	return n.regs.Count()
 }
 
 func (n *NexNode) Start() error {
@@ -232,10 +241,8 @@ func (n *NexNode) Start() error {
 	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIdByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// System only agent endpoints
-	if n.allowAgentRegistration {
-		errs = errors.Join(errs, n.service.AddEndpoint("InitRegisterRemoteAgent", micro.HandlerFunc(n.handleInitRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIInitRemoteRegisterSubscribeSubject(n.nexus)), micro.WithEndpointQueueGroup(n.nexus)))
-		// errs = errors.Join(errs, n.service.AddEndpoint("StartAgent", micro.HandlerFunc(n.handleStartAgent()), micro.WithEndpointSubject(models.StartAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-		// errs = errors.Join(errs, n.service.AddEndpoint("StopAgent", micro.HandlerFunc(n.handleStopAgent()), micro.WithEndpointSubject(models.StopAgentSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	if n.allowRemoteAgentRegistration {
+		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIInitRemoteRegisterSubscribeSubject(n.nexus)), micro.WithEndpointQueueGroup(n.nexus)))
 	}
 	errs = errors.Join(errs, n.service.AddEndpoint("RegisterAgent", micro.HandlerFunc(n.handleRegisterAgent()), micro.WithEndpointSubject(models.AgentAPIRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// User endpoints
@@ -250,7 +257,7 @@ func (n *NexNode) Start() error {
 	}
 
 	// At this point, nex controller is running
-	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStartedEvent{
+	err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStartedEvent{
 		Id:    pubKey,
 		Name:  n.name,
 		Nexus: n.nexus,
@@ -260,6 +267,7 @@ func (n *NexNode) Start() error {
 	if err != nil {
 		n.logger.Error("failed to emit nex started event", slog.String("err", err.Error()))
 	}
+	go n.heartbeat()
 
 	for _, e := range n.service.Info().Endpoints {
 		if e.QueueGroup != micro.DefaultQueueGroup {
@@ -269,84 +277,31 @@ func (n *NexNode) Start() error {
 		}
 	}
 
-	startedRunners := []*sdk.Runner{}
+	// Start agents via constructor
 	for _, runner := range n.embeddedRunners {
-		if _, _, ok := n.regs.Find(runner.String()); ok {
-			n.logger.Warn("agent already registered; skipping additional registration", slog.String("agent_name", runner.String()))
-			continue
-		}
-
 		id := n.idgen.Generate(nil)
-		err = n.regs.New(id, models.RegTypeEmbeddedAgent, "")
-		if err != nil {
-			n.logger.Error("failed to register agent", slog.String("agent_name", runner.String()), slog.String("err", err.Error()))
-			continue
-		}
-
 		connData, err := n.minter.MintRegister(id, pubKey)
 		if err != nil {
 			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
 			continue
 		}
-
-		err = runner.Run(id, *connData)
-		if err != nil {
-			n.logger.Error("agent failed to run", slog.String("agent_name", runner.String()), slog.String("err", err.Error()))
-			n.regs.Remove(id)
-			continue
-		}
-
-		err = emitSystemEvent(n.nc, n.nodeKeypair, &models.AgentStartedEvent{
-			Id:   id,
-			Name: runner.String(),
-			Type: models.AgentStartedEventTypeEmbedded,
-		})
-		if err != nil {
-			n.logger.Error("failed to emit agent started event", slog.String("err", err.Error()), slog.String("agent_name", runner.String()))
-		}
-
-		n.logger.Info("starting embedded agent", slog.String("agent_name", runner.String()))
-		startedRunners = append(startedRunners, runner)
+		go n.agentWatcher.StartEmbeddedAgent(id, runner, connData)
 	}
-	n.embeddedRunners = startedRunners
 
 	// start local agents
 	for _, agentProcess := range n.localRunners {
 		agentProcess.HostNode = pubKey
-		agentProcess.Id = n.idgen.Generate(nil)
-		connData, err := n.minter.MintRegister(agentProcess.Id, pubKey)
+		agentProcess.ID = n.idgen.Generate(nil)
+		connData, err := n.minter.MintRegister(agentProcess.ID, pubKey)
 		if err != nil {
 			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
 			continue
 		}
-		go n.agentWatcher.New(n.regs, agentProcess, connData)
+		go n.agentWatcher.StartLocalBinaryAgent(agentProcess, connData)
 	}
 
-	go func() {
-		for range time.Tick(10 * time.Second) {
-			if n.nc.IsClosed() {
-				return
-			}
-			// TODO: what should go in this payload??
-			hb := struct {
-				Registrations string `json:"registrations"`
-			}{
-				Registrations: n.regs.String(),
-			}
-			hbB, err := json.Marshal(hb)
-			if err != nil {
-				n.logger.Error("failed Marshal heartbeat", slog.String("err", err.Error()))
-			}
-			err = n.nc.Publish(models.NodeEmitHeartbeatSubject(pubKey), hbB)
-			if err != nil {
-				n.logger.Error("failed to publish heartbeat", slog.String("err", err.Error()))
-			}
-		}
-	}()
-
-	time.Sleep(time.Second) // allow for local registrations to finish
-
-	if n.regs.Count() == 0 {
+	n.agentWatcher.WaitForAgents()
+	if n.registeredAgents.Count() == 0 {
 		n.logger.Warn("nex node started without any agents")
 	}
 
@@ -372,56 +327,9 @@ func (n *NexNode) Shutdown() error {
 	}
 	n.nodeState = models.NodeStateStopping
 
-	var err error
-	for _, agent := range n.embeddedRunners {
-		err = agent.Shutdown()
-		if err != nil {
-			n.logger.Error("agent failed to shutdown", slog.String("agent_name", agent.String()), slog.String("err", err.Error()))
-			continue
-		}
-		n.logger.Info("agent shutdown", slog.String("agent_name", agent.String()))
-	}
+	n.agentWatcher.Shutdown()
 
-	for _, agent := range n.regs.Items() {
-		if agent.Type == models.RegTypeEmbeddedAgent {
-			err = internal.StopProcess(agent.Process)
-			if err == nil {
-				procState, err := agent.Process.Wait()
-				if err != nil {
-					n.logger.Error("failed to cleanly shutdown local agent process; force killing", slog.String("err", err.Error()))
-					err = agent.Process.Kill()
-					if err != nil {
-						n.logger.Error("failed to kill local agent process", slog.String("err", err.Error()))
-						break
-					}
-				}
-				n.logger.Info("local agent shutdown", slog.String("agent_name", agent.OriginalRequest.Name), slog.String("agent_type", agent.OriginalRequest.RegisterType), slog.String("exit_code", procState.String()))
-			} else {
-				n.logger.Error("failed to cleanly shutdown local agent process; force killing", slog.String("err", err.Error()))
-				err = agent.Process.Kill()
-				if err != nil {
-					n.logger.Error("failed to kill local agent process", slog.String("err", err.Error()), slog.Int("pid", agent.Process.Pid))
-					break
-				}
-			}
-			err = emitSystemEvent(n.nc, n.nodeKeypair, &models.AgentStoppedEvent{
-				Id:        agent.Id,
-				Name:      agent.OriginalRequest.Name,
-				Timestamp: time.Now(),
-				Reason: func() string {
-					if n.shutdownDueToLameduck {
-						return "lameduck mode"
-					}
-					return "shutdown"
-				}(),
-			})
-			if err != nil {
-				n.logger.Error("failed to emit agent stopped event", slog.String("err", err.Error()), slog.String("agent_id", agent.Id), slog.String("agent_name", agent.OriginalRequest.Name))
-			}
-		}
-	}
-
-	err = n.service.Stop()
+	err := n.service.Stop()
 	if err != nil {
 		n.logger.Error("failed to stop micro service", slog.String("err", err.Error()))
 	}
@@ -431,7 +339,7 @@ func (n *NexNode) Shutdown() error {
 		n.logger.Error("failed to get node public key", slog.String("err", err.Error()))
 	}
 
-	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStoppedEvent{Id: pubKey})
+	err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStoppedEvent{Id: pubKey})
 	if err != nil {
 		n.logger.Error("failed to emit nex stopped event", slog.String("err", err.Error()))
 	}
@@ -491,7 +399,7 @@ func (n *NexNode) enterLameduck(delay time.Duration) {
 	if err != nil {
 		n.logger.Error("failed to get node public key", slog.String("err", err.Error()))
 	}
-	err = emitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeLameduckSetEvent{
+	err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeLameduckSetEvent{
 		Id:   pubKey,
 		Time: time.Now().Add(delay),
 	})

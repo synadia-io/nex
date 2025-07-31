@@ -13,7 +13,7 @@ var (
 		return jwt.Permissions{
 			Pub: jwt.Permission{
 				Allow: []string{
-					fmt.Sprintf("%s.LREGISTER.%s", models.AgentAPIPrefix(nodeId), id),
+					fmt.Sprintf("%s.REGISTER.%s", models.AgentAPIPrefix(nodeId), id),
 				},
 			},
 			Sub: jwt.Permission{

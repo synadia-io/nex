@@ -75,6 +75,16 @@ func WithNodeXKeyPair(kp nkeys.KeyPair) NexNodeOption {
 	}
 }
 
+func WithAgentRestartLimit(limit int) NexNodeOption {
+	return func(n *NexNode) error {
+		if limit < 0 {
+			return errors.New("agent restart limit must be non-negative")
+		}
+		n.agentRestartLimit = limit
+		return nil
+	}
+}
+
 func WithAgentRunner(agent *sdk.Runner) NexNodeOption {
 	return func(n *NexNode) error {
 		n.embeddedRunners = append(n.embeddedRunners, agent)
@@ -82,7 +92,7 @@ func WithAgentRunner(agent *sdk.Runner) NexNodeOption {
 	}
 }
 
-func WithLocalAgent(agent models.Agent) NexNodeOption {
+func WithAgent(agent models.Agent) NexNodeOption {
 	return func(n *NexNode) error {
 		ap := &internal.AgentProcess{
 			Config: &agent,
@@ -104,9 +114,9 @@ func WithTag(key, value string) NexNodeOption {
 	}
 }
 
-func WithAllowAgentRegistration() NexNodeOption {
+func WithAllowRemoteAgentRegistration() NexNodeOption {
 	return func(n *NexNode) error {
-		n.allowAgentRegistration = true
+		n.allowRemoteAgentRegistration = true
 		return nil
 	}
 }
@@ -140,7 +150,7 @@ func WithAuctioneer(a models.Auctioneer) NexNodeOption {
 	}
 }
 
-func WithIdGenerator(a models.IDGen) NexNodeOption {
+func WithIDGenerator(a models.IDGen) NexNodeOption {
 	return func(n *NexNode) error {
 		n.idgen = a
 		return nil

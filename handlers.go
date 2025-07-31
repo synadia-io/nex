@@ -13,6 +13,8 @@ import (
 
 	"disorder.dev/shandler"
 	"github.com/synadia-io/orbit.go/natsext"
+	"github.com/synadia-labs/nex/internal"
+	"github.com/synadia-labs/nex/internal/emitter"
 	"github.com/synadia-labs/nex/models"
 
 	"github.com/nats-io/nats.go"
@@ -48,7 +50,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 		}
 
 		err = r.RespondJSON(models.NodePingResponse{
-			AgentCount: n.agentCount(),
+			AgentCount: n.registeredAgents.Count(),
 			NodeId:     pubKey,
 			Tags:       n.tags,
 			Uptime:     time.Since(n.startTime).String(),
@@ -106,7 +108,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 
 		// TODO: Adds agentid to lameduck response
 		var errs error
-		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPISetLameduckSubject(pubKey), ldReqB, natsext.RequestManyMaxMessages(n.regs.Count()))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPISetLameduckSubject(pubKey), ldReqB, natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 		if err == nil {
 			msgs(func(m *nats.Msg, err error) bool {
 				if err == nil {
@@ -123,7 +125,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 						return true
 					}
 
-					err = emitSystemEvent(n.nc, n.nodeKeypair, &models.AgentLameduckSetEvent{
+					err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.AgentLameduckSetEvent{
 						Success: t.Success,
 					})
 					if err != nil {
@@ -171,7 +173,7 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 
 		var errs error
 		as := models.AgentSummaries{}
-		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIPingAllSubject(pubKey), nil, natsext.RequestManyMaxMessages(n.regs.Count()))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIPingAllSubject(pubKey), nil, natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 		if err == nil {
 			msgs(func(m *nats.Msg, err error) bool {
 				if err == nil {
@@ -226,8 +228,8 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 		}
 
 		// If node doesnt have agent type, request is thrown away
-		_, reg, ok := n.regs.Find(req.AgentType)
-		if !ok {
+		reg, err := n.registeredAgents.GetByRegisterType(req.AgentType)
+		if err != nil {
 			n.logger.Log(n.ctx, shandler.LevelTrace, "no valid agents found for this workload", slog.String("agent_type", req.AgentType))
 			return
 		}
@@ -254,9 +256,9 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 		n.logger.Debug("responding to auction", slog.Any("auctionId", req.AuctionId))
 		err = r.RespondJSON(models.AuctionResponse{
 			BidderId:            bidderId,
-			Xkey:                reg.OriginalRequest.PublicXkey,
-			StartRequestSchema:  reg.OriginalRequest.StartRequestSchema,
-			SupportedLifecycles: reg.OriginalRequest.SupportedLifecycles,
+			Xkey:                reg.RegisterRequest.PublicXkey,
+			StartRequestSchema:  reg.RegisterRequest.StartRequestSchema,
+			SupportedLifecycles: reg.RegisterRequest.SupportedLifecycles,
 		})
 		if err != nil {
 			n.logger.Error("failed to respond to auction request", slog.String("err", err.Error()))
@@ -288,8 +290,8 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		aid, reg, ok := n.regs.Find(req.WorkloadType)
-		if !ok {
+		reg, err := n.registeredAgents.GetByRegisterType(req.WorkloadType)
+		if err != nil {
 			n.handlerError(r, errors.New("workload type not found"), "100", "workload type not found")
 			return
 		}
@@ -329,7 +331,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, aid, workloadId), aReqB, time.Minute)
+		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadId), aReqB, time.Minute)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish start workload request")
 			return
@@ -380,7 +382,7 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			WorkloadType: "",
 		}
 
-		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), natsext.RequestManyMaxMessages(n.regs.Count()))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 		if err != nil {
 			err = r.RespondJSON(ret)
 			if err != nil {
@@ -484,7 +486,7 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 		}
 
 		resp := models.AgentListWorkloadsResponse{}
-		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), natsext.RequestManyMaxMessages(n.regs.Count()))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 		if err != nil {
 			respB, err := json.Marshal(resp)
 			if err != nil {
@@ -525,21 +527,11 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 	}
 }
 
-// TODO: future work
-// func (n *NexNode) handleStartAgent() func(micro.Request) {
-// 	return func(r micro.Request) {
-// 	}
-// }
-//
-// func (n *NexNode) handleStopAgent() func(micro.Request) {
-// 	return func(r micro.Request) {
-// 	}
-// }
-
 func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 	return func(r micro.Request) {
+		// $NEX.SVC.<nodeid>.agent.REGISTER.<agentid>
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
-		agentId := splitSub[5]
+		agentID := splitSub[5]
 
 		registrationRequest := new(models.RegisterAgentRequest)
 		err := json.Unmarshal(r.Data(), registrationRequest)
@@ -553,14 +545,9 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			return
 		}
 
-		err = n.aregistrar.RegisterAgent(registrationRequest)
+		err = n.aregistrar.RegisterAgent(r.Headers(), registrationRequest)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed agent registrar check")
-			return
-		}
-
-		if !n.regs.Has(agentId) {
-			n.handlerError(r, errors.New(registrationRequest.Name+" agent provided invalid agentid ["+agentId+"]"), "100", "invalid agent id provided")
 			return
 		}
 
@@ -593,16 +580,19 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			return
 		}
 
-		err = n.regs.Update(agentId, &models.Reg{
-			OriginalRequest: registrationRequest,
+		p := &internal.AgentRegistration{
+			ID:              agentID,
+			RegisterRequest: registrationRequest,
 			Schema:          schema,
-		})
+		}
+
+		err = n.registeredAgents.Add(p)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to update registration")
 			return
 		}
 
-		natsConn, err := n.minter.Mint(models.AgentCred, "", agentId)
+		natsConn, err := n.minter.Mint(models.AgentCred, "", agentID)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to mint nats connection")
 			return
@@ -637,11 +627,11 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			n.logger.Error("failed to respond to register local agent request", slog.String("err", err.Error()))
 			return
 		}
-		n.logger.Info("agent registered", slog.String("name", registrationRequest.Name), slog.String("type", registrationRequest.RegisterType), slog.String("agent_id", agentId))
+		n.logger.Info("agent registered", slog.String("name", registrationRequest.Name), slog.String("type", registrationRequest.RegisterType), slog.String("agent_id", agentID))
 	}
 }
 
-func (n *NexNode) handleInitRegisterRemoteAgent() func(micro.Request) {
+func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 	return func(r micro.Request) {
 		req := new(models.RegisterRemoteAgentRequest)
 		err := json.Unmarshal(r.Data(), req)
@@ -650,33 +640,27 @@ func (n *NexNode) handleInitRegisterRemoteAgent() func(micro.Request) {
 			return
 		}
 
-		err = n.aregistrar.RegisterRemoteInit(req)
+		err = n.aregistrar.RegisterRemoteInit(r.Headers(), req)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed agent registrar check")
 			return
 		}
 
-		agentId := n.idgen.Generate(nil)
-		err = n.regs.New(agentId, models.ReqTypeRemoteAgent, req.PublicSigningKey)
-		if err != nil {
-			n.handlerError(r, err, "100", "failed to register remote agent")
-			return
-		}
-
+		agentID := n.idgen.Generate(nil)
 		pubNodeKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to get public key from keypair")
 			return
 		}
 
-		connData, err := n.minter.MintRegister(agentId, pubNodeKey)
+		connData, err := n.minter.MintRegister(agentID, pubNodeKey)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to mint register")
 			return
 		}
 
 		ret := models.RegisterRemoteAgentResponse{
-			AssignedAgentId:   agentId,
+			AssignedAgentId:   agentID,
 			RegistrationCreds: connData,
 			RespondTo:         pubNodeKey,
 		}
@@ -693,18 +677,16 @@ func (n *NexNode) handleGetAgentIdByName() func(micro.Request) {
 	return func(r micro.Request) {
 		agentName := string(r.Data())
 		if agentName == "" {
-			_ = r.Respond([]byte{})
+			n.handlerError(r, errors.New("agent name is required"), "100", "agent name is required")
 			return
 		}
-		agentId, _, found := n.regs.Find(agentName)
-		if !found {
-			_ = r.Respond([]byte{})
-			return
-		}
-		err := r.Respond([]byte(agentId))
-		if err != nil {
-			n.logger.Error("failed to respond to get agent id by name request", slog.String("err", err.Error()))
-			return
+
+		if agent, err := n.registeredAgents.GetByRegisterName(agentName); err == nil {
+			err = r.Respond([]byte(agent.ID))
+			if err != nil {
+				n.logger.Error("failed to respond to get agent id by name request", slog.String("err", err.Error()))
+				return
+			}
 		}
 	}
 }

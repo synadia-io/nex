@@ -2,77 +2,125 @@ package internal
 
 import (
 	"bytes"
-	"context"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/carlmjohnson/be"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nkeys"
 	"github.com/synadia-labs/nex/models"
 )
 
-func TestNewAgentWatcher(t *testing.T) {
-	at := NewAgentWatcher(context.TODO(), slog.New(slog.NewTextHandler(io.Discard, nil)), 1)
-	be.Nonzero(t, at)
-	be.Equal(t, 1, at.resetLimit)
+const (
+	nodeSeed = "SNAD2VTZQ7Z3CCB6TJWFFJK6J7DDZ5SQUHOFPQFRKDIVDQBM2WLGZGELSE"
+	nodePub  = "NB4XOM2IOV2NRLRZZU5PFMQFBAQXYQOG4WOVGOWRYJRBWI3JO5QJK7AG"
+)
+
+func startNatsServer(t testing.TB, workDir string) *server.Server {
+	t.Helper()
+
+	server := server.New(&server.Options{
+		Port:      -1,
+		JetStream: true,
+		StoreDir:  workDir,
+	})
+
+	server.Start()
+
+	return server
 }
 
-func TestNewAgent(t *testing.T) {
+func TestWatcherRestart(t *testing.T) {
+	s := startNatsServer(t, t.TempDir())
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL())
+	be.NilErr(t, err)
+
 	stdout := new(bytes.Buffer)
 	logger := slog.New(slog.NewTextHandler(stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	at := NewAgentWatcher(context.TODO(), logger, 1)
 
+	kp, err := nkeys.FromSeed([]byte(nodeSeed))
+	be.NilErr(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1) // Testing one agent with restart
+
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
 	uri, err := exec.LookPath("sleep")
 	be.NilErr(t, err)
 
-	regs := models.NewRegistrationList(logger)
 	ap := &AgentProcess{
 		Config: &models.Agent{
 			Uri:  uri,
 			Argv: []string{"1"},
 		},
-		Id:           "abc",
+		ID:           "abc",
 		HostNode:     "node1",
 		restartCount: 0,
 		state:        "testing",
 	}
-	regCreds := &models.NatsConnectionData{}
 
-	at.New(regs, ap, regCreds)
+	at.StartLocalBinaryAgent(ap, &models.NatsConnectionData{NatsServers: []string{s.ClientURL()}})
 
-	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="starting local agent" agent=sleep restart_count=0 reset_limit=1`))
-	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="starting local agent" agent=sleep restart_count=1 reset_limit=1`))
-	be.Equal(t, 2, strings.Count(stdout.String(), `level=WARN msg="Process unexpectedly exited with state" state="exit status 0"`))
+	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="started local agent" agent=sleep restart_count=0 reset_limit=1`))
+	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="started local agent" agent=sleep restart_count=1 reset_limit=1`))
+	be.Equal(t, 2, strings.Count(stdout.String(), `level=WARN msg="Nexlet process unexpectedly exited with state" state="exit status 0"`))
 }
 
-func TestNewAgentBadCommand(t *testing.T) {
+func TestWatcherNewAgentBadCommand(t *testing.T) {
+	s := startNatsServer(t, t.TempDir())
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL())
+	be.NilErr(t, err)
+
 	stdout := new(bytes.Buffer)
 	logger := slog.New(slog.NewTextHandler(stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	at := NewAgentWatcher(context.TODO(), logger, 1)
 
-	regs := &models.Regs{}
+	kp, err := nkeys.FromSeed([]byte(nodeSeed))
+	be.NilErr(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1) // Testing one agent with restart
+
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
+
 	ap := &AgentProcess{
 		Config: &models.Agent{
 			Uri: "foobar",
 		},
-		Id:           "abc",
+		ID:           "abc",
 		HostNode:     "node1",
 		restartCount: 0,
 		state:        "testing",
 	}
-	regCreds := &models.NatsConnectionData{}
-
-	at.New(regs, ap, regCreds)
+	at.StartLocalBinaryAgent(ap, &models.NatsConnectionData{NatsServers: []string{s.ClientURL()}})
 	be.True(t, strings.Contains(stdout.String(), `level=ERROR msg="provide path is not a binary file" agent_uri=foobar err="stat foobar: no such file or directory"`))
 }
 
-func TestNewAgentBadBinary(t *testing.T) {
+func TestWatcherNewAgentBadBinary(t *testing.T) {
+	s := startNatsServer(t, t.TempDir())
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL())
+	be.NilErr(t, err)
+
 	stdout := new(bytes.Buffer)
 	logger := slog.New(slog.NewTextHandler(stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	at := NewAgentWatcher(context.TODO(), logger, 1)
+
+	kp, err := nkeys.FromSeed([]byte(nodeSeed))
+	be.NilErr(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1) // Testing one agent with restart
+
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
 
 	fakeBinary, err := os.CreateTemp(t.TempDir(), "fakebin*")
 	be.NilErr(t, err)
@@ -80,49 +128,55 @@ func TestNewAgentBadBinary(t *testing.T) {
 	be.NilErr(t, err)
 	_ = fakeBinary.Close()
 
-	regs := models.NewRegistrationList(logger)
 	ap := &AgentProcess{
 		Config: &models.Agent{
 			Uri: fakeBinary.Name(),
 		},
-		Id:           "abc",
+		ID:           "abc",
 		HostNode:     "node1",
 		restartCount: 0,
 		state:        "testing",
 	}
-	regCreds := &models.NatsConnectionData{}
-
-	at.New(regs, ap, regCreds)
-
+	at.StartLocalBinaryAgent(ap, &models.NatsConnectionData{NatsServers: []string{s.ClientURL()}})
 	be.Equal(t, 2, strings.Count(stdout.String(), `level=ERROR msg="failed to start local agent"`))
 }
 
-func TestNewAgentBadCommandArgs(t *testing.T) {
+func TestWatcherNewAgentBadCommandArgs(t *testing.T) {
+	s := startNatsServer(t, t.TempDir())
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL())
+	be.NilErr(t, err)
+
 	stdout := new(bytes.Buffer)
 	logger := slog.New(slog.NewTextHandler(stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	at := NewAgentWatcher(context.TODO(), logger, 1)
+
+	kp, err := nkeys.FromSeed([]byte(nodeSeed))
+	be.NilErr(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1) // Testing one agent with restart
+
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
 
 	uri, err := exec.LookPath("sleep")
 	be.NilErr(t, err)
 
-	regs := models.NewRegistrationList(logger)
 	ap := &AgentProcess{
 		Config: &models.Agent{
 			Uri: uri,
 		},
-		Id:           "abc",
+		ID:           "abc",
 		HostNode:     "node1",
 		restartCount: 0,
 		state:        "testing",
 	}
-	regCreds := &models.NatsConnectionData{}
 
-	at.New(regs, ap, regCreds)
+	at.StartLocalBinaryAgent(ap, &models.NatsConnectionData{NatsServers: []string{s.ClientURL()}})
+	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="started local agent" agent=sleep restart_count=0 reset_limit=1`))
+	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="started local agent" agent=sleep restart_count=1 reset_limit=1`))
 
-	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="starting local agent" agent=sleep restart_count=0 reset_limit=1`))
-	be.True(t, strings.Contains(stdout.String(), `level=INFO msg="starting local agent" agent=sleep restart_count=1 reset_limit=1`))
-
-	// TODO: This adds some flakiness to the test, investigate later
+	// For whatever reason, these checks add flake to the test suite on osx
 	// be.Equal(t, 2, strings.Count(stdout.String(), `level=ERROR`)) // error message is different for linux/osx so the CI breaks if we include any more context
-	// be.Equal(t, 2, strings.Count(stdout.String(), `level=WARN msg="Process unexpectedly exited with state" state="exit status 1"`))
+	// be.Equal(t, 2, strings.Count(stdout.String(), `level=WARN msg="Nexlet process unexpectedly exited with state" state="exit status 1"`))
 }

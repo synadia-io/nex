@@ -51,12 +51,12 @@ func AgentEmitMetricsSubject(inNamespace, inWorkloadId string) string {
 
 // $NEX.SVC.nodeid.agent.LREGISTER.*
 func AgentAPIRegisterSubscribeSubject(inNodeId string) string {
-	return fmt.Sprintf("%s.LREGISTER.*", AgentAPIPrefix(inNodeId))
+	return fmt.Sprintf("%s.REGISTER.*", AgentAPIPrefix(inNodeId))
 }
 
 // $NEX.SVC.nodeid.agent.LREGISTER.agentid
 func AgentAPIRegisterRequestSubject(inAgentId, inNodeId string) string {
-	return fmt.Sprintf("%s.LREGISTER.%s", AgentAPIPrefix(inNodeId), inAgentId)
+	return fmt.Sprintf("%s.REGISTER.%s", AgentAPIPrefix(inNodeId), inAgentId)
 }
 
 // $NEX.SVC.*.agent.RREGISTER

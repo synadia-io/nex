@@ -1,13 +1,12 @@
-package nex
+package emitter
 
 import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/synadia-labs/nex/models"
-
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	"github.com/synadia-labs/nex/models"
 )
 
 type NexNodeEvent interface {
@@ -19,7 +18,11 @@ type NexNodeEvent interface {
 		*models.AgentLameduckSetEvent
 }
 
-func emitSystemEvent[T NexNodeEvent](nc *nats.Conn, kp nkeys.KeyPair, in T) error {
+func EmitSystemEvent[T NexNodeEvent](nc *nats.Conn, kp nkeys.KeyPair, in T) error {
+	if nc == nil || kp == nil {
+		return fmt.Errorf("system event emitter requires a valid NATS connection and keypair")
+	}
+
 	pubKey, err := kp.PublicKey()
 	if err != nil {
 		return err

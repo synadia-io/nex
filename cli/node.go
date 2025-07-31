@@ -36,22 +36,23 @@ type Node struct {
 
 type (
 	Up struct {
-		Agents                 AgentConfigs      `name:"agents" help:"Workload types configurations for nex node to initialize"`
-		DisableNativeStart     bool              `name:"disable-native-start" help:"Disable native start agent" default:"false"`
-		AllowAgentRegistration bool              `name:"allow-agent-registration" help:"Allow agents to register with the node after start" default:"false"`
-		ShowWorkloadLogs       bool              `name:"show-workload-logs" help:"Hide logs from workloads" default:"false"`
-		NexusName              string            `name:"nexus" default:"nexus" help:"Nexus name"`
-		NodeName               string            `name:"node-name" placeholder:"nex-node" help:"Name of the node; random if not provided"`
-		NodeSeed               string            `name:"node-seed" help:"Node Seed used for identifier.  Default is generated" placeholder:"NBTAFHAKW..."`
-		NodeXKeySeed           string            `name:"node-xkey-seed" help:"Node XKey Seed used for encryption.  Default is generated" placeholder:"XAIHERHS..."`
-		ResourceDir            string            `name:"resource-directory" default:"${defaultResourcePath}"`
-		Tags                   map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
-		State                  string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
-		InternalNatsServerConf string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
-		IssuerSigningKey       string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key" help:"SIGNING KEY | Seed key for signing" placeholder:"SASIGNINGKEY..."`
-		IssuerRootAccountKey   string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key-root-account" help:"SIGNING KEY | Public key for root account" placeholder:"AAMYACCOUNT..."`
-		IssuerNkey             string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey" help:"NKEY | User Nkey used in credential vendor" placeholder:"UMYNKEY..."`
-		IssuerNkeySeed         string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey-seed" help:"NKEY | User Nkey Seed Used in credential vendor" placeholder:"SUMYNKEYSEED..."`
+		Agents                       AgentConfigs      `name:"agents" help:"Workload types configurations for nex node to initialize"`
+		AgentRestartLimit            int               `name:"agent-restart-limit" help:"Maximum number of times an agent can be restarted before it is stopped permanently" default:"3"`
+		DisableNativeStart           bool              `name:"disable-native-start" help:"Disable native start agent" default:"false"`
+		AllowRemoteAgentRegistration bool              `name:"allow-remote-agent-registration" help:"Allow agents to register with the node after start" default:"false"`
+		ShowWorkloadLogs             bool              `name:"show-workload-logs" help:"Hide logs from workloads" default:"false"`
+		NexusName                    string            `name:"nexus" default:"nexus" help:"Nexus name"`
+		NodeName                     string            `name:"node-name" placeholder:"nex-node" help:"Name of the node; random if not provided"`
+		NodeSeed                     string            `name:"node-seed" help:"Node Seed used for identifier.  Default is generated" placeholder:"NBTAFHAKW..."`
+		NodeXKeySeed                 string            `name:"node-xkey-seed" help:"Node XKey Seed used for encryption.  Default is generated" placeholder:"XAIHERHS..."`
+		ResourceDir                  string            `name:"resource-directory" default:"${defaultResourcePath}"`
+		Tags                         map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
+		State                        string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
+		InternalNatsServerConf       string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
+		IssuerSigningKey             string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key" help:"SIGNING KEY | Seed key for signing" placeholder:"SASIGNINGKEY..."`
+		IssuerRootAccountKey         string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key-root-account" help:"SIGNING KEY | Public key for root account" placeholder:"AAMYACCOUNT..."`
+		IssuerNkey                   string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey" help:"NKEY | User Nkey used in credential vendor" placeholder:"UMYNKEY..."`
+		IssuerNkeySeed               string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey-seed" help:"NKEY | User Nkey Seed Used in credential vendor" placeholder:"SUMYNKEYSEED..."`
 	}
 	Info struct {
 		NodeID string `arg:"node-id" required:"" help:"Node ID to query" placeholder:"NBTAFHAKW..."`
@@ -172,6 +173,7 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		nex.WithLogger(logger),
 		nex.WithNodeKeyPair(nodeKeyPair),
 		nex.WithNodeXKeyPair(nodeXkeyPair),
+		nex.WithAgentRestartLimit(u.AgentRestartLimit),
 	}
 
 	if !u.DisableNativeStart {
@@ -182,8 +184,8 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		opts = append(opts, nex.WithAgentRunner(nativeAgent))
 	}
 
-	if u.AllowAgentRegistration {
-		opts = append(opts, nex.WithAllowAgentRegistration())
+	if u.AllowRemoteAgentRegistration {
+		opts = append(opts, nex.WithAllowRemoteAgentRegistration())
 	}
 
 	switch u.State {
@@ -264,7 +266,7 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 	}
 
 	for _, agent := range u.Agents {
-		opts = append(opts, nex.WithLocalAgent(models.Agent{
+		opts = append(opts, nex.WithAgent(models.Agent{
 			Uri:  agent.Uri,
 			Argv: agent.Argv,
 			Env:  agent.Env,

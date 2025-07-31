@@ -46,7 +46,7 @@ func TestDefaultNexNodeConstructor(t *testing.T) {
 	be.Nonzero(t, n.ctx)
 	be.Nonzero(t, n.logger)
 	be.Zero(t, n.startTime)
-	be.False(t, n.allowAgentRegistration)
+	be.False(t, n.allowRemoteAgentRegistration)
 	be.Equal(t, "nexnode", n.name)
 	be.Equal(t, "nexus", n.nexus)
 	be.Equal(t, runtime.GOOS, n.tags[models.TagOS])
@@ -59,7 +59,7 @@ func TestDefaultNexNodeConstructor(t *testing.T) {
 	be.AllEqual(t, []*sdk.Runner{}, n.embeddedRunners)
 	be.AllEqual(t, []*internal.AgentProcess{}, n.localRunners)
 	be.Nonzero(t, n.agentWatcher)
-	be.Nonzero(t, n.regs)
+	be.Nonzero(t, n.registeredAgents)
 	be.Zero(t, n.nc)
 	be.Zero(t, n.server)
 	be.Nonzero(t, n.auctionMap)
@@ -82,9 +82,9 @@ func TestNodeOptions(t *testing.T) {
 		{"WithNodeXKeyPair", WithNodeXKeyPair(xkp), func(t *testing.T, n *NexNode) { be.Equal(t, xkp, n.nodeXKeypair) }},
 		{"WithState", WithState(&state.NoState{}), func(t *testing.T, n *NexNode) { be.Nonzero(t, n.state) }},
 		{"WithAgentRunner", WithAgentRunner(&sdk.Runner{}), func(t *testing.T, n *NexNode) { be.Equal(t, 1, len(n.embeddedRunners)) }},
-		{"WithLocalAgent", WithLocalAgent(models.Agent{}), func(t *testing.T, n *NexNode) { be.Equal(t, 1, len(n.localRunners)) }},
+		{"WithLocalAgent", WithAgent(models.Agent{}), func(t *testing.T, n *NexNode) { be.Equal(t, 1, len(n.localRunners)) }},
 		{"WithTags", WithTag("foo", "bar"), func(t *testing.T, n *NexNode) { be.Equal(t, "bar", n.tags["foo"]) }},
-		{"WithAllowAgentRegistration", WithAllowAgentRegistration(), func(t *testing.T, n *NexNode) { be.True(t, n.allowAgentRegistration) }},
+		{"WithAllowAgentRegistration", WithAllowRemoteAgentRegistration(), func(t *testing.T, n *NexNode) { be.True(t, n.allowRemoteAgentRegistration) }},
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
@@ -108,7 +108,11 @@ func TestNodeStartStop(t *testing.T) {
 	defer nc.Close()
 
 	output := new(bytes.Buffer)
+
 	logger := slog.New(slog.NewJSONHandler(output, nil))
+	// logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	// 	Level: slog.LevelDebug,
+	// }))
 
 	kp, err := nkeys.CreateServer()
 	be.NilErr(t, err)
@@ -144,7 +148,7 @@ func TestNodeStartStop(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	be.Equal(t, 1, nn.agentCount())
+	be.Equal(t, 1, nn.registeredAgents.Count())
 	be.Equal(t, 20, nc.NumSubscriptions())
 	be.Equal(t, models.NodeStateRunning, nn.nodeState)
 

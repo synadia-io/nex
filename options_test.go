@@ -113,10 +113,10 @@ func TestNexNodeOptions(t *testing.T) {
 	t.Run("WithAllowAgentRegistration", func(t *testing.T) {
 		t.Parallel()
 		nn, err := NewNexNode(
-			WithAllowAgentRegistration(),
+			WithAllowRemoteAgentRegistration(),
 		)
 		be.NilErr(t, err)
-		be.True(t, nn.allowAgentRegistration)
+		be.True(t, nn.allowRemoteAgentRegistration)
 	})
 	t.Run("WithState", func(t *testing.T) {
 		t.Parallel()
@@ -162,6 +162,14 @@ func TestNexNodeOptions(t *testing.T) {
 		aa, ok := nn.auctioneer.(*auction)
 		be.True(t, ok)
 		be.DeepEqual(t, a, aa)
+	})
+	t.Run("WithAgentRestartLimit", func(t *testing.T) {
+		t.Parallel()
+		nn, err := NewNexNode(
+			WithAgentRestartLimit(5),
+		)
+		be.NilErr(t, err)
+		be.Equal(t, 5, nn.agentRestartLimit)
 	})
 }
 
