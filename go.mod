@@ -6,12 +6,12 @@ require (
 	disorder.dev/shandler v0.0.0-20250411134702-523d18ddef40
 	github.com/carlmjohnson/be v0.24.1
 	github.com/nats-io/jwt/v2 v2.7.4
-	github.com/nats-io/nats-server/v2 v2.11.6
-	github.com/nats-io/nats.go v1.43.0
+	github.com/nats-io/nats-server/v2 v2.11.7
+	github.com/nats-io/nats.go v1.44.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nexlet.go v0.0.0-20250730153012-37b1ad42cd05
+	github.com/synadia-io/nexlet.go v0.0.0-20250804170336-faa08833921e
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	github.com/synadia-labs/nex/client v0.0.0-20250624164046-0cf978095e4d
 	golang.org/x/sys v0.34.0
@@ -41,7 +41,7 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.22.0 // indirect
+	github.com/prometheus/client_golang v1.23.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
