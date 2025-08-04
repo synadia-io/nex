@@ -116,11 +116,13 @@ type CloneWorkloadResponse struct {
 	StartWorkloadRequest *StartWorkloadRequest `json:"start_workload_request,omitempty"`
 }
 
+type NodeAgentSummaryResponse map[string]NodeAgentSummary
+
 type NodeInfoRequest map[string]interface{}
 
 type NodeInfoResponse struct {
-	// AgentSummaries corresponds to the JSON schema field "agent_summaries".
-	AgentSummaries AgentSummaries `json:"agent_summaries,omitempty"`
+	// List of node agent summaries
+	NodeAgentSummaries []NodeAgentSummary `json:"node_agent_summaries,omitempty"`
 
 	// The public nkey of the node
 	NodeId string `json:"node_id"`

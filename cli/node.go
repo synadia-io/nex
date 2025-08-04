@@ -56,6 +56,7 @@ type (
 	}
 	Info struct {
 		NodeID string `arg:"node-id" required:"" help:"Node ID to query" placeholder:"NBTAFHAKW..."`
+		Full   bool   `name:"full" help:"Show full information about the nodes agents" default:"false"`
 	}
 	LameDuck struct {
 		Delay  time.Duration     `name:"delay" help:"Delay before stopping workloads.  Allows for user to migrate workloads" default:"1m"`
@@ -98,8 +99,11 @@ func (u Up) Validate() error {
 	}
 
 	if u.NodeXKeySeed != "" {
-		_, err := nkeys.Decode(nkeys.PrefixByteCluster, []byte(u.NodeXKeySeed))
+		prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeXKeySeed))
 		errs = errors.Join(errs, err)
+		if prefix != nkeys.PrefixByteCurve {
+			errs = errors.Join(errs, errors.New("node xkey seed must be a curve seed"))
+		}
 	}
 
 	if u.InternalNatsServerConf != "" {
@@ -140,7 +144,7 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 
 	var nodeXkeyPair nkeys.KeyPair
 	if u.NodeXKeySeed != "" {
-		nodeXkeyPair, err = nkeys.FromSeed([]byte(u.NodeXKeySeed))
+		nodeXkeyPair, err = nkeys.FromCurveSeed([]byte(u.NodeXKeySeed))
 		if err != nil {
 			return err
 		}
@@ -353,16 +357,23 @@ func (i Info) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	if len(infoResponse.AgentSummaries) > 0 {
+	if len(infoResponse.NodeAgentSummaries) > 0 {
 		tW := table.NewWriter()
 		tW.SetStyle(table.StyleRounded)
 		tW.Style().Title.Align = text.AlignCenter
 		tW.Style().Format.Header = text.FormatDefault
 		tW.SetTitle("Running Agents")
 
-		tW.AppendHeader(table.Row{"Id", "Name", "Workload Type", "Start Time", "State", "Supported Lifecycles", "Running Workloads"})
-		for aId, aInfo := range infoResponse.AgentSummaries {
-			tW.AppendRow(table.Row{aId, fmt.Sprintf("%s [%s]", aInfo.Name, aInfo.Version), aInfo.Type, aInfo.StartTime, aInfo.State, aInfo.SupportedLifecycles, aInfo.WorkloadCount})
+		if !i.Full {
+			tW.AppendHeader(table.Row{"", "Name", "Workload Type", "Running Workloads"})
+			for _, aInfo := range infoResponse.NodeAgentSummaries {
+				tW.AppendRow(table.Row{aInfo.AgentHealthStoplight, fmt.Sprintf("%s [%s]", aInfo.AgentSummary.Name, aInfo.AgentSummary.Version), aInfo.AgentSummary.Type, aInfo.AgentSummary.WorkloadCount})
+			}
+		} else {
+			tW.AppendHeader(table.Row{"Health", "Id", "Name", "Workload Type", "Start Time", "State", "Supported Lifecycles", "Running Workloads", "Last Heartbeat"})
+			for _, aInfo := range infoResponse.NodeAgentSummaries {
+				tW.AppendRow(table.Row{fmt.Sprintf("%s [%s]", aInfo.AgentHealthStoplight, aInfo.AgentHealth), aInfo.AgentId, fmt.Sprintf("%s [%s]", aInfo.AgentSummary.Name, aInfo.AgentSummary.Version), aInfo.AgentSummary.Type, aInfo.AgentSummary.StartTime, aInfo.AgentSummary.State, aInfo.AgentSummary.SupportedLifecycles, aInfo.AgentSummary.WorkloadCount, aInfo.AgentLastHeartbeatTime.Format(time.RFC3339)})
+			}
 		}
 
 		tW.SortBy([]table.SortBy{

@@ -39,6 +39,7 @@ tasks:
         --schema-output=io.nats.nex.v2.auction_response=../api_control.go
         --schema-output=io.nats.nex.v2.clone_workload_request=../api_control.go
         --schema-output=io.nats.nex.v2.clone_workload_response=../api_control.go
+        --schema-output=io.nats.nex.v2.node_agent_summary_response=../api_control.go
         --schema-output=io.synadia.nex.event.nexnode_started=../events.go
         --schema-output=io.synadia.nex.event.nexnode_lameduck=../events.go
         --schema-output=io.synadia.nex.event.nexnode_stopped=../events.go

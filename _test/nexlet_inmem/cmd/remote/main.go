@@ -51,7 +51,7 @@ func main() {
 		cancel()
 	}()
 
-	nc, err := nats.Connect("nats://127.0.0.1:18001")
+	nc, err := nats.Connect(nats.DefaultURL)
 	if err != nil {
 		slog.Error("Failed to connect to NATS", "error", err)
 		return

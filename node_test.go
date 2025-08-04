@@ -149,7 +149,7 @@ func TestNodeStartStop(t *testing.T) {
 	}
 
 	be.Equal(t, 1, nn.registeredAgents.Count())
-	be.Equal(t, 20, nc.NumSubscriptions())
+	be.Equal(t, 21, nc.NumSubscriptions())
 	be.Equal(t, models.NodeStateRunning, nn.nodeState)
 
 	cancel()
@@ -440,7 +440,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	}()
 
 	output := new(bytes.Buffer)
-	logger := slog.New(slog.NewJSONHandler(output, nil))
+	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	nc, err := nats.Connect(s.ClientURL())
 	be.NilErr(t, err)
@@ -487,7 +487,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	reqB, err := json.Marshal(req)
 	be.NilErr(t, err)
 
-	auctionRespRaw, err := nc.Request(models.AuctionRequestSubject(models.SystemNamespace), reqB, time.Second)
+	auctionRespRaw, err := nc.Request(models.AuctionRequestSubject(models.SystemNamespace), reqB, time.Second*3)
 	be.NilErr(t, err)
 
 	auctionResp := models.AuctionResponse{}

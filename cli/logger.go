@@ -102,6 +102,10 @@ func configureLogger(globals *Globals, nc *nats.Conn, serverPublicKey string, sh
 
 	handlerOpts = append(handlerOpts, shandler.WithTextOutputFormat("%[2]s [%[1]s] %[3]s\n"))
 
+	if globals.LogLineInfo {
+		handlerOpts = append(handlerOpts, shandler.WithLineInfo(true))
+	}
+
 	return slog.New(shandler.NewHandler(handlerOpts...))
 }
 

@@ -28,6 +28,7 @@ type GlobalLogger struct {
 	LogTimeFormat   string   `name:"timefmt" default:"DateTime" help:"Time format for log messages" enum:"DateTime,TimeOnly,DateOnly,Stamp,RFC822,RFC3339"`
 	LogWithPid      bool     `name:"with-pid" default:"false" help:"Include process ID in log messages"`
 	LogGroupOnRight bool     `name:"group-on-right" default:"false" help:"Place log group on the right"`
+	LogLineInfo     bool     `name:"line-info" default:"false" help:"Include file and line number in log messages"`
 }
 
 type GlobalNats struct {

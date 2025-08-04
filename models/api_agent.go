@@ -9,11 +9,8 @@ type AgentHeartbeat struct {
 	// Send additional data in heartbeat
 	Data string `json:"data"`
 
-	// The state of the agent. Must be of able to map to models.AgentState
-	State string `json:"state"`
-
-	// The number of agents running with workload count
-	WorkloadCount int `json:"workload_count"`
+	// Summary corresponds to the JSON schema field "summary".
+	Summary AgentSummary `json:"summary"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -25,11 +22,8 @@ func (j *AgentHeartbeat) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["data"]; raw != nil && !ok {
 		return fmt.Errorf("field data in AgentHeartbeat: required")
 	}
-	if _, ok := raw["state"]; raw != nil && !ok {
-		return fmt.Errorf("field state in AgentHeartbeat: required")
-	}
-	if _, ok := raw["workload_count"]; raw != nil && !ok {
-		return fmt.Errorf("field workload_count in AgentHeartbeat: required")
+	if _, ok := raw["summary"]; raw != nil && !ok {
+		return fmt.Errorf("field summary in AgentHeartbeat: required")
 	}
 	type Plain AgentHeartbeat
 	var plain Plain
@@ -246,28 +240,7 @@ func (j *RegisterAgentResponse) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
-type RegisterRemoteAgentRequest struct {
-	// The registration request will need to be signed by this key
-	PublicSigningKey string `json:"public_signing_key"`
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *RegisterRemoteAgentRequest) UnmarshalJSON(value []byte) error {
-	var raw map[string]interface{}
-	if err := json.Unmarshal(value, &raw); err != nil {
-		return err
-	}
-	if _, ok := raw["public_signing_key"]; raw != nil && !ok {
-		return fmt.Errorf("field public_signing_key in RegisterRemoteAgentRequest: required")
-	}
-	type Plain RegisterRemoteAgentRequest
-	var plain Plain
-	if err := json.Unmarshal(value, &plain); err != nil {
-		return err
-	}
-	*j = RegisterRemoteAgentRequest(plain)
-	return nil
-}
+type RegisterRemoteAgentRequest map[string]interface{}
 
 type RegisterRemoteAgentResponse struct {
 	// The assigned agent id

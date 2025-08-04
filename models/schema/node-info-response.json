@@ -24,8 +24,12 @@
       "$ref": "./shared-tag-map.json",
       "description": "Placement tags associated with node"
     },
-    "agent_summaries": {
-      "$ref": "./shared-agent-summaries.json"
+    "node_agent_summaries": {
+      "type": "array",
+      "description": "List of node agent summaries",
+      "items": {
+        "$ref": "./shared-node-agent-summary.json"
+      }
     }
   },
   "required": [
@@ -34,7 +38,7 @@
     "uptime",
     "xkey",
     "tags",
-    "agent_summary"
+    "node_agent_summary"
   ],
   "additionalProperties": false
 }

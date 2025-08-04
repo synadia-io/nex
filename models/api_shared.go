@@ -5,6 +5,7 @@ package models
 import "encoding/json"
 import "fmt"
 import "reflect"
+import "time"
 
 type AgentIngressCommands string
 
@@ -72,7 +73,7 @@ type AgentSummary struct {
 	Name string `json:"name"`
 
 	// The start time of the agent
-	StartTime string `json:"start_time"`
+	StartTime time.Time `json:"start_time"`
 
 	// The state of the agent
 	State string `json:"state"`
@@ -323,6 +324,53 @@ func (j *NatsConnectionData) UnmarshalJSON(value []byte) error {
 		return err
 	}
 	*j = NatsConnectionData(plain)
+	return nil
+}
+
+type NodeAgentSummary struct {
+	// Nodes perspective of agent health
+	AgentHealth string `json:"agent_health"`
+
+	// Nodes perspective of agent health | stoplight format
+	AgentHealthStoplight string `json:"agent_health_stoplight"`
+
+	// Unique identifier for the agent
+	AgentId string `json:"agent_id"`
+
+	// Last time the agent sent a heartbeat
+	AgentLastHeartbeatTime time.Time `json:"agent_last_heartbeat_time"`
+
+	// AgentSummary corresponds to the JSON schema field "agent_summary".
+	AgentSummary AgentSummary `json:"agent_summary"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *NodeAgentSummary) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["agent_health"]; raw != nil && !ok {
+		return fmt.Errorf("field agent_health in NodeAgentSummary: required")
+	}
+	if _, ok := raw["agent_health_stoplight"]; raw != nil && !ok {
+		return fmt.Errorf("field agent_health_stoplight in NodeAgentSummary: required")
+	}
+	if _, ok := raw["agent_id"]; raw != nil && !ok {
+		return fmt.Errorf("field agent_id in NodeAgentSummary: required")
+	}
+	if _, ok := raw["agent_last_heartbeat_time"]; raw != nil && !ok {
+		return fmt.Errorf("field agent_last_heartbeat_time in NodeAgentSummary: required")
+	}
+	if _, ok := raw["agent_summary"]; raw != nil && !ok {
+		return fmt.Errorf("field agent_summary in NodeAgentSummary: required")
+	}
+	type Plain NodeAgentSummary
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = NodeAgentSummary(plain)
 	return nil
 }
 

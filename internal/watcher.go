@@ -102,11 +102,12 @@ func (a *AgentWatcher) StartEmbeddedAgent(agentID string, runner *agent.Runner, 
 	restartCount := 0
 
 	for range a.resetLimit {
+		a.logger.Debug("starting embedded agent", slog.String("agent_id", agentID), slog.Int("restart_count", restartCount))
 		err := runner.Run(agentID, *connData)
 		if err != nil {
 			restartCount++
 			if restartCount <= a.resetLimit {
-				a.logger.Info("restarting agent", slog.String("agent_name", runner.String()), slog.Int("restart_count", restartCount), slog.Int("reset_limit", a.resetLimit))
+				a.logger.Warn("restarting agent", slog.String("agent_name", runner.String()), slog.Int("restart_count", restartCount), slog.Int("reset_limit", a.resetLimit), slog.String("err", err.Error()))
 				continue
 			} else {
 				a.logger.Error("agent failed to start after maximum retries", slog.String("agent_name", runner.String()), slog.Int("reset_limit", a.resetLimit), slog.String("err", err.Error()))
@@ -121,7 +122,6 @@ func (a *AgentWatcher) StartEmbeddedAgent(agentID string, runner *agent.Runner, 
 	a.embeddedAgents[agentID] = runner
 	a.embeddedAgentsLock.Unlock()
 
-	a.logger.Info("started embedded agent", slog.String("agent_name", runner.String()))
 	a.agentCount++
 	a.initAgentsWg.Done()
 }

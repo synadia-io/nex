@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/goombaio/namegenerator"
@@ -82,7 +83,7 @@ func newNativeWorkloadAgent(ctx context.Context, logger *slog.Logger) (*NativeAg
 		xkp:        xkp,
 		startTime:  time.Now(),
 		state:      new(nexletState),
-		agentState: models.AgentStateStarting,
+		agentState: models.AgentStateRunning,
 	}
 
 	da.state.ctx = ctx
@@ -125,10 +126,22 @@ func (a *NativeAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 		return nil, err
 	}
 
+	supportedLifecycles := make([]string, len(SUPPORTED_LIFECYCLES))
+	for i, lc := range SUPPORTED_LIFECYCLES {
+		supportedLifecycles[i] = string(lc)
+	}
+
 	return &models.AgentHeartbeat{
-		Data:          string(statsB),
-		State:         string(a.agentState),
-		WorkloadCount: a.state.WorkloadCount(),
+		Data: string(statsB),
+		Summary: models.AgentSummary{
+			Name:                NEXLET_NAME,
+			StartTime:           a.startTime,
+			State:               string(a.agentState),
+			SupportedLifecycles: strings.Join(supportedLifecycles, ","),
+			Type:                NEXLET_REGISTER_TYPE,
+			Version:             VERSION,
+			WorkloadCount:       a.state.WorkloadCount(),
+		},
 	}, nil
 }
 
@@ -175,7 +188,7 @@ func (a *NativeAgent) Ping() (*models.AgentSummary, error) {
 	return &models.AgentSummary{
 		Name:                NEXLET_NAME,
 		Type:                NEXLET_REGISTER_TYPE,
-		StartTime:           a.startTime.Format(time.RFC3339),
+		StartTime:           a.startTime,
 		State:               string(models.AgentStateRunning),
 		SupportedLifecycles: "job,service",
 		Version:             VERSION,

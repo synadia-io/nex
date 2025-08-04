@@ -49,24 +49,24 @@ func AgentEmitMetricsSubject(inNamespace, inWorkloadId string) string {
 	return fmt.Sprintf("%s.%s", MetricsAPIPrefix(inNamespace), inWorkloadId)
 }
 
-// $NEX.SVC.nodeid.agent.LREGISTER.*
+// $NEX.SVC.nodeid.agent.REGISTER.*
 func AgentAPIRegisterSubscribeSubject(inNodeId string) string {
 	return fmt.Sprintf("%s.REGISTER.*", AgentAPIPrefix(inNodeId))
 }
 
-// $NEX.SVC.nodeid.agent.LREGISTER.agentid
+// $NEX.SVC.nodeid.agent.REGISTER.agentid
 func AgentAPIRegisterRequestSubject(inAgentId, inNodeId string) string {
 	return fmt.Sprintf("%s.REGISTER.%s", AgentAPIPrefix(inNodeId), inAgentId)
 }
 
 // $NEX.SVC.*.agent.RREGISTER
 func AgentAPIInitRemoteRegisterSubscribeSubject(nexus string) string {
-	return fmt.Sprintf("%s.RREGISTER.*", AgentAPIPrefix(nexus))
+	return fmt.Sprintf("%s.RREGISTER", AgentAPIPrefix(nexus))
 }
 
 // $NEX.SVC.signingKey.agent.RREGISTER
-func AgentAPIInitRemoteRegisterRequestSubject(nexus, inSigningKey string) string {
-	return fmt.Sprintf("%s.RREGISTER.%s", AgentAPIPrefix(nexus), inSigningKey)
+func AgentAPIInitRemoteRegisterRequestSubject(nexus string) string {
+	return fmt.Sprintf("%s.RREGISTER", AgentAPIPrefix(nexus))
 }
 
 // $NEX.SVC.nodeid.agent.HEARTBEAT.agentId

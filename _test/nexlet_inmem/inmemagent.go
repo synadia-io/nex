@@ -106,10 +106,22 @@ func (a *InMemAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 	a.Workloads.Lock()
 	defer a.Workloads.Unlock()
 
+	workloadCount := 0
+	for _, workloads := range a.Workloads.State {
+		workloadCount += len(workloads)
+	}
+
 	status := &models.AgentHeartbeat{
-		Data:          "In-Memory Nexlet",
-		State:         "running",
-		WorkloadCount: len(a.Workloads.State),
+		Data: "In-Memory Nexlet",
+		Summary: models.AgentSummary{
+			Name:                a.Name,
+			Type:                a.Name,
+			StartTime:           a.StartTime,
+			State:               "running",
+			SupportedLifecycles: "service,job,function",
+			WorkloadCount:       workloadCount,
+			Version:             a.Version,
+		},
 	}
 
 	return status, nil
@@ -278,7 +290,7 @@ func (a *InMemAgent) Ping() (*models.AgentSummary, error) {
 	return &models.AgentSummary{
 		Name:                a.Name,
 		Type:                a.Name,
-		StartTime:           a.StartTime.String(),
+		StartTime:           a.StartTime,
 		State:               "running",
 		SupportedLifecycles: "service,job,function",
 		WorkloadCount:       workloadCount,

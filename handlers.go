@@ -165,47 +165,20 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 			n.handlerError(r, err, "100", "failed to get public key from keypair")
 			return
 		}
+
 		pubXKey, err := n.nodeXKeypair.PublicKey()
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to get public xkey from xkeypair")
 			return
 		}
 
-		var errs error
-		as := models.AgentSummaries{}
-		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIPingAllSubject(pubKey), nil, natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
-		if err == nil {
-			msgs(func(m *nats.Msg, err error) bool {
-				if err == nil {
-					agentId := m.Header.Get("agentId")
-					if agentId == "" {
-						n.logger.Error("failed to get agentId from header")
-						return true
-					}
-
-					t := new(models.AgentSummary)
-					err = json.Unmarshal(m.Data, t)
-					if err == nil {
-						as[agentId] = *t
-					}
-				}
-				errs = errors.Join(errs, err)
-				return true
-			})
-		} else {
-			errs = errors.Join(errs, err)
-		}
-
-		if errs != nil {
-			n.logger.Error("errors in gathering agent summaries", slog.Any("errs", errs))
-		}
 		err = r.RespondJSON(models.NodeInfoResponse{
-			AgentSummaries: as,
-			NodeId:         pubKey,
-			Xkey:           pubXKey,
-			Tags:           n.tags,
-			Uptime:         time.Since(n.startTime).String(),
-			Version:        n.version,
+			NodeAgentSummaries: n.registeredAgents.AgentSummaries(),
+			NodeId:             pubKey,
+			Xkey:               pubXKey,
+			Tags:               n.tags,
+			Uptime:             time.Since(n.startTime).String(),
+			Version:            n.version,
 		})
 		if err != nil {
 			n.logger.Error("failed to respond to node info request", slog.String("err", err.Error()))
@@ -216,8 +189,8 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 
 func (n *NexNode) handleAuction() func(micro.Request) {
 	return func(r micro.Request) {
-		// $NEX.control.namespace.AUCTION
-		splitSub := strings.SplitN(r.Subject(), ".", 4)
+		// $NEX.SVC.<namespace>.control.AUCTION
+		splitSub := strings.SplitN(r.Subject(), ".", 5)
 		namespace := splitSub[2]
 
 		req := new(models.AuctionRequest)
@@ -250,12 +223,12 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 			}
 		}
 
-		bidderId := n.idgen.Generate(nil)
-		n.auctionMap.Put(bidderId, "", nil)
+		bidderID := n.idgen.Generate(nil)
+		n.auctionMap.Put(bidderID, "", nil)
 
 		n.logger.Debug("responding to auction", slog.Any("auctionId", req.AuctionId))
 		err = r.RespondJSON(models.AuctionResponse{
-			BidderId:            bidderId,
+			BidderId:            bidderID,
 			Xkey:                reg.RegisterRequest.PublicXkey,
 			StartRequestSchema:  reg.RegisterRequest.StartRequestSchema,
 			SupportedLifecycles: reg.RegisterRequest.SupportedLifecycles,
@@ -271,9 +244,9 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 	return func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		namespace := splitSub[2]
-		bidId := splitSub[5]
+		bidID := splitSub[5]
 
-		if !n.auctionMap.Exists(bidId) {
+		if !n.auctionMap.Exists(bidID) {
 			// not this nodes bidder id (or it expired), throw away request
 			return
 		}
@@ -314,8 +287,8 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		workloadId := n.idgen.Generate(req)
-		wlNatsConn, err := n.minter.Mint(models.WorkloadCred, namespace, workloadId)
+		workloadID := n.idgen.Generate(req)
+		wlNatsConn, err := n.minter.Mint(models.WorkloadCred, namespace, workloadID)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to mint workload nats connection")
 			return
@@ -331,7 +304,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadId), aReqB, time.Minute)
+		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, time.Minute)
 		if err != nil {
 			n.handlerError(r, err, "100", "failed to publish start workload request")
 			return
@@ -343,7 +316,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		err = n.state.StoreWorkload(workloadId, *req)
+		err = n.state.StoreWorkload(workloadID, *req)
 		if err != nil {
 			n.logger.Warn("failed to store node state", slog.String("err", err.Error()))
 			return
@@ -355,7 +328,7 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 	return func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		namespace := splitSub[2]
-		workloadId := splitSub[5]
+		workloadID := splitSub[5]
 
 		req := new(models.StopWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
@@ -376,13 +349,13 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 		}
 
 		ret := &models.StopWorkloadResponse{
-			Id:           workloadId,
+			Id:           workloadID,
 			Message:      string(models.GenericErrorsWorkloadNotFound),
 			Stopped:      false,
 			WorkloadType: "",
 		}
 
-		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadId), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
+		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadID), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 		if err != nil {
 			err = r.RespondJSON(ret)
 			if err != nil {
@@ -411,7 +384,7 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		err = n.state.RemoveWorkload(ret.WorkloadType, workloadId)
+		err = n.state.RemoveWorkload(ret.WorkloadType, workloadID)
 		if err != nil {
 			n.logger.Warn("failed to delete node state", slog.String("err", err.Error()))
 			return
@@ -423,7 +396,7 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 	return func(r micro.Request) {
 		splitSub := strings.SplitN(r.Subject(), ".", 6)
 		namespace := splitSub[2]
-		workloadId := splitSub[5]
+		workloadID := splitSub[5]
 
 		req := new(models.CloneWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
@@ -443,7 +416,7 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 			return
 		}
 
-		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadId), r.Data(), time.Second*3)
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), time.Second*3)
 		if err != nil {
 			n.logger.Debug("failed to find workload request", slog.String("err", err.Error()))
 			return
@@ -604,17 +577,17 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 		}
 
 		state := models.RegisterAgentResponseExistingState{}
-		for workloadId, swr := range agentState {
-			natsConn, err := n.minter.Mint(models.WorkloadCred, swr.Namespace, workloadId)
+		for workloadID, swr := range agentState {
+			natsConn, err := n.minter.Mint(models.WorkloadCred, swr.Namespace, workloadID)
 			if err != nil {
-				n.logger.Warn("failed to mint workload nats connection", slog.String("err", err.Error()), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadId))
+				n.logger.Warn("failed to mint workload nats connection", slog.String("err", err.Error()), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadID))
 				continue
 			}
 			aswr := models.AgentStartWorkloadRequest{
 				Request:       swr,
 				WorkloadCreds: *natsConn,
 			}
-			state[workloadId] = aswr
+			state[workloadID] = aswr
 		}
 
 		err = r.RespondJSON(models.RegisterAgentResponse{
@@ -673,7 +646,7 @@ func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 	}
 }
 
-func (n *NexNode) handleGetAgentIdByName() func(micro.Request) {
+func (n *NexNode) handleGetAgentIDByName() func(micro.Request) {
 	return func(r micro.Request) {
 		agentName := string(r.Data())
 		if agentName == "" {

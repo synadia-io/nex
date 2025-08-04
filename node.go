@@ -137,8 +137,6 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		allowRemoteAgentRegistration: false,
 		auctionMap:                   internal.NewTTLMap(defaultAuctionTTLMapDuration),
 
-		registeredAgents: internal.NewAgentRegistrations(),
-
 		nc:     nil,
 		server: nil,
 
@@ -159,9 +157,15 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	n.tags[models.TagNexus] = n.nexus
 	n.tags[models.TagNodeName] = n.name
 
-	var agentsStartedWg sync.WaitGroup
-	agentsStartedWg.Add(len(n.embeddedRunners) + len(n.localRunners))
-	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.agentRestartLimit, &agentsStartedWg)
+	pubKey, err := n.nodeKeypair.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+	n.registeredAgents = internal.NewAgentRegistrations(n.ctx, pubKey, n.nc, n.logger.WithGroup("agent-registrations"))
+
+	var agentStarter sync.WaitGroup
+	agentStarter.Add(len(n.embeddedRunners) + len(n.localRunners))
+	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.agentRestartLimit, &agentStarter)
 
 	return n, nil
 }
@@ -239,9 +243,10 @@ func (n *NexNode) Start() error {
 	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIdByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIDByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
 	// System only agent endpoints
 	if n.allowRemoteAgentRegistration {
+		n.logger.Warn("remote registration enabled. agents can remotely register to this node")
 		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIInitRemoteRegisterSubscribeSubject(n.nexus)), micro.WithEndpointQueueGroup(n.nexus)))
 	}
 	errs = errors.Join(errs, n.service.AddEndpoint("RegisterAgent", micro.HandlerFunc(n.handleRegisterAgent()), micro.WithEndpointSubject(models.AgentAPIRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))

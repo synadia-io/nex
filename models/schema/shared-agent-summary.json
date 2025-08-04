@@ -14,7 +14,8 @@
     },
     "start_time": {
       "type": "string",
-      "description": "The start time of the agent"
+      "description": "The start time of the agent",
+      "format": "date-time"
     },
     "supported_lifecycles": {
       "type": "string",

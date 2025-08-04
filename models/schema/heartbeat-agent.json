@@ -4,13 +4,8 @@
   "title": "AgentHeartbeat",
   "type": "object",
   "properties": {
-    "state": {
-      "type": "string",
-      "description": "The state of the agent. Must be of able to map to models.AgentState"
-    },
-    "workload_count": {
-      "type": "integer",
-      "description": "The number of agents running with workload count"
+    "summary": {
+      "$ref": "./shared-agent-summary.json"
     },
     "data": {
       "type": "string",
@@ -18,8 +13,7 @@
     }
   },
   "required": [
-    "state",
-    "workload_count",
+    "summary",
     "data"
   ],
   "additionalProperties": false

@@ -53,6 +53,6 @@ func TestNewWorkloadAgent(t *testing.T) {
 		be.NilErr(t, err)
 
 		be.Equal(t, string(statsB), req.Data)
-		be.Equal(t, string(na.agentState), req.State)
+		be.Equal(t, string(na.agentState), req.Summary.State)
 	})
 }
