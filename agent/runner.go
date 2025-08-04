@@ -90,16 +90,14 @@ func WithIngressSettings(hostMachineIPAddr string) RunnerOpt {
 }
 
 func RemoteAgentInit(nc *nats.Conn, nexus, pubKey string) (*models.RegisterRemoteAgentResponse, error) {
-	req := models.RegisterRemoteAgentRequest{
-		PublicSigningKey: pubKey,
-	}
+	req := models.RegisterRemoteAgentRequest{}
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal remote agent registration request: %w", err)
 	}
 
-	regResp, err := nc.Request(models.AgentAPIInitRemoteRegisterRequestSubject(nexus, pubKey), reqB, time.Second*3)
+	regResp, err := nc.Request(models.AgentAPIInitRemoteRegisterRequestSubject(nexus), reqB, time.Second*3)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send remote agent registration request: %w", err)
 	}
@@ -214,24 +212,12 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 		return fmt.Errorf("failed to configure NATS connection with registration response data: %w", err)
 	}
 
+	// HB once immediately to ensure the agent is registered
+	a.performHeartbeat()
 	// Start agent heartbeat
 	go func() {
 		for range time.Tick(time.Second * 10) {
-			hb, err := a.agent.Heartbeat()
-			if err != nil {
-				a.logger.Warn("error generating heartbeat", slog.String("err", err.Error()))
-				continue
-			}
-			hbB, err := json.Marshal(hb)
-			if err != nil {
-				a.logger.Warn("error marshalling heartbeat", slog.String("err", err.Error()))
-				continue
-			}
-			err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.nodeID, a.agentID), hbB)
-			if err != nil {
-				a.logger.Warn("error publishing heartbeat", slog.String("err", err.Error()))
-				continue
-			}
+			a.performHeartbeat()
 		}
 	}()
 
@@ -294,6 +280,24 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
 	}
 
 	return nil
+}
+
+func (a *Runner) performHeartbeat() {
+	hb, err := a.agent.Heartbeat()
+	if err != nil {
+		a.logger.Warn("error generating heartbeat", slog.String("err", err.Error()))
+		return
+	}
+	hbB, err := json.Marshal(hb)
+	if err != nil {
+		a.logger.Warn("error marshalling heartbeat", slog.String("err", err.Error()))
+		return
+	}
+	err = a.nc.Publish(models.AgentAPIHeartbeatSubject(a.nodeID, a.agentID), hbB)
+	if err != nil {
+		a.logger.Warn("error publishing heartbeat", slog.String("err", err.Error()))
+		return
+	}
 }
 
 func (a *Runner) Shutdown() error {
