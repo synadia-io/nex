@@ -152,8 +152,7 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 		startRequest: &startRequest.Request,
 	})
 
-	a.Logger.Debug("StartWorkload successful")
-	err := a.Runner.EmitEvent(models.WorkloadStartedEvent{
+	err := a.Runner.EmitEvent(startRequest.Request.Namespace, models.WorkloadStartedEvent{
 		Id:           workloadId,
 		Metadata:     models.WorkloadStartedEventMetadata{},
 		Namespace:    startRequest.Request.Namespace,
@@ -162,6 +161,7 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 	if err != nil {
 		a.Logger.Error("failed to emit workload started event", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
 	}
+	a.Logger.Debug("StartWorkload successful")
 
 	if startRequest.Request.WorkloadLifecycle == models.WorkloadLifecycleFunction {
 		err = a.Runner.RegisterTrigger(workloadId, workloadId, &startRequest.WorkloadCreds, func(_ []byte) ([]byte, error) {
@@ -199,8 +199,8 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 			} else {
 				a.Workloads.State[stopRequest.Namespace] = workloads
 			}
-			a.Logger.Debug("StopWorkload successful", slog.String("workloadId", workloadId))
-			err := a.Runner.EmitEvent(models.WorkloadStoppedEvent{
+
+			err := a.Runner.EmitEvent(stopRequest.Namespace, models.WorkloadStoppedEvent{
 				Id:           workloadId,
 				Metadata:     models.WorkloadStoppedEventMetadata{},
 				Namespace:    stopRequest.Namespace,
@@ -209,6 +209,7 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 			if err != nil {
 				a.Logger.Error("failed to emit workload stopped event", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
 			}
+			a.Logger.Debug("StopWorkload successful", slog.String("workloadId", workloadId))
 
 			if workload.startRequest.WorkloadLifecycle == models.WorkloadLifecycleFunction {
 				err := a.Runner.UnregisterTrigger(workloadId)

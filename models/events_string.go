@@ -24,10 +24,10 @@ func (AgentLameduckSetEvent) String() string {
 	return "AGENTLAMEDUCKSET"
 }
 
-func (WorkloadStartedEvent) Subject() string {
+func (WorkloadStartedEvent) String() string {
 	return "WORKLOADSTARTED"
 }
 
-func (WorkloadStoppedEvent) Subject() string {
+func (WorkloadStoppedEvent) String() string {
 	return "WORKLOADSTOPPED"
 }

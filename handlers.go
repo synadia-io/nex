@@ -14,7 +14,6 @@ import (
 	"disorder.dev/shandler"
 	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/internal/emitter"
 	"github.com/synadia-labs/nex/models"
 
 	"github.com/nats-io/nats.go"
@@ -125,7 +124,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 						return true
 					}
 
-					err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.AgentLameduckSetEvent{
+					err = n.eventEmitter.EmitEvent(n.id, models.AgentLameduckSetEvent{
 						Success: t.Success,
 					})
 					if err != nil {

@@ -257,7 +257,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 					wsr.Error.Code = strconv.Itoa(pState.ExitCode())
 				}
 
-				if err := n.runner.EmitEvent(wsr); err != nil {
+				if err := n.runner.EmitEvent(namespace, wsr); err != nil {
 					n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 				}
 				return
@@ -277,7 +277,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 	n.logger.Debug("workload created", slog.String("namespace", namespace), slog.String("workloadId", workloadId), slog.Bool("restart", n.workloads[namespace][workloadId].Restarts > 0))
 	n.Unlock()
 
-	if err := n.runner.EmitEvent(models.WorkloadStartedEvent{Id: workloadId, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
+	if err := n.runner.EmitEvent(namespace, models.WorkloadStartedEvent{Id: workloadId, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
 		n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 	}
 	return nil
@@ -353,7 +353,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 		delete(n.workloads[namespace], workloadId)
 		n.Unlock()
 
-		if err := n.runner.EmitEvent(wse); err != nil {
+		if err := n.runner.EmitEvent(namespace, wse); err != nil {
 			n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 		}
 	}(np)
@@ -393,7 +393,7 @@ func (n *nexletState) SetLameduckMode(before time.Duration) error {
 						case <-ticker.C:
 							// Check if the process still exists
 							if err := process.Process.Signal(syscall.Signal(0)); err != nil {
-								if err := n.runner.EmitEvent(models.WorkloadStoppedEvent{Id: id, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
+								if err := n.runner.EmitEvent(namespace, models.WorkloadStoppedEvent{Id: id, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
 									n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 								}
 								wg.Done()

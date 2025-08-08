@@ -1,6 +1,6 @@
 module github.com/synadia-labs/nex/agents
 
-go 1.24.0
+go 1.24.1
 
 replace github.com/synadia-labs/nex => ..
 
@@ -9,8 +9,8 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.44.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/synadia-io/nexlet.go v0.0.0-20250804170336-faa08833921e
-	github.com/synadia-labs/nex v0.0.0-20250804165719-079f9598a0e6
+	github.com/synadia-io/nexlet.go v0.0.0-20250805150903-fa7772770073
+	github.com/synadia-labs/nex v0.0.0-20250804171320-f9fb68fc9d24
 	golang.org/x/sys v0.34.0
 )
 

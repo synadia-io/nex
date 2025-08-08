@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -23,6 +24,7 @@ import (
 	"github.com/synadia-labs/nex/agents/native"
 	"github.com/synadia-labs/nex/client"
 	"github.com/synadia-labs/nex/internal/credentials"
+	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
 	"github.com/synadia-labs/nex/internal/state"
 	"github.com/synadia-labs/nex/models"
 )
@@ -48,6 +50,7 @@ type (
 		ResourceDir                  string            `name:"resource-directory" default:"${defaultResourcePath}"`
 		Tags                         map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 		State                        string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
+		LogEvents                    bool              `name:"log-events" help:"Log events" default:"false"`
 		InternalNatsServerConf       string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
 		IssuerSigningKey             string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key" help:"SIGNING KEY | Seed key for signing" placeholder:"SASIGNINGKEY..."`
 		IssuerRootAccountKey         string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key-root-account" help:"SIGNING KEY | Public key for root account" placeholder:"AAMYACCOUNT..."`
@@ -267,6 +270,10 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 			NatsServers: globals.NatsServers,
 		}
 		opts = append(opts, nex.WithMinter(minter))
+	}
+
+	if u.LogEvents {
+		opts = append(opts, nex.WithEventEmitter(eventemitter.NewLogEmitter(ctx, logger.WithGroup("event_emitter"), slog.LevelInfo)))
 	}
 
 	for _, agent := range u.Agents {

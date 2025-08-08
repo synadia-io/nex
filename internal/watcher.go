@@ -14,7 +14,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/synadia-io/nexlet.go/agent"
-	"github.com/synadia-labs/nex/internal/emitter"
 	"github.com/synadia-labs/nex/models"
 )
 
@@ -38,6 +37,7 @@ type AgentWatcher struct {
 	nc          *nats.Conn
 	nodeKeypair nkeys.KeyPair
 	logger      *slog.Logger
+	emitter     models.EventEmitter
 
 	initAgentsWg *sync.WaitGroup
 	resetLimit   int
@@ -51,12 +51,13 @@ type AgentWatcher struct {
 	agentCount int
 }
 
-func NewAgentWatcher(ctx context.Context, nc *nats.Conn, kp nkeys.KeyPair, logger *slog.Logger, restarts int, wg *sync.WaitGroup) *AgentWatcher {
+func NewAgentWatcher(ctx context.Context, nc *nats.Conn, kp nkeys.KeyPair, logger *slog.Logger, emitter models.EventEmitter, restarts int, wg *sync.WaitGroup) *AgentWatcher {
 	return &AgentWatcher{
 		ctx:          ctx,
 		nc:           nc,
 		nodeKeypair:  kp,
 		logger:       logger,
+		emitter:      emitter,
 		resetLimit:   restarts,
 		initAgentsWg: wg,
 		agentCount:   0,
@@ -103,7 +104,7 @@ func (a *AgentWatcher) StartEmbeddedAgent(agentID string, runner *agent.Runner, 
 
 	for range a.resetLimit {
 		a.logger.Debug("starting embedded agent", slog.String("agent_id", agentID), slog.Int("restart_count", restartCount))
-		err := runner.Run(agentID, *connData)
+		err := runner.Run(agentID, *connData, a.emitter)
 		if err != nil {
 			restartCount++
 			if restartCount <= a.resetLimit {
@@ -145,7 +146,13 @@ func (a *AgentWatcher) StopEmbeddedAgent(agentID string) error {
 	a.logger.Debug("stopped embedded agent", slog.String("agent_id", agentID))
 	a.agentCount--
 
-	err = emitter.EmitSystemEvent(a.nc, a.nodeKeypair, &models.AgentStoppedEvent{
+	pubKey, err := a.nodeKeypair.PublicKey()
+	if err != nil {
+		a.logger.Error("failed to get public key for agent stopped event", slog.String("agent_id", agentID), slog.String("err", err.Error()))
+		return err
+	}
+
+	err = a.emitter.EmitEvent(pubKey, &models.AgentStoppedEvent{
 		Id:        agentID,
 		Timestamp: time.Now(),
 	})
@@ -266,7 +273,13 @@ func (a *AgentWatcher) StopLocalBinaryAgent(agentID string) error {
 
 	a.logger.Debug("stopped local agent", slog.String("agent_id", agentID))
 
-	err = emitter.EmitSystemEvent(a.nc, a.nodeKeypair, &models.AgentStoppedEvent{
+	pubKey, err := a.nodeKeypair.PublicKey()
+	if err != nil {
+		a.logger.Error("failed to get public key for agent stopped event", slog.String("agent_id", agentID), slog.String("err", err.Error()))
+		return err
+	}
+
+	err = a.emitter.EmitEvent(pubKey, &models.AgentStoppedEvent{
 		Id:        agentID,
 		Timestamp: time.Now(),
 	})

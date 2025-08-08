@@ -15,7 +15,7 @@ import (
 	"github.com/synadia-labs/nex/internal"
 	"github.com/synadia-labs/nex/internal/aregistrar"
 	"github.com/synadia-labs/nex/internal/credentials"
-	"github.com/synadia-labs/nex/internal/emitter"
+	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
 	"github.com/synadia-labs/nex/internal/idgen"
 	secretstore "github.com/synadia-labs/nex/internal/secret_store"
 	"github.com/synadia-labs/nex/internal/state"
@@ -34,6 +34,7 @@ type (
 	NexNode       struct {
 		ctx       context.Context
 		cancel    context.CancelFunc
+		id        string
 		version   string
 		commit    string
 		builddate string
@@ -65,12 +66,13 @@ type (
 		// List of active agents
 		registeredAgents *internal.AgentRegistrations
 
-		minter      models.CredVendor
-		state       models.NexNodeState
-		auctioneer  models.Auctioneer
-		idgen       models.IDGen
-		aregistrar  models.AgentRegistrar
-		secretStore models.SecretStore
+		minter       models.CredVendor
+		state        models.NexNodeState
+		auctioneer   models.Auctioneer
+		idgen        models.IDGen
+		aregistrar   models.AgentRegistrar
+		secretStore  models.SecretStore
+		eventEmitter models.EventEmitter
 
 		nc          *nats.Conn
 		service     micro.Service
@@ -125,12 +127,13 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		embeddedRunners:   make([]*sdk.Runner, 0),
 		localRunners:      make([]*internal.AgentProcess, 0),
 
-		minter:      &credentials.FullAccessMinter{NatsServers: []string{nats.DefaultURL}},
-		state:       &state.NoState{},
-		auctioneer:  nil,
-		idgen:       idgen.NewNuidGen(),
-		aregistrar:  &aregistrar.AllowAllRegistrar{},
-		secretStore: &secretstore.NoStore{},
+		minter:       &credentials.FullAccessMinter{NatsServers: []string{nats.DefaultURL}},
+		state:        &state.NoState{},
+		auctioneer:   nil,
+		idgen:        idgen.NewNuidGen(),
+		aregistrar:   &aregistrar.AllowAllRegistrar{},
+		secretStore:  &secretstore.NoStore{},
+		eventEmitter: &eventemitter.NoEmit{},
 
 		nodeKeypair:                  kp,
 		nodeXKeypair:                 xkp,
@@ -153,6 +156,11 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		return nil, errs
 	}
 
+	n.id, err = n.nodeKeypair.PublicKey()
+	if err != nil {
+		return nil, err
+	}
+
 	n.ctx, n.cancel = context.WithCancel(n.ctx)
 	n.tags[models.TagNexus] = n.nexus
 	n.tags[models.TagNodeName] = n.name
@@ -165,17 +173,12 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 
 	var agentStarter sync.WaitGroup
 	agentStarter.Add(len(n.embeddedRunners) + len(n.localRunners))
-	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.agentRestartLimit, &agentStarter)
+	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.eventEmitter, n.agentRestartLimit, &agentStarter)
 
 	return n, nil
 }
 
 func (n *NexNode) Start() error {
-	pubKey, err := n.nodeKeypair.PublicKey()
-	if err != nil {
-		return err
-	}
-
 	version, ok := n.ctx.Value("VERSION").(string)
 	if ok {
 		n.version = version
@@ -203,6 +206,7 @@ func (n *NexNode) Start() error {
 		}
 	}
 
+	var err error
 	if n.nc == nil && n.server != nil {
 		n.nc, err = configureNatsConnection(n.serverCreds)
 		if err != nil {
@@ -217,7 +221,7 @@ func (n *NexNode) Start() error {
 		slog.String("version", n.version),
 		slog.String("commit", n.commit),
 		slog.String("build_date", n.builddate),
-		slog.String("node_id", pubKey),
+		slog.String("node_id", n.id),
 		slog.String("name", n.name),
 		slog.String("nexus", n.nexus),
 		slog.String("nats_server", n.nc.ConnectedUrl()),
@@ -239,38 +243,37 @@ func (n *NexNode) Start() error {
 
 	var errs error
 	// System only endpoints
-	errs = errors.Join(errs, n.service.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIDByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIDByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
 	// System only agent endpoints
 	if n.allowRemoteAgentRegistration {
 		n.logger.Warn("remote registration enabled. agents can remotely register to this node")
 		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIInitRemoteRegisterSubscribeSubject(n.nexus)), micro.WithEndpointQueueGroup(n.nexus)))
 	}
-	errs = errors.Join(errs, n.service.AddEndpoint("RegisterAgent", micro.HandlerFunc(n.handleRegisterAgent()), micro.WithEndpointSubject(models.AgentAPIRegisterSubscribeSubject(pubKey)), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("RegisterAgent", micro.HandlerFunc(n.handleRegisterAgent()), micro.WithEndpointSubject(models.AgentAPIRegisterSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
 	// User endpoints
-	errs = errors.Join(errs, n.service.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
-	errs = errors.Join(errs, n.service.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(pubKey)))
+	errs = errors.Join(errs, n.service.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
 
 	if errs != nil {
 		return errs
 	}
 
-	// At this point, nex controller is running
-	err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStartedEvent{
-		Id:    pubKey,
+	err = n.eventEmitter.EmitEvent(n.id, models.NexNodeStartedEvent{
+		Id:    n.id,
 		Name:  n.name,
 		Nexus: n.nexus,
 		Tags:  n.tags,
 		Type:  "io.synadia.nex.event.nexnode_started",
 	})
 	if err != nil {
-		n.logger.Error("failed to emit nex started event", slog.String("err", err.Error()))
+		n.logger.Error("failed to emit nex node started event", slog.String("err", err.Error()))
 	}
 	go n.heartbeat()
 
@@ -285,7 +288,7 @@ func (n *NexNode) Start() error {
 	// Start agents via constructor
 	for _, runner := range n.embeddedRunners {
 		id := n.idgen.Generate(nil)
-		connData, err := n.minter.MintRegister(id, pubKey)
+		connData, err := n.minter.MintRegister(id, n.id)
 		if err != nil {
 			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
 			continue
@@ -295,9 +298,9 @@ func (n *NexNode) Start() error {
 
 	// start local agents
 	for _, agentProcess := range n.localRunners {
-		agentProcess.HostNode = pubKey
+		agentProcess.HostNode = n.id
 		agentProcess.ID = n.idgen.Generate(nil)
-		connData, err := n.minter.MintRegister(agentProcess.ID, pubKey)
+		connData, err := n.minter.MintRegister(agentProcess.ID, n.id)
 		if err != nil {
 			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
 			continue
@@ -344,9 +347,11 @@ func (n *NexNode) Shutdown() error {
 		n.logger.Error("failed to get node public key", slog.String("err", err.Error()))
 	}
 
-	err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeStoppedEvent{Id: pubKey})
+	err = n.eventEmitter.EmitEvent(n.id, models.NexNodeStoppedEvent{
+		Id: pubKey,
+	})
 	if err != nil {
-		n.logger.Error("failed to emit nex stopped event", slog.String("err", err.Error()))
+		n.logger.Error("failed to emit nex node stopped event", slog.String("err", err.Error()))
 	}
 
 	if n.nc != nil && !n.nc.IsClosed() {
@@ -400,16 +405,17 @@ func (n *NexNode) enterLameduck(delay time.Duration) {
 			n.logger.Error("failed to shutdown nex node", slog.String("err", err.Error()))
 		}
 	}()
+
 	pubKey, err := n.nodeKeypair.PublicKey()
 	if err != nil {
 		n.logger.Error("failed to get node public key", slog.String("err", err.Error()))
 	}
-	err = emitter.EmitSystemEvent(n.nc, n.nodeKeypair, &models.NexNodeLameduckSetEvent{
+	err = n.eventEmitter.EmitEvent(n.id, models.NexNodeLameduckSetEvent{
 		Id:   pubKey,
 		Time: time.Now().Add(delay),
 	})
 	if err != nil {
-		n.logger.Error("failed to emit lameduck event", slog.String("err", err.Error()))
+		n.logger.Error("failed to emit nex node lameduck event", slog.String("err", err.Error()))
 	}
 }
 

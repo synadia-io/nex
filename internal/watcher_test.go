@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
+	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
 	"github.com/synadia-labs/nex/models"
 )
 
@@ -51,7 +52,9 @@ func TestWatcherRestart(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1) // Testing one agent with restart
 
-	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
+	emitter := eventemitter.NewLogEmitter(t.Context(), logger, slog.LevelDebug)
+
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, emitter, 1, &wg)
 	uri, err := exec.LookPath("sleep")
 	be.NilErr(t, err)
 
@@ -89,7 +92,9 @@ func TestWatcherNewAgentBadCommand(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1) // Testing one agent with restart
 
-	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
+	emitter := eventemitter.NewLogEmitter(t.Context(), logger, slog.LevelDebug)
+
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, emitter, 1, &wg)
 
 	ap := &AgentProcess{
 		Config: &models.Agent{
@@ -120,7 +125,8 @@ func TestWatcherNewAgentBadBinary(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1) // Testing one agent with restart
 
-	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
+	emitter := eventemitter.NewLogEmitter(t.Context(), logger, slog.LevelDebug)
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, emitter, 1, &wg)
 
 	fakeBinary, err := os.CreateTemp(t.TempDir(), "fakebin*")
 	be.NilErr(t, err)
@@ -157,7 +163,9 @@ func TestWatcherNewAgentBadCommandArgs(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1) // Testing one agent with restart
 
-	at := NewAgentWatcher(t.Context(), nc, kp, logger, 1, &wg)
+	emitter := eventemitter.NewLogEmitter(t.Context(), logger, slog.LevelDebug)
+
+	at := NewAgentWatcher(t.Context(), nc, kp, logger, emitter, 1, &wg)
 
 	uri, err := exec.LookPath("sleep")
 	be.NilErr(t, err)

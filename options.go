@@ -170,3 +170,10 @@ func WithSecretStore(s models.SecretStore) NexNodeOption {
 		return nil
 	}
 }
+
+func WithEventEmitter(e models.EventEmitter) NexNodeOption {
+	return func(n *NexNode) error {
+		n.eventEmitter = e
+		return nil
+	}
+}

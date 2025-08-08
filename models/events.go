@@ -2,10 +2,11 @@
 
 package models
 
-import "encoding/json"
-import "fmt"
-import "reflect"
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 type AgentLameduckSetEvent struct {
 	// Indicates if the lameduck setting was successful
@@ -43,9 +44,11 @@ type AgentStartedEvent struct {
 
 type AgentStartedEventType string
 
-const AgentStartedEventTypeEmbedded AgentStartedEventType = "embedded"
-const AgentStartedEventTypeLocal AgentStartedEventType = "local"
-const AgentStartedEventTypeRemote AgentStartedEventType = "remote"
+const (
+	AgentStartedEventTypeEmbedded AgentStartedEventType = "embedded"
+	AgentStartedEventTypeLocal    AgentStartedEventType = "local"
+	AgentStartedEventTypeRemote   AgentStartedEventType = "remote"
+)
 
 var enumValues_AgentStartedEventType = []interface{}{
 	"embedded",
@@ -59,16 +62,16 @@ func (j *AgentStartedEventType) UnmarshalJSON(value []byte) error {
 	if err := json.Unmarshal(value, &v); err != nil {
 		return err
 	}
-	var ok bool
-	for _, expected := range enumValues_AgentStartedEventType {
-		if reflect.DeepEqual(v, expected) {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_AgentStartedEventType, v)
-	}
+	//	var ok bool
+	// for _, expected := range enumValues_AgentStartedEventType {
+	// 	if reflect.DeepEqual(v, expected) {
+	// 		ok = true
+	// 		break
+	// 	}
+	// }
+	// if !ok {
+	// 	return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_AgentStartedEventType, v)
+	// }
 	*j = AgentStartedEventType(v)
 	return nil
 }

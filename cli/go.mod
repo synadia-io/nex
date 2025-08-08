@@ -1,6 +1,6 @@
 module github.com/synadia-labs/nex/cli
 
-go 1.24.0
+go 1.24.1
 
 replace github.com/synadia-labs/nex => ..
 
@@ -20,9 +20,9 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.10.0
-	github.com/synadia-labs/nex v0.0.0-20250804165719-079f9598a0e6
-	github.com/synadia-labs/nex/agents v0.0.0-20250804165719-079f9598a0e6
-	github.com/synadia-labs/nex/client v0.0.0-20250804165719-079f9598a0e6
+	github.com/synadia-labs/nex v0.0.0-20250804171320-f9fb68fc9d24
+	github.com/synadia-labs/nex/agents v0.0.0-20250804171320-f9fb68fc9d24
+	github.com/synadia-labs/nex/client v0.0.0-20250804171320-f9fb68fc9d24
 )
 
 require (
@@ -52,7 +52,7 @@ require (
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/synadia-io/nexlet.go v0.0.0-20250804170336-faa08833921e // indirect
+	github.com/synadia-io/nexlet.go v0.0.0-20250805150903-fa7772770073 // indirect
 	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.40.0 // indirect
