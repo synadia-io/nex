@@ -22,6 +22,11 @@ const (
 	EnvVarPrefix = "NEX_AGENT"
 )
 
+var (
+	defaultEmitEvent func(string, any) error = func(string, any) error { return nil }
+	defaultLogger                            = slog.New(slog.NewTextHandler(io.Discard, nil))
+)
+
 type Runner struct {
 	ctx          context.Context
 	name         string
@@ -119,7 +124,7 @@ func NewRunner(ctx context.Context, nexus, nodeID string, na Agent, opts ...Runn
 		name:         "default",
 		registerType: "default",
 		version:      "0.0.0",
-		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:       defaultLogger,
 		metrics:      false,
 		metricsPort:  9095,
 
@@ -130,8 +135,7 @@ func NewRunner(ctx context.Context, nexus, nodeID string, na Agent, opts ...Runn
 		triggers: make(map[string]*triggerResources),
 
 		secretStore: nil,
-
-		EmitEvent: func(string, any) error { return nil },
+		EmitEvent:   defaultEmitEvent,
 	}
 
 	for _, opt := range opts {
