@@ -16,7 +16,7 @@ type NatsEmitter struct {
 	nc  *nats.Conn
 }
 
-func NewNatsEmitter(ctx context.Context, nc *nats.Conn, subject string) *NatsEmitter {
+func NewNatsEmitter(ctx context.Context, nc *nats.Conn) *NatsEmitter {
 	return &NatsEmitter{
 		ctx: ctx,
 		nc:  nc,
@@ -29,26 +29,14 @@ func (e *NatsEmitter) EmitEvent(from string, event any) error {
 		return fmt.Errorf("could not convert event to bytes: %w", err)
 	}
 
-	switch event.(type) {
-	case *models.WorkloadStartedEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".WORKLOADSTARTED", eventBytes)
-	case *models.WorkloadStoppedEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".WORKLOADSTOPPED", eventBytes)
-	case *models.NexNodeStartedEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".NODESTARTED", eventBytes)
-	case *models.NexNodeStoppedEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".NODESTOPPED", eventBytes)
-	case *models.NexNodeLameduckSetEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".NODELAMEDUCKSET", eventBytes)
-	case *models.AgentStartedEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".AGENTSTARTED", eventBytes)
-	case *models.AgentStoppedEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".AGENTSTOPPED", eventBytes)
-	case *models.AgentLameduckSetEvent:
-		return e.nc.Publish(models.EventAPIPrefix(from)+".AGENTLAMEDUCKSET", eventBytes)
-	default:
-		return fmt.Errorf("unsupported event type: %T", event)
+	// Use the event's String() method to get the subject event suffix
+	stringer, ok := event.(fmt.Stringer)
+	if !ok {
+		return fmt.Errorf("event type %T does not implement String()", event)
 	}
+
+	eventSubject := models.EventAPIPrefix(from) + "." + stringer.String()
+	return e.nc.Publish(eventSubject, eventBytes)
 }
 
 func toBytes(e any) ([]byte, error) {

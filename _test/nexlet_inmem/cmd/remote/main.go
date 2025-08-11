@@ -14,6 +14,8 @@ import (
 	"github.com/synadia-io/nexlet.go/agent"
 
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
+	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
+	"github.com/synadia-labs/nex/models"
 )
 
 var (
@@ -82,7 +84,7 @@ func main() {
 	}
 
 	// launch the agent
-	if err := myAgent.Run(rrr.AssignedAgentId, *rrr.RegistrationCreds); err != nil {
+	if err := myAgent.Run(rrr.AssignedAgentId, *rrr.RegistrationCreds, eventemitter.NewNatsEmitter(actx, nc)); err != nil {
 		slog.Error(err.Error())
 		return
 	}

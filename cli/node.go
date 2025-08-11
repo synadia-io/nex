@@ -50,7 +50,7 @@ type (
 		ResourceDir                  string            `name:"resource-directory" default:"${defaultResourcePath}"`
 		Tags                         map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 		State                        string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
-		LogEvents                    bool              `name:"log-events" help:"Log events" default:"false"`
+		EventEmitter                 string            `name:"events" help:"Emit events" enum:",nats,logs" default:""`
 		InternalNatsServerConf       string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
 		IssuerSigningKey             string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key" help:"SIGNING KEY | Seed key for signing" placeholder:"SASIGNINGKEY..."`
 		IssuerRootAccountKey         string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key-root-account" help:"SIGNING KEY | Public key for root account" placeholder:"AAMYACCOUNT..."`
@@ -272,9 +272,16 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		opts = append(opts, nex.WithMinter(minter))
 	}
 
-	if u.LogEvents {
-		opts = append(opts, nex.WithEventEmitter(eventemitter.NewLogEmitter(ctx, logger.WithGroup("event_emitter"), slog.LevelInfo)))
+	var emitter models.EventEmitter
+	switch u.EventEmitter {
+	case "nats":
+		emitter = eventemitter.NewNatsEmitter(ctx, nc)
+	case "logs":
+		emitter = eventemitter.NewLogEmitter(ctx, logger.WithGroup("event_emitter"), slog.LevelInfo)
+	default:
+		emitter = eventemitter.NoEmit{}
 	}
+	opts = append(opts, nex.WithEventEmitter(emitter))
 
 	for _, agent := range u.Agents {
 		opts = append(opts, nex.WithAgent(models.Agent{
