@@ -22,6 +22,11 @@ const (
 	EnvVarPrefix = "NEX_AGENT"
 )
 
+var (
+	defaultEmitEvent func(string, any) error = func(string, any) error { return nil }
+	defaultLogger                            = slog.New(slog.NewTextHandler(io.Discard, nil))
+)
+
 type Runner struct {
 	ctx          context.Context
 	name         string
@@ -44,6 +49,8 @@ type Runner struct {
 
 	// Ingress Settings
 	ingressHostMachineIPAddr string
+
+	EmitEvent func(string, any) error
 }
 
 type triggerResources struct {
@@ -117,7 +124,7 @@ func NewRunner(ctx context.Context, nexus, nodeID string, na Agent, opts ...Runn
 		name:         "default",
 		registerType: "default",
 		version:      "0.0.0",
-		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		logger:       defaultLogger,
 		metrics:      false,
 		metricsPort:  9095,
 
@@ -128,6 +135,7 @@ func NewRunner(ctx context.Context, nexus, nodeID string, na Agent, opts ...Runn
 		triggers: make(map[string]*triggerResources),
 
 		secretStore: nil,
+		EmitEvent:   defaultEmitEvent,
 	}
 
 	for _, opt := range opts {
@@ -154,7 +162,12 @@ func (a *Runner) GetLogger(workloadID, namespace string, lType models.LogOut) io
 	return NewAgentLogCapture(a.nc, slog.Default(), lType, a.agentID, workloadID, namespace)
 }
 
-func (a *Runner) Run(agentID string, connData models.NatsConnectionData) error {
+func (a *Runner) Run(agentID string, connData models.NatsConnectionData, eventEmitter models.EventEmitter) error {
+	if eventEmitter == nil {
+		return errors.New("event emitter cannot be nil")
+	}
+	a.EmitEvent = eventEmitter.EmitEvent
+
 	if a.metrics {
 		go func() {
 			http.Handle("/metrics", promhttp.Handler())
@@ -310,28 +323,6 @@ func (a *Runner) GetNamespaceSecret(namespace, secretKey string) ([]byte, error)
 	}
 
 	return a.secretStore.GetSecret(namespace, secretKey)
-}
-
-func (a *Runner) EmitEvent(event any) error {
-	var eventB []byte
-	var err error
-	var eventType string
-
-	// FIX: nex has stringer implementation for events, use that instead
-	switch event.(type) {
-	case models.WorkloadStartedEvent:
-		eventType = "WorkloadStarted"
-	case models.WorkloadStoppedEvent:
-		eventType = "WorkloadStopped"
-	default:
-		return errors.New("invalid event type")
-	}
-
-	eventB, err = json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event: %w", err)
-	}
-	return a.nc.Publish(models.AgentAPIEmitEventSubject(a.agentID, eventType), eventB)
 }
 
 func (a *Runner) RegisterTrigger(workloadID, triggerSubject string, workloadConnData *models.NatsConnectionData, tFunc func([]byte) ([]byte, error)) error {
