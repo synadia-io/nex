@@ -164,7 +164,7 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 	a.Logger.Debug("StartWorkload successful")
 
 	if startRequest.Request.WorkloadLifecycle == models.WorkloadLifecycleFunction {
-		err = a.Runner.RegisterTrigger(workloadId, workloadId, &startRequest.WorkloadCreds, func(_ []byte) ([]byte, error) {
+		err = a.Runner.RegisterTrigger(workloadId, startRequest.Request.Namespace, workloadId, &startRequest.WorkloadCreds, func(_ []byte) ([]byte, error) {
 			a.Logger.Debug("Function trigger invoked", slog.String("workloadId", workloadId))
 			return []byte("Function executed successfully"), nil
 		})

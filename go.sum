@@ -96,6 +96,8 @@ github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOf
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/synadia-io/nexlet.go v0.0.0-20250811143704-a4e3bda2d1a6 h1:BTSNHAkQcUtUXN1jM7xT9RlI3wPEwu0yucub5PVFaro=
 github.com/synadia-io/nexlet.go v0.0.0-20250811143704-a4e3bda2d1a6/go.mod h1:MI8+/o83oxuL7g/xEAZSo340rZKv2jYLwrZfsUP52+Q=
+github.com/synadia-io/nexlet.go v0.0.0-20250812184238-d7907d506839 h1:s3vUpEvL/3PXSWUIB7mXgqE/lJNVS+MGtCBZ+NlrZAI=
+github.com/synadia-io/nexlet.go v0.0.0-20250812184238-d7907d506839/go.mod h1:2+czXYk+c6HFh6laXpWfW2Kgwoz5oy6YsRGJXnLAPt8=
 github.com/synadia-io/orbit.go/natsext v0.1.1 h1:ujoNs8vQtez640kkgXotSUZj2+GmsmqgjMKnJOLSE6s=
 github.com/synadia-io/orbit.go/natsext v0.1.1/go.mod h1:TbK/ch5qjAMr9HuCF+Guyws92rpWfotFarOuVjfJIv8=
 github.com/synadia-labs/nex/client v0.0.0-20250804171320-f9fb68fc9d24 h1:cmkgm6eTQDrmPcno6G9BgJH11zHbXRJY3f58h8Db9D4=
