@@ -325,7 +325,7 @@ func (a *Runner) GetNamespaceSecret(namespace, secretKey string) ([]byte, error)
 	return a.secretStore.GetSecret(namespace, secretKey)
 }
 
-func (a *Runner) RegisterTrigger(workloadID, triggerSubject string, workloadConnData *models.NatsConnectionData, tFunc func([]byte) ([]byte, error)) error {
+func (a *Runner) RegisterTrigger(workloadID, namespace, triggerSubject string, workloadConnData *models.NatsConnectionData, tFunc func([]byte) ([]byte, error)) error {
 	tr := new(triggerResources)
 
 	var err error
@@ -336,12 +336,13 @@ func (a *Runner) RegisterTrigger(workloadID, triggerSubject string, workloadConn
 
 	tr.sub, err = tr.nc.Subscribe(triggerSubject, func(m *nats.Msg) {
 		go func() {
+			startTime := time.Now()
 			ret, funcError := tFunc(m.Data)
 			if funcError != nil {
 				a.logger.Error("error running trigger function", slog.String("err", funcError.Error()))
 			}
 			if m.Reply != "" { // empty if original trigger was a publish and not request
-				nHeader := nats.Header{"workload_id": []string{workloadID}}
+				nHeader := nats.Header{"workload_id": []string{workloadID}, "namespace": []string{namespace}}
 				if funcError != nil {
 					nHeader["error"] = []string{funcError.Error()}
 				}
@@ -354,6 +355,15 @@ func (a *Runner) RegisterTrigger(workloadID, triggerSubject string, workloadConn
 				if pubErr != nil {
 					a.logger.Error("error responding to trigger", slog.String("err", pubErr.Error()))
 				}
+			}
+
+			runDuration := time.Since(startTime)
+			if err = a.EmitEvent(namespace, models.WorkloadTriggeredEvent{
+				Duration:  float64(runDuration.Milliseconds()),
+				Id:        workloadID,
+				Namespace: namespace,
+			}); err != nil {
+				a.logger.Error("error emitting workload triggered event", slog.String("err", err.Error()))
 			}
 		}()
 	})
