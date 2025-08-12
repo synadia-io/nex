@@ -7,7 +7,7 @@ require (
 	github.com/nats-io/nats.go v1.44.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/prometheus/client_golang v1.23.0
-	github.com/synadia-labs/nex v0.0.0-20250808151807-9e7dd26ad1e7
+	github.com/synadia-labs/nex v0.0.0-20250812183326-4e61a793875b
 )
 
 require (
