@@ -5,13 +5,13 @@ go 1.24.1
 require (
 	disorder.dev/shandler v0.0.0-20250411134702-523d18ddef40
 	github.com/carlmjohnson/be v0.24.1
-	github.com/nats-io/jwt/v2 v2.7.4
+	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats-server/v2 v2.11.7
 	github.com/nats-io/nats.go v1.44.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nexlet.go v0.0.0-20250812184238-d7907d506839
+	github.com/synadia-io/nexlet.go v0.0.0-20250812185147-9d782efcdea4
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	github.com/synadia-labs/nex/client v0.0.0-20250804171320-f9fb68fc9d24
 	golang.org/x/sys v0.35.0
@@ -25,7 +25,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/colorprofile v0.3.1 // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
-	github.com/charmbracelet/x/ansi v0.9.3 // indirect
+	github.com/charmbracelet/x/ansi v0.10.1 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/goccy/go-yaml v1.17.1 // indirect
