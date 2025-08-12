@@ -2,11 +2,9 @@
 
 package models
 
-import (
-	"encoding/json"
-	"fmt"
-	"time"
-)
+import "encoding/json"
+import "fmt"
+import "time"
 
 type AgentLameduckSetEvent struct {
 	// Indicates if the lameduck setting was successful
@@ -39,41 +37,7 @@ type AgentStartedEvent struct {
 	Name string `json:"name"`
 
 	// The type of the agent
-	Type AgentStartedEventType `json:"type"`
-}
-
-type AgentStartedEventType string
-
-const (
-	AgentStartedEventTypeEmbedded AgentStartedEventType = "embedded"
-	AgentStartedEventTypeLocal    AgentStartedEventType = "local"
-	AgentStartedEventTypeRemote   AgentStartedEventType = "remote"
-)
-
-var enumValues_AgentStartedEventType = []interface{}{
-	"embedded",
-	"local",
-	"remote",
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (j *AgentStartedEventType) UnmarshalJSON(value []byte) error {
-	var v string
-	if err := json.Unmarshal(value, &v); err != nil {
-		return err
-	}
-	//	var ok bool
-	// for _, expected := range enumValues_AgentStartedEventType {
-	// 	if reflect.DeepEqual(v, expected) {
-	// 		ok = true
-	// 		break
-	// 	}
-	// }
-	// if !ok {
-	// 	return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_AgentStartedEventType, v)
-	// }
-	*j = AgentStartedEventType(v)
-	return nil
+	RegisterType string `json:"register_type"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -88,8 +52,8 @@ func (j *AgentStartedEvent) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["name"]; raw != nil && !ok {
 		return fmt.Errorf("field name in AgentStartedEvent: required")
 	}
-	if _, ok := raw["type"]; raw != nil && !ok {
-		return fmt.Errorf("field type in AgentStartedEvent: required")
+	if _, ok := raw["register_type"]; raw != nil && !ok {
+		return fmt.Errorf("field register_type in AgentStartedEvent: required")
 	}
 	type Plain AgentStartedEvent
 	var plain Plain
@@ -354,5 +318,40 @@ func (j *WorkloadStoppedEvent) UnmarshalJSON(value []byte) error {
 		return err
 	}
 	*j = WorkloadStoppedEvent(plain)
+	return nil
+}
+
+type WorkloadTriggeredEvent struct {
+	// The duration of the workload execution in milliseconds
+	Duration float64 `json:"duration"`
+
+	// The unique identifier of the workload
+	Id string `json:"id"`
+
+	// The namespace of the workload
+	Namespace string `json:"namespace"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *WorkloadTriggeredEvent) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["duration"]; raw != nil && !ok {
+		return fmt.Errorf("field duration in WorkloadTriggeredEvent: required")
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in WorkloadTriggeredEvent: required")
+	}
+	if _, ok := raw["namespace"]; raw != nil && !ok {
+		return fmt.Errorf("field namespace in WorkloadTriggeredEvent: required")
+	}
+	type Plain WorkloadTriggeredEvent
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = WorkloadTriggeredEvent(plain)
 	return nil
 }
