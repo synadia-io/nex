@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	defaultTimeout = 60 * time.Second
-	defaultStall   = 2 * time.Second
+	defaultTimeout      = 60 * time.Second
+	defaultStall        = 2 * time.Second
+	defaultAuctionStall = 1 * time.Second
 )
 
 type nexClient struct {
@@ -27,10 +28,10 @@ type nexClient struct {
 	namespace string
 
 	// timeout configurations
-	defaultTimeout       time.Duration
-	auctionTimeout       time.Duration
-	startWorkloadTimeout time.Duration
-	requestManyStall     time.Duration
+	defaultTimeout          time.Duration
+	startWorkloadTimeout    time.Duration
+	requestManyStall        time.Duration
+	auctionRequestManyStall time.Duration
 }
 
 func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...ClientOption) (*nexClient, error) {
@@ -43,10 +44,10 @@ func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...Cli
 		nc:        nc,
 		namespace: namespace,
 		// Set default timeout values
-		defaultTimeout:       defaultTimeout,
-		auctionTimeout:       defaultTimeout,
-		startWorkloadTimeout: time.Minute,
-		requestManyStall:     defaultStall,
+		defaultTimeout:          defaultTimeout,
+		startWorkloadTimeout:    time.Minute,
+		requestManyStall:        defaultStall,
+		auctionRequestManyStall: defaultAuctionStall,
 	}
 
 	// Apply options
@@ -166,7 +167,7 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 		return nil, err
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(n.requestManyStall))
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(n.auctionRequestManyStall))
 	if errors.Is(err, nats.ErrNoResponders) {
 		return []*models.AuctionResponse{}, nil
 	}

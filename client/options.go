@@ -13,16 +13,18 @@ func WithDefaultTimeout(timeout time.Duration) ClientOption {
 	}
 }
 
-func WithAuctionTimeout(timeout time.Duration) ClientOption {
+func WithStartWorkloadTimeout(timeout time.Duration) ClientOption {
 	return func(c *nexClient) error {
-		c.auctionTimeout = timeout
+		c.startWorkloadTimeout = timeout
 		return nil
 	}
 }
 
-func WithStartWorkloadTimeout(timeout time.Duration) ClientOption {
+// WithAuctionStall modifies the stall duration for the request many call
+// conducted during an auction
+func WithAuctionStall(stall time.Duration) ClientOption {
 	return func(c *nexClient) error {
-		c.startWorkloadTimeout = timeout
+		c.auctionRequestManyStall = stall
 		return nil
 	}
 }
@@ -33,4 +35,3 @@ func WithRequestManyStall(stall time.Duration) ClientOption {
 		return nil
 	}
 }
-

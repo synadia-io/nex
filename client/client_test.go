@@ -51,7 +51,6 @@ func TestNewNexClientWithOptions(t *testing.T) {
 
 	client, err := NewClient(context.Background(), nc, "test",
 		WithDefaultTimeout(customTimeout),
-		WithAuctionTimeout(customTimeout),
 		WithStartWorkloadTimeout(customStartTimeout),
 		WithRequestManyStall(customStall),
 	)
@@ -59,7 +58,6 @@ func TestNewNexClientWithOptions(t *testing.T) {
 	be.Nonzero(t, client)
 
 	be.Equal(t, customTimeout, client.defaultTimeout)
-	be.Equal(t, customTimeout, client.auctionTimeout)
 	be.Equal(t, customStartTimeout, client.startWorkloadTimeout)
 	be.Equal(t, customStall, client.requestManyStall)
 }
