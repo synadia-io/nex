@@ -102,12 +102,14 @@ func (ar *AgentRegistrations) String() string {
 	if ar == nil || ar.Count() == 0 {
 		return ""
 	}
-	sb := strings.Builder{}
-
-	i := 0
-
 	ar.rwLock.RLock()
 	defer ar.rwLock.RUnlock()
+	return ar.stringNoLock()
+}
+
+func (ar *AgentRegistrations) stringNoLock() string {
+	sb := strings.Builder{}
+	i := 0
 	for k, v := range ar.Registrations {
 		sb.WriteString(fmt.Sprintf("%s [%s]", k, v.RegisterRequest.RegisterType))
 		if i < len(ar.Registrations)-1 {
@@ -176,7 +178,7 @@ func (ar *AgentRegistrations) Add(reg *AgentRegistration) error {
 		return fmt.Errorf("failed to add a <nil> registration")
 	}
 	if reg.ID == "" {
-		return fmt.Errorf("failed to register agent with empty ID: %+v", reg)
+		return fmt.Errorf("failed to register agent with empty ID")
 	}
 	if _, exists := ar.Registrations[reg.ID]; exists {
 		return fmt.Errorf("agent with ID %s is already registered", reg.ID)

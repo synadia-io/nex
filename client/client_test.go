@@ -355,7 +355,7 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			defer nc.Close()
 
-			client, err := NewClient(context.Background(), nc, "user")
+			client, err := NewClient(context.Background(), nc, "user", WithAuctionStall(1*time.Second))
 			be.NilErr(t, err)
 			be.Nonzero(t, client)
 

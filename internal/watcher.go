@@ -226,6 +226,8 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 			a.localAgents[ap.ID] = ap
 			a.localAgentLock.Unlock()
 
+			ap.agentLock.Unlock()
+
 			state, err := cmd.Process.Wait()
 			if err != nil {
 				a.logger.Error("Nexlet process exited with error", slog.Int("process", ap.Process.Pid), slog.String("err", err.Error()))
@@ -240,7 +242,6 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 			}
 
 			ap.restartCount++
-			ap.agentLock.Unlock()
 		}
 	}
 }
