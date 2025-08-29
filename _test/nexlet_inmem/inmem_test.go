@@ -55,9 +55,18 @@ func newInmemAgent(t testing.TB, withState bool) *InMemAgent {
 	}
 }
 
+func TestOptions(t *testing.T) {
+	inmem, err := newInMemAgent("nexus", "PUBKEY", slog.New(slog.NewTextHandler(io.Discard, nil)), WithAgentName("foo"), WithWorkloadType("bar"))
+	be.NilErr(t, err)
+	be.Equal(t, "foo", inmem.Name)
+	be.Equal(t, "bar", inmem.WorkloadType)
+}
+
 func TestStopWorkload(t *testing.T) {
 	agt := newInmemAgent(t, true)
-	agt.Runner = &agent.Runner{}
+	agt.Runner = &agent.Runner{
+		EmitEvent: func(string, any) error { return nil },
+	}
 
 	err := agt.StopWorkload("abc123", &models.StopWorkloadRequest{
 		Namespace: "default",
@@ -74,7 +83,9 @@ func TestStopWorkload(t *testing.T) {
 
 func TestStartWorkload(t *testing.T) {
 	agt := newInmemAgent(t, false)
-	agt.Runner = &agent.Runner{}
+	agt.Runner = &agent.Runner{
+		EmitEvent: func(string, any) error { return nil },
+	}
 
 	swr, err := agt.StartWorkload("abc123", &models.AgentStartWorkloadRequest{
 		Request: models.StartWorkloadRequest{

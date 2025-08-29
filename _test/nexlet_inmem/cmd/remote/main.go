@@ -15,7 +15,6 @@ import (
 
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
 	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
-	"github.com/synadia-labs/nex/models"
 )
 
 var (

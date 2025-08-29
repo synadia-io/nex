@@ -18,18 +18,20 @@ import (
 var (
 	_ agent.Agent = (*InMemAgent)(nil)
 
-	agentName string = "inmem"
-	VERSION   string = "0.0.0"
+	agentNameDefault string = "inmem"
+	agentTypeDefault string = "inmem"
+	VERSION          string = "0.0.0"
 )
 
 type InMemAgent struct {
-	Name      string
-	Nexus     string
-	Version   string
-	Workloads Workloads
-	XPair     nkeys.KeyPair
-	StartTime time.Time
-	Runner    *agent.Runner
+	Name         string
+	WorkloadType string
+	Nexus        string
+	Version      string
+	Workloads    Workloads
+	XPair        nkeys.KeyPair
+	StartTime    time.Time
+	Runner       *agent.Runner
 
 	Logger *slog.Logger
 }
@@ -47,16 +49,52 @@ type Workloads struct {
 	State map[string][]InMemWorkload
 }
 
-func NewInMemAgent(nexus, nodeId string, logger *slog.Logger) (*agent.Runner, error) {
+type InMemAgentOpt func(*InMemAgent) error
+
+func WithAgentName(name string) InMemAgentOpt {
+	return func(a *InMemAgent) error {
+		a.Name = name
+		return nil
+	}
+}
+
+func WithWorkloadType(workloadType string) InMemAgentOpt {
+	return func(a *InMemAgent) error {
+		a.WorkloadType = workloadType
+		return nil
+	}
+}
+
+func NewInMemAgent(nexus, nodeId string, logger *slog.Logger, opts ...InMemAgentOpt) (*agent.Runner, error) {
+	inmemAgent, err := newInMemAgent(nexus, nodeId, logger, opts...)
+
+	runnerOpts := []agent.RunnerOpt{
+		agent.WithLogger(logger),
+	}
+
+	if !nkeys.IsValidPublicServerKey(nodeId) {
+		return nil, errors.New("node id is not a valid public server key")
+	}
+
+	inmemAgent.Runner, err = agent.NewRunner(context.Background(), nexus, nodeId, inmemAgent, runnerOpts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return inmemAgent.Runner, nil
+}
+
+func newInMemAgent(nexus, nodeId string, logger *slog.Logger, opts ...InMemAgentOpt) (*InMemAgent, error) {
 	xkp, err := nkeys.CreateCurveKeys()
 	if err != nil {
 		return nil, err
 	}
 
 	inmemAgent := &InMemAgent{
-		Name:    agentName,
-		Nexus:   nexus,
-		Version: VERSION,
+		Name:         agentNameDefault,
+		WorkloadType: agentTypeDefault,
+		Nexus:        nexus,
+		Version:      VERSION,
 		Workloads: Workloads{
 			State: make(map[string][]InMemWorkload),
 		},
@@ -65,20 +103,13 @@ func NewInMemAgent(nexus, nodeId string, logger *slog.Logger) (*agent.Runner, er
 		Logger:    logger,
 	}
 
-	opts := []agent.RunnerOpt{
-		agent.WithLogger(logger),
+	for _, opt := range opts {
+		if err := opt(inmemAgent); err != nil {
+			return nil, err
+		}
 	}
 
-	if !nkeys.IsValidPublicServerKey(nodeId) {
-		return nil, errors.New("node id is not a valid public server key")
-	}
-
-	inmemAgent.Runner, err = agent.NewRunner(context.Background(), nexus, nodeId, inmemAgent, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return inmemAgent.Runner, nil
+	return inmemAgent, nil
 }
 
 func (a *InMemAgent) Register() (*models.RegisterAgentRequest, error) {
@@ -90,7 +121,7 @@ func (a *InMemAgent) Register() (*models.RegisterAgentRequest, error) {
 		Description:        "In memory no-op agent",
 		MaxWorkloads:       0,
 		Name:               a.Name,
-		RegisterType:       a.Name,
+		RegisterType:       a.WorkloadType,
 		PublicXkey:         pub,
 		StartRequestSchema: "{}",
 		SupportedLifecycles: []models.WorkloadLifecycle{
@@ -115,7 +146,7 @@ func (a *InMemAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 		Data: "In-Memory Nexlet",
 		Summary: models.AgentSummary{
 			Name:                a.Name,
-			Type:                a.Name,
+			Type:                a.WorkloadType,
 			StartTime:           a.StartTime,
 			State:               "running",
 			SupportedLifecycles: "service,job,function",
@@ -156,7 +187,7 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 		Id:           workloadId,
 		Metadata:     models.WorkloadStartedEventMetadata{},
 		Namespace:    startRequest.Request.Namespace,
-		WorkloadType: a.Name,
+		WorkloadType: a.WorkloadType,
 	})
 	if err != nil {
 		a.Logger.Error("failed to emit workload started event", slog.String("workloadId", workloadId), slog.String("namespace", startRequest.Request.Namespace), slog.String("name", startRequest.Request.Name))
@@ -204,7 +235,7 @@ func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWor
 				Id:           workloadId,
 				Metadata:     models.WorkloadStoppedEventMetadata{},
 				Namespace:    stopRequest.Namespace,
-				WorkloadType: a.Name,
+				WorkloadType: a.WorkloadType,
 			})
 			if err != nil {
 				a.Logger.Error("failed to emit workload stopped event", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
@@ -245,7 +276,7 @@ func (a *InMemAgent) QueryWorkloads(namespace string, filter []string) (*models.
 			Name:              workload.name,
 			Runtime:           time.Since(workload.startTime).String(),
 			StartTime:         workload.startTime.Format(time.RFC3339),
-			WorkloadType:      "inmem",
+			WorkloadType:      a.WorkloadType,
 			WorkloadState:     models.WorkloadStateRunning,
 			WorkloadLifecycle: "service",
 			Metadata:          map[string]string{"extra": "metadata"},
@@ -290,7 +321,7 @@ func (a *InMemAgent) Ping() (*models.AgentSummary, error) {
 	}
 	return &models.AgentSummary{
 		Name:                a.Name,
-		Type:                a.Name,
+		Type:                a.WorkloadType,
 		StartTime:           a.StartTime,
 		State:               "running",
 		SupportedLifecycles: "service,job,function",
