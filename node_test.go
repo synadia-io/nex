@@ -17,7 +17,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
-	sdk "github.com/synadia-io/nexlet.go/agent"
+	sdk "github.com/synadia-labs/nex/sdk/go/agent"
 	tminter "github.com/synadia-labs/nex/_test/minter"
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
 	"github.com/synadia-labs/nex/internal"

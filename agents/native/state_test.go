@@ -12,7 +12,7 @@ import (
 
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nexlet.go/agent"
+	"github.com/synadia-labs/nex/sdk/go/agent"
 	"github.com/synadia-labs/nex/_test"
 	"github.com/synadia-labs/nex/models"
 )

@@ -71,10 +71,10 @@ github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 h1:KRzFb2m7YtdldCEkzs6KqmJw4nqEV
 github.com/santhosh-tekuri/jsonschema/v6 v6.0.2/go.mod h1:JXeL+ps8p7/KNMjDQk3TCwPpBy0wYklyWTfbkIzdIFU=
 github.com/stretchr/testify v1.10.0 h1:Xv5erBjTwe/5IxqUQTdXv5kgmIvbHo3QQyRwhJsOfJA=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/synadia-io/nexlet.go v0.0.0-20250812185930-5796cf343810 h1:jIrZqRvIyzTwzANO0rQqAyZGSXd3WOuz/q0L23JxR5w=
+github.com/synadia-io/nexlet.go v0.0.0-20250812185930-5796cf343810/go.mod h1:9mv3Jf0nU60VwH6uggM6zxQFL91YT1KYLXx6Vux1fw8=
 github.com/synadia-io/orbit.go/natsext v0.1.1 h1:ujoNs8vQtez640kkgXotSUZj2+GmsmqgjMKnJOLSE6s=
 github.com/synadia-io/orbit.go/natsext v0.1.1/go.mod h1:TbK/ch5qjAMr9HuCF+Guyws92rpWfotFarOuVjfJIv8=
-github.com/synadia-labs/nex v0.0.0-20250812184923-486e290d8044 h1:Ufao7Burv3vFfCnTuzsLjLQqqvckvG99NfSSBSbU12w=
-github.com/synadia-labs/nex v0.0.0-20250812184923-486e290d8044/go.mod h1:YLn7JtBuO66ir83tsQ0gMvq31rxUE953/A1q8+ygMxw=
 github.com/synadia-labs/nex/client v0.0.0-20250804171320-f9fb68fc9d24 h1:cmkgm6eTQDrmPcno6G9BgJH11zHbXRJY3f58h8Db9D4=
 github.com/synadia-labs/nex/client v0.0.0-20250804171320-f9fb68fc9d24/go.mod h1:0p1kqugn+JeESrMsV8hHdagYq9A9L/Te8YloZKGqPCA=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=

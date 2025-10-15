@@ -9,10 +9,12 @@ require (
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.44.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/synadia-io/nexlet.go v0.0.0-20250812185147-9d782efcdea4
-	github.com/synadia-labs/nex v0.0.0-20250812184923-486e290d8044
+	github.com/synadia-labs/nex v0.0.0-20250829204512-92b0e08d0aad
+	github.com/synadia-labs/nex/sdk/go v0.0.0-unpublished
 	golang.org/x/sys v0.35.0
 )
+
+replace github.com/synadia-labs/nex/sdk/go => ../sdk/go
 
 require (
 	dario.cat/mergo v1.0.2 // indirect

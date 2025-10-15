@@ -11,11 +11,13 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nexlet.go v0.0.0-20250812185147-9d782efcdea4
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	github.com/synadia-labs/nex/client v0.0.0-20250804171320-f9fb68fc9d24
+	github.com/synadia-labs/nex/sdk/go v0.0.0-unpublished
 	golang.org/x/sys v0.35.0
 )
+
+replace github.com/synadia-labs/nex/sdk/go => ./sdk/go/
 
 require (
 	dario.cat/mergo v1.0.2 // indirect

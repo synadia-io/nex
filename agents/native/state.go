@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nexlet.go/agent"
+	"github.com/synadia-labs/nex/sdk/go/agent"
 	"github.com/synadia-labs/nex/internal"
 	"github.com/synadia-labs/nex/models"
 )

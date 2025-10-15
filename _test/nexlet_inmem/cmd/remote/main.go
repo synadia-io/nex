@@ -11,7 +11,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nexlet.go/agent"
+	"github.com/synadia-labs/nex/sdk/go/agent"
 
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
 	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"

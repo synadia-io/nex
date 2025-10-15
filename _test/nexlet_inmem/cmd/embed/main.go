@@ -13,7 +13,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nexlet.go/utils"
+	"github.com/synadia-labs/nex/sdk/go/utils"
 	"github.com/synadia-labs/nex/models"
 
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"

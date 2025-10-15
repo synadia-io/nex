@@ -26,7 +26,7 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	sdk "github.com/synadia-io/nexlet.go/agent"
+	sdk "github.com/synadia-labs/nex/sdk/go/agent"
 )
 
 type (

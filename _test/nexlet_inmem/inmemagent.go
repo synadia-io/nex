@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/synadia-io/nexlet.go/agent"
+	"github.com/synadia-labs/nex/sdk/go/agent"
 	"github.com/synadia-labs/nex/models"
 
 	"github.com/nats-io/nkeys"

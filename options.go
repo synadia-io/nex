@@ -12,7 +12,7 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	sdk "github.com/synadia-io/nexlet.go/agent"
+	sdk "github.com/synadia-labs/nex/sdk/go/agent"
 )
 
 func WithNodeName(name string) NexNodeOption {
