@@ -75,6 +75,11 @@ jobs:
       working-directory: ./cli
       run: |
         go test -v -race ./...
+    - 
+      name: Run test suite | SDK (Go)
+      working-directory: ./sdk/go
+      run: |
+        go test -v -race ./...
 
   build:
     timeout-minutes: 10
