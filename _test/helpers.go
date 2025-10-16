@@ -13,11 +13,11 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/sdk/go/agent"
 	"github.com/synadia-labs/nex"
 	testminter "github.com/synadia-labs/nex/_test/minter"
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
 	iState "github.com/synadia-labs/nex/internal/state"
+	"github.com/synadia-labs/nex/sdk/go/agent"
 )
 
 func init() {

@@ -13,14 +13,19 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/sdk/go/agent"
 	"github.com/synadia-labs/nex/_test"
 	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
 	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-labs/nex/sdk/go/agent"
 )
 
 func TestRunningRunner(t *testing.T) {
 	t.Helper()
+
+	const (
+		NexusName  = "testnexus"
+		NexletName = "inmem"
+	)
 
 	ctx, cancel := context.WithTimeoutCause(context.Background(), time.Second*5, fmt.Errorf("test timed out"))
 	defer cancel()
@@ -32,9 +37,10 @@ func TestRunningRunner(t *testing.T) {
 	be.NilErr(t, err)
 
 	inmemNexlet := &inmem.InMemAgent{
-		Name:    "inmem",
-		Nexus:   "nexus",
-		Version: "0.0.0-test",
+		Name:         NexletName,
+		Nexus:        NexusName,
+		WorkloadType: NexletName,
+		Version:      "0.0.0-test",
 		Workloads: inmem.Workloads{
 			State: make(map[string][]inmem.InMemWorkload),
 		},
@@ -43,7 +49,7 @@ func TestRunningRunner(t *testing.T) {
 		Logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 
-	runner, err := agent.NewRunner(context.Background(), "nexus", _test.Node1Pub, inmemNexlet)
+	runner, err := agent.NewRunner(context.Background(), NexusName, _test.Node1Pub, inmemNexlet)
 	be.NilErr(t, err)
 
 	inmemNexlet.Runner = runner
@@ -64,9 +70,10 @@ func TestRunningRunner(t *testing.T) {
 	nc, err := nats.Connect(s.ClientURL())
 	be.NilErr(t, err)
 
-	agentId, err := nc.Request(models.GetAgentIdByNameSubject(_test.Node1Pub), []byte("inmem"), time.Second*5)
+	resp, err := nc.Request(models.GetAgentIdByNameSubject(_test.Node1Pub), []byte(NexletName), time.Second*5)
 	be.NilErr(t, err)
-	be.Nonzero(t, agentId.Data)
+	agentId := resp.Data
+	be.Nonzero(t, agentId)
 
 	// This is the actual test
 	go func() {
@@ -107,7 +114,7 @@ func TestRunningRunner(t *testing.T) {
 					Namespace:         "default",
 					RunRequest:        "{}",
 					WorkloadLifecycle: models.WorkloadLifecycleService,
-					WorkloadType:      "inmem",
+					WorkloadType:      NexletName,
 				},
 				WorkloadCreds: models.NatsConnectionData{
 					NatsServers: []string{s.ClientURL()},
@@ -117,7 +124,7 @@ func TestRunningRunner(t *testing.T) {
 			be.NilErr(t, err)
 
 			resp, err := nc.Request(
-				models.AgentAPIStartWorkloadRequestSubject(_test.Node1Pub, string(agentId.Data), "abc123"),
+				models.AgentAPIStartWorkloadRequestSubject(_test.Node1Pub, string(resp.Data), "abc123"),
 				swr_b,
 				time.Second*5,
 			)
