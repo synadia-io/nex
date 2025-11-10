@@ -1,6 +1,6 @@
 package credentials
 
-import "github.com/synadia-labs/nex/models"
+import "github.com/synadia-io/nex/models"
 
 type NkeyMinter struct {
 	NatsServers []string

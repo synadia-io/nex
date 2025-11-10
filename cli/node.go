@@ -20,13 +20,13 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/natscli/columns"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex"
-	"github.com/synadia-labs/nex/agents/native"
-	"github.com/synadia-labs/nex/client"
-	"github.com/synadia-labs/nex/internal/credentials"
-	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
-	"github.com/synadia-labs/nex/internal/state"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex"
+	"github.com/synadia-io/nex/agents/native"
+	"github.com/synadia-io/nex/client"
+	"github.com/synadia-io/nex/internal/credentials"
+	eventemitter "github.com/synadia-io/nex/internal/event_emitter"
+	"github.com/synadia-io/nex/internal/state"
+	"github.com/synadia-io/nex/models"
 )
 
 type Node struct {

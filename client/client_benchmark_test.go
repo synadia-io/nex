@@ -6,7 +6,7 @@ import (
 
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-labs/nex/_test"
+	"github.com/synadia-io/nex/_test"
 )
 
 func BenchmarkClientAuction(b *testing.B) {

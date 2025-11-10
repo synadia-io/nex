@@ -1,14 +1,14 @@
-module github.com/synadia-labs/nex/client
+module github.com/synadia-io/nex/client
 
 go 1.24.1
 
 toolchain go1.24.5
 
-replace github.com/synadia-labs/nex => ..
+replace github.com/synadia-io/nex => ..
 
-replace github.com/synadia-labs/nex/sdk/go => ../sdk/go
+replace github.com/synadia-io/nex/sdk/go => ../sdk/go
 
-replace github.com/synadia-labs/nex/agents => ../agents
+replace github.com/synadia-io/nex/agents => ../agents
 
 require (
 	github.com/carlmjohnson/be v0.24.1
@@ -16,7 +16,7 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/synadia-io/orbit.go/natsext v0.1.1
-	github.com/synadia-labs/nex v0.0.0-20250829204512-92b0e08d0aad
+	github.com/synadia-io/nex v0.0.0-20250829204512-92b0e08d0aad
 )
 
 require (
@@ -47,7 +47,7 @@ require (
 	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
-	github.com/synadia-labs/nex/sdk/go v0.0.0-unpublished // indirect
+	github.com/synadia-io/nex/sdk/go v0.0.0-unpublished // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	golang.org/x/crypto v0.43.0 // indirect

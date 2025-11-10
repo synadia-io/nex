@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/carlmjohnson/be"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 func TestNoState(t *testing.T) {

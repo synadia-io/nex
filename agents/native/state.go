@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-labs/nex/sdk/go/agent"
-	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
+	"github.com/synadia-io/nex/internal"
+	"github.com/synadia-io/nex/models"
 )
 
 type nexletState struct {

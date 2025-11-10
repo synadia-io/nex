@@ -6,13 +6,13 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/internal"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	sdk "github.com/synadia-labs/nex/sdk/go/agent"
+	sdk "github.com/synadia-io/nex/sdk/go/agent"
 )
 
 func WithNodeName(name string) NexNodeOption {

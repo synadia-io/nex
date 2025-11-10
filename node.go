@@ -12,21 +12,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/internal/aregistrar"
-	"github.com/synadia-labs/nex/internal/credentials"
-	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
-	"github.com/synadia-labs/nex/internal/idgen"
-	secretstore "github.com/synadia-labs/nex/internal/secret_store"
-	"github.com/synadia-labs/nex/internal/state"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/internal"
+	"github.com/synadia-io/nex/internal/aregistrar"
+	"github.com/synadia-io/nex/internal/credentials"
+	eventemitter "github.com/synadia-io/nex/internal/event_emitter"
+	"github.com/synadia-io/nex/internal/idgen"
+	secretstore "github.com/synadia-io/nex/internal/secret_store"
+	"github.com/synadia-io/nex/internal/state"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	sdk "github.com/synadia-labs/nex/sdk/go/agent"
+	sdk "github.com/synadia-io/nex/sdk/go/agent"
 )
 
 type (

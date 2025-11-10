@@ -5,7 +5,7 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 var _ models.EventEmitter = (*LogEmitter)(nil)

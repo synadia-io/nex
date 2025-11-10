@@ -1,7 +1,7 @@
 version: '3'
 
 env:
-  GOPRIVATE: "github.com/synadia-labs,github.com/synadia-io"
+  GOPRIVATE: "github.com/synadia-io"
   GOWORK: off
 
 tasks:

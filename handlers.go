@@ -13,8 +13,8 @@ import (
 
 	"disorder.dev/shandler"
 	"github.com/synadia-io/orbit.go/natsext"
-	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/internal"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"

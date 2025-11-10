@@ -5,7 +5,7 @@ import (
 
 	"github.com/nats-io/jwt/v2"
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 var (

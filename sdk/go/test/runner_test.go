@@ -13,10 +13,10 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/_test"
-	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
-	"github.com/synadia-labs/nex/models"
-	"github.com/synadia-labs/nex/sdk/go/agent"
+	"github.com/synadia-io/nex/_test"
+	inmem "github.com/synadia-io/nex/_test/nexlet_inmem"
+	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
 )
 
 func TestRunningRunner(t *testing.T) {

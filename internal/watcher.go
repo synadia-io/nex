@@ -13,8 +13,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/sdk/go/agent"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
+	"github.com/synadia-io/nex/models"
 )
 
 type AgentProcess struct {

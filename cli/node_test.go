@@ -15,8 +15,8 @@ import (
 	"github.com/alecthomas/kong"
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/_test"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/_test"
+	"github.com/synadia-io/nex/models"
 )
 
 func TestNodeCommandDefaults(t *testing.T) {

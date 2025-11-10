@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/alecthomas/kong"
 )

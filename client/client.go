@@ -12,7 +12,7 @@ import (
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
 	"github.com/synadia-io/orbit.go/natsext"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 const (

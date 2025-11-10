@@ -1,4 +1,4 @@
-module github.com/synadia-labs/nex
+module github.com/synadia-io/nex
 
 go 1.24.1
 
@@ -11,13 +11,15 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
+	github.com/synadia-io/nex/client v0.0.0-20250804171320-f9fb68fc9d24
+	github.com/synadia-io/nex/sdk/go v0.0.0-unpublished
 	github.com/synadia-io/orbit.go/natsext v0.1.1
-	github.com/synadia-labs/nex/client v0.0.0-20250804171320-f9fb68fc9d24
-	github.com/synadia-labs/nex/sdk/go v0.0.0-unpublished
 	golang.org/x/sys v0.37.0
 )
 
-replace github.com/synadia-labs/nex/sdk/go => ./sdk/go/
+replace github.com/synadia-io/nex/sdk/go => ./sdk/go/
+
+replace github.com/synadia-io/nex/client => ./client
 
 require (
 	dario.cat/mergo v1.0.2 // indirect

@@ -1,20 +1,20 @@
-module github.com/synadia-labs/nex/agents
+module github.com/synadia-io/nex/agents
 
 go 1.24.1
 
-replace github.com/synadia-labs/nex => ..
+replace github.com/synadia-io/nex => ..
 
 require (
 	github.com/carlmjohnson/be v0.24.1
 	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/nats.go v1.47.0
 	github.com/nats-io/nkeys v0.4.11
-	github.com/synadia-labs/nex v0.0.0-20250829204512-92b0e08d0aad
-	github.com/synadia-labs/nex/sdk/go v0.0.0-unpublished
+	github.com/synadia-io/nex v0.0.0-20250829204512-92b0e08d0aad
+	github.com/synadia-io/nex/sdk/go v0.0.0-unpublished
 	golang.org/x/sys v0.37.0
 )
 
-replace github.com/synadia-labs/nex/sdk/go => ../sdk/go
+replace github.com/synadia-io/nex/sdk/go => ../sdk/go
 
 require (
 	dario.cat/mergo v1.0.2 // indirect

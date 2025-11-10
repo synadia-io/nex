@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 type LogType int

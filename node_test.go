@@ -17,12 +17,12 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
-	sdk "github.com/synadia-labs/nex/sdk/go/agent"
-	tminter "github.com/synadia-labs/nex/_test/minter"
-	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
-	"github.com/synadia-labs/nex/internal"
-	"github.com/synadia-labs/nex/internal/state"
-	"github.com/synadia-labs/nex/models"
+	sdk "github.com/synadia-io/nex/sdk/go/agent"
+	tminter "github.com/synadia-io/nex/_test/minter"
+	inmem "github.com/synadia-io/nex/_test/nexlet_inmem"
+	"github.com/synadia-io/nex/internal"
+	"github.com/synadia-io/nex/internal/state"
+	"github.com/synadia-io/nex/models"
 )
 
 func startNatsServer(t testing.TB) *server.Server {

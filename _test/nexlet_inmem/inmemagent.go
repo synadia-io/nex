@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/synadia-labs/nex/sdk/go/agent"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nkeys"
 )

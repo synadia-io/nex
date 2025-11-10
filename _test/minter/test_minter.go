@@ -1,6 +1,6 @@
 package testminter
 
-import "github.com/synadia-labs/nex/models"
+import "github.com/synadia-io/nex/models"
 
 type TestMinter struct {
 	NatsServers []string

@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nkeys"
 )

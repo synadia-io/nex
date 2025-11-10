@@ -10,7 +10,7 @@ import (
 
 	"disorder.dev/shandler"
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 func configureLogger(globals *Globals, nc *nats.Conn, serverPublicKey string, showWorkloadLogs bool) *slog.Logger {

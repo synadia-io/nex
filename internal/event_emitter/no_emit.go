@@ -1,7 +1,7 @@
 // Package eventemitter provides a implementations of the EventEmitter interface.
 package eventemitter
 
-import "github.com/synadia-labs/nex/models"
+import "github.com/synadia-io/nex/models"
 
 var _ models.EventEmitter = (*NoEmit)(nil)
 

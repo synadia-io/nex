@@ -13,8 +13,8 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
-	"github.com/synadia-labs/nex/models"
+	eventemitter "github.com/synadia-io/nex/internal/event_emitter"
+	"github.com/synadia-io/nex/models"
 )
 
 const (

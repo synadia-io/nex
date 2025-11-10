@@ -2,7 +2,7 @@ package idgen
 
 import (
 	"github.com/nats-io/nuid"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 type NuidGen struct {

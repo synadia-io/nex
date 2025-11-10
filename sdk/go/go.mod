@@ -1,4 +1,4 @@
-module github.com/synadia-labs/nex/sdk/go
+module github.com/synadia-io/nex/sdk/go
 
 go 1.24.1
 
@@ -7,10 +7,10 @@ require (
 	github.com/nats-io/nats.go v1.47.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/prometheus/client_golang v1.23.2
-	github.com/synadia-labs/nex v0.0.0-20250829204512-92b0e08d0aad
+	github.com/synadia-io/nex v0.0.0-20250829204512-92b0e08d0aad
 )
 
-replace github.com/synadia-labs/nex => ../../
+replace github.com/synadia-io/nex => ../../
 
 require (
 	disorder.dev/shandler v0.0.0-20250411134702-523d18ddef40 // indirect

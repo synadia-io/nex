@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 type hb struct {

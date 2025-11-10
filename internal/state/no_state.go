@@ -1,6 +1,6 @@
 package state
 
-import "github.com/synadia-labs/nex/models"
+import "github.com/synadia-io/nex/models"
 
 var _ models.NexNodeState = (*NoState)(nil)
 

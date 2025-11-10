@@ -13,11 +13,11 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/sdk/go/utils"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/sdk/go/utils"
+	"github.com/synadia-io/nex/models"
 
-	inmem "github.com/synadia-labs/nex/_test/nexlet_inmem"
-	eventemitter "github.com/synadia-labs/nex/internal/event_emitter"
+	inmem "github.com/synadia-io/nex/_test/nexlet_inmem"
+	eventemitter "github.com/synadia-io/nex/internal/event_emitter"
 )
 
 var (

@@ -11,8 +11,8 @@ import (
 
 	"github.com/goombaio/namegenerator"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/sdk/go/agent"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
+	"github.com/synadia-io/nex/models"
 )
 
 //go:embed start_request.json

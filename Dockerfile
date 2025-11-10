@@ -15,6 +15,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 # Copy the sdk/go directory to satisfy the replace directive
 COPY sdk/go/ ./sdk/go/
+COPY client/ ./client
 RUN --mount=type=ssh go mod download
 
 COPY . .

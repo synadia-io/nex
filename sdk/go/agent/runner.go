@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"

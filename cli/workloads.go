@@ -15,8 +15,8 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert/yaml"
-	"github.com/synadia-labs/nex/client"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/client"
+	"github.com/synadia-io/nex/models"
 )
 
 type Workload struct {

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/carlmjohnson/be"
-	"github.com/synadia-labs/nex/_test"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/_test"
+	"github.com/synadia-io/nex/models"
 )
 
 func TestNewNativeRunner(t *testing.T) {

@@ -13,8 +13,8 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-labs/nex/internal/state"
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/internal/state"
+	"github.com/synadia-io/nex/models"
 )
 
 func TestNexNodeOptions(t *testing.T) {

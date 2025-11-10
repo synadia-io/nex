@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 type NativeProcesses map[string]*NativeProcess

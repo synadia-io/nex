@@ -1,6 +1,6 @@
 package aregistrar
 
-import "github.com/synadia-labs/nex/models"
+import "github.com/synadia-io/nex/models"
 
 var _ models.AgentRegistrar = (*AllowAllRegistrar)(nil)
 

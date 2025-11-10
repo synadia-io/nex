@@ -3,7 +3,7 @@ package secretstore
 import (
 	"errors"
 
-	"github.com/synadia-labs/nex/models"
+	"github.com/synadia-io/nex/models"
 )
 
 var _ models.SecretStore = (*NoStore)(nil)
