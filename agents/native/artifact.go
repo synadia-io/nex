@@ -39,10 +39,10 @@ type ArtifactReference struct {
 // Obtains an artifact from the specified location. If the indicated location allows for
 // differentiation using tags (e.g. OCI, Object Store), then the supplied tag will be used,
 // otherwise it will be ignored
-func getArtifact(inUri string, nc *nats.Conn) (*ArtifactReference, error) {
-	uri, err := parseUri(inUri)
+func getArtifact(inURI string, nc *nats.Conn) (*ArtifactReference, error) {
+	uri, err := parseUri(inURI)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse artifact URI: %w", err)
 	}
 
 	switch uri.schema {

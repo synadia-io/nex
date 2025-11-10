@@ -137,3 +137,43 @@ func TestNexletState(t *testing.T) {
 		})
 	}
 }
+
+func TestAddWorkloadWithInvalidUri(t *testing.T) {
+	mockRunner, err := MockRunner(t)
+	be.NilErr(t, err)
+
+	ns := nexletState{
+		Mutex:     sync.Mutex{},
+		ctx:       context.Background(),
+		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		runner:    mockRunner,
+		status:    models.AgentStateStarting,
+		workloads: map[string]NativeProcesses{},
+	}
+
+	const (
+		namespace  = "test"
+		workloadID = "12345"
+	)
+
+	tempDir := t.TempDir()
+	req := models.AgentStartWorkloadRequest{
+		Request: models.StartWorkloadRequest{
+			Name:              "invalid_workload",
+			Namespace:         namespace,
+			RunRequest:        fmt.Sprintf(`{"uri":"file://%s"}`, tempDir),
+			WorkloadLifecycle: "service",
+			WorkloadType:      "native",
+		},
+	}
+
+	err = ns.AddWorkload(req.Request.Namespace, workloadID, &req)
+	if err == nil {
+		t.Fatal("expected error when workload run request URI lacks file:// prefix")
+	}
+
+	be.Equal(t, 0, ns.WorkloadCount())
+
+	_, ok := ns.Exists(workloadID)
+	be.False(t, ok)
+}

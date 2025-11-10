@@ -155,8 +155,9 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 	}
 
 	if !strings.HasPrefix(startReq.Uri, "file://") && !strings.HasPrefix(startReq.Uri, "nats://") {
+		delete(n.workloads[namespace], workloadId)
 		n.Unlock()
-		return errors.New("invalid uri; must be prefixed with file:// or nats://")
+		return fmt.Errorf("invalid uri; must be prefixed with file:// for local binary or nats:// to fetch an artifact: %s", startReq.Uri)
 	}
 
 	var nc *nats.Conn
@@ -166,14 +167,15 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 			nats.Name("artifact_fetcher-"+workloadId))
 		if err != nil {
 			n.logger.Error("error connecting to nats", slog.String("err", err.Error()))
-			return err
+			return fmt.Errorf("failed to make a nats connection to retrieve runnable artifact: %w", err)
 		}
 	}
 
 	ar, err := getArtifact(startReq.Uri, nc)
 	if err != nil {
+		delete(n.workloads[namespace], workloadId)
 		n.Unlock()
-		return err
+		return fmt.Errorf("failed to retrieve artifact: %w", err)
 	}
 	if nc != nil {
 		nc.Close()
@@ -185,9 +187,10 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 		if secretKey, found := strings.CutPrefix(v, models.NexSecretPrefix); found {
 			secretValue, err := n.runner.GetNamespaceSecret(namespace, secretKey)
 			if err != nil {
+				delete(n.workloads[namespace], workloadId)
 				n.logger.Error("error retrieving secret", slog.String("err", err.Error()), slog.String("secret_key", secretKey), slog.String("namespace", namespace))
 				n.Unlock()
-				return err
+				return fmt.Errorf("failed to retrieve namespace secret %s: %w", secretKey, err)
 			}
 			env = append(env, k+"="+string(secretValue))
 		} else {
@@ -200,9 +203,10 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 		if secretKey, found := strings.CutPrefix(v, models.NexSecretPrefix); found {
 			secretValue, err := n.runner.GetNamespaceSecret(namespace, secretKey)
 			if err != nil {
+				delete(n.workloads[namespace], workloadId)
 				n.logger.Error("error retrieving secret", slog.String("err", err.Error()), slog.String("secret_key", secretKey), slog.String("namespace", namespace))
 				n.Unlock()
-				return err
+				return fmt.Errorf("failed to retrieve namespace secret %s: %w", secretKey, err)
 			}
 			argv = append(argv, string(secretValue))
 		} else {
@@ -226,7 +230,7 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 	if err := cmd.Start(); err != nil {
 		delete(n.workloads[namespace], workloadId)
 		n.Unlock()
-		return err
+		return fmt.Errorf("failed to start native binary: %w", err)
 	}
 	n.workloads[namespace][workloadId].Process = cmd.Process
 	n.workloads[namespace][workloadId].SetState(models.WorkloadStateRunning)

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -156,7 +157,7 @@ func (a *NativeAgent) StartWorkload(workloadId string, req *models.AgentStartWor
 
 	err := a.state.AddWorkload(req.Request.Namespace, workloadId, req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to run workload %s: %w", workloadId, err)
 	}
 
 	return &models.StartWorkloadResponse{
