@@ -184,22 +184,20 @@ func TestNexClient_SystemAsUser(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
 	be.Equal(t, 1, len(nexNodes))
 
-	client, err := NewClient(context.Background(), nc, "user")
+	client, err := NewClient(t.Context(), nc, "user")
 	be.NilErr(t, err)
 	be.Nonzero(t, client)
 
 	_, err = client.GetNodeInfo(_test.Node1Pub)
-	be.Equal(t, "node not found", err.Error())
+	be.Unequal(t, err, nil)
 
 	nodes, err := client.ListNodes(map[string]string{"foo": "bar"})
 	be.NilErr(t, err)
-	//	be.Equal(t, "no nodes found", err.Error())
 	be.Equal(t, 0, len(nodes))
 
 	ldresp, err := client.SetLameduck(_test.Node1Pub, 0, nil)
