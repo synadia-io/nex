@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.node_agent_summary_response",
+  "title": "NodeAgentSummaryResponse",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "./shared-node-agent-summary.json"
+  }
+}

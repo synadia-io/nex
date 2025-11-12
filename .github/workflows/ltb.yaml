@@ -1,0 +1,108 @@
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Lint | Test | Build
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  GO_VER: '1.24.*'
+  GOPRIVATE: github.com/synadia-io/nexlet.go
+  GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+
+
+jobs:
+  lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+    - 
+      name: Checkout code
+      uses: actions/checkout@v4
+    - 
+      name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VER }}
+        cache: false
+    - 
+      name: Private Module Setup
+      run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/ 
+    - 
+      name: golangci-lint
+      uses: golangci/golangci-lint-action@v8.0.0
+      with:
+        version: v2.1.6
+
+  test:
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        #os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+    - 
+      name: Checkout code
+      uses: actions/checkout@v4
+    - 
+      name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VER }}
+    - 
+      name: Private Module Setup
+      run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/ 
+    - 
+      name: Run test suite | nex
+      run: |
+        go test -v -race ./...
+    - 
+      name: Run test suite | agents
+      working-directory: ./agents
+      run: |
+        go test -v -race ./...
+    - 
+      name: Run test suite | client
+      working-directory: ./client
+      run: |
+        go test -v  -race ./...
+    - 
+      name: Run test suite | CLI
+      working-directory: ./cli
+      run: |
+        go test -v -race ./...
+    - 
+      name: Run test suite | SDK (Go)
+      working-directory: ./sdk/go
+      run: |
+        go test -v -race ./...
+
+  build:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+    -
+      name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    -
+      name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VER }}
+    - 
+      name: Private Module Setup
+      run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/ 
+    -
+      name: Run GoReleaser
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: latest
+        args: build --clean --snapshot
+

@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
+
+env:
+  GO_VER: '1.24.*'
+  GOPRIVATE: github.com/synadia-io/nexlet.go
+  GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
+
+jobs:
+  goreleaser:
+    name: Run GoReleaser
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Check out code
+        uses: actions/checkout@v4
+
+      - 
+        name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VER }}
+          cache: false
+
+      - 
+        name: Private Module Setup
+        run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/ 
+
+      - 
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - 
+        name: Get short SHA
+        id: get_sha
+        run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - 
+        name: Dispatch `release` event
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPOSITORY_DISPATCH_PAT }}
+          repository: ${{ vars.NEX_INTERNAL_REPO }} 
+          event-type: release-created
+          client-payload: |
+            {
+              "short_sha":   "${{ steps.get_sha.outputs.short_sha }}",
+              "tag":      "${{ github.ref_name }}",
+              "release_url": "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+            }

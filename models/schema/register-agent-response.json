@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_register_response",
+  "title": "RegisterAgentResponse",
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Indicates if the agent was successfully registered"
+    },
+    "message": {
+      "type": "string",
+      "description": "A message indicating the result of the registration"
+    },
+    "node_id": {
+      "type": "string",
+      "description": "The ID of the node the agent is registered to"
+    },
+    "connection_data": {
+      "$ref": "./shared-nats-connection-data.json"
+    },
+    "existing_state": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "./shared-agent-start-workload-request.json"
+      }
+    }
+  },
+  "required": [
+    "success",
+    "message",
+    "node_id",
+    "connection_data",
+    "existing_state"
+  ],
+  "additionalProperties": false
+}

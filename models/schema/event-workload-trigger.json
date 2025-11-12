@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.synadia.nex.event.workload_triggered",
+  "title": "WorkloadTriggeredEvent",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "The unique identifier of the workload"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "The namespace of the workload"
+    },
+    "duration": {
+      "type": "number",
+      "description": "The duration of the workload execution in milliseconds"
+    }
+  },
+  "required": [
+    "id",
+    "namespace",
+    "duration"
+  ]
+}

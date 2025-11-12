@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_ping_response",
+  "title": "AgentPingResponse",
+  "type": "object",
+  "$ref": "./shared-agent-summary.json",
+  "additionalProperties": false
+}

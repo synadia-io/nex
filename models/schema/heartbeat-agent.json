@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_heartbeat",
+  "title": "AgentHeartbeat",
+  "type": "object",
+  "properties": {
+    "summary": {
+      "$ref": "./shared-agent-summary.json"
+    },
+    "data": {
+      "type": "string",
+      "description": "Send additional data in heartbeat"
+    }
+  },
+  "required": [
+    "summary",
+    "data"
+  ],
+  "additionalProperties": false
+}

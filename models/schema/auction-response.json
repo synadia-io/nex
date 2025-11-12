@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.auction_response",
+  "title": "AuctionResponse",
+  "type": "object",
+  "properties": {
+    "bidder_id": {
+      "type": "string",
+      "description": "A one-time identifier used to target deployments"
+    },
+    "xkey": {
+      "type": "string",
+      "description": "Key used for encrypting parts of start request"
+    },
+    "start_request_schema": {
+      "type": "string",
+      "description": "Schema for the start request"
+    },
+    "supported_lifecycles": {
+      "type": "array",
+      "items": {
+        "$ref": "./shared-workload-lifecycle.json"
+      },
+      "description": "Supported lifecycle types"
+    }
+  },
+  "required": [
+    "bidder_id",
+    "xkey",
+    "start_request_schema",
+    "supported_lifecycles"
+  ],
+  "additionalProperties": false
+}

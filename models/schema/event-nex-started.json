@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "io.synadia.nex.event.nexnode_started",
+  "title": "NexNodeStartedEvent",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "io.synadia.nex.event.nexnode_started"
+    },
+    "id": {
+      "type": "string",
+      "description": "The unique identifier of the nex node"
+    },
+    "name": {
+      "type": "string",
+      "description": "The name of the nex node"
+    },
+    "nexus": {
+      "type": "string",
+      "description": "Nexus the nex node belongs to"
+    },
+    "tags": {
+      "$ref": "./shared-tag-map.json",
+      "description": "Placement tags associated with the nex node"
+    }
+  },
+  "required": [
+    "type",
+    "id",
+    "name",
+    "nexus",
+    "tags"
+  ]
+}

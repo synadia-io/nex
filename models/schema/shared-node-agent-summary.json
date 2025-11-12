@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "shared",
+  "title": "NodeAgentSummary",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Unique identifier for the agent"
+    },
+    "agent_health": {
+      "type": "string",
+      "description": "Nodes perspective of agent health"
+    },
+    "agent_health_stoplight": {
+      "type": "string",
+      "description": "Nodes perspective of agent health | stoplight format"
+    },
+    "agent_last_heartbeat_time": {
+      "type": "string",
+      "description": "Last time the agent sent a heartbeat",
+      "format": "date-time"
+    },
+    "agent_summary": {
+      "$ref": "./shared-agent-summary.json"
+    }
+  },
+  "required": [
+    "agent_id",
+    "agent_health",
+    "agent_health_stoplight",
+    "agent_last_heartbeat_time",
+    "agent_summary"
+  ],
+  "additionalProperties": false
+}

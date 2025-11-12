@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.agent_remote_register_request",
+  "title": "RegisterRemoteAgentResponse",
+  "type": "object",
+  "properties": {
+    "assigned_agent_id": {
+      "type": "string",
+      "description": "The assigned agent id"
+    },
+    "registration_creds": {
+      "$ref": "./shared-nats-connection-data.json",
+      "description": "Agent registration credentials"
+    },
+    "respond_to": {
+      "type": "string",
+      "description": "The node waiting for response"
+    }
+  },
+  "required": [
+    "assigned_agent_id",
+    "respond_to"
+  ]
+}

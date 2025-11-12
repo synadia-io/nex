@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "shared",
+  "title": "AgentSummaries",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "./shared-agent-summary.json"
+  }
+}

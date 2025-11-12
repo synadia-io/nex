@@ -1,0 +1,5 @@
+# ignore all nk files 
+**/*.nk
+
+# ignore all creds files
+**/*.creds

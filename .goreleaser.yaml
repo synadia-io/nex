@@ -7,7 +7,7 @@ before:
 builds:
   - 
     id: "nex"
-    dir: "./cmd/nex"
+    dir: "./cli"
     main: "."
     binary: "nex"
     goos:
@@ -25,7 +25,7 @@ builds:
 
 archives:
   - id: binaries
-    format: binary
+    formats: binary
     name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     allow_different_binary_count: true
 

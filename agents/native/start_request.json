@@ -1,0 +1,40 @@
+{
+  "$id": "gen",
+  "title": "StartRequest",
+  "type": "object",
+  "properties": {
+    "uri": {
+      "type": "string",
+      "description": "The URI of the workload"
+    },
+    "argv": {
+      "type": "array",
+      "description": "Arguments to be passed to the binary",
+      "items": {
+        "type": "string"
+      }
+    },
+    "environment": {
+      "type": "object",
+      "contentEncoding": "base64",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "The base64-encoded byte array of the encrypted environment with public key of encryptor"
+    },
+    "description": {
+      "type": "string",
+      "description": "A description of the workload"
+    },
+    "expose_ports": {
+      "type": "array",
+      "description": "The port to expose",
+      "items": {
+        "type": "integer"
+      }
+    }
+  },
+  "required": [
+    "uri"
+  ]
+}

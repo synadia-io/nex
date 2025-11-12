@@ -1,0 +1,517 @@
+//go:build !custom
+
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"log/slog"
+	"math/rand"
+	"os"
+	"os/signal"
+	"slices"
+	"time"
+
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/natscli/columns"
+	"github.com/nats-io/nkeys"
+	"github.com/synadia-io/nex"
+	"github.com/synadia-io/nex/agents/native"
+	"github.com/synadia-io/nex/client"
+	"github.com/synadia-io/nex/internal/credentials"
+	eventemitter "github.com/synadia-io/nex/internal/event_emitter"
+	"github.com/synadia-io/nex/internal/state"
+	"github.com/synadia-io/nex/models"
+)
+
+type Node struct {
+	Up       Up       `cmd:"up" help:"Bring a node up"`
+	LameDuck LameDuck `cmd:"lameduck" name:"lameduck" help:"Command a node to enter lame duck mode" aliases:"down"`
+	List     List     `cmd:"list" aliases:"ls" help:"List running nodes"`
+	Info     Info     `cmd:"info" help:"Provide information about a running node"`
+}
+
+type (
+	Up struct {
+		Agents                       AgentConfigs      `name:"agents" help:"Workload types configurations for nex node to initialize"`
+		AgentRestartLimit            int               `name:"agent-restart-limit" help:"Maximum number of times an agent can be restarted before it is stopped permanently" default:"3"`
+		DisableNativeStart           bool              `name:"disable-native-start" help:"Disable native start agent" default:"false"`
+		AllowRemoteAgentRegistration bool              `name:"allow-remote-agent-registration" help:"Allow agents to register with the node after start" default:"false"`
+		ShowWorkloadLogs             bool              `name:"show-workload-logs" help:"Hide logs from workloads" default:"false"`
+		NexusName                    string            `name:"nexus" default:"nexus" help:"Nexus name"`
+		NodeName                     string            `name:"node-name" placeholder:"nex-node" help:"Name of the node; random if not provided"`
+		NodeSeed                     string            `name:"node-seed" help:"Node Seed used for identifier.  Default is generated" placeholder:"NBTAFHAKW..."`
+		NodeXKeySeed                 string            `name:"node-xkey-seed" help:"Node XKey Seed used for encryption.  Default is generated" placeholder:"XAIHERHS..."`
+		ResourceDir                  string            `name:"resource-directory" default:"${defaultResourcePath}"`
+		Tags                         map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
+		State                        string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
+		EventEmitter                 string            `name:"events" help:"Emit events" enum:",nats,logs" default:""`
+		InternalNatsServerConf       string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
+		IssuerSigningKey             string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key" help:"SIGNING KEY | Seed key for signing" placeholder:"SASIGNINGKEY..."`
+		IssuerRootAccountKey         string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key-root-account" help:"SIGNING KEY | Public key for root account" placeholder:"AAMYACCOUNT..."`
+		IssuerNkey                   string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey" help:"NKEY | User Nkey used in credential vendor" placeholder:"UMYNKEY..."`
+		IssuerNkeySeed               string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-nkey-seed" help:"NKEY | User Nkey Seed Used in credential vendor" placeholder:"SUMYNKEYSEED..."`
+	}
+	Info struct {
+		NodeID string `arg:"node-id" required:"" help:"Node ID to query" placeholder:"NBTAFHAKW..."`
+		Full   bool   `name:"full" help:"Show full information about the nodes agents" default:"false"`
+	}
+	LameDuck struct {
+		Delay  time.Duration     `name:"delay" help:"Delay before stopping workloads.  Allows for user to migrate workloads" default:"1m"`
+		Tag    map[string]string `name:"tag" help:"Put all nodes with tag in lameduck.  Only 1 tag allowed" placeholder:"nex.nexus=mynexus"`
+		NodeID string            `name:"node-id" arg:"" help:"Node ID to command into lame duck mode" placeholder:"NBTAFHAKW..."`
+	}
+	List struct {
+		Filter map[string]string `name:"filter" help:"Filter the list of nodes on tags. Node must match all provided tags to be returned" placeholder:"nex.nexus=mynexus"`
+	}
+)
+
+func (u Up) Validate() error {
+	var errs error
+
+	if u.NodeSeed != "" {
+		prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeSeed))
+		if err != nil {
+			errs = errors.Join(errs, err)
+		} else {
+			if prefix != nkeys.PrefixByteServer {
+				errs = errors.Join(errs, errors.New("node seed must be a server seed"))
+			}
+		}
+	}
+
+	if u.IssuerSigningKey != "" && u.IssuerRootAccountKey == "" {
+		errs = errors.Join(errs, errors.New("root-account-key must be provided if signing-key is provided"))
+	}
+
+	if u.IssuerRootAccountKey != "" && u.IssuerSigningKey == "" {
+		errs = errors.Join(errs, errors.New("signing-key must be provided if root-account-key is provided"))
+	}
+
+	if u.IssuerNkey != "" && u.IssuerNkeySeed == "" {
+		errs = errors.Join(errs, errors.New("nkey-seed must be provided if nkey is provided"))
+	}
+
+	if u.IssuerNkeySeed != "" && u.IssuerNkey == "" {
+		errs = errors.Join(errs, errors.New("nkey must be provided if nkey-seed is provided"))
+	}
+
+	if u.NodeXKeySeed != "" {
+		prefix, _, err := nkeys.DecodeSeed([]byte(u.NodeXKeySeed))
+		errs = errors.Join(errs, err)
+		if prefix != nkeys.PrefixByteCurve {
+			errs = errors.Join(errs, errors.New("node xkey seed must be a curve seed"))
+		}
+	}
+
+	if u.InternalNatsServerConf != "" {
+		_, err := server.ProcessConfigFile(u.InternalNatsServerConf)
+		errs = errors.Join(errs, err)
+	}
+
+	return errs
+}
+
+func (u Up) Run(ctx context.Context, globals *Globals) error {
+	var err error
+	var nc *nats.Conn
+
+	if u.InternalNatsServerConf == "" {
+		nc, err = configureNatsConnection(globals)
+		if err != nil {
+			return err
+		}
+	}
+
+	if nc == nil && u.InternalNatsServerConf == "" {
+		return errors.New("no NATS connection available, and no internal NATS server configuration provided")
+	}
+
+	var nodeKeyPair nkeys.KeyPair
+	if u.NodeSeed != "" {
+		nodeKeyPair, err = nkeys.FromSeed([]byte(u.NodeSeed))
+		if err != nil {
+			return err
+		}
+	} else {
+		nodeKeyPair, err = nkeys.CreateServer()
+		if err != nil {
+			return err
+		}
+	}
+
+	var nodeXkeyPair nkeys.KeyPair
+	if u.NodeXKeySeed != "" {
+		nodeXkeyPair, err = nkeys.FromCurveSeed([]byte(u.NodeXKeySeed))
+		if err != nil {
+			return err
+		}
+	} else {
+		nodeXkeyPair, err = nkeys.CreateCurveKeys()
+		if err != nil {
+			return err
+		}
+	}
+
+	nodePub, err := nodeKeyPair.PublicKey()
+	if err != nil {
+		return err
+	}
+
+	if u.NodeName == "" {
+		u.NodeName = fmt.Sprintf("nex-node-%d", rand.Intn(10_000))
+	}
+
+	logger := configureLogger(globals, nc, nodePub, u.ShowWorkloadLogs)
+	if nc == nil && slices.Contains(globals.Target, "nats") {
+		logger.Warn("No NATS connection available, logs will not be sent over NATS")
+	}
+
+	opts := []nex.NexNodeOption{
+		nex.WithContext(ctx),
+		nex.WithNodeName(u.NodeName),
+		nex.WithNexus(u.NexusName),
+		nex.WithNatsConn(nc),
+		nex.WithLogger(logger),
+		nex.WithNodeKeyPair(nodeKeyPair),
+		nex.WithNodeXKeyPair(nodeXkeyPair),
+		nex.WithAgentRestartLimit(u.AgentRestartLimit),
+	}
+
+	if !u.DisableNativeStart {
+		nativeAgent, err := native.NewNativeWorkloadRunner(ctx, u.NexusName, nodePub, logger.WithGroup("native-agent"), nil)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, nex.WithAgentRunner(nativeAgent))
+	}
+
+	if u.AllowRemoteAgentRegistration {
+		opts = append(opts, nex.WithAllowRemoteAgentRegistration())
+	}
+
+	switch u.State {
+	case "kv":
+		kvState, err := state.NewNatsKVState(nc, fmt.Sprintf("nex-%s", nodePub), logger)
+		if err != nil {
+			return err
+		}
+		opts = append(opts, nex.WithState(kvState))
+	}
+
+	if u.InternalNatsServerConf != "" {
+		natsOpts, err := server.ProcessConfigFile(u.InternalNatsServerConf)
+		if err != nil {
+			return err
+		}
+
+		connData := &models.NatsConnectionData{
+			NatsServers:      globals.NatsServers,
+			NatsUserSeed:     globals.NatsUserSeed,
+			NatsUserJwt:      globals.NatsUserJWT,
+			NatsUserName:     globals.NatsUser,
+			NatsUserPassword: globals.NatsUserPassword,
+			NatsUserNkey:     globals.NatsUserNkey,
+			TlsCa:            globals.NatsTLSCA,
+			TlsCert:          globals.NatsTLSCert,
+			TlsFirst:         globals.NatsTLSFirst,
+			TlsKey:           globals.NatsTLSKey,
+		}
+
+		if globals.NatsCredentialsFile != "" {
+			decoratedCreds, err := os.ReadFile(globals.NatsCredentialsFile)
+			if err != nil {
+				return fmt.Errorf("failed to read NATS credentials file: %w", err)
+			}
+
+			connData.NatsUserJwt, err = nkeys.ParseDecoratedJWT(decoratedCreds)
+			if err != nil {
+				return fmt.Errorf("failed to parse NATS credentials file: %w", err)
+			}
+			kp, err := nkeys.ParseDecoratedNKey(decoratedCreds)
+			if err != nil {
+				return fmt.Errorf("failed to parse NATS credentials file: %w", err)
+			}
+			seed, err := kp.Seed()
+			if err != nil {
+				return fmt.Errorf("failed to get seed from NATS credentials file: %w", err)
+			}
+
+			connData.NatsUserSeed = string(seed)
+		}
+
+		opts = append(opts, nex.WithInternalNatsServer(natsOpts, connData))
+	}
+
+	switch {
+	case u.IssuerSigningKey != "" && u.IssuerRootAccountKey != "":
+		minter := &credentials.SigningKeyMinter{
+			NodeId:         nodePub,
+			Nexus:          u.NexusName,
+			NatsServers:    globals.NatsServers,
+			RootAccountKey: u.IssuerRootAccountKey,
+			SigningSeed:    u.IssuerSigningKey,
+		}
+		opts = append(opts, nex.WithMinter(minter))
+	case u.IssuerNkey != "":
+		minter := &credentials.NkeyMinter{
+			NatsServers: globals.NatsServers,
+			NkeyCred:    u.IssuerNkey,
+			NkeySeed:    u.IssuerNkeySeed,
+		}
+		opts = append(opts, nex.WithMinter(minter))
+	default:
+		minter := &credentials.FullAccessMinter{
+			NatsServers: globals.NatsServers,
+		}
+		opts = append(opts, nex.WithMinter(minter))
+	}
+
+	var emitter models.EventEmitter
+	switch u.EventEmitter {
+	case "nats":
+		emitter = eventemitter.NewNatsEmitter(ctx, nc)
+	case "logs":
+		emitter = eventemitter.NewLogEmitter(ctx, logger.WithGroup("event_emitter"), slog.LevelInfo)
+	default:
+		emitter = eventemitter.NoEmit{}
+	}
+	opts = append(opts, nex.WithEventEmitter(emitter))
+
+	for _, agent := range u.Agents {
+		opts = append(opts, nex.WithAgent(models.Agent{
+			Uri:  agent.Uri,
+			Argv: agent.Argv,
+			Env:  agent.Env,
+		}))
+	}
+
+	for k, v := range u.Tags {
+		opts = append(opts, nex.WithTag(k, v))
+	}
+
+	nex, err := nex.NewNexNode(opts...)
+	if err != nil {
+		return err
+	}
+
+	if err := nex.Start(); err != nil {
+		return err
+	}
+
+	for nex.IsReady() {
+		time.Sleep(100 * time.Millisecond)
+		break
+	}
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	go func() {
+		<-quit
+		err := nex.Shutdown()
+		if err != nil {
+			logger.Error("Error shutting down nex", "error", err)
+		}
+	}()
+
+	return nex.WaitForShutdown()
+}
+
+func (i Info) Run(ctx context.Context, globals *Globals) error {
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	if nc == nil {
+		return errors.New("no NATS connection available")
+	}
+
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	infoResponse, err := nexClient.GetNodeInfo(i.NodeID)
+	if err != nil {
+		return err
+	}
+
+	if globals.JSON {
+		infoB, err := json.Marshal(infoResponse)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(infoB))
+		return nil
+	}
+
+	tags := make([]string, 0)
+	for k, v := range infoResponse.Tags {
+		tags = append(tags, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	w := columns.New(fmt.Sprintf("Information about Node %s", infoResponse.NodeId))
+	w.AddRow("Nexus", infoResponse.Tags[models.TagNexus])
+	w.AddRow("Node Name", infoResponse.Tags[models.TagNodeName])
+	w.AddRow("Tags", tags)
+	w.AddRow("XKey", infoResponse.Xkey)
+	w.AddRow("Uptime", infoResponse.Uptime)
+	w.AddRow("Version", infoResponse.Version)
+	details, err := w.Render()
+	if err != nil {
+		return err
+	}
+
+	if len(infoResponse.NodeAgentSummaries) > 0 {
+		tW := table.NewWriter()
+		tW.SetStyle(table.StyleRounded)
+		tW.Style().Title.Align = text.AlignCenter
+		tW.Style().Format.Header = text.FormatDefault
+		tW.SetTitle("Running Agents")
+
+		if !i.Full {
+			tW.AppendHeader(table.Row{"", "Name", "Workload Type", "Running Workloads"})
+			for _, aInfo := range infoResponse.NodeAgentSummaries {
+				tW.AppendRow(table.Row{aInfo.AgentHealthStoplight, fmt.Sprintf("%s [%s]", aInfo.AgentSummary.Name, aInfo.AgentSummary.Version), aInfo.AgentSummary.Type, aInfo.AgentSummary.WorkloadCount})
+			}
+		} else {
+			tW.AppendHeader(table.Row{"Health", "Id", "Name", "Workload Type", "Start Time", "State", "Supported Lifecycles", "Running Workloads", "Last Heartbeat"})
+			for _, aInfo := range infoResponse.NodeAgentSummaries {
+				tW.AppendRow(table.Row{fmt.Sprintf("%s [%s]", aInfo.AgentHealthStoplight, aInfo.AgentHealth), aInfo.AgentId, fmt.Sprintf("%s [%s]", aInfo.AgentSummary.Name, aInfo.AgentSummary.Version), aInfo.AgentSummary.Type, aInfo.AgentSummary.StartTime, aInfo.AgentSummary.State, aInfo.AgentSummary.SupportedLifecycles, aInfo.AgentSummary.WorkloadCount, aInfo.AgentLastHeartbeatTime.Format(time.RFC3339)})
+			}
+		}
+
+		tW.SortBy([]table.SortBy{
+			{Name: "Name", Mode: table.Asc},
+		})
+
+		fmt.Println(details)
+		fmt.Println(tW.Render())
+	} else {
+		fmt.Println(details)
+		fmt.Println("No agents running")
+	}
+	return nil
+}
+
+func (l LameDuck) Run(ctx context.Context, globals *Globals) error {
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	if nc == nil {
+		return errors.New("no NATS connection available")
+	}
+
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	ldr, err := nexClient.SetLameduck(l.NodeID, l.Delay, l.Tag)
+	if err != nil {
+		return err
+	}
+
+	if globals.JSON {
+		respB, err := json.Marshal(ldr)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(respB))
+		return nil
+	}
+
+	if ldr.Success {
+		fmt.Println("Node successfully commanded into lame duck mode. Workloads will being shutting down at", time.Now().Add(l.Delay).Format(time.RFC3339))
+		return nil
+	}
+
+	fmt.Println("Node failed to enter lame duck mode")
+	return nil
+}
+
+func (l List) Run(ctx context.Context, globals *Globals) error {
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	if nc == nil {
+		return errors.New("no NATS connection available")
+	}
+
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+	resp, err := nexClient.ListNodes(l.Filter)
+	if err != nil {
+		return err
+	}
+
+	if globals.JSON {
+		respB, err := json.Marshal(resp)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(respB))
+		return nil
+	}
+
+	if len(resp) > 0 {
+		tW := table.NewWriter()
+
+		tW.SetTitle("Nex Nodes")
+		tW.SetStyle(table.StyleRounded)
+		tW.Style().Title.Align = text.AlignCenter
+		tW.Style().Format.Header = text.FormatDefault
+
+		tW.AppendHeader(table.Row{"Nexus", "ID (* = Lameduck Mode)", "Name", "Version", "Uptime", "State", "Running Agents"})
+		for _, nInfo := range resp {
+			nexus, ok := nInfo.Tags[models.TagNexus]
+			if !ok {
+				nexus = "[unknown]"
+			}
+			name, ok := nInfo.Tags[models.TagNodeName]
+			if !ok {
+				name = "[unknown]"
+			}
+
+			id := nInfo.NodeId
+			ld, ok := nInfo.Tags[models.TagLameDuck]
+			if ok && ld == "true" {
+				id = id + "*"
+			}
+
+			tW.AppendRow(table.Row{nexus, id, name, nInfo.Version, nInfo.Uptime, nInfo.State, nInfo.AgentCount})
+		}
+
+		tW.SortBy([]table.SortBy{
+			{Name: "Nexus", Mode: table.Asc},
+			{Name: "Name", Mode: table.Asc},
+		})
+
+		fmt.Println(tW.Render())
+		return nil
+	}
+	fmt.Println("No nodes found")
+	return nil
+}

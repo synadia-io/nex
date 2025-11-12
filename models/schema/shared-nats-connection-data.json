@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "shared",
+  "title": "NatsConnectionData",
+  "type": "object",
+  "properties": {
+    "conn_name": {
+      "type": "string"
+    },
+    "nats_servers": {
+      "type": "array",
+      "description": "List of NATS Server URLs",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tls_cert": {
+      "type": "string"
+    },
+    "tls_key": {
+      "type": "string"
+    },
+    "tls_ca": {
+      "type": "string"
+    },
+    "tls_first": {
+      "type": "boolean"
+    },
+    "nats_user_seed": {
+      "description": "Seed for nats user, used with JWT",
+      "type": "string"
+    },
+    "nats_user_jwt": {
+      "description": "JWT for nats user, used with Seed",
+      "type": "string"
+    },
+    "nats_user_nkey": {
+      "type": "string"
+    },
+    "nats_user_name": {
+      "description": "Name of the nats user, used with password",
+      "type": "string"
+    },
+    "nats_user_password": {
+      "description": "Password for the nats user, used with user name",
+      "type": "string"
+    }
+  },
+  "required": [
+    "conn_name",
+    "nats_servers",
+    "tls_cert",
+    "tls_key",
+    "tls_ca",
+    "tls_first",
+    "nats_user_seed",
+    "nats_user_jwt",
+    "nats_user_nkey",
+    "nats_user_name",
+    "nats_user_password"
+  ]
+}

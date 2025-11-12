@@ -1,0 +1,3 @@
+# disable diffs on go.mod and go.sum so GitHub won't render the text changes
+go.mod    -diff
+go.sum    -diff
