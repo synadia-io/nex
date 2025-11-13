@@ -8,8 +8,6 @@ on:
 
 env:
   GO_VER: '1.24.*'
-  GOPRIVATE: github.com/synadia-io/nexlet.go
-  GH_ACCESS_TOKEN: ${{ secrets.GH_ACCESS_TOKEN }}
 
 jobs:
   goreleaser:
@@ -27,9 +25,7 @@ jobs:
           go-version: ${{ env.GO_VER }}
           cache: false
 
-      - 
-        name: Private Module Setup
-        run: git config --global url.https://$GH_ACCESS_TOKEN@github.com/.insteadOf https://github.com/ 
+      
 
       - 
         name: Run GoReleaser
