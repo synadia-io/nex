@@ -58,4 +58,4 @@ Nex is the NATS Execution Engine—a lightweight way to run distributed workload
    nex -s nats://127.0.0.1:4222 workload ls
    ```
 
-For deeper guides, concepts, and nexlet development, visit our docs site at [docs.synadia.com/oss/nex](https://docs.synadia.com/oss/nex).
+For deeper guides, concepts, and nexlet development, read our [docs](./docs/nex).
