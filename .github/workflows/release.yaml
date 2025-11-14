@@ -25,8 +25,6 @@ jobs:
           go-version: ${{ env.GO_VER }}
           cache: false
 
-      
-
       - 
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -36,22 +34,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - 
-        name: Get short SHA
-        id: get_sha
-        run: echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - 
-        name: Dispatch `release` event
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.REPOSITORY_DISPATCH_PAT }}
-          repository: ${{ vars.NEX_INTERNAL_REPO }} 
-          event-type: release-created
-          client-payload: |
-            {
-              "short_sha":   "${{ steps.get_sha.outputs.short_sha }}",
-              "tag":      "${{ github.ref_name }}",
-              "release_url": "https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
-            }
