@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -501,7 +502,7 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 				id = id + "*"
 			}
 
-			tW.AppendRow(table.Row{nexus, id, name, nInfo.Version, nInfo.Uptime, nInfo.State, nInfo.AgentCount})
+			tW.AppendRow(table.Row{nexus, id, name, nInfo.Version, friendlyDuration(time.Since(nInfo.StartTime)), nInfo.State, nInfo.AgentCount})
 		}
 
 		tW.SortBy([]table.SortBy{
@@ -514,4 +515,28 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 	}
 	fmt.Println("No nodes found")
 	return nil
+}
+
+func friendlyDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	hours := d / time.Hour
+	d -= hours * time.Hour
+	minutes := d / time.Minute
+	d -= minutes * time.Minute
+	seconds := d / time.Second
+
+	var parts []string
+	if hours > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", hours))
+	}
+	if minutes > 0 {
+		parts = append(parts, fmt.Sprintf("%dm", minutes))
+	}
+	if seconds > 0 {
+		parts = append(parts, fmt.Sprintf("%ds", seconds))
+	}
+	if len(parts) == 0 {
+		return "0s"
+	}
+	return strings.Join(parts, " ")
 }

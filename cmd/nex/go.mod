@@ -1,4 +1,4 @@
-module github.com/synadia-io/nex/cli
+module github.com/synadia-io/nex/cmd/nex
 
 go 1.24.1
 
