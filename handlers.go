@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"disorder.dev/shandler"
-	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-io/nex/internal"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/orbit.go/natsext"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
@@ -52,7 +52,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 			AgentCount: n.registeredAgents.Count(),
 			NodeId:     pubKey,
 			Tags:       n.tags,
-			Uptime:     time.Since(n.startTime).String(),
+			StartTime:  n.startTime,
 			Version:    n.version,
 			Xkey:       pubXKey,
 			State:      n.nodeState,

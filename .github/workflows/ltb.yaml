@@ -66,7 +66,7 @@ jobs:
         go test -v  -race ./...
     - 
       name: Run test suite | CLI
-      working-directory: ./cli
+      working-directory: ./cmd/nex
       run: |
         go test -v -race ./...
     - 
