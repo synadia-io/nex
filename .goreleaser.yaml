@@ -7,7 +7,7 @@ before:
 builds:
   - 
     id: "nex"
-    dir: "./cli"
+    dir: "./cmd/nex"
     main: "."
     binary: "nex"
     goos:
