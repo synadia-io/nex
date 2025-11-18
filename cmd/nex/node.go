@@ -517,7 +517,7 @@ func (l List) Run(ctx context.Context, globals *Globals) error {
 	return nil
 }
 
-func PrettyDuration(d time.Duration) string {
+func friendlyDuration(d time.Duration) string {
 	d = d.Round(time.Second)
 
 	days := d / (24 * time.Hour)
