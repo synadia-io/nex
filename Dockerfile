@@ -15,7 +15,7 @@ COPY client/ ./client
 RUN go mod download
 
 COPY . .
-WORKDIR /app/cli
+WORKDIR /app/cmd/nex
 RUN go build -o /nex
 
 FROM scratch
