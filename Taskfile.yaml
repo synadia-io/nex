@@ -79,7 +79,7 @@ tasks:
       - go test -v -cover -race ./...
   
   test:cli:
-    dir: cli
+    dir: cmd/nex
     cmds:
       - go test -v -cover -race ./...
   

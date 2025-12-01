@@ -12,9 +12,10 @@
       "type": "string",
       "description": "The version of the node"
     },
-    "uptime": {
+    "start_time": {
       "type": "string",
-      "description": "The uptime of the node"
+      "format": "date-time",
+      "description": "The start time of the node"
     },
     "xkey": {
       "type": "string",
@@ -36,7 +37,7 @@
   "required": [
     "node_id",
     "version",
-    "uptime",
+    "start_time",
     "xkey",
     "tags",
     "agent_count",

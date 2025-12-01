@@ -4,6 +4,7 @@ package models
 
 import "encoding/json"
 import "fmt"
+import "time"
 
 type AuctionRequest struct {
 	// The type of agent to use for the auction
@@ -202,14 +203,14 @@ type NodePingResponse struct {
 	// The unique identifier of the node
 	NodeId string `json:"node_id"`
 
+	// The start time of the node
+	StartTime time.Time `json:"start_time"`
+
 	// The state of the node
 	State NodeState `json:"state"`
 
 	// Placement tags associated with node
 	Tags NodeTags `json:"tags"`
-
-	// The uptime of the node
-	Uptime string `json:"uptime"`
 
 	// The version of the node
 	Version string `json:"version"`
@@ -230,14 +231,14 @@ func (j *NodePingResponse) UnmarshalJSON(value []byte) error {
 	if _, ok := raw["node_id"]; raw != nil && !ok {
 		return fmt.Errorf("field node_id in NodePingResponse: required")
 	}
+	if _, ok := raw["start_time"]; raw != nil && !ok {
+		return fmt.Errorf("field start_time in NodePingResponse: required")
+	}
 	if _, ok := raw["state"]; raw != nil && !ok {
 		return fmt.Errorf("field state in NodePingResponse: required")
 	}
 	if _, ok := raw["tags"]; raw != nil && !ok {
 		return fmt.Errorf("field tags in NodePingResponse: required")
-	}
-	if _, ok := raw["uptime"]; raw != nil && !ok {
-		return fmt.Errorf("field uptime in NodePingResponse: required")
 	}
 	if _, ok := raw["version"]; raw != nil && !ok {
 		return fmt.Errorf("field version in NodePingResponse: required")
