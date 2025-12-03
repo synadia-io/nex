@@ -19,8 +19,6 @@ type (
 )
 
 const (
-	DirectStartActorName = "direct-start"
-
 	RunRequestKVBucket = "run_request"
 
 	AgentStateStarting AgentState = "starting"
