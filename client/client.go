@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -77,9 +78,9 @@ func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
 	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, n.defaultTimeout)
 	if err != nil && !errors.Is(err, nats.ErrNoResponders) && !errors.Is(err, nats.ErrTimeout) {
 		return nil, err
-	}
-
-	if err != nil || len(resp.Data) == 0 {
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to request node info: %w", err)
+	} else if len(resp.Data) == 0 {
 		return nil, errors.New("node not found")
 	}
 
