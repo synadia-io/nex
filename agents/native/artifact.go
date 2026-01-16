@@ -69,7 +69,7 @@ func cacheFile(uri *uri) (*ArtifactReference, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer fOrig.Close()
+	defer func() { _ = fOrig.Close() }()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, fOrig); err != nil {
@@ -113,7 +113,7 @@ func cacheObjectStoreArtifact(uri *uri, nc *nats.Conn) (*ArtifactReference, erro
 	if err != nil {
 		return nil, err
 	}
-	defer fCache.Close()
+	defer func() { _ = fCache.Close() }()
 
 	_, err = fCache.Write(bin_b)
 	if err != nil {

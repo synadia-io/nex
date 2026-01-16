@@ -72,11 +72,12 @@ func BenchmarkClientAuction(b *testing.B) {
 			ctx := b.Context()
 
 			nexNodes := _test.StartNexus(b, ctx, server.ClientURL(), tc.clusterSize, false)
-			defer func() {
+			defer func(b *testing.B) {
 				for _, nn := range nexNodes {
-					nn.Shutdown()
+					shutdownErr := nn.Shutdown()
+					b.Logf("failed to shutdown nex node: %s", shutdownErr)
 				}
-			}()
+			}(b)
 			nc.Close()
 
 			// open a new fresh connection for the nex client

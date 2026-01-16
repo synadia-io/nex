@@ -29,7 +29,7 @@ func createTestBinary(t testing.TB, tmpDir string) (string, string, int) {
 	if err != nil {
 		t.Errorf("Failed to write to Go file: %v", err)
 	}
-	f.Close()
+	be.NilErr(t, f.Close())
 
 	// Command to compile the Go code into a binary
 	// go build -trimpath -ldflags="-buildid= -X 'main.buildTime=static_time'"
@@ -116,7 +116,7 @@ func TestArtifactNats(t *testing.T) {
 	be.Equal(t, binHash, ref.Digest)
 	be.Equal(t, binLen, ref.Size)
 
-	os.RemoveAll(tDir)
+	be.NilErr(t, os.RemoveAll(tDir))
 }
 
 func TestArtifactFile(t *testing.T) {
@@ -139,7 +139,7 @@ func TestArtifactFile(t *testing.T) {
 	be.Equal(t, binHash, ref.Digest)
 	be.Equal(t, binLen, ref.Size)
 
-	os.RemoveAll(workingDir)
+	be.NilErr(t, os.RemoveAll(workingDir))
 }
 
 const testProg string = `package main
