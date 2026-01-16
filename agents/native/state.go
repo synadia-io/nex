@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nex/sdk/go/agent"
 	"github.com/synadia-io/nex/internal"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
 )
 
 type nexletState struct {
@@ -300,7 +300,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 		w.SetState(models.WorkloadStateStopping)
 		n.Unlock()
 
-		err := stopProcess(w.Process)
+		err := internal.StopProcess(w.Process)
 		// this will hit if the process is already stopped
 		if errors.Is(err, os.ErrProcessDone) {
 			n.logger.Debug("process already exited", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
