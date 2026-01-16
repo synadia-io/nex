@@ -4,12 +4,6 @@ go 1.24.1
 
 replace github.com/synadia-io/nex => ../../
 
-replace github.com/synadia-io/nex/agents => ../../agents
-
-replace github.com/synadia-io/nex/client => ../../client
-
-replace github.com/synadia-io/nex/sdk/go => ../../sdk/go
-
 require (
 	disorder.dev/shandler v0.0.0-20250411134702-523d18ddef40
 	github.com/alecthomas/kong v1.12.1
@@ -22,9 +16,7 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.11.1
-	github.com/synadia-io/nex v0.0.0-20250829204512-92b0e08d0aad
-	github.com/synadia-io/nex/agents v0.0.0-20250829204512-92b0e08d0aad
-	github.com/synadia-io/nex/client v0.0.0-20250829204512-92b0e08d0aad
+	github.com/synadia-io/nex v0.0.0-20251215181507-b7b76c894989
 )
 
 require (
@@ -56,7 +48,6 @@ require (
 	github.com/prometheus/common v0.67.1 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/synadia-io/nex/sdk/go v0.0.0-unpublished // indirect
 	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
