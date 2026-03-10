@@ -17,6 +17,16 @@ var (
 	EventAPIPrefix   = func(ns string) string { return fmt.Sprintf("$NEX.FEED.%s.events", ns) }
 )
 
+// $NEX.SVC.namespace.control.PTAGS
+func PingPTagRequestSubject(inNamespace string) string {
+	return fmt.Sprintf("%s.PTAGS", ControlAPIPrefix(inNamespace))
+}
+
+// $NEX.SVC.system.control.PTAGS
+func PingPTagSubscribeSubject() string {
+	return fmt.Sprintf("%s.PTAGS", ControlAPIPrefix(NodeSystemNamespace))
+}
+
 // $NEX.SVC.namespace.control.PING
 func PingRequestSubject(inNamespace string) string {
 	return fmt.Sprintf("%s.PING", ControlAPIPrefix(inNamespace))

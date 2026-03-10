@@ -11,8 +11,8 @@ import (
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
-	"github.com/synadia-io/orbit.go/natsext"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/orbit.go/natsext"
 )
 
 const (
@@ -65,6 +65,36 @@ func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...Cli
 	client.cancel = cancel
 
 	return client, nil
+}
+
+func (n *nexClient) GetNexusPTags() (map[string]string, error) {
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingPTagRequestSubject(n.namespace), []byte{}, natsext.RequestManyStall(n.requestManyStall))
+	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var errs error
+	resp := make(map[string]string)
+	msgs(func(m *nats.Msg, err error) bool {
+		if err == nil && m.Data != nil && string(m.Data) != "null" {
+			t := map[string]string{}
+			err = json.Unmarshal(m.Data, &t)
+			if err == nil {
+				for k, v := range t {
+					if _, ok := resp[k]; !ok {
+						resp[k] = v
+					}
+				}
+			}
+		}
+		errs = errors.Join(errs, err)
+		return true
+	})
+
+	return resp, nil
 }
 
 func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error) {

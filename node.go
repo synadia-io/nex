@@ -243,6 +243,7 @@ func (n *NexNode) Start() error {
 
 	var errs error
 	// System only endpoints
+	errs = errors.Join(errs, n.service.AddEndpoint("PingPlacementTags", micro.HandlerFunc(n.handlePlacementTagPing()), micro.WithEndpointSubject(models.PingPTagSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
 	errs = errors.Join(errs, n.service.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
 	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
 	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
