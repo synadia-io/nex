@@ -36,7 +36,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 		rep := new(models.NodePingRequest)
 		err := json.Unmarshal(r.Data(), rep)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal ping request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal ping request")
 			return
 		}
 
@@ -48,13 +48,13 @@ func (n *NexNode) handlePing() func(micro.Request) {
 
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
 		pubXKey, err := n.nodeXKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public xkey from xkeypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public xkey from xkeypair")
 			return
 		}
 
@@ -79,13 +79,13 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 		req := new(models.LameduckRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal lameduck request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal lameduck request")
 			return
 		}
 
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
@@ -100,7 +100,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 
 		delay, err := time.ParseDuration(req.Delay)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to parse lameduck delay")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to parse lameduck delay")
 			return
 		}
 
@@ -111,7 +111,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 
 		ldReqB, err := json.Marshal(ldReq)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to marshal lameduck request")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to marshal lameduck request")
 			return
 		}
 
@@ -171,13 +171,13 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 	return func(r micro.Request) {
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
 		pubXKey, err := n.nodeXKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public xkey from xkeypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public xkey from xkeypair")
 			return
 		}
 
@@ -205,7 +205,7 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 		req := new(models.AuctionRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal auction request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal auction request")
 			return
 		}
 
@@ -225,9 +225,12 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 		}
 
 		if n.auctioneer != nil {
-			err = n.auctioneer.Auction(namespace, req.AgentType, req.Tags)
-			if err != nil {
-				n.logger.Error("auctioneer failed to pass auction", slog.String("err", err.Error()))
+			instaFail, err := n.auctioneer.Auction(namespace, req.AgentType, req.Tags)
+			if instaFail && err != nil {
+				n.handlerError(r, err, models.ErrCodeBadRequest, "failed to auction")
+				return
+			} else if !instaFail && err != nil {
+				n.logger.Info("auctioneer failed to pass auction", slog.String("err", err.Error()))
 				return
 			}
 		}
@@ -263,43 +266,43 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 		req := new(models.StartWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal auction deploy workload request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal auction deploy workload request")
 			return
 		}
 
 		if namespace != req.Namespace && namespace != models.SystemNamespace {
-			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
+			n.handlerError(r, errors.New("namespace mismatch"), models.ErrCodeForbidden, fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
 
 		reg, err := n.registeredAgents.GetByRegisterType(req.WorkloadType)
 		if err != nil {
-			n.handlerError(r, errors.New("workload type not found"), "100", "workload type not found")
+			n.handlerError(r, errors.New("workload type not found"), models.ErrCodeNotFound, "workload type not found")
 			return
 		}
 
 		rr, err := jsonschema.UnmarshalJSON(strings.NewReader(req.RunRequest))
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal start request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal start request")
 			return
 		}
 
 		err = reg.Schema.Validate(rr)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to validate run request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to validate run request")
 			return
 		}
 
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
 		workloadID := n.idgen.Generate(req)
 		wlNatsConn, err := n.minter.Mint(models.WorkloadCred, namespace, workloadID)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to mint workload nats connection")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to mint workload nats connection")
 			return
 		}
 
@@ -309,13 +312,13 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 
 		aReqB, err := json.Marshal(aReq)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to marshal agent start workload request")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to marshal agent start workload request")
 			return
 		}
 
 		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, time.Minute)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to publish start workload request")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to publish start workload request")
 			return
 		}
 
@@ -342,18 +345,18 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 		req := new(models.StopWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal stop workload request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal stop workload request")
 			return
 		}
 
 		if namespace != req.Namespace && namespace != models.SystemNamespace {
-			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
+			n.handlerError(r, errors.New("namespace mismatch"), models.ErrCodeForbidden, fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
 
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
@@ -410,18 +413,18 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 		req := new(models.CloneWorkloadRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal clone workload request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal clone workload request")
 			return
 		}
 
 		if namespace != req.Namespace && namespace != models.SystemNamespace {
-			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
+			n.handlerError(r, errors.New("namespace mismatch"), models.ErrCodeForbidden, fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
 
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
@@ -452,33 +455,25 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 		req := new(models.AgentListWorkloadsRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal ping request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal ping request")
 			return
 		}
 
 		if namespace != req.Namespace && namespace != models.SystemNamespace {
-			n.handlerError(r, errors.New("namespace mismatch"), "100", fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
+			n.handlerError(r, errors.New("namespace mismatch"), models.ErrCodeForbidden, fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
 			return
 		}
 
 		pubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
 		resp := models.AgentListWorkloadsResponse{}
 		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIQueryWorkloadsSubject(pubKey), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 		if err != nil {
-			respB, err := json.Marshal(resp)
-			if err != nil {
-				n.handlerError(r, err, "100", "failed to marshal response")
-				return
-			}
-			err = r.Error("100", "failed to publish query workloads request", respB)
-			if err != nil {
-				n.logger.Error("failed to send micro request error message", slog.String("err", err.Error()))
-			}
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to publish query workloads request")
 			return
 		}
 
@@ -497,7 +492,7 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 
 		respB, err := json.Marshal(resp)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to marshal response")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to marshal response")
 			return
 		}
 
@@ -518,24 +513,24 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 		registrationRequest := new(models.RegisterAgentRequest)
 		err := json.Unmarshal(r.Data(), registrationRequest)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal register local agent request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal register local agent request")
 			return
 		}
 
 		if registrationRequest.RegisterType == "" {
-			n.handlerError(r, errors.New("register_type is required"), "100", "register_type is required")
+			n.handlerError(r, errors.New("register_type is required"), models.ErrCodeBadRequest, "register_type is required")
 			return
 		}
 
 		err = n.aregistrar.RegisterAgent(r.Headers(), registrationRequest)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed agent registrar check")
+			n.handlerError(r, err, models.ErrCodeForbidden, "failed agent registrar check")
 			return
 		}
 
 		rawSchema, err := jsonschema.UnmarshalJSON(strings.NewReader(registrationRequest.StartRequestSchema))
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal start request schema")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal start request schema")
 			return
 		}
 
@@ -546,19 +541,19 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 
 		c := jsonschema.NewCompiler()
 		if err := c.AddResource(fileLocation, rawSchema); err != nil {
-			n.handlerError(r, err, "100", "failed to add resource")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to add resource")
 			return
 		}
 
 		schema, err := c.Compile(fileLocation)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to compile schema")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to compile schema")
 			return
 		}
 
 		nodePubKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
@@ -570,13 +565,13 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 
 		err = n.registeredAgents.Add(p)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to update registration")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to update registration")
 			return
 		}
 
 		natsConn, err := n.minter.Mint(models.AgentCred, "", agentID)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to mint nats connection")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to mint nats connection")
 			return
 		}
 
@@ -618,26 +613,26 @@ func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 		req := new(models.RegisterRemoteAgentRequest)
 		err := json.Unmarshal(r.Data(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to unmarshal register remote agent request")
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal register remote agent request")
 			return
 		}
 
 		err = n.aregistrar.RegisterRemoteInit(r.Headers(), req)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed agent registrar check")
+			n.handlerError(r, err, models.ErrCodeForbidden, "failed agent registrar check")
 			return
 		}
 
 		agentID := n.idgen.Generate(nil)
 		pubNodeKey, err := n.nodeKeypair.PublicKey()
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to get public key from keypair")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
 			return
 		}
 
 		connData, err := n.minter.MintRegister(agentID, pubNodeKey)
 		if err != nil {
-			n.handlerError(r, err, "100", "failed to mint register")
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to mint register")
 			return
 		}
 
@@ -659,7 +654,7 @@ func (n *NexNode) handleGetAgentIDByName() func(micro.Request) {
 	return func(r micro.Request) {
 		agentName := string(r.Data())
 		if agentName == "" {
-			n.handlerError(r, errors.New("agent name is required"), "100", "agent name is required")
+			n.handlerError(r, errors.New("agent name is required"), models.ErrCodeBadRequest, "agent name is required")
 			return
 		}
 
@@ -674,25 +669,35 @@ func (n *NexNode) handleGetAgentIDByName() func(micro.Request) {
 }
 
 func (n *NexNode) handlerError(r micro.Request, err error, code, msg string) {
+	errorID := n.loggerID.Next()
+
 	if msg != "" {
-		n.logger.Error(msg, slog.String("err", err.Error()))
+		n.logger.Error(msg, slog.String("err", err.Error()), slog.String("error_id", errorID))
+	}
+
+	// For 5xx errors, return a generic message to avoid leaking internal details.
+	// The full error is logged above with the error_id for correlation.
+	clientError := err.Error()
+	if strings.HasPrefix(code, "5") {
+		clientError = "internal server error"
 	}
 
 	errMsg := struct {
-		Error string `json:"error"`
+		ErrorID string `json:"error_id"`
+		Error   string `json:"error"`
 	}{
-		Error: err.Error(),
+		ErrorID: errorID,
+		Error:   clientError,
 	}
 
-	errMsgB, err := json.Marshal(errMsg)
-	if err != nil {
-		n.logger.Error("failed to marshal error message", slog.String("err", err.Error()))
+	errMsgB, marshalErr := json.Marshal(errMsg)
+	if marshalErr != nil {
+		n.logger.Error("failed to marshal error message", slog.String("err", marshalErr.Error()), slog.String("error_id", errorID))
 		errMsgB = []byte(`{}`)
 	}
 
-	// TODO: look into how to preserve original error as output by the logger
-	err = r.Error(code, msg, errMsgB)
-	if err != nil {
-		n.logger.Error("failed to send micro request error message", slog.String("err", err.Error()))
+	sendErr := r.Error(code, msg, errMsgB)
+	if sendErr != nil {
+		n.logger.Error("failed to send micro request error message", slog.String("err", sendErr.Error()), slog.String("error_id", errorID))
 	}
 }
