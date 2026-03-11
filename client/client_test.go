@@ -388,6 +388,78 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 	}
 }
 
+func TestNexClient_GetNexusPTags(t *testing.T) {
+	nodeSize := []struct {
+		name string
+		size int
+	}{
+		{"OneNodeNexus", 1},
+		{"ThreeNodeNexus", 3},
+		{"FiveNodeNexus", 5},
+	}
+
+	for _, tt := range nodeSize {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			workDir := t.TempDir()
+			server := _test.StartNatsServer(t, workDir)
+			defer func() {
+				for server.NumClients() == 0 {
+					server.Shutdown()
+					return
+				}
+			}()
+
+			nc, err := nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+
+			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), tt.size, false)
+			be.Equal(t, tt.size, len(nexNodes))
+
+			nc, err = nats.Connect(server.ClientURL())
+			be.NilErr(t, err)
+			defer nc.Close()
+
+			client, err := NewClient(context.Background(), nc, models.SystemNamespace)
+			be.NilErr(t, err)
+			be.Nonzero(t, client)
+
+			tags, err := client.GetNexusPTags()
+			be.NilErr(t, err)
+			be.Equal(t, "bar", tags["foo"])
+
+			for _, node := range nexNodes {
+				be.NilErr(t, node.Shutdown())
+			}
+		})
+	}
+}
+
+func TestNexClient_GetNexusPTags_NoNodes(t *testing.T) {
+	server := _test.StartNatsServer(t, t.TempDir())
+	defer func() {
+		for server.NumClients() == 0 {
+			server.Shutdown()
+		}
+	}()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	client, err := NewClient(context.Background(), nc, models.SystemNamespace)
+	be.NilErr(t, err)
+	be.Nonzero(t, client)
+
+	tags, err := client.GetNexusPTags()
+	be.NilErr(t, err)
+	be.Equal(t, 0, len(tags))
+}
+
 func TestNexClient_StopWorkloadDNE(t *testing.T) {
 	nodeSize := []struct {
 		name string

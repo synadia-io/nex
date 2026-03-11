@@ -7,7 +7,7 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
 
 env:
-  GO_VER: '1.24.*'
+  GO_VER: '1.25.*'
 
 jobs:
   goreleaser:

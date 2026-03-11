@@ -21,6 +21,16 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
+func (n *NexNode) handlePlacementTagPing() func(micro.Request) {
+	return func(r micro.Request) {
+		err := r.RespondJSON(n.tags)
+		if err != nil {
+			n.logger.Error("failed to respond to placement tag ping request", slog.String("err", err.Error()))
+			return
+		}
+	}
+}
+
 func (n *NexNode) handlePing() func(micro.Request) {
 	return func(r micro.Request) {
 		rep := new(models.NodePingRequest)

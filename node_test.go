@@ -17,12 +17,12 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
 	"github.com/nats-io/nuid"
-	sdk "github.com/synadia-io/nex/sdk/go/agent"
 	tminter "github.com/synadia-io/nex/_test/minter"
 	inmem "github.com/synadia-io/nex/_test/nexlet_inmem"
 	"github.com/synadia-io/nex/internal"
 	"github.com/synadia-io/nex/internal/state"
 	"github.com/synadia-io/nex/models"
+	sdk "github.com/synadia-io/nex/sdk/go/agent"
 )
 
 func startNatsServer(t testing.TB) *server.Server {
@@ -149,7 +149,7 @@ func TestNodeStartStop(t *testing.T) {
 	}
 
 	be.Equal(t, 1, nn.registeredAgents.Count())
-	be.Equal(t, 21, nc.NumSubscriptions())
+	be.Equal(t, 22, nc.NumSubscriptions())
 	be.Equal(t, models.NodeStateRunning, nn.nodeState)
 
 	cancel()
