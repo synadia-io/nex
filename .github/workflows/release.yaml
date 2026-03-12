@@ -13,10 +13,14 @@ jobs:
   goreleaser:
     name: Run GoReleaser
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - 
+      -
         name: Check out code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - 
         name: Set up Go
