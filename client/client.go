@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"math/rand"
+	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -26,6 +28,7 @@ type nexClient struct {
 	cancel    context.CancelFunc
 	nc        *nats.Conn
 	namespace string
+	errorID   *nuid.NUID
 
 	// timeout configurations
 	defaultTimeout          time.Duration
@@ -43,6 +46,7 @@ func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...Cli
 	client := &nexClient{
 		nc:        nc,
 		namespace: namespace,
+		errorID:   nuid.New(),
 		// Set default timeout values
 		defaultTimeout:          defaultTimeout,
 		startWorkloadTimeout:    time.Minute,
@@ -101,22 +105,26 @@ func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
 	req := &models.NodeInfoRequest{}
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal node info request")
 	}
 
 	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, n.defaultTimeout)
 	if err != nil && !errors.Is(err, nats.ErrNoResponders) && !errors.Is(err, nats.ErrTimeout) {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to request node info")
 	}
 
 	if err != nil || len(resp.Data) == 0 {
-		return nil, errors.New("node not found")
+		return nil, n.nexNotFoundError(errors.New("node not found"), "node not found")
+	}
+
+	if nexErr := nexErrorFromMsg(resp); nexErr != nil {
+		return nil, nexErr
 	}
 
 	infoResponse := new(models.NodeInfoResponse)
 	err = json.Unmarshal(resp.Data, infoResponse)
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to unmarshal node info response")
 	}
 
 	return infoResponse, nil
@@ -130,21 +138,25 @@ func (n *nexClient) SetLameduck(nodeId string, delay time.Duration, tag map[stri
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal lameduck request")
 	}
 
 	respMsg, err := n.nc.Request(models.LameduckRequestSubject(n.namespace, nodeId), reqB, n.defaultTimeout)
 	if err != nil && !errors.Is(err, nats.ErrNoResponders) {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to request lameduck")
 	}
 	if errors.Is(err, nats.ErrNoResponders) {
 		return &models.LameduckResponse{Success: false}, nil
 	}
 
+	if nexErr := nexErrorFromMsg(respMsg); nexErr != nil {
+		return nil, nexErr
+	}
+
 	resp := new(models.LameduckResponse)
 	err = json.Unmarshal(respMsg.Data, resp)
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to unmarshal lameduck response")
 	}
 
 	return resp, nil
@@ -157,7 +169,7 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal list nodes request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
@@ -165,13 +177,16 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 		return []*models.NodePingResponse{}, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to request list nodes")
 	}
 
 	var errs error
 	resp := []*models.NodePingResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil && m.Data != nil && string(m.Data) != "null" {
+			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+				return true
+			}
 			t := new(models.NodePingResponse)
 			err = json.Unmarshal(m.Data, t)
 			if err == nil {
@@ -194,7 +209,7 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 
 	auctionRequestB, err := json.Marshal(auctionRequest)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal auction request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(n.auctionRequestManyStall))
@@ -202,13 +217,16 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 		return []*models.AuctionResponse{}, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to request auction")
 	}
 
 	var errs error
 	resp := []*models.AuctionResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil {
+			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+				return true
+			}
 			t := new(models.AuctionResponse)
 			err = json.Unmarshal(m.Data, t)
 			if err == nil {
@@ -239,22 +257,22 @@ func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, 
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal start workload request")
 	}
 
 	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, n.startWorkloadTimeout)
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to request start workload")
 	}
 
-	if startResponseMsg.Header.Get(micro.ErrorCodeHeader) != "" {
-		return nil, errors.New("Failed to start workload: " + startResponseMsg.Header.Get(micro.ErrorHeader))
+	if nexErr := nexErrorFromMsg(startResponseMsg); nexErr != nil {
+		return nil, nexErr
 	}
 
 	startResponse := new(models.StartWorkloadResponse)
 	err = json.Unmarshal(startResponseMsg.Data, startResponse)
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to unmarshal start workload response")
 	}
 
 	return startResponse, nil
@@ -267,7 +285,7 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal stop workload request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(n.requestManyStall))
@@ -289,6 +307,9 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 
 	msgs(func(m *nats.Msg, e error) bool {
 		if e == nil && m.Data != nil && string(m.Data) != "null" {
+			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+				return true
+			}
 			var swresp models.StopWorkloadResponse
 			err = json.Unmarshal(m.Data, &swresp)
 			if err == nil {
@@ -312,7 +333,7 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal list workloads request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
@@ -320,13 +341,16 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 		return []*models.AgentListWorkloadsResponse{}, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to request list workloads")
 	}
 
 	var errs error
 	resp := []*models.AgentListWorkloadsResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil && m.Data != nil && string(m.Data) != "null" {
+			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+				return true
+			}
 			t := new(models.AgentListWorkloadsResponse)
 			err = json.Unmarshal(m.Data, t)
 			if err == nil && len(*t) > 0 {
@@ -343,12 +367,12 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.StartWorkloadResponse, error) {
 	tKp, err := nkeys.CreateCurveKeys()
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to create clone keys")
 	}
 
 	tKpPub, err := tKp.PublicKey()
 	if err != nil {
-		return nil, err
+		return nil, n.nexInternalError(err, "failed to get clone public key")
 	}
 
 	cloneReq := models.CloneWorkloadRequest{
@@ -358,24 +382,24 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 
 	cloneReqB, err := json.Marshal(cloneReq)
 	if err != nil {
-		return nil, err
+		return nil, n.nexBadRequestError(err, "failed to marshal clone request")
 	}
 
 	genericNotFoundError := errors.New(string(models.GenericErrorsWorkloadNotFound))
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(n.requestManyStall))
 	if errors.Is(err, nats.ErrNoResponders) {
-		return nil, genericNotFoundError
+		return nil, n.nexNotFoundError(genericNotFoundError, "workload not found")
 	}
 	if err != nil {
-		return nil, genericNotFoundError
-	}
-	if errors.Is(err, nats.ErrTimeout) {
-		return nil, genericNotFoundError
+		return nil, n.nexInternalError(err, "workload not found")
 	}
 
 	var cloneResp *models.StartWorkloadRequest
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil && m.Data != nil && string(m.Data) != "null" {
+			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+				return true
+			}
 			err = json.Unmarshal(m.Data, &cloneResp)
 			if err != nil {
 				return false
@@ -385,7 +409,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 	})
 
 	if cloneResp == nil {
-		return nil, errors.New(string(models.GenericErrorsWorkloadNotFound))
+		return nil, n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
 	}
 
 	aucResp, err := n.Auction(cloneResp.WorkloadType, tags)
@@ -394,7 +418,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 	}
 
 	if len(aucResp) == 0 {
-		return nil, errors.New("no nodes available for placement")
+		return nil, n.nexNotFoundError(errors.New("no nodes available for placement"), "no nodes available for placement")
 	}
 
 	randomNode := aucResp[rand.Intn(len(aucResp))]
@@ -404,4 +428,42 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 	}
 
 	return swr, nil
+}
+
+func (n *nexClient) nexInternalError(err error, friendlyMsg string) *models.NexError {
+	return models.NewNexError(n.errorID.Next(), err, friendlyMsg, http.StatusInternalServerError)
+}
+
+func (n *nexClient) nexBadRequestError(err error, friendlyMsg string) *models.NexError {
+	return models.NewNexError(n.errorID.Next(), err, friendlyMsg, http.StatusBadRequest)
+}
+
+func (n *nexClient) nexNotFoundError(err error, friendlyMsg string) *models.NexError {
+	return models.NewNexError(n.errorID.Next(), err, friendlyMsg, http.StatusNotFound)
+}
+
+func nexErrorFromMsg(msg *nats.Msg) *models.NexError {
+	codeStr := msg.Header.Get(micro.ErrorCodeHeader)
+	if codeStr == "" {
+		return nil
+	}
+
+	friendlyMsg := msg.Header.Get(micro.ErrorHeader)
+	httpStatus, _ := strconv.Atoi(codeStr)
+
+	// Unmarshal failure is intentionally ignored — if the body is malformed,
+	// body.Error will be empty and we fall back to using friendlyMsg from
+	// the NATS micro error header as the error text.
+	var body struct {
+		ErrorID string `json:"error_id"`
+		Error   string `json:"error"`
+	}
+	_ = json.Unmarshal(msg.Data, &body)
+
+	rawErr := errors.New(body.Error)
+	if body.Error == "" {
+		rawErr = errors.New(friendlyMsg)
+	}
+
+	return models.NewNexError(body.ErrorID, rawErr, friendlyMsg, httpStatus)
 }

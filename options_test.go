@@ -175,8 +175,8 @@ func TestNexNodeOptions(t *testing.T) {
 
 type auction struct{}
 
-func (a *auction) Auction(namespace, _type string, aTags map[string]string) error {
-	return nil
+func (a *auction) Auction(namespace, _type string, aTags map[string]string) (bool, error) {
+	return false, nil
 }
 
 type minter struct{}
