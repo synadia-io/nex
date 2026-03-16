@@ -159,7 +159,7 @@ func (a *Runner) String() string {
 }
 
 func (a *Runner) GetLogger(workloadID, namespace string, lType models.LogOut) io.Writer {
-	return NewAgentLogCapture(a.nc, slog.Default(), lType, a.agentID, workloadID, namespace)
+	return NewAgentLogCapture(a.nc, a.logger, lType, a.agentID, workloadID, namespace)
 }
 
 func (a *Runner) Run(agentID string, connData models.NatsConnectionData, eventEmitter models.EventEmitter) error {
