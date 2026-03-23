@@ -13,7 +13,7 @@ type Nexfile struct {
 	AuctionTags  map[string]string `json:"tags" yaml:"tags"`
 	Type         string            `json:"type" yaml:"type"`
 	Lifecycle    string            `json:"lifecycle" yaml:"lifecycle"`
-	StartRequest any               `json:"start_request" yaml:"start_request"`
+	StartRequest any               `json:"start_request,omitempty" yaml:"start_request,omitempty"`
 }
 
 func (j *Nexfile) UnmarshalJSON(b []byte) error {
