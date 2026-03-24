@@ -372,8 +372,8 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			err = r.RespondJSON(ret)
 			if err != nil {
 				n.logger.Error("failed to respond to stop workload request", slog.String("err", err.Error()))
-				return
 			}
+			return
 		}
 
 		msgs(func(m *nats.Msg, e error) bool {
