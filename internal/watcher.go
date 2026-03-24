@@ -228,11 +228,11 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 
 			ap.agentLock.Unlock()
 
-			state, err := cmd.Process.Wait()
+			err = cmd.Wait()
 			if err != nil {
 				a.logger.Error("Nexlet process exited with error", slog.Int("process", ap.Process.Pid), slog.String("err", err.Error()))
-			} else if state != nil && ap.state != models.AgentStateStopping || ap.state != models.AgentStateLameduck {
-				a.logger.Warn("Nexlet process unexpectedly exited with state", slog.Any("state", state), slog.Int("process", ap.Process.Pid))
+			} else if cmd.ProcessState != nil && ap.state != models.AgentStateStopping || ap.state != models.AgentStateLameduck {
+				a.logger.Warn("Nexlet process unexpectedly exited with state", slog.Any("state", cmd.ProcessState), slog.Int("process", ap.Process.Pid))
 			}
 
 			a.agentCount--
