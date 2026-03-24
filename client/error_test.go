@@ -24,8 +24,9 @@ func TestNexClientErrorHelpers_GenerateUniqueIDs(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client, err := NewClient(context.Background(), nc, "test")
+	c, err := NewClient(context.Background(), nc, "test")
 	be.NilErr(t, err)
+	client := c.(*nexClient)
 
 	e1 := client.nexInternalError(errors.New("a"), "a")
 	e2 := client.nexInternalError(errors.New("b"), "b")
@@ -51,8 +52,9 @@ func TestNexClientErrorHelpers_NonEmptyIDs(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client, err := NewClient(context.Background(), nc, "test")
+	c, err := NewClient(context.Background(), nc, "test")
 	be.NilErr(t, err)
+	client := c.(*nexClient)
 
 	be.Nonzero(t, client.nexInternalError(errors.New("x"), "x").ID())
 	be.Nonzero(t, client.nexBadRequestError(errors.New("x"), "x").ID())
@@ -69,8 +71,9 @@ func TestNexClientErrorHelpers_StatusCodes(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client, err := NewClient(context.Background(), nc, "test")
+	c, err := NewClient(context.Background(), nc, "test")
 	be.NilErr(t, err)
+	client := c.(*nexClient)
 
 	be.Equal(t, http.StatusInternalServerError, client.nexInternalError(errors.New("x"), "x").Status())
 	be.Equal(t, http.StatusBadRequest, client.nexBadRequestError(errors.New("x"), "x").Status())
@@ -87,8 +90,9 @@ func TestNexClientErrorHelpers_PreservesMessages(t *testing.T) {
 	be.NilErr(t, err)
 	defer nc.Close()
 
-	client, err := NewClient(context.Background(), nc, "test")
+	c, err := NewClient(context.Background(), nc, "test")
 	be.NilErr(t, err)
+	client := c.(*nexClient)
 
 	ne := client.nexInternalError(errors.New("raw detail"), "friendly message")
 	be.Equal(t, "raw detail", ne.Error())
