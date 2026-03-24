@@ -13,7 +13,7 @@ require (
 	github.com/nats-io/nuid v1.0.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/orbit.go/natsext v0.1.1
+	github.com/synadia-io/orbit.go/natsext v0.1.2-0.20250624153732-8c4b4e437f6d
 	golang.org/x/sys v0.42.0
 )
 
