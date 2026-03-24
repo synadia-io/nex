@@ -49,7 +49,7 @@ require (
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/synadia-io/orbit.go/natsext v0.1.1 // indirect
+	github.com/synadia-io/orbit.go/natsext v0.1.2-0.20250624153732-8c4b4e437f6d // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
