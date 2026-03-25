@@ -52,6 +52,7 @@ type (
 		Tags                         map[string]string `name:"tags" placeholder:"nex:iscool;..." help:"Tags to be used for nex node"`
 		State                        string            `name:"state" help:"Adds persistence; for usecase such as disaster recovery" enum:",kv" default:""`
 		EventEmitter                 string            `name:"events" help:"Emit events" enum:",nats,logs" default:""`
+		AuctionMapTTL                time.Duration     `name:"auction-ttl" help:"set the ttl for auction IDs to remain valid" default:"10s"`
 		InternalNatsServerConf       string            `name:"inats-config" help:"Path to the NATS configuration file" type:"existingfile" placeholder:"/etc/nex/nats.conf"`
 		IssuerSigningKey             string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key" help:"SIGNING KEY | Seed key for signing" placeholder:"SASIGNINGKEY..."`
 		IssuerRootAccountKey         string            `group:"Credential Issuer Nexlet/Workload Auth" name:"issuer-signing-key-root-account" help:"SIGNING KEY | Public key for root account" placeholder:"AAMYACCOUNT..."`
@@ -182,6 +183,7 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		nex.WithNodeKeyPair(nodeKeyPair),
 		nex.WithNodeXKeyPair(nodeXkeyPair),
 		nex.WithAgentRestartLimit(u.AgentRestartLimit),
+		nex.WithAuctionTimeout(u.AuctionMapTTL),
 	}
 
 	if !u.DisableNativeStart {

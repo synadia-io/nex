@@ -46,6 +46,7 @@ type (
 
 		allowRemoteAgentRegistration bool
 		auctionMap                   *internal.TTLMap
+		auctionMapTimeout            time.Duration
 
 		nodeKeypair  nkeys.KeyPair
 		nodeXKeypair nkeys.KeyPair
@@ -141,7 +142,7 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		nodeKeypair:                  kp,
 		nodeXKeypair:                 xkp,
 		allowRemoteAgentRegistration: false,
-		auctionMap:                   internal.NewTTLMap(defaultAuctionTTLMapDuration),
+		auctionMapTimeout:            defaultAuctionTTLMapDuration,
 
 		nc:     nil,
 		server: nil,
@@ -158,6 +159,8 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	if errs != nil {
 		return nil, errs
 	}
+
+	n.auctionMap = internal.NewTTLMap(n.auctionMapTimeout)
 
 	n.id, err = n.nodeKeypair.PublicKey()
 	if err != nil {
