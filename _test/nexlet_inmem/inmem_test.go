@@ -142,8 +142,7 @@ func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 	)
 	be.NilErr(t, err)
 	be.NilErr(t, nn.Start())
-	for nn.IsReady() {
-		break
+	for !nn.IsReady() {
 	}
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second*3)
