@@ -131,8 +131,7 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 		be.NilErr(t, err)
 		be.NilErr(t, node.Start())
 
-		for node.IsReady() {
-			break
+		for !node.IsReady() {
 		}
 
 		ret[i] = node

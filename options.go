@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/synadia-io/nex/internal"
 	"github.com/synadia-io/nex/models"
@@ -174,6 +175,13 @@ func WithSecretStore(s models.SecretStore) NexNodeOption {
 func WithEventEmitter(e models.EventEmitter) NexNodeOption {
 	return func(n *NexNode) error {
 		n.eventEmitter = e
+		return nil
+	}
+}
+
+func WithAuctionTimeout(to time.Duration) NexNodeOption {
+	return func(n *NexNode) error {
+		n.auctionMapTimeout = to
 		return nil
 	}
 }
