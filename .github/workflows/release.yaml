@@ -6,9 +6,6 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+"
 
-env:
-  GO_VER: '1.25.*'
-
 jobs:
   goreleaser:
     name: Run GoReleaser
@@ -26,7 +23,7 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ env.GO_VER }}
+          go-version-file: go.mod
           cache: false
 
       - 

@@ -111,7 +111,7 @@ func (ar *AgentRegistrations) stringNoLock() string {
 	sb := strings.Builder{}
 	i := 0
 	for k, v := range ar.Registrations {
-		sb.WriteString(fmt.Sprintf("%s [%s]", k, v.RegisterRequest.RegisterType))
+		fmt.Fprintf(&sb, "%s [%s]", k, v.RegisterRequest.RegisterType)
 		if i < len(ar.Registrations)-1 {
 			sb.WriteString(", ")
 		}
