@@ -1,6 +1,6 @@
 module github.com/synadia-io/nex
 
-go 1.25.5
+go 1.26.1
 
 require (
 	disorder.dev/shandler v0.0.0-20260106145239-fd7f0bc7a73d
