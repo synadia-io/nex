@@ -75,12 +75,7 @@ func TestNodeCommandDefaults(t *testing.T) {
 
 func TestNodeUp(t *testing.T) {
 	s := startNatsServer(t)
-	defer func() {
-		for s.NumClients() == 0 {
-			s.Shutdown()
-			return
-		}
-	}()
+	defer s.Shutdown()
 
 	nex := NexCLI{
 		Globals: Globals{
@@ -112,7 +107,6 @@ func TestNodeUp(t *testing.T) {
 	stdout := captureOutput(t, func() {
 		err := nex.Node.Up.Run(ctx, &nex.Globals)
 		be.NilErr(t, err)
-		time.Sleep(500 * time.Millisecond)
 	})
 
 	be.True(t, strings.Contains(stdout, fmt.Sprintf("[INFO] Starting nex node version=0.0.0 commit=development build_date=unknown node_id=%s name=testnode nexus=testnexus nats_server=%s start_time=", TestServerPublicKey, s.ClientURL())))
@@ -122,12 +116,7 @@ func TestNodeUp(t *testing.T) {
 
 func TestNodeList(t *testing.T) {
 	s := startNatsServer(t)
-	defer func() {
-		for s.NumClients() == 0 {
-			s.Shutdown()
-			return
-		}
-	}()
+	defer s.Shutdown()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -147,7 +136,6 @@ func TestNodeList(t *testing.T) {
 	stdout := captureOutput(t, func() {
 		err := nex.Node.List.Run(ctx, &nex.Globals)
 		be.NilErr(t, err)
-		time.Sleep(500 * time.Millisecond)
 	})
 
 	resp := []*models.NodePingResponse{}
@@ -180,15 +168,13 @@ func captureOutput(t testing.TB, f func()) string {
 
 	f()
 
-	w.Close()
+	be.NilErr(t, w.Close())
 	os.Stdout = origStdout
 
 	var buf bytes.Buffer
 	_, err = io.Copy(&buf, r)
-	if err != nil {
-		t.Fatal("failed to read from pipe: " + err.Error())
-	}
-	r.Close()
+	be.NilErr(t, err)
+	be.NilErr(t, r.Close())
 
 	return buf.String()
 }

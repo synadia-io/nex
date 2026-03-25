@@ -307,9 +307,8 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	for nex.IsReady() {
-		time.Sleep(100 * time.Millisecond)
-		break
+	if err := nex.IsReady(10 * time.Second); err != nil {
+		return err
 	}
 
 	quit := make(chan os.Signal, 1)

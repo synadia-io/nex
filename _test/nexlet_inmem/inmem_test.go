@@ -115,6 +115,9 @@ func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 		StoreDir:  t.TempDir(),
 	})
 	server.Start()
+	if !server.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server failed to start")
+	}
 	defer server.Shutdown()
 
 	nc, err := nats.Connect(server.ClientURL())
@@ -142,8 +145,7 @@ func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 	)
 	be.NilErr(t, err)
 	be.NilErr(t, nn.Start())
-	for !nn.IsReady() {
-	}
+	be.NilErr(t, nn.IsReady(10*time.Second))
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second*3)
 	defer cancel()

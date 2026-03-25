@@ -29,17 +29,15 @@ func startNatsServer(t testing.TB) *server.Server {
 	be.NilErr(t, err)
 
 	s.Start()
+	if !s.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server failed to start")
+	}
 	return s
 }
 
 func TestConfigureLogger(t *testing.T) {
 	s := startNatsServer(t)
-	defer func() {
-		for s.NumClients() == 0 {
-			s.Shutdown()
-			return
-		}
-	}()
+	defer s.Shutdown()
 
 	today := time.Now().Format("2006-01-02")
 

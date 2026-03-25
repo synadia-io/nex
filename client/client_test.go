@@ -13,12 +13,7 @@ import (
 
 func TestNewNexClient(t *testing.T) {
 	server := _test.StartNatsServer(t, t.TempDir())
-	defer func() {
-		for server.NumClients() == 0 {
-			server.Shutdown()
-			return
-		}
-	}()
+	defer server.Shutdown()
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
@@ -35,12 +30,7 @@ func TestNewNexClient(t *testing.T) {
 
 func TestNewNexClientWithOptions(t *testing.T) {
 	server := _test.StartNatsServer(t, t.TempDir())
-	defer func() {
-		for server.NumClients() == 0 {
-			server.Shutdown()
-			return
-		}
-	}()
+	defer server.Shutdown()
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
@@ -67,12 +57,7 @@ func TestNewNexClientWithOptions(t *testing.T) {
 func TestNexClient_User(t *testing.T) {
 	workDir := t.TempDir()
 	server := _test.StartNatsServer(t, workDir)
-	defer func() {
-		for server.NumClients() == 0 {
-			server.Shutdown()
-			return
-		}
-	}()
+	defer server.Shutdown()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -122,12 +107,7 @@ func TestNexClient_System(t *testing.T) {
 			t.Parallel()
 			workDir := t.TempDir()
 			server := _test.StartNatsServer(t, workDir)
-			defer func() {
-				for server.NumClients() == 0 {
-					server.Shutdown()
-					return
-				}
-			}()
+			defer server.Shutdown()
 
 			nc, err := nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -159,10 +139,11 @@ func TestNexClient_System(t *testing.T) {
 			ldr, err := client.SetLameduck(_test.Node1Pub, 0, nil)
 			be.NilErr(t, err)
 			be.True(t, ldr.Success)
-			time.Sleep(250 * time.Millisecond)
 
-			nodes, err = client.ListNodes(nil)
-			be.NilErr(t, err)
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				nodes, err = client.ListNodes(nil)
+				return err == nil && len(nodes) == tt.size-1
+			}, "waiting for lameduck node to disappear from list")
 			be.Equal(t, tt.size-1, len(nodes))
 
 			for _, node := range nexNodes {
@@ -175,12 +156,7 @@ func TestNexClient_System(t *testing.T) {
 func TestNexClient_SystemAsUser(t *testing.T) {
 	workDir := t.TempDir()
 	server := _test.StartNatsServer(t, workDir)
-	defer func() {
-		for server.NumClients() == 0 {
-			server.Shutdown()
-			return
-		}
-	}()
+	defer server.Shutdown()
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
@@ -228,12 +204,7 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			t.Parallel()
 			workDir := t.TempDir()
 			server := _test.StartNatsServer(t, workDir)
-			defer func() {
-				for server.NumClients() == 0 {
-					server.Shutdown()
-					return
-				}
-			}()
+			defer server.Shutdown()
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -285,11 +256,7 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 
 func TestNexClient_List_NoNodes(t *testing.T) {
 	server := _test.StartNatsServer(t, t.TempDir())
-	defer func() {
-		for server.NumClients() == 0 {
-			server.Shutdown()
-		}
-	}()
+	defer server.Shutdown()
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
@@ -336,12 +303,7 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			t.Parallel()
 			workDir := t.TempDir()
 			server := _test.StartNatsServer(t, workDir)
-			defer func() {
-				for server.NumClients() == 0 {
-					server.Shutdown()
-					return
-				}
-			}()
+			defer server.Shutdown()
 
 			nc, err := nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -371,16 +333,18 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			_, err = client.CloneWorkload(swr.Id, nil)
 			be.NilErr(t, err)
 
-			time.Sleep(250 * time.Millisecond)
-
-			wl, err := client.ListWorkloads(nil)
-			be.NilErr(t, err)
-
-			totalCount := 0
-			for _, w := range wl {
-				totalCount += len(*w)
-			}
-
+			var totalCount int
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				wl, wlErr := client.ListWorkloads(nil)
+				if wlErr != nil {
+					return false
+				}
+				totalCount = 0
+				for _, w := range wl {
+					totalCount += len(*w)
+				}
+				return totalCount == 2
+			}, "waiting for cloned workload to appear")
 			be.Equal(t, 2, totalCount)
 
 			for _, node := range nexNodes {
@@ -405,12 +369,7 @@ func TestNexClient_GetNexusPTags(t *testing.T) {
 			t.Parallel()
 			workDir := t.TempDir()
 			server := _test.StartNatsServer(t, workDir)
-			defer func() {
-				for server.NumClients() == 0 {
-					server.Shutdown()
-					return
-				}
-			}()
+			defer server.Shutdown()
 
 			nc, err := nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -443,11 +402,7 @@ func TestNexClient_GetNexusPTags(t *testing.T) {
 
 func TestNexClient_GetNexusPTags_NoNodes(t *testing.T) {
 	server := _test.StartNatsServer(t, t.TempDir())
-	defer func() {
-		for server.NumClients() == 0 {
-			server.Shutdown()
-		}
-	}()
+	defer server.Shutdown()
 
 	nc, err := nats.Connect(server.ClientURL())
 	be.NilErr(t, err)
@@ -477,12 +432,7 @@ func TestNexClient_StopWorkloadDNE(t *testing.T) {
 			t.Parallel()
 			workDir := t.TempDir()
 			server := _test.StartNatsServer(t, workDir)
-			defer func() {
-				for server.NumClients() == 0 {
-					server.Shutdown()
-					return
-				}
-			}()
+			defer server.Shutdown()
 
 			nc, err := nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -532,12 +482,7 @@ func TestNexClient_StopWorkload(t *testing.T) {
 			t.Parallel()
 			workDir := t.TempDir()
 			server := _test.StartNatsServer(t, workDir)
-			defer func() {
-				for server.NumClients() == 0 {
-					server.Shutdown()
-					return
-				}
-			}()
+			defer server.Shutdown()
 
 			nc, err := nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -564,7 +509,17 @@ func TestNexClient_StopWorkload(t *testing.T) {
 			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
-			time.Sleep(250 * time.Millisecond)
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				wl, wlErr := client.ListWorkloads(nil)
+				if wlErr != nil {
+					return false
+				}
+				totalCount := 0
+				for _, w := range wl {
+					totalCount += len(*w)
+				}
+				return totalCount == 1
+			}, "waiting for workload to be running")
 
 			str, err := client.StopWorkload(swr.Id)
 			be.NilErr(t, err)

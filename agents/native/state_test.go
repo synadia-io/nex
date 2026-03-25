@@ -17,6 +17,18 @@ import (
 	"github.com/synadia-io/nex/models"
 )
 
+func waitFor(t testing.TB, timeout time.Duration, condition func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting: %s", msg)
+}
+
 func MockRunner(t testing.TB) (*agent.Runner, error) {
 	t.Helper()
 
@@ -116,7 +128,9 @@ func TestNexletState(t *testing.T) {
 			err = ns.RemoveWorkload("derp", "abc123")
 			be.NilErr(t, err)
 
-			time.Sleep(300 * time.Millisecond)
+			waitFor(t, 5*time.Second, func() bool {
+				return ns.WorkloadCount() == 0
+			}, "waiting for workload removal")
 
 			be.Equal(t, 1, ns.NamespaceCount())
 			be.Equal(t, 0, ns.WorkloadCount())
@@ -131,7 +145,9 @@ func TestNexletState(t *testing.T) {
 			err = ns.SetLameduckMode(time.Second)
 			be.NilErr(t, err)
 
-			time.Sleep(2000 * time.Millisecond)
+			waitFor(t, 10*time.Second, func() bool {
+				return ns.NamespaceCount() == 0 && ns.WorkloadCount() == 0
+			}, "waiting for lameduck cleanup")
 			be.Equal(t, 0, ns.NamespaceCount())
 			be.Equal(t, 0, ns.WorkloadCount())
 		})

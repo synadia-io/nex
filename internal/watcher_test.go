@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats-server/v2/server"
@@ -32,6 +33,9 @@ func startNatsServer(t testing.TB, workDir string) *server.Server {
 	})
 
 	server.Start()
+	if !server.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server failed to start")
+	}
 
 	return server
 }

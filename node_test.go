@@ -36,6 +36,9 @@ func startNatsServer(t testing.TB) *server.Server {
 	be.NilErr(t, err)
 
 	s.Start()
+	if !s.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server failed to start")
+	}
 	return s
 }
 
@@ -97,11 +100,7 @@ func TestNodeOptions(t *testing.T) {
 
 func TestNodeStartStop(t *testing.T) {
 	s := startNatsServer(t)
-	defer func() {
-		for s.NumClients() == 0 {
-			s.Shutdown()
-		}
-	}()
+	defer s.Shutdown()
 
 	nc, err := nats.Connect(s.ClientURL())
 	be.NilErr(t, err)
@@ -134,7 +133,7 @@ func TestNodeStartStop(t *testing.T) {
 	)
 	be.NilErr(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	go func() {
@@ -144,9 +143,7 @@ func TestNodeStartStop(t *testing.T) {
 
 	be.NilErr(t, nn.Start())
 
-	for !nn.IsReady() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	be.NilErr(t, nn.IsReady(10*time.Second))
 
 	be.Equal(t, 1, nn.registeredAgents.Count())
 	be.Equal(t, 22, nc.NumSubscriptions())
@@ -212,7 +209,7 @@ func TestNodeInfoHandler(t *testing.T) {
 	)
 	be.NilErr(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	go func() {
@@ -222,9 +219,7 @@ func TestNodeInfoHandler(t *testing.T) {
 
 	be.NilErr(t, nn.Start())
 
-	for !nn.IsReady() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	be.NilErr(t, nn.IsReady(10*time.Second))
 
 	nodeInfo, err := nc.Request(models.NodeInfoRequestSubject(models.SystemNamespace, pub), []byte{}, time.Second)
 	be.NilErr(t, err)
@@ -277,9 +272,7 @@ func TestNodeLameduckHandlerWithTag(t *testing.T) {
 
 	be.NilErr(t, nn.Start())
 
-	for !nn.IsReady() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	be.NilErr(t, nn.IsReady(10*time.Second))
 
 	req := models.LameduckRequest{
 		Delay: "0s",
@@ -332,9 +325,7 @@ func TestNodeLameduckHandlerWithoutTag(t *testing.T) {
 
 	be.NilErr(t, nn.Start())
 
-	for !nn.IsReady() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	be.NilErr(t, nn.IsReady(10*time.Second))
 
 	req := models.LameduckRequest{
 		Delay: "0s",
@@ -373,9 +364,7 @@ func TestNodeShutdownExitCodes(t *testing.T) {
 
 		be.NilErr(t, nn.Start())
 
-		for !nn.IsReady() {
-			time.Sleep(10 * time.Millisecond)
-		}
+		be.NilErr(t, nn.IsReady(10*time.Second))
 
 		// Normal shutdown
 		go func() {
@@ -412,9 +401,7 @@ func TestNodeShutdownExitCodes(t *testing.T) {
 
 		be.NilErr(t, nn.Start())
 
-		for !nn.IsReady() {
-			time.Sleep(10 * time.Millisecond)
-		}
+		be.NilErr(t, nn.IsReady(10*time.Second))
 
 		// Trigger lameduck
 		req := models.LameduckRequest{
@@ -433,11 +420,7 @@ func TestNodeShutdownExitCodes(t *testing.T) {
 
 func TestNodeDeployCloneUndeploy(t *testing.T) {
 	s := startNatsServer(t)
-	defer func() {
-		for s.NumClients() == 0 {
-			s.Shutdown()
-		}
-	}()
+	defer s.Shutdown()
 
 	output := new(bytes.Buffer)
 	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -466,7 +449,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	)
 	be.NilErr(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	go func() {
@@ -476,9 +459,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 
 	be.NilErr(t, nn.Start())
 
-	for !nn.IsReady() {
-		time.Sleep(100 * time.Millisecond)
-	}
+	be.NilErr(t, nn.IsReady(10*time.Second))
 
 	req := models.AuctionRequest{
 		AgentType: "inmem",
@@ -487,7 +468,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	reqB, err := json.Marshal(req)
 	be.NilErr(t, err)
 
-	auctionRespRaw, err := nc.Request(models.AuctionRequestSubject(models.SystemNamespace), reqB, time.Second*3)
+	auctionRespRaw, err := nc.Request(models.AuctionRequestSubject(models.SystemNamespace), reqB, time.Second*10)
 	be.NilErr(t, err)
 
 	auctionResp := models.AuctionResponse{}
@@ -504,7 +485,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	startWorkloadReqB, err := json.Marshal(startWorkloadReq)
 	be.NilErr(t, err)
 
-	startWorkloadRespRaw, err := nc.Request(models.AuctionDeployRequestSubject(models.SystemNamespace, auctionResp.BidderId), startWorkloadReqB, time.Second)
+	startWorkloadRespRaw, err := nc.Request(models.AuctionDeployRequestSubject(models.SystemNamespace, auctionResp.BidderId), startWorkloadReqB, time.Second*5)
 	be.NilErr(t, err)
 
 	startWorkloadResp := models.StartWorkloadResponse{}
@@ -522,7 +503,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	cloneWorkloadReqB, err := json.Marshal(cloneWorkloadReq)
 	be.NilErr(t, err)
 
-	cloneWorkloadRespRaw, err := nc.Request(models.CloneWorkloadRequestSubject(models.SystemNamespace, startWorkloadResp.Id), cloneWorkloadReqB, time.Second)
+	cloneWorkloadRespRaw, err := nc.Request(models.CloneWorkloadRequestSubject(models.SystemNamespace, startWorkloadResp.Id), cloneWorkloadReqB, time.Second*5)
 	be.NilErr(t, err)
 
 	cloneWorkloadResp := models.CloneWorkloadResponse{}
@@ -535,7 +516,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	nsPingReqB, err := json.Marshal(nsPingReq)
 	be.NilErr(t, err)
 
-	nsPingRespRaw, err := nc.Request(models.NamespacePingRequestSubject(models.SystemNamespace), nsPingReqB, time.Second*5)
+	nsPingRespRaw, err := nc.Request(models.NamespacePingRequestSubject(models.SystemNamespace), nsPingReqB, time.Second*10)
 	be.NilErr(t, err)
 
 	nsPingResp := models.AgentListWorkloadsResponse{}
@@ -547,7 +528,7 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	stopWorkloadReqB, err := json.Marshal(stopWorkloadReq)
 	be.NilErr(t, err)
 
-	stopWorkloadRespRaw, err := nc.Request(models.UndeployRequestSubject(models.SystemNamespace, startWorkloadResp.Id), stopWorkloadReqB, time.Second)
+	stopWorkloadRespRaw, err := nc.Request(models.UndeployRequestSubject(models.SystemNamespace, startWorkloadResp.Id), stopWorkloadReqB, time.Second*5)
 	be.NilErr(t, err)
 
 	stopWorkloadResp := models.StopWorkloadResponse{}

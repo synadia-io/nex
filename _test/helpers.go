@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats-server/v2/server"
@@ -63,6 +64,9 @@ func StartNatsServer(t testing.TB, workDir string) *server.Server {
 	})
 
 	server.Start()
+	if !server.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server failed to start")
+	}
 
 	return server
 }
@@ -131,10 +135,22 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 		be.NilErr(t, err)
 		be.NilErr(t, node.Start())
 
-		for !node.IsReady() {
-		}
+		be.NilErr(t, node.IsReady(10*time.Second))
 
 		ret[i] = node
 	}
 	return ret
+}
+
+// WaitFor polls condition every 25ms until it returns true or timeout is reached.
+func WaitFor(t testing.TB, timeout time.Duration, condition func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting: %s", msg)
 }

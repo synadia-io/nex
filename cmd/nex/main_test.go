@@ -52,7 +52,7 @@ func TestCLIWithConfig(t *testing.T) {
 	be.NilErr(t, err)
 
 	_, _ = f.WriteString(config)
-	defer f.Close()
+	defer func() { be.NilErr(t, f.Close()) }()
 
 	nex := NexCLI{}
 	parser := kong.Must(&nex,
