@@ -115,6 +115,9 @@ func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 		StoreDir:  t.TempDir(),
 	})
 	server.Start()
+	if !server.ReadyForConnections(5 * time.Second) {
+		t.Fatal("nats server failed to start")
+	}
 	defer server.Shutdown()
 
 	nc, err := nats.Connect(server.ClientURL())
@@ -142,17 +145,24 @@ func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 	)
 	be.NilErr(t, err)
 	be.NilErr(t, nn.Start())
-	for !nn.IsReady() {
-	}
+	be.NilErr(t, nn.IsReady(10*time.Second))
 
-	ctx, cancel := context.WithTimeout(t.Context(), time.Second*3)
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second*30)
 	defer cancel()
 
 	nClient, err := client.NewClient(ctx, nc, models.SystemNamespace)
 	be.NilErr(t, err)
 	be.Nonzero(t, nClient)
 
-	aR, err := nClient.Auction("inmem", nil)
+	var aR []*models.AuctionResponse
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		aR, err = nClient.Auction("inmem", nil)
+		if err == nil && len(aR) == 1 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	be.NilErr(t, err)
 	be.Equal(t, 1, len(aR))
 

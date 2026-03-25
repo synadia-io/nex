@@ -90,7 +90,7 @@ func (r *StartWorkload) Run(ctx context.Context, globals *Globals) error {
 
 	var nexfile models.Nexfile
 	if r.WorkloadNexfile != nil {
-		defer r.WorkloadNexfile.Close()
+		defer func() { _ = r.WorkloadNexfile.Close() }()
 
 		data, err := io.ReadAll(r.WorkloadNexfile)
 		if err != nil {

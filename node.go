@@ -325,8 +325,15 @@ func (n *NexNode) Start() error {
 	return nil
 }
 
-func (n *NexNode) IsReady() bool {
-	return n.nodeState == models.NodeStateRunning
+func (n *NexNode) IsReady(timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if n.nodeState == models.NodeStateRunning {
+			return nil
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	return fmt.Errorf("node not ready after %s", timeout)
 }
 
 func (n *NexNode) Shutdown() error {
