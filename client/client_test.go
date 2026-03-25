@@ -28,8 +28,9 @@ func TestNewNexClient(t *testing.T) {
 	be.NilErr(t, err)
 	be.Nonzero(t, client)
 
-	be.DeepEqual(t, nc, client.nc)
-	be.Equal(t, "test", client.namespace)
+	c := client.(*nexClient)
+	be.DeepEqual(t, nc, c.nc)
+	be.Equal(t, "test", c.namespace)
 }
 
 func TestNewNexClientWithOptions(t *testing.T) {
@@ -57,9 +58,10 @@ func TestNewNexClientWithOptions(t *testing.T) {
 	be.NilErr(t, err)
 	be.Nonzero(t, client)
 
-	be.Equal(t, customTimeout, client.defaultTimeout)
-	be.Equal(t, customStartTimeout, client.startWorkloadTimeout)
-	be.Equal(t, customStall, client.requestManyStall)
+	c := client.(*nexClient)
+	be.Equal(t, customTimeout, c.defaultTimeout)
+	be.Equal(t, customStartTimeout, c.startWorkloadTimeout)
+	be.Equal(t, customStall, c.requestManyStall)
 }
 
 func TestNexClient_User(t *testing.T) {

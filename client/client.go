@@ -23,6 +23,18 @@ const (
 	defaultAuctionStall = 1 * time.Second
 )
 
+type NexClient interface {
+	GetNexusPTags() (map[string]string, error)
+	GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
+	SetLameduck(nodeId string, delay time.Duration, tag map[string]string) (*models.LameduckResponse, error)
+	ListNodes(filter map[string]string) ([]*models.NodePingResponse, error)
+	Auction(typ string, tags map[string]string) ([]*models.AuctionResponse, error)
+	StartWorkload(deployId, name, desc, runRequest, typ string, lifecycle models.WorkloadLifecycle, pTags models.NodeTags) (*models.StartWorkloadResponse, error)
+	StopWorkload(workloadId string) (*models.StopWorkloadResponse, error)
+	ListWorkloads(filter []string) ([]*models.AgentListWorkloadsResponse, error)
+	CloneWorkload(id string, tags map[string]string) (*models.StartWorkloadResponse, error)
+}
+
 type nexClient struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -37,7 +49,7 @@ type nexClient struct {
 	auctionRequestManyStall time.Duration
 }
 
-func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...ClientOption) (*nexClient, error) {
+func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...ClientOption) (NexClient, error) {
 	var cancel context.CancelFunc
 	if ctx == nil {
 		ctx = context.Background()
