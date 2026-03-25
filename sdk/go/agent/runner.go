@@ -314,6 +314,9 @@ func (a *Runner) performHeartbeat() {
 }
 
 func (a *Runner) Shutdown() error {
+	if a.micro == nil {
+		return nil
+	}
 	return a.micro.Stop()
 }
 
