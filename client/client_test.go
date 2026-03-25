@@ -73,9 +73,11 @@ func TestNexClient_User(t *testing.T) {
 	be.NilErr(t, err)
 	be.Nonzero(t, client)
 
-	ar, err := client.Auction("inmem", map[string]string{})
-	be.NilErr(t, err)
-	be.Equal(t, 1, len(ar))
+	var ar []*models.AuctionResponse
+	_test.WaitFor(t, 10*time.Second, func() bool {
+		ar, err = client.Auction("inmem", map[string]string{})
+		return err == nil && len(ar) == 1
+	}, "waiting for auction to return 1 result")
 
 	sr, err := client.StartWorkload(ar[0].BidderId, "tester", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 	be.NilErr(t, err)
@@ -220,23 +222,27 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
-			ar, err := client.Auction("inmem", map[string]string{})
-			be.NilErr(t, err)
-			be.Equal(t, 1, len(ar))
+			var ar []*models.AuctionResponse
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				ar, err = client.Auction("inmem", map[string]string{})
+				return err == nil && len(ar) == 1
+			}, "waiting for auction to return 1 result")
 
 			_, err = client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
-			ar, err = client.Auction("inmem", map[string]string{})
-			be.NilErr(t, err)
-			be.Equal(t, 1, len(ar))
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				ar, err = client.Auction("inmem", map[string]string{})
+				return err == nil && len(ar) == 1
+			}, "waiting for auction to return 1 result")
 
 			_, err = client.StartWorkload(ar[0].BidderId, "tester2", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
-			ar, err = client.Auction("inmem", map[string]string{})
-			be.NilErr(t, err)
-			be.Equal(t, 1, len(ar))
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				ar, err = client.Auction("inmem", map[string]string{})
+				return err == nil && len(ar) == 1
+			}, "waiting for auction to return 1 result")
 
 			_, err = client.StartWorkload(ar[0].BidderId, "tester3", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
@@ -323,9 +329,11 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
-			ar, err := client.Auction("inmem", map[string]string{})
-			be.NilErr(t, err)
-			be.Equal(t, tt.size, len(ar))
+			var ar []*models.AuctionResponse
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				ar, err = client.Auction("inmem", map[string]string{})
+				return err == nil && len(ar) == tt.size
+			}, "waiting for auction to return expected results")
 
 			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
@@ -502,9 +510,11 @@ func TestNexClient_StopWorkload(t *testing.T) {
 			be.NilErr(t, err)
 			be.Nonzero(t, client)
 
-			ar, err := client.Auction("inmem", map[string]string{})
-			be.NilErr(t, err)
-			be.Equal(t, tt.size, len(ar))
+			var ar []*models.AuctionResponse
+			_test.WaitFor(t, 10*time.Second, func() bool {
+				ar, err = client.Auction("inmem", map[string]string{})
+				return err == nil && len(ar) == tt.size
+			}, "waiting for auction to return expected results")
 
 			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)

@@ -247,6 +247,7 @@ func (ar *AgentRegistrations) startHealthMonitor() {
 			ar.rwLock.Unlock()
 			return
 		case <-ticker.C:
+			ar.rwLock.RLock()
 			for _, reg := range ar.Registrations {
 				reg.rwLock.Lock()
 				switch {
@@ -257,6 +258,7 @@ func (ar *AgentRegistrations) startHealthMonitor() {
 				}
 				reg.rwLock.Unlock()
 			}
+			ar.rwLock.RUnlock()
 		}
 	}
 }
