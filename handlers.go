@@ -118,7 +118,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 		// TODO: Adds agentid to lameduck response
 		var errs error
 		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPISetLameduckSubject(pubKey), ldReqB, natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
-		if err == nil {
+		if err == nil && msgs != nil {
 			msgs(func(m *nats.Msg, err error) bool {
 				if err == nil {
 					agentID := m.Header.Get("agentId")
@@ -376,19 +376,21 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		msgs(func(m *nats.Msg, e error) bool {
-			if e == nil && m.Data != nil && string(m.Data) != "null" {
-				var swresp models.StopWorkloadResponse
-				err = json.Unmarshal(m.Data, &swresp)
-				if err == nil {
-					if swresp.Stopped {
-						_ = json.Unmarshal(m.Data, ret)
-						return false
+		if msgs != nil {
+			msgs(func(m *nats.Msg, e error) bool {
+				if e == nil && m.Data != nil && string(m.Data) != "null" {
+					var swresp models.StopWorkloadResponse
+					err = json.Unmarshal(m.Data, &swresp)
+					if err == nil {
+						if swresp.Stopped {
+							_ = json.Unmarshal(m.Data, ret)
+							return false
+						}
 					}
 				}
-			}
-			return true
-		})
+				return true
+			})
+		}
 
 		err = r.RespondJSON(ret)
 		if err != nil {
@@ -478,17 +480,19 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 		}
 
 		var errs error
-		msgs(func(m *nats.Msg, err error) bool {
-			if err == nil && m.Data != nil {
-				tResp := models.AgentListWorkloadsResponse{}
-				err = json.Unmarshal(m.Data, &tResp)
-				if err == nil {
-					resp = append(resp, tResp...)
+		if msgs != nil {
+			msgs(func(m *nats.Msg, err error) bool {
+				if err == nil && m.Data != nil {
+					tResp := models.AgentListWorkloadsResponse{}
+					err = json.Unmarshal(m.Data, &tResp)
+					if err == nil {
+						resp = append(resp, tResp...)
+					}
 				}
-			}
-			errs = errors.Join(errs, err)
-			return true
-		})
+				errs = errors.Join(errs, err)
+				return true
+			})
+		}
 
 		respB, err := json.Marshal(resp)
 		if err != nil {
