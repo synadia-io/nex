@@ -669,6 +669,7 @@ func TestNexClient_ListWorkloads_PartialError(t *testing.T) {
 
 	sub := fakeErrorResponder(t, errNC, models.NamespacePingRequestSubject("user"), 500, "node unavailable")
 	defer func() { _ = sub.Unsubscribe() }()
+	be.NilErr(t, errNC.Flush())
 
 	wl, err := client.ListWorkloads([]string{})
 	be.Nonzero(t, err)
