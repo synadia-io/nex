@@ -117,7 +117,7 @@ func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error)
 	req := &models.NodeInfoRequest{}
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal node info request")
+		return nil, n.nexInternalError(err, "failed to marshal node info request")
 	}
 
 	resp, err := n.nc.Request(models.NodeInfoRequestSubject(n.namespace, nodeId), reqB, n.defaultTimeout)
@@ -150,7 +150,7 @@ func (n *nexClient) SetLameduck(nodeId string, delay time.Duration, tag map[stri
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal lameduck request")
+		return nil, n.nexInternalError(err, "failed to marshal lameduck request")
 	}
 
 	respMsg, err := n.nc.Request(models.LameduckRequestSubject(n.namespace, nodeId), reqB, n.defaultTimeout)
@@ -181,7 +181,7 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal list nodes request")
+		return nil, n.nexInternalError(err, "failed to marshal list nodes request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
@@ -221,7 +221,7 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 
 	auctionRequestB, err := json.Marshal(auctionRequest)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal auction request")
+		return nil, n.nexInternalError(err, "failed to marshal auction request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(n.auctionRequestManyStall))
@@ -269,7 +269,7 @@ func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, 
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal start workload request")
+		return nil, n.nexInternalError(err, "failed to marshal start workload request")
 	}
 
 	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(n.namespace, deployId), reqB, n.startWorkloadTimeout)
@@ -297,7 +297,7 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal stop workload request")
+		return nil, n.nexInternalError(err, "failed to marshal stop workload request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(n.requestManyStall))
@@ -345,7 +345,7 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 
 	reqB, err := json.Marshal(req)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal list workloads request")
+		return nil, n.nexInternalError(err, "failed to marshal list workloads request")
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
@@ -394,7 +394,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 
 	cloneReqB, err := json.Marshal(cloneReq)
 	if err != nil {
-		return nil, n.nexBadRequestError(err, "failed to marshal clone request")
+		return nil, n.nexInternalError(err, "failed to marshal clone request")
 	}
 
 	genericNotFoundError := errors.New(string(models.GenericErrorsWorkloadNotFound))
