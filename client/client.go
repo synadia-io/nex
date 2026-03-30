@@ -85,9 +85,6 @@ func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...Cli
 
 func (n *nexClient) GetNexusPTags() (map[string]string, error) {
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingPTagRequestSubject(n.namespace), []byte{}, natsext.RequestManyStall(n.requestManyStall))
-	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) {
-		return map[string]string{}, nil
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +107,9 @@ func (n *nexClient) GetNexusPTags() (map[string]string, error) {
 				}
 			}
 		}
-		errs = errors.Join(errs, err)
+		if err != nil && !errors.Is(err, nats.ErrNoResponders) {
+			errs = errors.Join(errs, err)
+		}
 		return true
 	})
 
@@ -189,9 +188,6 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
-	if errors.Is(err, nats.ErrNoResponders) || errors.Is(err, nats.ErrTimeout) {
-		return []*models.NodePingResponse{}, nil
-	}
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request list nodes")
 	}
@@ -210,7 +206,9 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 				resp = append(resp, t)
 			}
 		}
-		errs = errors.Join(errs, err)
+		if err != nil && !errors.Is(err, nats.ErrNoResponders) {
+			errs = errors.Join(errs, err)
+		}
 		return true
 	})
 
@@ -230,9 +228,6 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(n.namespace), auctionRequestB, natsext.RequestManyStall(n.auctionRequestManyStall))
-	if errors.Is(err, nats.ErrNoResponders) {
-		return []*models.AuctionResponse{}, nil
-	}
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request auction")
 	}
@@ -251,7 +246,9 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 				resp = append(resp, t)
 			}
 		}
-		errs = errors.Join(errs, err)
+		if err != nil && !errors.Is(err, nats.ErrNoResponders) {
+			errs = errors.Join(errs, err)
+		}
 		return true
 	})
 
@@ -307,14 +304,6 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(n.requestManyStall))
-	if errors.Is(err, nats.ErrNoResponders) {
-		return &models.StopWorkloadResponse{
-			Id:           workloadId,
-			Message:      string(models.GenericErrorsWorkloadNotFound),
-			Stopped:      false,
-			WorkloadType: "",
-		}, nil
-	}
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request stop workload")
 	}
@@ -342,7 +331,9 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 				}
 			}
 		}
-		errs = errors.Join(errs, e)
+		if e != nil && !errors.Is(e, nats.ErrNoResponders) {
+			errs = errors.Join(errs, e)
+		}
 		return true
 	})
 
@@ -361,9 +352,6 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
-	if errors.Is(err, nats.ErrNoResponders) {
-		return []*models.AgentListWorkloadsResponse{}, nil
-	}
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request list workloads")
 	}
@@ -382,7 +370,9 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 				resp = append(resp, t)
 			}
 		}
-		errs = errors.Join(errs, err)
+		if err != nil && !errors.Is(err, nats.ErrNoResponders) {
+			errs = errors.Join(errs, err)
+		}
 		return true
 	})
 
@@ -410,11 +400,7 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, n.nexInternalError(err, "failed to marshal clone request")
 	}
 
-	genericNotFoundError := errors.New(string(models.GenericErrorsWorkloadNotFound))
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(n.requestManyStall))
-	if errors.Is(err, nats.ErrNoResponders) {
-		return nil, n.nexNotFoundError(genericNotFoundError, "workload not found")
-	}
 	if err != nil {
 		return nil, n.nexInternalError(err, "workload not found")
 	}
@@ -432,7 +418,9 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 				return false
 			}
 		}
-		cloneErrs = errors.Join(cloneErrs, err)
+		if err != nil && !errors.Is(err, nats.ErrNoResponders) {
+			cloneErrs = errors.Join(cloneErrs, err)
+		}
 		return true
 	})
 
