@@ -96,6 +96,10 @@ func (n *nexClient) GetNexusPTags() (map[string]string, error) {
 	resp := make(map[string]string)
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil && m.Data != nil && string(m.Data) != "null" {
+			if nexErr := nexErrorFromMsg(m); nexErr != nil {
+				errs = errors.Join(errs, nexErr)
+				return true
+			}
 			t := map[string]string{}
 			err = json.Unmarshal(m.Data, &t)
 			if err == nil {
@@ -110,7 +114,7 @@ func (n *nexClient) GetNexusPTags() (map[string]string, error) {
 		return true
 	})
 
-	return resp, nil
+	return resp, errs
 }
 
 func (n *nexClient) GetNodeInfo(nodeId string) (*models.NodeInfoResponse, error) {
@@ -196,7 +200,8 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 	resp := []*models.NodePingResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil && m.Data != nil && string(m.Data) != "null" {
-			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+			if nexErr := nexErrorFromMsg(m); nexErr != nil {
+				errs = errors.Join(errs, nexErr)
 				return true
 			}
 			t := new(models.NodePingResponse)
@@ -209,7 +214,7 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 		return true
 	})
 
-	return resp, nil
+	return resp, errs
 }
 
 func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.AuctionResponse, error) {
@@ -236,7 +241,8 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 	resp := []*models.AuctionResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil {
-			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+			if nexErr := nexErrorFromMsg(m); nexErr != nil {
+				errs = errors.Join(errs, nexErr)
 				return true
 			}
 			t := new(models.AuctionResponse)
@@ -249,7 +255,7 @@ func (n *nexClient) Auction(typ string, tags map[string]string) ([]*models.Aucti
 		return true
 	})
 
-	return resp, nil
+	return resp, errs
 }
 
 func (n *nexClient) StartWorkload(deployId, name, desc, runRequest, typ string, lifecycle models.WorkloadLifecycle, pTags models.NodeTags) (*models.StartWorkloadResponse, error) {
@@ -301,13 +307,16 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 	}
 
 	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(n.namespace, workloadId), reqB, natsext.RequestManyStall(n.requestManyStall))
-	if err != nil {
+	if errors.Is(err, nats.ErrNoResponders) {
 		return &models.StopWorkloadResponse{
 			Id:           workloadId,
-			Message:      err.Error(),
+			Message:      string(models.GenericErrorsWorkloadNotFound),
 			Stopped:      false,
 			WorkloadType: "",
 		}, nil
+	}
+	if err != nil {
+		return nil, n.nexInternalError(err, "failed to request stop workload")
 	}
 
 	ret := &models.StopWorkloadResponse{
@@ -317,9 +326,11 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 		WorkloadType: "",
 	}
 
+	var errs error
 	msgs(func(m *nats.Msg, e error) bool {
 		if e == nil && m.Data != nil && string(m.Data) != "null" {
-			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+			if nexErr := nexErrorFromMsg(m); nexErr != nil {
+				errs = errors.Join(errs, nexErr)
 				return true
 			}
 			var swresp models.StopWorkloadResponse
@@ -331,10 +342,11 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 				}
 			}
 		}
+		errs = errors.Join(errs, e)
 		return true
 	})
 
-	return ret, nil
+	return ret, errs
 }
 
 func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloadsResponse, error) {
@@ -360,7 +372,8 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 	resp := []*models.AgentListWorkloadsResponse{}
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil && m.Data != nil && string(m.Data) != "null" {
-			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+			if nexErr := nexErrorFromMsg(m); nexErr != nil {
+				errs = errors.Join(errs, nexErr)
 				return true
 			}
 			t := new(models.AgentListWorkloadsResponse)
@@ -373,7 +386,7 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 		return true
 	})
 
-	return resp, nil
+	return resp, errs
 }
 
 func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.StartWorkloadResponse, error) {
@@ -407,9 +420,11 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 	}
 
 	var cloneResp *models.StartWorkloadRequest
+	var cloneErrs error
 	msgs(func(m *nats.Msg, err error) bool {
 		if err == nil && m.Data != nil && string(m.Data) != "null" {
-			if m.Header.Get(micro.ErrorCodeHeader) != "" {
+			if nexErr := nexErrorFromMsg(m); nexErr != nil {
+				cloneErrs = errors.Join(cloneErrs, nexErr)
 				return true
 			}
 			err = json.Unmarshal(m.Data, &cloneResp)
@@ -417,19 +432,23 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 				return false
 			}
 		}
+		cloneErrs = errors.Join(cloneErrs, err)
 		return true
 	})
+
+	if cloneResp == nil && cloneErrs != nil {
+		return nil, cloneErrs
+	}
 
 	if cloneResp == nil {
 		return nil, n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
 	}
 
 	aucResp, err := n.Auction(cloneResp.WorkloadType, tags)
-	if err != nil {
-		return nil, err
-	}
-
 	if len(aucResp) == 0 {
+		if err != nil {
+			return nil, err
+		}
 		return nil, n.nexNotFoundError(errors.New("no nodes available for placement"), "no nodes available for placement")
 	}
 
