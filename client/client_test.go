@@ -208,11 +208,11 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			server := _test.StartNatsServer(t, workDir)
 			defer server.Shutdown()
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 			defer cancel()
 
-			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
-			be.Equal(t, 1, len(nexNodes))
+			nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), tt.size, false)
+			be.Equal(t, tt.size, len(nexNodes))
 
 			nc, err := nats.Connect(server.ClientURL())
 			be.NilErr(t, err)
@@ -225,33 +225,36 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 			var ar []*models.AuctionResponse
 			_test.WaitFor(t, 10*time.Second, func() bool {
 				ar, err = client.Auction("inmem", map[string]string{})
-				return err == nil && len(ar) == 1
-			}, "waiting for auction to return 1 result")
+				return err == nil && len(ar) == tt.size
+			}, "waiting for auction to return expected results")
 
 			_, err = client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
 			_test.WaitFor(t, 10*time.Second, func() bool {
 				ar, err = client.Auction("inmem", map[string]string{})
-				return err == nil && len(ar) == 1
-			}, "waiting for auction to return 1 result")
+				return err == nil && len(ar) == tt.size
+			}, "waiting for auction to return expected results")
 
-			_, err = client.StartWorkload(ar[0].BidderId, "tester2", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			_, err = client.StartWorkload(ar[1%tt.size].BidderId, "tester2", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
 			_test.WaitFor(t, 10*time.Second, func() bool {
 				ar, err = client.Auction("inmem", map[string]string{})
-				return err == nil && len(ar) == 1
-			}, "waiting for auction to return 1 result")
+				return err == nil && len(ar) == tt.size
+			}, "waiting for auction to return expected results")
 
-			_, err = client.StartWorkload(ar[0].BidderId, "tester3", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			_, err = client.StartWorkload(ar[2%tt.size].BidderId, "tester3", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
 			be.NilErr(t, err)
 
 			wl, err := client.ListWorkloads([]string{})
 			be.NilErr(t, err)
 
-			be.Equal(t, 1, len(wl))
-			be.Equal(t, 3, len(*wl[0]))
+			totalCount := 0
+			for _, w := range wl {
+				totalCount += len(*w)
+			}
+			be.Equal(t, 3, totalCount)
 
 			for _, node := range nexNodes {
 				be.NilErr(t, node.Shutdown())
