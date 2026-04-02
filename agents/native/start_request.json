@@ -1,5 +1,4 @@
 {
-  "$id": "gen",
   "title": "StartRequest",
   "type": "object",
   "properties": {
