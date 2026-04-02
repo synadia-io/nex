@@ -182,6 +182,7 @@ func (a *NativeAgent) QueryWorkloads(namespace string, filter []string) (*models
 }
 
 func (a *NativeAgent) SetLameduck(before time.Duration) error {
+	a.agentState = models.AgentStateLameduck
 	return a.state.SetLameduckMode(before)
 }
 

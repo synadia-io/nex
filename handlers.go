@@ -198,6 +198,11 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 
 func (n *NexNode) handleAuction() func(micro.Request) {
 	return func(r micro.Request) {
+		if n.nodeState != models.NodeStateRunning {
+			n.logger.Log(n.ctx, shandler.LevelTrace, "node not running, ignoring auction", slog.String("state", string(n.nodeState)))
+			return
+		}
+
 		// $NEX.SVC.<namespace>.control.AUCTION
 		splitSub := strings.SplitN(r.Subject(), ".", 5)
 		namespace := splitSub[2]

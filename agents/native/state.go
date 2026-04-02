@@ -366,52 +366,58 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 }
 
 func (n *nexletState) SetLameduckMode(before time.Duration) error {
-	n.Lock()
-	defer n.Unlock()
+	shutdownDelay := time.Duration(float64(before) * 0.9)
+	shutdownTimeout := before - shutdownDelay
 
-	var wg sync.WaitGroup
-	for namespace, processes := range n.workloads {
-		wg.Add(len(processes))
-		for id, process := range processes {
-			go func() {
-				process.SetState(models.WorkloadStateStopping)
-				err := internal.StopProcess(process.Process)
-				if err != nil {
-					n.logger.Error("error stopping process; cancelling context", slog.String("err", err.Error()))
-					process.cancel()
-				} else {
-					timeout := time.After(before)
-					ticker := time.NewTicker(250 * time.Millisecond) // Check every 250ms
+	go func() {
+		time.Sleep(shutdownDelay)
+
+		n.Lock()
+		defer n.Unlock()
+
+		var wg sync.WaitGroup
+		for namespace, processes := range n.workloads {
+			wg.Add(len(processes))
+			for id, process := range processes {
+				go func() {
+					defer wg.Done()
+					process.SetState(models.WorkloadStateStopping)
+					err := internal.StopProcess(process.Process)
+					if err != nil {
+						n.logger.Error("error stopping process; cancelling context", slog.String("err", err.Error()))
+						process.cancel()
+						return
+					}
+
+					timeout := time.After(shutdownTimeout)
+					ticker := time.NewTicker(250 * time.Millisecond)
 					defer ticker.Stop()
 
 					for {
 						select {
 						case <-timeout:
-							fmt.Println("Process did not exit within timeout, sending SIGKILL...")
+							n.logger.Warn("process did not exit within timeout, sending SIGKILL")
 							if err := process.Process.Kill(); err != nil {
-								fmt.Println("Error killing process:", err)
+								n.logger.Error("error killing process", slog.String("err", err.Error()))
 								process.cancel()
 							}
-							wg.Done()
 							return
 						case <-ticker.C:
-							// Check if the process still exists
 							if err := process.Process.Signal(syscall.Signal(0)); err != nil {
 								if err := n.runner.EmitEvent(namespace, models.WorkloadStoppedEvent{Id: id, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
 									n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 								}
-								wg.Done()
 								return
 							}
 						}
 					}
-				}
-				wg.Done()
-			}()
+				}()
+			}
 		}
-	}
 
-	wg.Wait()
-	n.workloads = make(map[string]NativeProcesses)
+		wg.Wait()
+		n.workloads = make(map[string]NativeProcesses)
+	}()
+
 	return nil
 }

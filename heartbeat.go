@@ -10,6 +10,7 @@ import (
 
 type hb struct {
 	Registrations string `json:"registrations"`
+	State         string `json:"state"`
 }
 
 func (n *NexNode) heartbeat() {
@@ -26,6 +27,7 @@ func (n *NexNode) heartbeat() {
 
 		beat := hb{
 			Registrations: n.registeredAgents.String(),
+			State:         string(n.nodeState),
 		}
 
 		hbB, err := json.Marshal(beat)
