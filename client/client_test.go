@@ -837,12 +837,14 @@ func TestNexClient_CloneWorkload_CrossNamespace(t *testing.T) {
 	})
 	be.NilErr(t, err)
 
-	// Sanity: the user namespace now has exactly one workload, the system
-	// namespace has none.
+	// Sanity: the user namespace now has exactly one workload, and a
+	// system-scoped list sees the same single workload (system aggregates
+	// across every namespace, and user is the only namespace with state).
 	_test.WaitFor(t, 10*time.Second, func() bool {
 		return countWorkloads(t, userClient) == 1
 	}, "waiting for original to register in user namespace")
-	be.Equal(t, 0, countWorkloads(t, systemClient)-countWorkloads(t, userClient))
+	be.Equal(t, 1, countWorkloads(t, userClient))
+	be.Equal(t, 1, countWorkloads(t, systemClient))
 
 	// System user clones the user-owned workload.
 	cloneResp, err := systemClient.CloneWorkload(origSwr.Id, nil)

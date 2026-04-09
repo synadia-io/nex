@@ -260,16 +260,22 @@ func (n *nexClient) StartWorkload(deployId string, req *models.StartWorkloadRequ
 	if req == nil {
 		return nil, n.nexBadRequestError(errors.New("nil request"), "start workload request must not be nil")
 	}
-	if req.Tags == nil {
-		req.Tags = make(models.NodeTags)
+
+	// Shallow-copy so defaulting Tags does not mutate the caller's struct.
+	// This matters for call sites like CloneWorkload that pass the agent's
+	// StartWorkloadRequest through verbatim — we must not silently poke at
+	// fields on a value the caller still holds a reference to.
+	local := *req
+	if local.Tags == nil {
+		local.Tags = make(models.NodeTags)
 	}
 
-	reqB, err := json.Marshal(req)
+	reqB, err := json.Marshal(&local)
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to marshal start workload request")
 	}
 
-	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(req.Namespace, deployId), reqB, n.startWorkloadTimeout)
+	startResponseMsg, err := n.nc.Request(models.AuctionDeployRequestSubject(local.Namespace, deployId), reqB, n.startWorkloadTimeout)
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request start workload")
 	}
@@ -484,6 +490,18 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 
 	if cloneResp == nil {
 		return nil, n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
+	}
+
+	// An empty namespace on the clone response means the agent did not
+	// report the workload's owning namespace — typically an older nexlet
+	// that pre-dates the WorkloadSummary.Namespace contract. Without a
+	// target namespace we would publish the auction on a malformed subject
+	// and the failure would surface as an unhelpful "no nodes available"
+	// error. Fail fast with a clear message instead.
+	if cloneResp.Namespace == "" {
+		return nil, n.nexInternalError(
+			errors.New("clone response missing namespace"),
+			"cannot clone workload: owning namespace not reported by the agent")
 	}
 
 	// The clone must be deployed into the workload's actual owning
