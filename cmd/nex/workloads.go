@@ -266,9 +266,15 @@ func (r *ListWorkload) Run(ctx context.Context, globals *Globals) error {
 		tW.Style().Title.Align = text.AlignCenter
 		tW.Style().Format.Header = text.FormatDefault
 		tW.SetTitle("Running Workloads - " + globals.Namespace)
-		if r.ShowMetadata {
+		showNamespace := globals.Namespace == models.SystemNamespace
+		switch {
+		case showNamespace && r.ShowMetadata:
+			tW.AppendHeader(table.Row{"Id", "Name", "Namespace", "Start Time", "Execution Time", "Type", "Lifecycle", "State", "Metadata", "Tags"})
+		case showNamespace:
+			tW.AppendHeader(table.Row{"Id", "Name", "Namespace", "Start Time", "Execution Time", "Type", "Lifecycle", "State"})
+		case r.ShowMetadata:
 			tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State", "Metadata", "Tags"})
-		} else {
+		default:
 			tW.AppendHeader(table.Row{"Id", "Name", "Start Time", "Execution Time", "Type", "Lifecycle", "State"})
 		}
 		for _, agentResponse := range resp {
@@ -278,16 +284,30 @@ func (r *ListWorkload) Run(ctx context.Context, globals *Globals) error {
 					rt = "--"
 				}
 
+				var meta string
 				if r.ShowMetadata {
-					meta := "--"
+					meta = "--"
 					if workload.Metadata != nil {
 						metaB, err := json.Marshal(workload.Metadata)
 						if err == nil {
 							meta = string(metaB)
 						}
 					}
+				}
+
+				wlNS := "--"
+				if workload.Namespace != nil {
+					wlNS = *workload.Namespace
+				}
+
+				switch {
+				case showNamespace && r.ShowMetadata:
+					tW.AppendRow(table.Row{workload.Id, workload.Name, wlNS, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState, meta, workload.Tags})
+				case showNamespace:
+					tW.AppendRow(table.Row{workload.Id, workload.Name, wlNS, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState})
+				case r.ShowMetadata:
 					tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState, meta, workload.Tags})
-				} else {
+				default:
 					tW.AppendRow(table.Row{workload.Id, workload.Name, workload.StartTime, rt, workload.WorkloadType, workload.WorkloadLifecycle, workload.WorkloadState})
 				}
 				workloads++

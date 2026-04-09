@@ -644,6 +644,9 @@ type WorkloadSummary struct {
 	// The name of the workload
 	Name string `json:"name"`
 
+	// The namespace the workload belongs to
+	Namespace *string `json:"namespace,omitempty"`
+
 	// The runtime of the workload
 	Runtime string `json:"runtime"`
 

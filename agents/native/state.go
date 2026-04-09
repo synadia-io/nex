@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -84,29 +85,41 @@ func (n *nexletState) WorkloadCount() int {
 	return total
 }
 
-func (n *nexletState) GetNamespaceWorkloadList(ns string) (*models.AgentListWorkloadsResponse, error) {
+func (n *nexletState) GetNamespaceWorkloadList(ns string, filter []string) (*models.AgentListWorkloadsResponse, error) {
 	n.Lock()
 	defer n.Unlock()
 
 	ret := new(models.AgentListWorkloadsResponse)
-	namespace, ok := n.workloads[ns]
-	if !ok || len(namespace) == 0 {
-		return ret, nil
-	}
 
-	for id, w := range namespace {
-		ws := models.WorkloadSummary{
-			Id:                id,
-			Metadata:          map[string]string{},
-			Name:              w.StartRequest.Name,
-			Runtime:           "--",
-			StartTime:         w.StartedAt.Format(time.RFC3339),
-			WorkloadLifecycle: string(w.StartRequest.WorkloadLifecycle),
-			WorkloadState:     w.GetState(),
-			WorkloadType:      NEXLET_REGISTER_TYPE,
-			Tags:              w.StartRequest.Tags,
+	// The system namespace is administrative: a query for it returns
+	// workloads across every namespace. Any other namespace only returns
+	// workloads that actually live under that map key.
+	//
+	// When filter is non-empty, only workloads whose id or name matches
+	// one of the filter entries are returned.
+	for mapNS, processes := range n.workloads {
+		if ns != models.SystemNamespace && ns != mapNS {
+			continue
 		}
-		*ret = append(*ret, ws)
+		workloadNS := mapNS
+		for id, w := range processes {
+			if len(filter) > 0 && !slices.Contains(filter, id) && !slices.Contains(filter, w.StartRequest.Name) {
+				continue
+			}
+			ws := models.WorkloadSummary{
+				Id:                id,
+				Namespace:         &workloadNS,
+				Metadata:          map[string]string{},
+				Name:              w.StartRequest.Name,
+				Runtime:           "--",
+				StartTime:         w.StartedAt.Format(time.RFC3339),
+				WorkloadLifecycle: string(w.StartRequest.WorkloadLifecycle),
+				WorkloadState:     w.GetState(),
+				WorkloadType:      NEXLET_REGISTER_TYPE,
+				Tags:              w.StartRequest.Tags,
+			}
+			*ret = append(*ret, ws)
+		}
 	}
 
 	return ret, nil

@@ -178,7 +178,7 @@ func (a *NativeAgent) GetWorkload(workloadId, targetXkey string) (*models.StartW
 }
 
 func (a *NativeAgent) QueryWorkloads(namespace string, filter []string) (*models.AgentListWorkloadsResponse, error) {
-	return a.state.GetNamespaceWorkloadList(namespace)
+	return a.state.GetNamespaceWorkloadList(namespace, filter)
 }
 
 func (a *NativeAgent) SetLameduck(before time.Duration) error {
