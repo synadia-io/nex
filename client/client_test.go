@@ -797,7 +797,6 @@ func countWorkloads(t *testing.T, c NexClient) int {
 // to StartWorkload with n.namespace="system" and the clone would be stored
 // under n.workloads["system"] on the agent.
 func TestNexClient_CloneWorkload_CrossNamespace(t *testing.T) {
-	t.Parallel()
 	workDir := t.TempDir()
 	server := _test.StartNatsServer(t, workDir)
 	defer server.Shutdown()
@@ -883,7 +882,6 @@ func TestNexClient_CloneWorkload_CrossNamespace(t *testing.T) {
 // discover the owning namespace via ListWorkloads and publish the stop on
 // that namespace's subject, not `system`.
 func TestNexClient_StopWorkload_System_Discovery(t *testing.T) {
-	t.Parallel()
 	workDir := t.TempDir()
 	server := _test.StartNatsServer(t, workDir)
 	defer server.Shutdown()
@@ -945,7 +943,6 @@ func TestNexClient_StopWorkload_System_Discovery(t *testing.T) {
 // for a nonexistent workload surfaces a clean not-found error rather than
 // silently returning Stopped=false.
 func TestNexClient_StopWorkload_System_NotFound(t *testing.T) {
-	t.Parallel()
 	workDir := t.TempDir()
 	server := _test.StartNatsServer(t, workDir)
 	defer server.Shutdown()
@@ -975,7 +972,6 @@ func TestNexClient_StopWorkload_System_NotFound(t *testing.T) {
 // clone-then-stop flow as a system user against a user-owned workload. The
 // clone must land in the user namespace and the original must be stopped.
 func TestNexClient_CloneWorkload_StopOrig_CrossNamespace(t *testing.T) {
-	t.Parallel()
 	workDir := t.TempDir()
 	server := _test.StartNatsServer(t, workDir)
 	defer server.Shutdown()
