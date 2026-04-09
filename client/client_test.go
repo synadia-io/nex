@@ -78,11 +78,18 @@ func TestNexClient_User(t *testing.T) {
 
 	var ar []*models.AuctionResponse
 	_test.WaitFor(t, 10*time.Second, func() bool {
-		ar, err = client.Auction("inmem", map[string]string{})
+		ar, err = client.Auction("user", "inmem", map[string]string{})
 		return err == nil && len(ar) == 1
 	}, "waiting for auction to return 1 result")
 
-	sr, err := client.StartWorkload(ar[0].BidderId, "tester", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+	sr, err := client.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "tester",
+		Description:       "My test workload",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
 	be.NilErr(t, err)
 	be.Equal(t, "tester", sr.Name)
 
@@ -227,27 +234,48 @@ func TestNexClient_ListWorkloads(t *testing.T) {
 
 			var ar []*models.AuctionResponse
 			_test.WaitFor(t, 10*time.Second, func() bool {
-				ar, err = client.Auction("inmem", map[string]string{})
+				ar, err = client.Auction("user", "inmem", map[string]string{})
 				return err == nil && len(ar) == tt.size
 			}, "waiting for auction to return expected results")
 
-			_, err = client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			_, err = client.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+				Namespace:         "user",
+				Name:              "tester1",
+				Description:       "My test workload",
+				RunRequest:        "{}",
+				WorkloadType:      "inmem",
+				WorkloadLifecycle: models.WorkloadLifecycleService,
+			})
 			be.NilErr(t, err)
 
 			_test.WaitFor(t, 10*time.Second, func() bool {
-				ar, err = client.Auction("inmem", map[string]string{})
+				ar, err = client.Auction("user", "inmem", map[string]string{})
 				return err == nil && len(ar) == tt.size
 			}, "waiting for auction to return expected results")
 
-			_, err = client.StartWorkload(ar[1%tt.size].BidderId, "tester2", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			_, err = client.StartWorkload(ar[1%tt.size].BidderId, &models.StartWorkloadRequest{
+				Namespace:         "user",
+				Name:              "tester2",
+				Description:       "My test workload",
+				RunRequest:        "{}",
+				WorkloadType:      "inmem",
+				WorkloadLifecycle: models.WorkloadLifecycleService,
+			})
 			be.NilErr(t, err)
 
 			_test.WaitFor(t, 10*time.Second, func() bool {
-				ar, err = client.Auction("inmem", map[string]string{})
+				ar, err = client.Auction("user", "inmem", map[string]string{})
 				return err == nil && len(ar) == tt.size
 			}, "waiting for auction to return expected results")
 
-			_, err = client.StartWorkload(ar[2%tt.size].BidderId, "tester3", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			_, err = client.StartWorkload(ar[2%tt.size].BidderId, &models.StartWorkloadRequest{
+				Namespace:         "user",
+				Name:              "tester3",
+				Description:       "My test workload",
+				RunRequest:        "{}",
+				WorkloadType:      "inmem",
+				WorkloadLifecycle: models.WorkloadLifecycleService,
+			})
 			be.NilErr(t, err)
 
 			wl, err := client.ListWorkloads([]string{})
@@ -337,11 +365,18 @@ func TestNexClient_CloneWorkload(t *testing.T) {
 
 			var ar []*models.AuctionResponse
 			_test.WaitFor(t, 10*time.Second, func() bool {
-				ar, err = client.Auction("inmem", map[string]string{})
+				ar, err = client.Auction("user", "inmem", map[string]string{})
 				return err == nil && len(ar) == tt.size
 			}, "waiting for auction to return expected results")
 
-			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			swr, err := client.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+				Namespace:         "user",
+				Name:              "tester1",
+				Description:       "My test workload",
+				RunRequest:        "{}",
+				WorkloadType:      "inmem",
+				WorkloadLifecycle: models.WorkloadLifecycleService,
+			})
 			be.NilErr(t, err)
 
 			_, err = client.CloneWorkload(swr.Id, nil)
@@ -518,11 +553,18 @@ func TestNexClient_StopWorkload(t *testing.T) {
 
 			var ar []*models.AuctionResponse
 			_test.WaitFor(t, 10*time.Second, func() bool {
-				ar, err = client.Auction("inmem", map[string]string{})
+				ar, err = client.Auction("user", "inmem", map[string]string{})
 				return err == nil && len(ar) == tt.size
 			}, "waiting for auction to return expected results")
 
-			swr, err := client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+			swr, err := client.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+				Namespace:         "user",
+				Name:              "tester1",
+				Description:       "My test workload",
+				RunRequest:        "{}",
+				WorkloadType:      "inmem",
+				WorkloadLifecycle: models.WorkloadLifecycleService,
+			})
 			be.NilErr(t, err)
 
 			_test.WaitFor(t, 10*time.Second, func() bool {
@@ -644,11 +686,18 @@ func TestNexClient_ListWorkloads_PartialError(t *testing.T) {
 
 	var ar []*models.AuctionResponse
 	_test.WaitFor(t, 10*time.Second, func() bool {
-		ar, err = client.Auction("inmem", map[string]string{})
+		ar, err = client.Auction("user", "inmem", map[string]string{})
 		return err == nil && len(ar) == 3
 	}, "waiting for auction to return 3 results")
 
-	_, err = client.StartWorkload(ar[0].BidderId, "tester1", "My test workload", "{}", "inmem", models.WorkloadLifecycleService, nil)
+	_, err = client.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "tester1",
+		Description:       "My test workload",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
 	be.NilErr(t, err)
 
 	_test.WaitFor(t, 10*time.Second, func() bool {
@@ -717,12 +766,282 @@ func TestNexClient_Auction_PartialError(t *testing.T) {
 
 	var ar []*models.AuctionResponse
 	_test.WaitFor(t, 10*time.Second, func() bool {
-		ar, err = client.Auction("inmem", map[string]string{})
+		ar, err = client.Auction("user", "inmem", map[string]string{})
 		return len(ar) == 3
 	}, "waiting for auction to return 3 healthy results")
 
 	be.Nonzero(t, err)
 	be.Equal(t, 3, len(ar))
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
+}
+
+// countWorkloads collapses the scatter-gather list response to a total count.
+func countWorkloads(t *testing.T, c NexClient) int {
+	t.Helper()
+	wl, err := c.ListWorkloads(nil)
+	be.NilErr(t, err)
+	total := 0
+	for _, w := range wl {
+		total += len(*w)
+	}
+	return total
+}
+
+// TestNexClient_CloneWorkload_CrossNamespace verifies that when a system-user
+// client clones a workload owned by a user namespace, the clone lands in the
+// owning namespace — not in `system`. This was the primary bug motivating the
+// cross-namespace fix: before the fix, client.CloneWorkload would pass through
+// to StartWorkload with n.namespace="system" and the clone would be stored
+// under n.workloads["system"] on the agent.
+func TestNexClient_CloneWorkload_CrossNamespace(t *testing.T) {
+	workDir := t.TempDir()
+	server := _test.StartNatsServer(t, workDir)
+	defer server.Shutdown()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+	be.Equal(t, 1, len(nexNodes))
+
+	// Build two clients sharing the same nexus: one scoped to the "user"
+	// namespace that will deploy the original workload, and one scoped to
+	// system that will perform the cross-namespace clone.
+	userClient, err := NewClient(context.Background(), nc, "user", WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	systemClient, err := NewClient(context.Background(), nc, models.SystemNamespace, WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	var ar []*models.AuctionResponse
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		ar, err = userClient.Auction("user", "inmem", map[string]string{})
+		return err == nil && len(ar) == 1
+	}, "waiting for user auction to return 1 result")
+
+	origSwr, err := userClient.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "orig",
+		Description:       "original workload owned by user",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+
+	// Sanity: both clients see exactly one workload. We use a single
+	// WaitFor on the user client (the authoritative namespace) and then
+	// read the system client once — keeping ListWorkloads calls to a
+	// minimum since each carries a RequestMany stall.
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		return countWorkloads(t, userClient) == 1
+	}, "waiting for original to register in user namespace")
+	be.Equal(t, 1, countWorkloads(t, systemClient))
+
+	// System user clones the user-owned workload.
+	cloneResp, err := systemClient.CloneWorkload(origSwr.Id, nil)
+	be.NilErr(t, err)
+	be.Nonzero(t, cloneResp)
+	be.Unequal(t, origSwr.Id, cloneResp.Id)
+
+	// Both the original and the clone must appear in the user namespace.
+	// A single WaitFor confirms the clone landed; we then do one
+	// system-scoped list to verify every workload's Namespace field
+	// reports "user", confirming nothing re-homed into system.
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		return countWorkloads(t, userClient) == 2
+	}, "waiting for clone to appear in user namespace")
+
+	sysList, err := systemClient.ListWorkloads(nil)
+	be.NilErr(t, err)
+	seenUser := 0
+	for _, agentResp := range sysList {
+		for _, summary := range *agentResp {
+			be.Nonzero(t, summary.Namespace)
+			if summary.Namespace != nil && *summary.Namespace == "user" {
+				seenUser++
+			}
+		}
+	}
+	be.Equal(t, 2, seenUser)
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
+}
+
+// TestNexClient_StopWorkload_System_Discovery verifies that a system-user
+// client can stop a workload owned by a different namespace. The client must
+// discover the owning namespace via ListWorkloads and publish the stop on
+// that namespace's subject, not `system`.
+func TestNexClient_StopWorkload_System_Discovery(t *testing.T) {
+	workDir := t.TempDir()
+	server := _test.StartNatsServer(t, workDir)
+	defer server.Shutdown()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+	be.Equal(t, 1, len(nexNodes))
+
+	userClient, err := NewClient(context.Background(), nc, "user", WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	systemClient, err := NewClient(context.Background(), nc, models.SystemNamespace, WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	var ar []*models.AuctionResponse
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		ar, err = userClient.Auction("user", "inmem", map[string]string{})
+		return err == nil && len(ar) == 1
+	}, "waiting for user auction to return 1 result")
+
+	swr, err := userClient.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "stoppable",
+		Description:       "workload to be stopped by system",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		return countWorkloads(t, userClient) == 1
+	}, "waiting for workload to register")
+
+	// System user stops the user-owned workload. The client must discover
+	// namespace=user from the list response and target the user subject.
+	stopResp, err := systemClient.StopWorkload(swr.Id)
+	be.NilErr(t, err)
+	be.True(t, stopResp.Stopped)
+	be.Equal(t, swr.Id, stopResp.Id)
+
+	// Confirm the workload is gone from the user namespace.
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		return countWorkloads(t, userClient) == 0
+	}, "waiting for workload to stop")
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
+}
+
+// TestNexClient_StopWorkload_System_NotFound verifies that a system-user stop
+// for a nonexistent workload surfaces a clean not-found error rather than
+// silently returning Stopped=false.
+func TestNexClient_StopWorkload_System_NotFound(t *testing.T) {
+	workDir := t.TempDir()
+	server := _test.StartNatsServer(t, workDir)
+	defer server.Shutdown()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+	be.Equal(t, 1, len(nexNodes))
+
+	systemClient, err := NewClient(context.Background(), nc, models.SystemNamespace, WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	_, err = systemClient.StopWorkload("does-not-exist")
+	be.Nonzero(t, err)
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
+}
+
+// TestNexClient_CloneWorkload_StopOrig_CrossNamespace exercises the CLI's
+// clone-then-stop flow as a system user against a user-owned workload. The
+// clone must land in the user namespace and the original must be stopped.
+func TestNexClient_CloneWorkload_StopOrig_CrossNamespace(t *testing.T) {
+	workDir := t.TempDir()
+	server := _test.StartNatsServer(t, workDir)
+	defer server.Shutdown()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+	be.Equal(t, 1, len(nexNodes))
+
+	userClient, err := NewClient(context.Background(), nc, "user", WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	systemClient, err := NewClient(context.Background(), nc, models.SystemNamespace, WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	var ar []*models.AuctionResponse
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		ar, err = userClient.Auction("user", "inmem", map[string]string{})
+		return err == nil && len(ar) == 1
+	}, "waiting for user auction to return 1 result")
+
+	origSwr, err := userClient.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "orig-stop",
+		Description:       "original, will be stopped after clone",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		return countWorkloads(t, userClient) == 1
+	}, "waiting for original to register")
+
+	// System-user clone then stop, mirroring `nex workload copy --stop`.
+	cloneResp, err := systemClient.CloneWorkload(origSwr.Id, nil)
+	be.NilErr(t, err)
+
+	stopResp, err := systemClient.StopWorkload(origSwr.Id)
+	be.NilErr(t, err)
+	be.True(t, stopResp.Stopped)
+
+	// Only the clone should remain, and it should be in the user namespace.
+	// A single authoritative ListWorkloads after the stop covers both the
+	// count and the namespace-field checks without redundant round-trips.
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		return countWorkloads(t, userClient) == 1
+	}, "waiting for original to stop after clone")
+
+	wl, err := userClient.ListWorkloads(nil)
+	be.NilErr(t, err)
+	foundClone := false
+	for _, agentResp := range wl {
+		for _, summary := range *agentResp {
+			if summary.Id == cloneResp.Id {
+				foundClone = true
+				be.Nonzero(t, summary.Namespace)
+				if summary.Namespace != nil {
+					be.Equal(t, "user", *summary.Namespace)
+				}
+			}
+		}
+	}
+	be.True(t, foundClone)
 
 	for _, node := range nexNodes {
 		be.NilErr(t, node.Shutdown())

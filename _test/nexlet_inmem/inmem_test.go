@@ -157,7 +157,7 @@ func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 	var aR []*models.AuctionResponse
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		aR, err = nClient.Auction("inmem", nil)
+		aR, err = nClient.Auction(models.SystemNamespace, "inmem", nil)
 		if err == nil && len(aR) == 1 {
 			break
 		}
@@ -166,7 +166,13 @@ func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 	be.NilErr(t, err)
 	be.Equal(t, 1, len(aR))
 
-	sR, err := nClient.StartWorkload(aR[0].BidderId, "inmemfunc", "", "{}", "inmem", "function", nil)
+	sR, err := nClient.StartWorkload(aR[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         models.SystemNamespace,
+		Name:              "inmemfunc",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: "function",
+	})
 	be.NilErr(t, err)
 	be.Nonzero(t, sR)
 

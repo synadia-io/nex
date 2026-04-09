@@ -320,6 +320,11 @@ func (n *NexNode) Start() error {
 		n.logger.Warn("nex node started without any agents")
 	}
 
+	// Ensure subscriptions are live at the server before declaring ready.
+	if err := n.nc.Flush(); err != nil {
+		return fmt.Errorf("failed to flush nats connection after subscribing: %w", err)
+	}
+
 	n.logger.Info("nex node ready")
 	n.nodeState = models.NodeStateRunning
 	return nil

@@ -119,7 +119,7 @@ func (r *StartWorkload) Run(ctx context.Context, globals *Globals) error {
 		r.WorkloadStartRequest = json.RawMessage(srB)
 	}
 
-	aucResp, err := client.Auction(r.AgentType, r.AuctionTags)
+	aucResp, err := client.Auction(globals.Namespace, r.AgentType, r.AuctionTags)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,15 @@ func (r *StartWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
-	startResponse, err := client.StartWorkload(randomNode.BidderId, r.WorkloadName, r.WorkloadDescription, string(wsrB), r.AgentType, models.WorkloadLifecycle(r.WorkloadLifecycle), r.AuctionTags)
+	startResponse, err := client.StartWorkload(randomNode.BidderId, &models.StartWorkloadRequest{
+		Namespace:         globals.Namespace,
+		Name:              r.WorkloadName,
+		Description:       r.WorkloadDescription,
+		RunRequest:        string(wsrB),
+		WorkloadType:      r.AgentType,
+		WorkloadLifecycle: models.WorkloadLifecycle(r.WorkloadLifecycle),
+		Tags:              r.AuctionTags,
+	})
 	if err != nil {
 		return err
 	}
@@ -344,27 +352,42 @@ func (r *CloneWorkload) Run(ctx context.Context, globals *Globals) error {
 	if err != nil {
 		return err
 	}
+
+	// Clone succeeded. If --stop was requested and the subsequent stop
+	// fails, report both outcomes distinctly instead of swallowing the
+	// clone success so the operator knows the clone is live and only the
+	// original is still running.
 	var stopped bool
+	var stopErr error
 	if r.StopOrig {
-		stopResp, err := nexClient.StopWorkload(r.WorkloadId)
-		if err != nil {
-			return err
-		} else if stopResp.Stopped {
+		stopResp, sErr := nexClient.StopWorkload(r.WorkloadId)
+		switch {
+		case sErr != nil:
+			stopErr = sErr
+		case stopResp.Stopped:
 			stopped = true
 		}
 	}
+
 	if globals.JSON {
 		respB, err := json.Marshal(resp)
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(respB))
+		if stopErr != nil {
+			return stopErr
+		}
 		return nil
 	}
 
 	fmt.Printf("Workload %s [%s] successfully started\n", resp.Name, resp.Id)
 	if stopped {
 		fmt.Printf("Original workload [%s] stopped\n", r.WorkloadId)
+	}
+	if stopErr != nil {
+		fmt.Fprintf(os.Stderr, "failed to stop original workload [%s]: %v\n", r.WorkloadId, stopErr)
+		return stopErr
 	}
 
 	return nil

@@ -91,7 +91,7 @@ func BenchmarkClientAuction(b *testing.B) {
 
 			b.ResetTimer()
 			for b.Loop() {
-				auctionResponses, err := client.Auction(workloadType, map[string]string{})
+				auctionResponses, err := client.Auction(namespace, workloadType, map[string]string{})
 				be.NilErr(b, err)
 				b.StopTimer()
 				for _, ar := range auctionResponses {
