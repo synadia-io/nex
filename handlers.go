@@ -300,7 +300,13 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 		}
 
 		workloadID := n.idgen.Generate(req)
-		wlNatsConn, err := n.minter.Mint(models.WorkloadCred, namespace, workloadID)
+		// Mint against the workload's owning namespace (from the request
+		// body), not the subject namespace. The subject namespace is only
+		// used for the authorization bypass check above; the workload's
+		// NATS permissions — specifically the log sub scope
+		// $NEX.FEED.<ns>.logs.> — must line up with where the workload
+		// actually lives, which is req.Namespace.
+		wlNatsConn, err := n.minter.Mint(models.WorkloadCred, req.Namespace, workloadID)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to mint workload nats connection")
 			return
@@ -437,6 +443,23 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 		}
 
 		if getWorkload.Header.Get("Nats-Service-Error") == string(models.GenericErrorsWorkloadNotFound) {
+			return
+		}
+
+		// The agent's state.Exists iterates every namespace when looking
+		// up a workload by id, so a user caller could otherwise fetch the
+		// full StartWorkloadRequest definition (including RunRequest) of a
+		// workload owned by another namespace. Verify the returned
+		// workload's namespace matches the caller's, unless the caller is
+		// system (which is permitted to clone across namespaces). Silent
+		// drop on mismatch matches the existing "not found" silence
+		// pattern above so existence is not leaked.
+		tmp := new(models.StartWorkloadRequest)
+		if err := json.Unmarshal(getWorkload.Data, tmp); err != nil {
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to unmarshal workload definition from agent")
+			return
+		}
+		if tmp.Namespace != namespace && namespace != models.SystemNamespace {
 			return
 		}
 
