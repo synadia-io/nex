@@ -263,34 +263,34 @@ func (a *InMemAgent) QueryWorkloads(namespace string, filter []string) (*models.
 	a.Workloads.RLock()
 	defer a.Workloads.RUnlock()
 
-	workloads, ok := a.Workloads.State[namespace]
-	if !ok {
-		a.Logger.Debug("namespace not found", slog.String("namespace", namespace))
-		return &models.AgentListWorkloadsResponse{}, nil
-	}
-
 	resp := models.AgentListWorkloadsResponse{}
-	for _, workload := range workloads {
-		resp = append(resp, models.WorkloadSummary{
-			Id:                workload.id,
-			Name:              workload.name,
-			Runtime:           time.Since(workload.startTime).String(),
-			StartTime:         workload.startTime.Format(time.RFC3339),
-			WorkloadType:      a.WorkloadType,
-			WorkloadState:     models.WorkloadStateRunning,
-			WorkloadLifecycle: "service",
-			Metadata:          map[string]string{"extra": "metadata"},
-		})
-	}
 
-	if len(filter) > 0 {
-		filteredResp := models.AgentListWorkloadsResponse{}
-		for _, workload := range resp {
-			if slices.Contains(filter, workload.Id) {
-				filteredResp = append(filteredResp, workload)
-			}
+	// The system namespace is administrative: a query for it returns
+	// workloads across every namespace. Any other namespace only returns
+	// workloads that actually live under that map key. When filter is
+	// non-empty, only workloads whose id or name matches one of the
+	// filter entries are returned.
+	for mapNS, workloads := range a.Workloads.State {
+		if namespace != models.SystemNamespace && namespace != mapNS {
+			continue
 		}
-		resp = filteredResp
+		workloadNS := mapNS
+		for _, workload := range workloads {
+			if len(filter) > 0 && !slices.Contains(filter, workload.id) && !slices.Contains(filter, workload.name) {
+				continue
+			}
+			resp = append(resp, models.WorkloadSummary{
+				Id:                workload.id,
+				Namespace:         &workloadNS,
+				Name:              workload.name,
+				Runtime:           time.Since(workload.startTime).String(),
+				StartTime:         workload.startTime.Format(time.RFC3339),
+				WorkloadType:      a.WorkloadType,
+				WorkloadState:     models.WorkloadStateRunning,
+				WorkloadLifecycle: "service",
+				Metadata:          map[string]string{"extra": "metadata"},
+			})
+		}
 	}
 
 	a.Logger.Debug("QueryWorkloads successful", slog.String("namespace", namespace), slog.String("filter", strings.Join(filter, ",")))
