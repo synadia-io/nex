@@ -27,10 +27,19 @@
     "run_request": {
       "type": "string",
       "description": "The agent specific run request for the workload"
-    }, 
+    },
     "tags": {
       "$ref": "./shared-tag-map.json",
       "description": "Placement tags associated with the workload"
+    },
+    "reference": {
+      "type": "string",
+      "description": "Optional documentation reference"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Optional metadata",
+      "additionalProperties": false
     }
   },
   "required": [

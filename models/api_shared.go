@@ -416,11 +416,17 @@ type StartWorkloadRequest struct {
 	// A description of the workload
 	Description string `json:"description"`
 
+	// Optional metadata
+	Metadata StartWorkloadRequestMetadata `json:"metadata,omitempty"`
+
 	// The name of the workload
 	Name string `json:"name"`
 
 	// The namespace of the workload
 	Namespace string `json:"namespace"`
+
+	// Optional documentation reference
+	Reference *string `json:"reference,omitempty"`
 
 	// The agent specific run request for the workload
 	RunRequest string `json:"run_request"`
@@ -434,6 +440,9 @@ type StartWorkloadRequest struct {
 	// The type of the workload
 	WorkloadType string `json:"workload_type"`
 }
+
+// Optional metadata
+type StartWorkloadRequestMetadata map[string]interface{}
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (j *StartWorkloadRequest) UnmarshalJSON(value []byte) error {
