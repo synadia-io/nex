@@ -16,6 +16,8 @@ const (
 
 	AgentEnvNatsUrl = "NEX_AGENT_NATS_URL"
 	AgentEnvNodeId  = "NEX_AGENT_NODE_ID"
+
+	ReservedMetadataPrefix = "nex_"
 )
 
 var ReservedTagPrefixes = []string{"nex."}

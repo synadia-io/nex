@@ -299,6 +299,13 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
+		for k := range req.Metadata {
+			if strings.HasPrefix(strings.ToLower(k), models.ReservedMetadataPrefix) {
+				n.handlerError(r, errors.New("reserved metadata prefix"), models.ErrCodeBadRequest, "can not use reserved metadata prefix: "+models.ReservedMetadataPrefix)
+				return
+			}
+		}
+
 		workloadID := n.idgen.Generate(req)
 		// Mint against the workload's owning namespace (from the request
 		// body), not the subject namespace. The subject namespace is only
