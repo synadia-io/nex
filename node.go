@@ -450,6 +450,10 @@ func natsConnectionOptions(connData *models.NatsConnectionData) []nats.Option {
 		// JWT) instead of permanently aborting the reconnect loop. This only
 		// affects reconnect behavior; the initial Connect still fails fast.
 		nats.IgnoreAuthErrorAbort(),
+		// Don't fire the disconnect/closed handlers for an intentional
+		// Close()/Drain(); otherwise routine shutdown logs a misleading
+		// "disconnected err=<nil>" / "closed" warning.
+		nats.NoCallbacksAfterClientClose(),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
 			slog.Default().Warn("nats connection disconnected", slog.Any("err", err))
 		}),
