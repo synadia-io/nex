@@ -44,6 +44,7 @@ func TestNatsConnectionOptions(t *testing.T) {
 	}
 
 	be.True(t, o.IgnoreAuthErrorAbort)
+	be.True(t, o.NoCallbacksAfterClientClose)
 	be.Equal(t, -1, o.MaxReconnect)
 }
 
