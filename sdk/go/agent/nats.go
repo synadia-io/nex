@@ -2,6 +2,7 @@ package agent
 
 import (
 	"log/slog"
+	"os"
 	"strings"
 	"time"
 
@@ -45,6 +46,17 @@ func natsConnectionOptions(connData models.NatsConnectionData) []nats.Option {
 	}
 	if connData.TlsFirst {
 		opts = append(opts, nats.TLSHandshakeFirst())
+	}
+
+	// A reloadable NATS creds file takes precedence over the static in-memory
+	// credentials. nats.go re-reads the file on every (re)connect, so a
+	// refreshed/re-minted credential written before the current one expires is
+	// picked up automatically, letting the connection self-heal across
+	// expiry/rotation without a restart. Falls back to the static creds
+	// (backward compatible) when the env var is unset.
+	if credsFile := os.Getenv("NEX_AGENT_NATS_CREDS_FILE"); credsFile != "" {
+		opts = append(opts, nats.UserCredentials(credsFile))
+		return opts
 	}
 
 	switch {
