@@ -18,6 +18,7 @@ import (
 	"github.com/synadia-io/nex/internal/credentials"
 	eventemitter "github.com/synadia-io/nex/internal/event_emitter"
 	"github.com/synadia-io/nex/internal/idgen"
+	"github.com/synadia-io/nex/internal/retry"
 	secretstore "github.com/synadia-io/nex/internal/secret_store"
 	"github.com/synadia-io/nex/internal/state"
 	"github.com/synadia-io/nex/models"
@@ -70,7 +71,13 @@ type (
 		// List of active agents
 		registeredAgents *internal.AgentRegistrations
 
-		minter       models.CredVendor
+		minter models.CredVendor
+		// minter wrapped with retry policies: startup rides out longer
+		// outages, handlers must answer within the caller's request timeout.
+		startupMinter models.CredVendor
+		handlerMinter models.CredVendor
+
+		agentStarter *sync.WaitGroup
 		state        models.NexNodeState
 		auctioneer   models.Auctioneer
 		idgen        models.IDGen
@@ -178,9 +185,14 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	}
 	n.registeredAgents = internal.NewAgentRegistrations(n.ctx, pubKey, n.nc, n.logger.WithGroup("agent-registrations"))
 
-	var agentStarter sync.WaitGroup
-	agentStarter.Add(len(n.embeddedRunners) + len(n.localRunners))
-	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.eventEmitter, n.agentRestartLimit, &agentStarter)
+	n.startupMinter = credentials.WithRetry(n.ctx, n.minter, retry.Long)
+	n.handlerMinter = credentials.WithRetry(n.ctx, n.minter, retry.Short)
+
+	// One token per agent goroutine, added right before each launch in
+	// Start(); a bulk Add here would leak tokens (and deadlock
+	// WaitForAgents) for agents whose mint fails and never launch.
+	n.agentStarter = new(sync.WaitGroup)
+	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.eventEmitter, n.agentRestartLimit, n.agentStarter)
 
 	return n, nil
 }
@@ -313,11 +325,12 @@ func (n *NexNode) Start() error {
 	// Start agents via constructor
 	for _, runner := range n.embeddedRunners {
 		id := n.idgen.Generate(nil)
-		connData, err := n.minter.MintRegister(id, n.id)
+		connData, err := n.startupMinter.MintRegister(id, n.id)
 		if err != nil {
 			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
 			continue
 		}
+		n.agentStarter.Add(1)
 		go n.agentWatcher.StartEmbeddedAgent(id, runner, connData)
 	}
 
@@ -325,11 +338,12 @@ func (n *NexNode) Start() error {
 	for _, agentProcess := range n.localRunners {
 		agentProcess.HostNode = n.id
 		agentProcess.ID = n.idgen.Generate(nil)
-		connData, err := n.minter.MintRegister(agentProcess.ID, n.id)
+		connData, err := n.startupMinter.MintRegister(agentProcess.ID, n.id)
 		if err != nil {
 			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
 			continue
 		}
+		n.agentStarter.Add(1)
 		go n.agentWatcher.StartLocalBinaryAgent(agentProcess, connData)
 	}
 

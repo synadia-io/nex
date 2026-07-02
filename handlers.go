@@ -306,7 +306,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 		// NATS permissions — specifically the log sub scope
 		// $NEX.FEED.<ns>.logs.> — must line up with where the workload
 		// actually lives, which is req.Namespace.
-		wlNatsConn, err := n.minter.Mint(models.WorkloadCred, req.Namespace, workloadID)
+		wlNatsConn, err := n.handlerMinter.Mint(models.WorkloadCred, req.Namespace, workloadID)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to mint workload nats connection")
 			return
@@ -596,7 +596,7 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			return
 		}
 
-		natsConn, err := n.minter.Mint(models.AgentCred, "", agentID)
+		natsConn, err := n.handlerMinter.Mint(models.AgentCred, "", agentID)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to mint nats connection")
 			return
@@ -609,9 +609,11 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 
 		state := models.RegisterAgentResponseExistingState{}
 		for workloadID, swr := range agentState {
-			natsConn, err := n.minter.Mint(models.WorkloadCred, swr.Namespace, workloadID)
+			natsConn, err := n.handlerMinter.Mint(models.WorkloadCred, swr.Namespace, workloadID)
 			if err != nil {
-				n.logger.Warn("failed to mint workload nats connection", slog.String("err", err.Error()), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadID))
+				// Workload is dropped from the agent's resume state — surface it
+				// as an error, not just a warning.
+				n.logger.Error("failed to mint workload nats connection, workload dropped from resume state", slog.String("err", err.Error()), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadID))
 				continue
 			}
 			aswr := models.AgentStartWorkloadRequest{
@@ -657,7 +659,7 @@ func (n *NexNode) handleRegisterRemoteAgent() func(micro.Request) {
 			return
 		}
 
-		connData, err := n.minter.MintRegister(agentID, pubNodeKey)
+		connData, err := n.handlerMinter.MintRegister(agentID, pubNodeKey)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to mint register")
 			return
