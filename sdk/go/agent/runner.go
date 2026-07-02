@@ -9,10 +9,12 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/pkg/retry"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/micro"
@@ -21,6 +23,22 @@ import (
 const (
 	EnvVarPrefix = "NEX_AGENT"
 )
+
+// requestWithRetry sends req and retries with backoff ONLY while the node is
+// not subscribed yet (nats.ErrNoResponders — instant, safe to resend), so a
+// blip during node restart does not kill the agent before it ever receives
+// its credentials. Any other failure — including a timeout — is permanent:
+// the node may already have processed the request, and registration is not
+// idempotent, so resending it would trip "already registered".
+func requestWithRetry(ctx context.Context, nc *nats.Conn, subject string, data []byte, timeout time.Duration) (*nats.Msg, error) {
+	return retry.Do(ctx, retry.Long, func() (*nats.Msg, error) {
+		msg, err := nc.Request(subject, data, timeout)
+		if err != nil && !errors.Is(err, nats.ErrNoResponders) {
+			return nil, retry.Permanent(err)
+		}
+		return msg, err
+	})
+}
 
 var (
 	defaultEmitEvent func(string, any) error = func(string, any) error { return nil }
@@ -44,6 +62,8 @@ type Runner struct {
 	agent Agent
 	nc    *nats.Conn
 	micro micro.Service
+
+	metricsOnce sync.Once
 
 	secretStore models.SecretStore
 
@@ -104,7 +124,7 @@ func RemoteAgentInit(nc *nats.Conn, nexus, pubKey string) (*models.RegisterRemot
 		return nil, fmt.Errorf("failed to marshal remote agent registration request: %w", err)
 	}
 
-	regResp, err := nc.Request(models.AgentAPIInitRemoteRegisterRequestSubject(nexus), reqB, time.Second*3)
+	regResp, err := requestWithRetry(context.Background(), nc, models.AgentAPIInitRemoteRegisterRequestSubject(nexus), reqB, time.Second*3)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send remote agent registration request: %w", err)
 	}
@@ -169,13 +189,17 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData, eventEm
 	a.EmitEvent = eventEmitter.EmitEvent
 
 	if a.metrics {
-		go func() {
-			http.Handle("/metrics", promhttp.Handler())
-			err := http.ListenAndServe(fmt.Sprintf(":%d", a.metricsPort), nil)
-			if err != nil {
-				a.logger.Error("failed to start metrics server", slog.String("err", err.Error()), slog.String("agent_id", agentID))
-			}
-		}()
+		// Run is re-invoked by the watcher on failure; registering /metrics
+		// twice on the default mux would panic and take the process down.
+		a.metricsOnce.Do(func() {
+			go func() {
+				http.Handle("/metrics", promhttp.Handler())
+				err := http.ListenAndServe(fmt.Sprintf(":%d", a.metricsPort), nil)
+				if err != nil {
+					a.logger.Error("failed to start metrics server", slog.String("err", err.Error()), slog.String("agent_id", agentID))
+				}
+			}()
+		})
 	}
 
 	var err error
@@ -201,9 +225,7 @@ func (a *Runner) Run(agentID string, connData models.NatsConnectionData, eventEm
 		return fmt.Errorf("failed to marshal registration request: %w", err)
 	}
 
-	var regRet *nats.Msg
-
-	regRet, err = a.nc.Request(models.AgentAPIRegisterRequestSubject(agentID, a.nodeID), registerB, time.Minute)
+	regRet, err := requestWithRetry(a.ctx, a.nc, models.AgentAPIRegisterRequestSubject(agentID, a.nodeID), registerB, time.Minute)
 	if err != nil {
 		return fmt.Errorf("failed to send agent registration request to node %s: %w", a.nodeID, err)
 	}
