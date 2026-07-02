@@ -58,7 +58,7 @@ func startAuthErrMockServer(t *testing.T) (addr string, accepted *int32, stop fu
 			}
 			n := atomic.AddInt32(&count, 1)
 			go func(conn net.Conn, n int32) {
-				defer conn.Close()
+				defer func() { _ = conn.Close() }()
 
 				// Advertise ourselves so the client proceeds with the handshake.
 				_, _ = conn.Write([]byte(`INFO {"server_id":"mock","nonce":"abc"}` + "\r\n"))
