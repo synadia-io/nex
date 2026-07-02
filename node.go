@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -292,6 +293,23 @@ func (n *NexNode) Start() error {
 		}
 	}
 
+	// TODO(cred-refresh): agent/workload creds minted here (via
+	// n.minter.MintRegister / Mint) are currently one-shot with a ~1y TTL and
+	// are handed to agents statically (embedded: in-process connData; local:
+	// NEX_AGENT_NATS_* env in internal/watcher.go; remote: over NATS in
+	// handlers.go). The NATS connection now self-heals across expiry/rotation
+	// IF pointed at a reloadable creds file (NEX_{NODE,AGENT}_NATS_CREDS_FILE ->
+	// nats.UserCredentials, re-read on every reconnect). The remaining
+	// "producer" half is to (a) write each minted Credential to a decorated
+	// creds file (see credentials.Credential.String), (b) set the matching
+	// NEX_*_NATS_CREDS_FILE for the consumer, and (c) run a re-mint loop that
+	// rewrites the file at ~2/3 of the TTL. This is deferred because it is
+	// cross-process and mode-specific: embedded agents share this process (no
+	// file/env boundary, would need an in-memory reload callback); local agents
+	// are child processes on this host (file-based, feasible); remote nexlets
+	// live on other hosts where the node cannot write files (creds must be
+	// pushed over NATS). Implement per-mode as a follow-up.
+	//
 	// Start agents via constructor
 	for _, runner := range n.embeddedRunners {
 		id := n.idgen.Generate(nil)
@@ -473,6 +491,17 @@ func natsConnectionOptions(connData *models.NatsConnectionData) []nats.Option {
 	}
 	if connData.TlsFirst {
 		opts = append(opts, nats.TLSHandshakeFirst())
+	}
+
+	// A reloadable NATS creds file takes precedence over the static in-memory
+	// credentials. nats.go re-reads the file on every (re)connect, so a
+	// refreshed/re-minted credential written before the current one expires is
+	// picked up automatically, letting the connection self-heal across
+	// expiry/rotation without a restart. Falls back to the static creds
+	// (backward compatible) when the env var is unset.
+	if credsFile := os.Getenv("NEX_NODE_NATS_CREDS_FILE"); credsFile != "" {
+		opts = append(opts, nats.UserCredentials(credsFile))
+		return opts
 	}
 
 	switch {
