@@ -9,12 +9,14 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nex/sdk/go/agent"
+	"github.com/synadia-io/nex/internal/retry"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
 )
 
 type AgentProcess struct {
@@ -48,7 +50,8 @@ type AgentWatcher struct {
 	localAgents    map[string]*AgentProcess // maps agentID to AgentProcess
 	localAgentLock sync.Mutex               // Lock for managing access to localAgents
 
-	agentCount int
+	// mutated from concurrent per-agent goroutines
+	agentCount atomic.Int32
 }
 
 func NewAgentWatcher(ctx context.Context, nc *nats.Conn, kp nkeys.KeyPair, logger *slog.Logger, emitter models.EventEmitter, restarts int, wg *sync.WaitGroup) *AgentWatcher {
@@ -60,7 +63,6 @@ func NewAgentWatcher(ctx context.Context, nc *nats.Conn, kp nkeys.KeyPair, logge
 		emitter:      emitter,
 		resetLimit:   restarts,
 		initAgentsWg: wg,
-		agentCount:   0,
 
 		embeddedAgents:     make(map[string]*agent.Runner),
 		embeddedAgentsLock: sync.Mutex{},
@@ -76,7 +78,7 @@ func (a *AgentWatcher) WaitForAgents() {
 }
 
 func (a *AgentWatcher) Shutdown() {
-	a.logger.Info("shutting down agent watcher", slog.Int("agent_count", a.agentCount))
+	a.logger.Info("shutting down agent watcher", slog.Int("agent_count", int(a.agentCount.Load())))
 
 	// Stop all embedded agents
 	for agentID := range a.embeddedAgents {
@@ -99,32 +101,59 @@ func (a *AgentWatcher) Shutdown() {
 	a.logger.Info("agent watcher shutdown complete")
 }
 
-func (a *AgentWatcher) StartEmbeddedAgent(agentID string, runner *agent.Runner, connData *models.NatsConnectionData) {
-	restartCount := 0
+// Restart attempts back off exponentially so a transient outage (e.g. NATS
+// briefly unavailable during agent registration) does not consume every
+// allowed restart within milliseconds and give up permanently.
+const (
+	restartBackoffBase = time.Second
+	restartBackoffMax  = 30 * time.Second
+)
 
-	for range a.resetLimit {
-		a.logger.Debug("starting embedded agent", slog.String("agent_id", agentID), slog.Int("restart_count", restartCount))
-		err := runner.Run(agentID, *connData, a.emitter)
-		if err != nil {
-			restartCount++
-			if restartCount <= a.resetLimit {
-				a.logger.Warn("restarting agent", slog.String("agent_name", runner.String()), slog.Int("restart_count", restartCount), slog.Int("reset_limit", a.resetLimit), slog.String("err", err.Error()))
-				continue
-			} else {
-				a.logger.Error("agent failed to start after maximum retries", slog.String("agent_name", runner.String()), slog.Int("reset_limit", a.resetLimit), slog.String("err", err.Error()))
-				a.initAgentsWg.Done()
-				return
-			}
-		}
-		break
+// restartBackoffDelay returns the sleep before restart attempt n (1-based):
+// base doubled per attempt, capped at restartBackoffMax. The shift is clamped
+// so large n cannot wrap the duration negative.
+func restartBackoffDelay(n int) time.Duration {
+	return min(restartBackoffBase<<min(n-1, 5), restartBackoffMax)
+}
+
+// backoffBeforeRestart sleeps with jittered exponential backoff before
+// restart attempt n (1-based). It returns false if the watcher context ended
+// while waiting.
+func (a *AgentWatcher) backoffBeforeRestart(n int) bool {
+	select {
+	case <-a.ctx.Done():
+		return false
+	case <-time.After(retry.Jitter(restartBackoffDelay(n))):
+		return true
 	}
+}
 
-	a.embeddedAgentsLock.Lock()
-	a.embeddedAgents[agentID] = runner
-	a.embeddedAgentsLock.Unlock()
+func (a *AgentWatcher) StartEmbeddedAgent(agentID string, runner *agent.Runner, connData *models.NatsConnectionData) {
+	defer a.initAgentsWg.Done()
 
-	a.agentCount++
-	a.initAgentsWg.Done()
+	attempts := max(a.resetLimit, 1)
+	for attempt := 1; attempt <= attempts; attempt++ {
+		a.logger.Debug("starting embedded agent", slog.String("agent_id", agentID), slog.Int("attempt", attempt))
+		err := runner.Run(agentID, *connData, a.emitter)
+		if err == nil {
+			a.embeddedAgentsLock.Lock()
+			a.embeddedAgents[agentID] = runner
+			a.embeddedAgentsLock.Unlock()
+
+			a.agentCount.Add(1)
+			return
+		}
+
+		if attempt == attempts {
+			a.logger.Error("agent failed to start after maximum retries", slog.String("agent_name", runner.String()), slog.Int("reset_limit", a.resetLimit), slog.String("err", err.Error()))
+			return
+		}
+
+		a.logger.Warn("restarting agent", slog.String("agent_name", runner.String()), slog.Int("attempt", attempt), slog.Int("reset_limit", a.resetLimit), slog.String("err", err.Error()))
+		if !a.backoffBeforeRestart(attempt) {
+			return
+		}
+	}
 }
 
 func (a *AgentWatcher) StopEmbeddedAgent(agentID string) error {
@@ -144,7 +173,7 @@ func (a *AgentWatcher) StopEmbeddedAgent(agentID string) error {
 	}
 
 	a.logger.Debug("stopped embedded agent", slog.String("agent_id", agentID))
-	a.agentCount--
+	a.agentCount.Add(-1)
 
 	pubKey, err := a.nodeKeypair.PublicKey()
 	if err != nil {
@@ -180,6 +209,13 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 			}
 			return
 		default:
+			if ap.restartCount > 0 && !a.backoffBeforeRestart(ap.restartCount) {
+				if !ap.initialized {
+					a.initAgentsWg.Done()
+				}
+				return
+			}
+
 			ap.agentLock.Lock()
 
 			env := []string{}
@@ -220,7 +256,7 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 				a.initAgentsWg.Done()
 			}
 			ap.initialized = true
-			a.agentCount++
+			a.agentCount.Add(1)
 
 			a.localAgentLock.Lock()
 			a.localAgents[ap.ID] = ap
@@ -235,7 +271,7 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 				a.logger.Warn("Nexlet process unexpectedly exited with state", slog.Any("state", cmd.ProcessState), slog.Int("process", ap.Process.Pid))
 			}
 
-			a.agentCount--
+			a.agentCount.Add(-1)
 
 			if ap.state == models.AgentStateStopping || ap.state == models.AgentStateLameduck {
 				break
@@ -243,6 +279,12 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 
 			ap.restartCount++
 		}
+	}
+
+	// Loop exhausted without a single successful start: release the startup
+	// gate so WaitForAgents does not block forever.
+	if !ap.initialized {
+		a.initAgentsWg.Done()
 	}
 }
 
