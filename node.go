@@ -419,7 +419,7 @@ func (n *NexNode) enterLameduck(delay time.Duration) {
 	}
 }
 
-func configureNatsConnection(connData *models.NatsConnectionData) (*nats.Conn, error) {
+func natsConnectionOptions(connData *models.NatsConnectionData) []nats.Option {
 	if connData.ConnName == "" {
 		connData.ConnName = "nexnode"
 	}
@@ -428,6 +428,22 @@ func configureNatsConnection(connData *models.NatsConnectionData) (*nats.Conn, e
 		nats.Name(connData.ConnName),
 		nats.MaxReconnects(-1),
 		nats.Timeout(10 * time.Second),
+		// Keep reconnecting through auth errors (e.g. an expired or rotated
+		// JWT) instead of permanently aborting the reconnect loop. This only
+		// affects reconnect behavior; the initial Connect still fails fast.
+		nats.IgnoreAuthErrorAbort(),
+		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
+			slog.Default().Warn("nats connection disconnected", slog.Any("err", err))
+		}),
+		nats.ReconnectHandler(func(nc *nats.Conn) {
+			slog.Default().Info("nats connection reconnected", slog.String("url", nc.ConnectedUrl()))
+		}),
+		nats.ClosedHandler(func(_ *nats.Conn) {
+			slog.Default().Warn("nats connection closed")
+		}),
+		nats.ErrorHandler(func(_ *nats.Conn, _ *nats.Subscription, err error) {
+			slog.Default().Error("nats connection error", slog.Any("err", err))
+		}),
 	}
 
 	if connData.TlsCert != "" && connData.TlsKey != "" {
@@ -454,6 +470,12 @@ func configureNatsConnection(connData *models.NatsConnectionData) (*nats.Conn, e
 	case connData.NatsUserName != "" && connData.NatsUserPassword != "": // Use user + password
 		opts = append(opts, nats.UserInfo(connData.NatsUserName, connData.NatsUserPassword))
 	}
+
+	return opts
+}
+
+func configureNatsConnection(connData *models.NatsConnectionData) (*nats.Conn, error) {
+	opts := natsConnectionOptions(connData)
 
 	if len(connData.NatsServers) == 0 {
 		connData.NatsServers = []string{nats.DefaultURL}
