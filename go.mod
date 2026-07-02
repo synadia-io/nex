@@ -5,21 +5,17 @@ go 1.24.1
 require (
 	disorder.dev/shandler v0.0.0-20250411134702-523d18ddef40
 	github.com/carlmjohnson/be v0.24.1
+	github.com/goombaio/namegenerator v0.0.0-20181006234301-989e774b106e
 	github.com/nats-io/jwt/v2 v2.8.0
 	github.com/nats-io/nats-server/v2 v2.12.1
 	github.com/nats-io/nats.go v1.47.0
 	github.com/nats-io/nkeys v0.4.11
 	github.com/nats-io/nuid v1.0.1
+	github.com/prometheus/client_golang v1.23.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/synadia-io/nex/client v0.0.0-20250804171320-f9fb68fc9d24
-	github.com/synadia-io/nex/sdk/go v0.0.0-unpublished
 	github.com/synadia-io/orbit.go/natsext v0.1.1
 	golang.org/x/sys v0.37.0
 )
-
-replace github.com/synadia-io/nex/sdk/go => ./sdk/go/
-
-replace github.com/synadia-io/nex/client => ./client
 
 require (
 	dario.cat/mergo v1.0.2 // indirect
@@ -48,7 +44,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.1 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
