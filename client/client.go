@@ -553,20 +553,41 @@ func (n *nexClient) UpdateWorkload(id string, req *models.StartWorkloadRequest) 
 		return nil, n.nexBadRequestError(errors.New("nil request"), "update workload request must not be nil")
 	}
 
-	// targetNS addresses the request (and, for a system caller, is
-	// discovered — see resolveOwningNamespace); it is deliberately NOT
-	// forced onto req.Namespace. UPDATE never moves a workload (the node
-	// rejects a namespace change with 403 — see handleUpdateWorkload), so a
-	// caller-supplied req naming a different namespace must fail loudly
-	// rather than have the client quietly correct it out from under them.
+	// targetNS addresses the request and, for a system caller, is
+	// discovered via resolveOwningNamespace.
 	targetNS, err := n.resolveOwningNamespace(id, "update")
 	if err != nil {
 		return nil, err
 	}
 
+	// Shallow-copy so the namespace fixup below does not mutate the
+	// caller's struct (same rationale as StartWorkload's local copy).
+	local := *req
+
+	// A plain-namespace caller's req.Namespace is deliberately left as
+	// given: UPDATE never moves a workload (the node rejects a namespace
+	// change with 403 — see handleUpdateWorkload), and for such a caller
+	// targetNS is always its own namespace with no discovery step, so a
+	// mismatching req.Namespace can only be a deliberate (or mistaken)
+	// relocation attempt that must still fail loudly.
+	//
+	// A system caller is different: it has no home namespace of its own,
+	// which is exactly why it went through discovery to find targetNS in
+	// the first place. Its StartWorkloadRequest is commonly built with the
+	// caller's own default namespace ("system") already filled in, not the
+	// workload's actual owner — the caller never asked to relocate
+	// anything, and the subject is already correctly addressed at the
+	// discovered owner. Silently adopting targetNS here only smooths over
+	// that default; it does not let a system caller actually relocate a
+	// workload, since the node still checks StartRequest.Namespace against
+	// the workload's real namespace, which this fixup does not touch.
+	if n.namespace == models.SystemNamespace && local.Namespace != targetNS {
+		local.Namespace = targetNS
+	}
+
 	updateReq := models.UpdateWorkloadRequest{
 		Namespace:    targetNS,
-		StartRequest: *req,
+		StartRequest: local,
 	}
 
 	reqB, err := json.Marshal(updateReq)

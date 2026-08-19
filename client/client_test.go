@@ -1030,6 +1030,81 @@ func TestNexClient_StopWorkload_System_Discovery(t *testing.T) {
 	}
 }
 
+// TestNexClient_UpdateWorkload_System_CrossNamespace is the regression test
+// for a bug found in review: UpdateWorkload used to forward the caller's
+// StartWorkloadRequest.Namespace into the request body unchanged. A system
+// caller has no home namespace of its own, so its request is commonly built
+// with the caller's own namespace ("system") already filled in rather than
+// the workload's actual owner -- exactly the case resolveOwningNamespace's
+// discovery exists to handle. The node addresses the subject correctly (at
+// the discovered owner) but then rejects the body's mismatched
+// StartRequest.Namespace with a 403 "cannot move a workload between
+// namespaces", even though the caller never asked to relocate anything. Same
+// scenario as `nex workload update` run from the default (system) namespace
+// against a tenant-owned workload.
+func TestNexClient_UpdateWorkload_System_CrossNamespace(t *testing.T) {
+	workDir := t.TempDir()
+	server := _test.StartNatsServer(t, workDir)
+	defer server.Shutdown()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, false)
+	be.Equal(t, 1, len(nexNodes))
+
+	userClient, err := NewClient(context.Background(), nc, "user", WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	systemClient, err := NewClient(context.Background(), nc, models.SystemNamespace, WithAuctionStall(5*time.Second))
+	be.NilErr(t, err)
+
+	var ar []*models.AuctionResponse
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		ar, err = userClient.Auction("user", "inmem", map[string]string{})
+		return err == nil && len(ar) == 1
+	}, "waiting for user auction to return 1 result")
+
+	sr, err := userClient.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "updatable",
+		Description:       "workload to be updated by system",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+
+	_test.WaitFor(t, 30*time.Second, func() bool {
+		return countWorkloads(t, userClient) == 1
+	}, "waiting for workload to register")
+
+	// System user updates the user-owned workload, deliberately leaving
+	// Namespace at the system caller's own namespace -- the shape a caller
+	// naturally produces without first learning the workload's real owner,
+	// and the exact shape `nex workload update` sends from its default
+	// namespace.
+	updateResp, err := systemClient.UpdateWorkload(sr.Id, &models.StartWorkloadRequest{
+		Namespace:         models.SystemNamespace,
+		Name:              "updated-by-system",
+		Description:       "workload updated by system",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+	be.Equal(t, sr.Id, updateResp.Id)
+	be.True(t, updateResp.Updated)
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
+}
+
 // TestNexClient_StopWorkload_System_NotFound verifies that a system-user stop
 // for a nonexistent workload surfaces a clean not-found error rather than
 // silently returning Stopped=false.
