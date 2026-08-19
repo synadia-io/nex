@@ -255,6 +255,29 @@ func (j *NodePingResponse) UnmarshalJSON(value []byte) error {
 	return nil
 }
 
+type RestartWorkloadRequest struct {
+	// Namespace of the workload to restart
+	Namespace string `json:"namespace"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *RestartWorkloadRequest) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["namespace"]; raw != nil && !ok {
+		return fmt.Errorf("field namespace in RestartWorkloadRequest: required")
+	}
+	type Plain RestartWorkloadRequest
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = RestartWorkloadRequest(plain)
+	return nil
+}
+
 type UpdateWorkloadRequest struct {
 	// Namespace of the workload to update
 	Namespace string `json:"namespace"`
