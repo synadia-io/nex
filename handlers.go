@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -614,6 +615,135 @@ func (n *NexNode) respondUpdateWorkload(r micro.Request, resp models.UpdateWorkl
 	}
 }
 
+// handleRestartWorkload restarts an existing workload from its STORED
+// definition, reusing the same workload id and reusing UpdateWorkloadResponse
+// as the reply type (a restart is an update whose replacement definition
+// happens to be the one already on file, so no new response shape earns its
+// keep).
+//
+// Subject parsing, namespace agreement, and the ownership-fetch/silent-drop
+// convention are identical to handleUpdateWorkload -- see its comment for why
+// unknown-id and not-your-namespace must be indistinguishable to the caller.
+//
+// The definition RESTART replays is deliberately NOT the one the ownership
+// fetch just returned. That fetch reports whatever the owning nexlet
+// currently has running -- "reality" -- while the node's persisted state
+// record is "intent" (replaceWorkload's doc comment, and design decision D3
+// in the execution plan: store-first makes the stored record the thing a
+// crash-safe caller can trust). The two normally agree, but they can
+// diverge exactly when a prior UPDATE didn't finish: an unconfirmed stop or
+// a failed start leaves the NEW definition stored while the nexlet still
+// runs (or, on a failed start, doesn't run) the OLD one. Restarting from the
+// agent's live snapshot in that case would silently re-apply the stale
+// definition and defeat store-first's whole point; restarting from the
+// stored record instead finishes the interrupted update. current (the
+// fetched definition) is used only to establish ownership and to pin the
+// workload type/namespace replaceWorkload enforces.
+func (n *NexNode) handleRestartWorkload() func(micro.Request) {
+	return func(r micro.Request) {
+		// $NEX.SVC.<namespace>.control.RESTART.<workloadId>
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
+		namespace := splitSub[2]
+		workloadID := splitSub[5]
+
+		req := new(models.RestartWorkloadRequest)
+		err := json.Unmarshal(r.Data(), req)
+		if err != nil {
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal restart workload request")
+			return
+		}
+
+		if namespace != req.Namespace && namespace != models.SystemNamespace {
+			n.handlerError(r, errors.New("namespace mismatch"), models.ErrCodeForbidden, fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
+			return
+		}
+
+		pubKey, err := n.nodeKeypair.PublicKey()
+		if err != nil {
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
+			return
+		}
+
+		// Same not-found/ownership resolution as handleUpdateWorkload: a
+		// nexlet that does not hold the id does not reply at all, so "no
+		// reply" is the not-found signal, and both "unknown id" and "owned
+		// by another namespace" (checked below) must be silent so the reply
+		// count cannot be used as an existence oracle. A caller reads
+		// no-responders/timeout as not-found, exactly as it already must for
+		// CLONE and UPDATE.
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), time.Second*3)
+		if err != nil {
+			n.logger.Debug("no local agent holds the workload to restart", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
+			return
+		}
+
+		if getWorkload.Header.Get("Nats-Service-Error") == string(models.GenericErrorsWorkloadNotFound) {
+			return
+		}
+
+		current := new(models.StartWorkloadRequest)
+		if err := json.Unmarshal(getWorkload.Data, current); err != nil {
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to unmarshal workload definition from agent")
+			return
+		}
+
+		// The nexlet's lookup by id spans every namespace, so without this
+		// check a caller could restart (and re-mint credentials for) a
+		// workload owned by another namespace. Silent drop, per the
+		// CLONE/UPDATE convention.
+		if current.Namespace != namespace && namespace != models.SystemNamespace {
+			return
+		}
+
+		// current only establishes ownership; the definition actually
+		// replayed is the STORED one (see the function doc comment above).
+		// The state interface has no per-id getter (models/state.go), so
+		// fetch every record in the workload's namespace and pick this id
+		// out of the map.
+		records, err := n.state.GetStateByNamespace(current.Namespace)
+		if err != nil {
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to read stored workload definitions")
+			return
+		}
+
+		storedDef, ok := records[workloadID]
+		if !ok {
+			// The nexlet holds the workload but the node has no persisted
+			// record for it. This is reachable in normal operation, not
+			// just as a bug: handleAuctionDeployWorkload responds to the
+			// deploy caller and starts the agent BEFORE calling
+			// state.StoreWorkload, and does not fail the deploy if that
+			// store errors -- so a workload can legitimately run with no
+			// stored record at all. Ownership was already established
+			// above, so there is no existence to hide by going silent here;
+			// silence would also be actively misleading, since the client
+			// maps no-responders to "not found" and the workload plainly
+			// does exist. Report the true state instead: nothing to restart
+			// from, and updated:false is truthful rather than an opaque
+			// error, matching the wording style of
+			// updateStopUnconfirmedMessage / replacementStartFailedMessage.
+			n.respondUpdateWorkload(r, models.UpdateWorkloadResponse{
+				Id:      workloadID,
+				Updated: false,
+				Message: "no stored definition for this workload; nothing to restart",
+			})
+			return
+		}
+
+		updated, message, rerr := n.replaceWorkload(workloadID, *current, storedDef)
+		if rerr != nil {
+			n.handlerError(r, rerr.err, rerr.code, rerr.msg)
+			return
+		}
+
+		n.respondUpdateWorkload(r, models.UpdateWorkloadResponse{
+			Id:      workloadID,
+			Updated: updated,
+			Message: message,
+		})
+	}
+}
+
 // replaceWorkload swaps the definition behind workloadID for def, reusing
 // the same workload id, and is the shared core of the workload-replacement
 // control verbs.
@@ -654,6 +784,17 @@ func (n *NexNode) respondUpdateWorkload(r micro.Request, resp models.UpdateWorkl
 // WORKLOADSTOPPED and one WORKLOADSTARTED, which is what namespace quota
 // accounting expects.
 func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWorkloadRequest) (bool, string, *replaceError) {
+	// Defensive: def.Metadata is mutated below (the nkey stamp). def and
+	// current are ordinary struct values, but their Metadata fields are
+	// maps -- reference types -- so if a caller ever constructs def and
+	// current from the same underlying value (e.g. a same-definition
+	// replacement like RESTART built the naive way, replaceWorkload(id,
+	// current, current)), def.Metadata and current.Metadata would be the
+	// SAME map and this function would silently mutate a map the caller
+	// still holds a reference to via current. Cloning up front makes the
+	// mutation-in-place below safe regardless of what the caller passed.
+	def.Metadata = maps.Clone(def.Metadata)
+
 	// A workload-type change would reopen the dual-writer window this verb
 	// exists to close, and store-first makes it worse rather than better.
 	// The state key embeds the type, so the replacement lands on a NEW key

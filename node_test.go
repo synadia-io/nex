@@ -147,8 +147,9 @@ func TestNodeStartStop(t *testing.T) {
 
 	be.Equal(t, 1, nn.registeredAgents.Count())
 	// Bump this whenever a node or agent endpoint is added or removed; the
-	// UpdateWorkload control endpoint took it from 22 to 23.
-	be.Equal(t, 23, nc.NumSubscriptions())
+	// UpdateWorkload control endpoint took it from 22 to 23, and the
+	// RestartWorkload control endpoint took it from 23 to 24.
+	be.Equal(t, 24, nc.NumSubscriptions())
 	be.Equal(t, models.NodeStateRunning, nn.nodeState)
 
 	cancel()
