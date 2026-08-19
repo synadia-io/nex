@@ -118,10 +118,12 @@ func TestNexClient_UpdateAndRestartWorkload(t *testing.T) {
 	defer cancel()
 
 	// state=true: unlike the other client tests in this file, RESTART reads
-	// the persisted workload record back (there is no per-id state getter --
-	// it iterates GetStateByNamespace, see handleRestartWorkload), so this
-	// test needs the real NATS KV state impl, not the NoState stub the other
-	// tests get away with (StopWorkload/CloneWorkload never read state back).
+	// the persisted workload record back (GetWorkloadRecord, see
+	// handleRestartWorkload), so this test needs the real NATS KV state
+	// impl, not the NoState stub the other tests get away with -- NoState
+	// reports every record as not-found, which RESTART would truthfully
+	// answer with "nothing to restart" (StopWorkload/CloneWorkload never
+	// read state back, so they are unaffected).
 	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, true)
 	be.Equal(t, 1, len(nexNodes))
 

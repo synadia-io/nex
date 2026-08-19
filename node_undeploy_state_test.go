@@ -69,11 +69,11 @@ func (r *recordingState) RemoveWorkload(workloadType, workloadId string) error {
 	return r.NexNodeState.RemoveWorkload(workloadType, workloadId)
 }
 
-func (r *recordingState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest) error {
+func (r *recordingState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest, expectedRevision uint64) error {
 	r.mu.Lock()
 	r.storeCalls = append(r.storeCalls, storeWorkloadCall{workloadId: workloadId, request: swr})
 	r.mu.Unlock()
-	return r.NexNodeState.StoreWorkload(workloadId, swr)
+	return r.NexNodeState.StoreWorkload(workloadId, swr, expectedRevision)
 }
 
 func (r *recordingState) stores() []storeWorkloadCall {
