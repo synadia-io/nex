@@ -34,6 +34,8 @@ type NexClient interface {
 	StopWorkload(workloadId string) (*models.StopWorkloadResponse, error)
 	ListWorkloads(filter []string) ([]*models.AgentListWorkloadsResponse, error)
 	CloneWorkload(id string, tags map[string]string) (*models.StartWorkloadResponse, error)
+	UpdateWorkload(id string, req *models.StartWorkloadRequest) (*models.UpdateWorkloadResponse, error)
+	RestartWorkload(id string) (*models.UpdateWorkloadResponse, error)
 }
 
 type nexClient struct {
@@ -294,57 +296,9 @@ func (n *nexClient) StartWorkload(deployId string, req *models.StartWorkloadRequ
 }
 
 func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadResponse, error) {
-	// targetNS is the namespace the workload actually lives in. For user
-	// callers it is the caller's own namespace. For system callers we must
-	// discover it because system is administrative and never hosts
-	// workloads itself (except in rare explicit system-namespace starts).
-	targetNS := n.namespace
-
-	if n.namespace == models.SystemNamespace {
-		summaries, err := n.ListWorkloads([]string{workloadId})
-		if err != nil {
-			return nil, n.nexInternalError(err, "failed to discover workload namespace")
-		}
-
-		var resolved []string
-		for _, agentResp := range summaries {
-			for _, summary := range *agentResp {
-				if summary.Id != workloadId {
-					continue
-				}
-				if summary.Namespace == nil {
-					return nil, n.nexInternalError(
-						errors.New("owning namespace not reported"),
-						fmt.Sprintf("cannot stop workload %s as system user: owning namespace could not be determined (nexlet does not report namespace in list response); retry with --namespace set to the owning namespace", workloadId))
-				}
-				already := false
-				for _, existing := range resolved {
-					if existing == *summary.Namespace {
-						already = true
-						break
-					}
-				}
-				if !already {
-					resolved = append(resolved, *summary.Namespace)
-				}
-			}
-		}
-
-		switch len(resolved) {
-		case 0:
-			return nil, n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
-		case 1:
-			targetNS = resolved[0]
-		default:
-			// Don't echo the resolved namespace names in the error
-			// message — even though only system callers reach this branch
-			// today, the error propagates through NATS micro response
-			// headers and logs where the audience is broader. The
-			// operator can list workloads themselves to investigate.
-			return nil, n.nexInternalError(
-				errors.New("ambiguous workload id"),
-				fmt.Sprintf("workload id %s is ambiguous: it matches workloads in multiple namespaces; use --namespace to specify which one to stop", workloadId))
-		}
+	targetNS, err := n.resolveOwningNamespace(workloadId, "stop")
+	if err != nil {
+		return nil, err
 	}
 
 	req := models.StopWorkloadRequest{
@@ -391,6 +345,69 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 	})
 
 	return ret, errs
+}
+
+// resolveOwningNamespace determines the namespace that owns workloadId, for
+// a control verb (identified by action, used only in error text) the caller
+// is about to run against it. Every control subject is namespace-scoped, so
+// the caller must know the target namespace before it can even address the
+// request.
+//
+// For a user caller this is simply its own namespace -- the node enforces
+// ownership itself, so there is nothing to discover. system is
+// administrative and does not host workloads of its own, so a system caller
+// has to discover the real owner first via ListWorkloads. Originally
+// StopWorkload-only logic; UpdateWorkload and RestartWorkload need the exact
+// same resolution to let system operators target them too.
+func (n *nexClient) resolveOwningNamespace(workloadId, action string) (string, error) {
+	if n.namespace != models.SystemNamespace {
+		return n.namespace, nil
+	}
+
+	summaries, err := n.ListWorkloads([]string{workloadId})
+	if err != nil {
+		return "", n.nexInternalError(err, "failed to discover workload namespace")
+	}
+
+	var resolved []string
+	for _, agentResp := range summaries {
+		for _, summary := range *agentResp {
+			if summary.Id != workloadId {
+				continue
+			}
+			if summary.Namespace == nil {
+				return "", n.nexInternalError(
+					errors.New("owning namespace not reported"),
+					fmt.Sprintf("cannot %s workload %s as system user: owning namespace could not be determined (nexlet does not report namespace in list response); retry with --namespace set to the owning namespace", action, workloadId))
+			}
+			already := false
+			for _, existing := range resolved {
+				if existing == *summary.Namespace {
+					already = true
+					break
+				}
+			}
+			if !already {
+				resolved = append(resolved, *summary.Namespace)
+			}
+		}
+	}
+
+	switch len(resolved) {
+	case 0:
+		return "", n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
+	case 1:
+		return resolved[0], nil
+	default:
+		// Don't echo the resolved namespace names in the error message —
+		// even though only system callers reach this branch today, the
+		// error propagates through NATS micro response headers and logs
+		// where the audience is broader. The operator can list workloads
+		// themselves to investigate.
+		return "", n.nexInternalError(
+			errors.New("ambiguous workload id"),
+			fmt.Sprintf("workload id %s is ambiguous: it matches workloads in multiple namespaces; use --namespace to specify which one to %s", workloadId, action))
+	}
 }
 
 func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloadsResponse, error) {
@@ -529,6 +546,97 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 	}
 
 	return swr, nil
+}
+
+func (n *nexClient) UpdateWorkload(id string, req *models.StartWorkloadRequest) (*models.UpdateWorkloadResponse, error) {
+	if req == nil {
+		return nil, n.nexBadRequestError(errors.New("nil request"), "update workload request must not be nil")
+	}
+
+	// targetNS addresses the request (and, for a system caller, is
+	// discovered — see resolveOwningNamespace); it is deliberately NOT
+	// forced onto req.Namespace. UPDATE never moves a workload (the node
+	// rejects a namespace change with 403 — see handleUpdateWorkload), so a
+	// caller-supplied req naming a different namespace must fail loudly
+	// rather than have the client quietly correct it out from under them.
+	targetNS, err := n.resolveOwningNamespace(id, "update")
+	if err != nil {
+		return nil, err
+	}
+
+	updateReq := models.UpdateWorkloadRequest{
+		Namespace:    targetNS,
+		StartRequest: *req,
+	}
+
+	reqB, err := json.Marshal(updateReq)
+	if err != nil {
+		return nil, n.nexInternalError(err, "failed to marshal update workload request")
+	}
+
+	return n.requestWorkloadReplacement(models.UpdateWorkloadRequestSubject(targetNS, id), reqB)
+}
+
+func (n *nexClient) RestartWorkload(id string) (*models.UpdateWorkloadResponse, error) {
+	targetNS, err := n.resolveOwningNamespace(id, "restart")
+	if err != nil {
+		return nil, err
+	}
+
+	restartReq := models.RestartWorkloadRequest{
+		Namespace: targetNS,
+	}
+
+	reqB, err := json.Marshal(restartReq)
+	if err != nil {
+		return nil, n.nexInternalError(err, "failed to marshal restart workload request")
+	}
+
+	return n.requestWorkloadReplacement(models.RestartWorkloadRequestSubject(targetNS, id), reqB)
+}
+
+// requestWorkloadReplacement issues a scatter-gather request on subject for
+// the workload-replacement verbs (UPDATE, RESTART): every node sees the
+// subject, but only the owning node's handler answers at all (the CLONE/
+// UPDATE silent-drop convention — see handleUpdateWorkload/
+// handleRestartWorkload), so a message never arriving within the stall
+// window means not-found rather than a real error. Mirrors CloneWorkload's
+// RequestMany + nexNotFoundError handling.
+func (n *nexClient) requestWorkloadReplacement(subject string, reqB []byte) (*models.UpdateWorkloadResponse, error) {
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, subject, reqB, natsext.RequestManyStall(n.requestManyStall))
+	if err != nil {
+		return nil, n.nexInternalError(err, "failed to request workload replacement")
+	}
+
+	var resp *models.UpdateWorkloadResponse
+	var errs error
+	msgs(func(m *nats.Msg, e error) bool {
+		if e == nil && m.Data != nil && string(m.Data) != "null" {
+			if nexErr := nexErrorFromMsg(m); nexErr != nil {
+				errs = errors.Join(errs, nexErr)
+				return true
+			}
+			t := new(models.UpdateWorkloadResponse)
+			if uerr := json.Unmarshal(m.Data, t); uerr == nil {
+				resp = t
+				return false
+			}
+		}
+		if e != nil && !errors.Is(e, nats.ErrNoResponders) {
+			errs = errors.Join(errs, e)
+		}
+		return true
+	})
+
+	if resp == nil && errs != nil {
+		return nil, errs
+	}
+
+	if resp == nil {
+		return nil, n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
+	}
+
+	return resp, nil
 }
 
 func (n *nexClient) nexInternalError(err error, friendlyMsg string) *models.NexError {
