@@ -28,6 +28,7 @@ package nex_test
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
 	"time"
 
@@ -38,6 +39,49 @@ import (
 	nex "github.com/synadia-io/nex"
 	"github.com/synadia-io/nex/models"
 )
+
+// mintCall records one models.CredVendor.Mint call.
+type mintCall struct {
+	typ       models.CredType
+	namespace string
+	id        string
+}
+
+// recordingMinter wraps the harness's real signing minter and records the
+// arguments of every Mint. The NAMESPACE argument is the load-bearing one: a
+// workload credential's log and trigger subjects are namespace-scoped
+// ($NEX.FEED.<ns>.logs.>), so minting against the wrong namespace hands a
+// workload authority inside a tenant it does not belong to. The response
+// alone cannot show that -- the credential is issued whether or not the
+// replacement then starts.
+type recordingMinter struct {
+	models.CredVendor
+
+	mu    sync.Mutex
+	mints []mintCall
+}
+
+func (m *recordingMinter) Mint(typ models.CredType, namespace, id string) (*models.NatsConnectionData, error) {
+	m.mu.Lock()
+	m.mints = append(m.mints, mintCall{typ: typ, namespace: namespace, id: id})
+	m.mu.Unlock()
+	return m.CredVendor.Mint(typ, namespace, id)
+}
+
+// workloadMintsFor returns every workload-credential mint issued for
+// workloadID, in order.
+func (m *recordingMinter) workloadMintsFor(workloadID string) []mintCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var out []mintCall
+	for _, c := range m.mints {
+		if c.typ == models.WorkloadCred && c.id == workloadID {
+			out = append(out, c)
+		}
+	}
+	return out
+}
 
 // fixedWorkloadIDGen hands out a caller-chosen id for every workload while
 // leaving agent/bidder ids random (models.IDGen: a nil start request means
@@ -295,4 +339,128 @@ func (h *updateHarness) registerAgain(t *testing.T, registerType, schema string)
 	resp := models.RegisterAgentResponse{}
 	be.NilErr(t, json.Unmarshal(respRaw.Data, &resp))
 	return resp
+}
+
+// TestNodeRestartForeignNamespaceRecordIsNotReplayed pins the namespace
+// filter on RESTART's stored-definition lookup.
+//
+// RESTART used to find the stored record by scanning
+// GetStateByNamespace(current.Namespace), which filtered by namespace as a
+// side effect. The direct GetWorkloadRecord read is keyed only by
+// (workload_type, workload_id), so that filter has to be re-applied
+// explicitly -- otherwise a record whose namespace disagrees with the live
+// workload's is replayed anyway, and replaceWorkload mints the replacement's
+// credential against the STORED definition's namespace. A workload
+// credential's log and trigger subjects are namespace-scoped, so that hands
+// the restarted workload authority inside a tenant its caller has no rights
+// to.
+//
+// The divergence is reachable rather than hypothetical: the workload id
+// generator is a public node option, and a deterministic one makes two
+// tenants deploying the same workload collide on one key. Create-only
+// (correctly) refuses the second tenant's store, so tenant A's record
+// survives while tenant B's workload runs -- exactly the state seeded here,
+// reached without any out-of-band writer.
+//
+// The right answer is the one the old scan gave: no record for THIS
+// workload, so there is nothing to restart.
+func TestNodeRestartForeignNamespaceRecordIsNotReplayed(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	h := newUpdateHarness(t, ctx, commandSchema)
+
+	// The live workload belongs to tenant-b.
+	workloadID := h.deploy(t, namespacedDef("tenant-b", "b-live", `{"command":"one"}`))
+
+	// The record on file belongs to tenant-a -- the state a key collision
+	// under a deterministic id generator leaves behind.
+	h.setStoredRecord(t, ctx, "inmem", workloadID,
+		namespacedDef("tenant-a", "a-stored", `{"command":"two"}`))
+
+	mintsBefore := len(h.mint.workloadMintsFor(workloadID))
+	startSpy := h.spyOnStarts(t)
+	stopSpy := h.spyOnStops(t)
+
+	// A fully authorized RESTART from the workload's OWN namespace: this is
+	// not an authorization bug, which is what makes it dangerous. Every
+	// check upstream passes.
+	msg := h.restart(t, "tenant-b", workloadID, models.RestartWorkloadRequest{
+		Namespace: "tenant-b",
+	})
+
+	be.Equal(t, "", msg.Header.Get("Nats-Service-Error-Code"))
+
+	resp := models.UpdateWorkloadResponse{}
+	be.NilErr(t, json.Unmarshal(msg.Data, &resp))
+	be.False(t, resp.Updated)
+	be.Equal(t, "no stored definition for this workload; nothing to restart", resp.Message)
+
+	// Nothing was replayed: no stop, no start, and the foreign record is
+	// untouched.
+	be.NilErr(t, h.nc.Flush())
+	be.Equal(t, 0, stopSpy.count())
+	be.Equal(t, 0, startSpy.count())
+
+	stored := h.storedRecord(t, ctx, "inmem", workloadID)
+	be.Equal(t, "a-stored", stored.Name)
+	be.Equal(t, "tenant-a", stored.Namespace)
+
+	// The decisive assertion: no credential was minted at all, and in
+	// particular none scoped to the foreign namespace. replaceWorkload mints
+	// before it stores, so a handler that got as far as the replacement has
+	// already issued the credential even if the rest then fails.
+	mints := h.mint.workloadMintsFor(workloadID)
+	be.Equal(t, mintsBefore, len(mints))
+	for _, m := range mints {
+		be.Unequal(t, "tenant-a", m.namespace)
+	}
+
+	// The live workload is still tenant-b's own definition.
+	live := h.agentDefinition(t, workloadID)
+	be.Equal(t, "b-live", live.Name)
+	be.Equal(t, "tenant-b", live.Namespace)
+}
+
+// TestNodeResumeFailedRereadDoesNotResumeStaleDefinition pins the last
+// failure branch in resume's conflict handling.
+//
+// The sequence is a double failure: resume re-reads a record, loses the CAS
+// to a concurrent writer, and then the re-read it does to recover ALSO
+// fails. At that point the only definition in hand is the one that just lost
+// -- known-stale, since a writer demonstrably replaced it. Handing it to the
+// agent would start the reverted definition, which is the silent-revert
+// class this whole task exists to close, arrived at through the error path
+// instead of the happy path.
+//
+// So the workload is dropped from the resume state and waits for the next
+// registration, exactly like every other failure branch in this loop.
+func TestNodeResumeFailedRereadDoesNotResumeStaleDefinition(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	h := newUpdateHarness(t, ctx, commandSchema)
+	workloadID := h.deploy(t, serviceDef("v1-stale", `{"command":"one"}`))
+
+	// Resume's first read succeeds; its recovery re-read (the second) fails.
+	h.rec.failGetWorkloadRecordAfter(1)
+
+	// ... and the CAS in between loses, which is what triggers that re-read.
+	h.rec.injectBeforeStore(func() {
+		h.setStoredRecord(t, ctx, "inmem", workloadID, serviceDef("v2-won-the-cas", `{"command":"two"}`))
+	})
+
+	registerResp := h.registerAgain(t, "inmem", commandSchema)
+	be.True(t, registerResp.Success)
+
+	// The decisive assertion: the workload is NOT in the resume state, so
+	// the stale definition is not started. Resuming it with "v1-stale"
+	// would be the revert.
+	_, ok := registerResp.ExistingState[workloadID]
+	be.False(t, ok)
+
+	// The winner's definition is still what is on file -- nothing wrote
+	// over it.
+	stored := h.storedRecord(t, ctx, "inmem", workloadID)
+	be.Equal(t, "v2-won-the-cas", stored.Name)
 }
