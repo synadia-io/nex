@@ -222,12 +222,35 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 		startRequest.Request.Name = workloadId
 	}
 
-	a.Workloads.State[startRequest.Request.Namespace] = append(a.Workloads.State[startRequest.Request.Namespace], InMemWorkload{
+	newEntry := InMemWorkload{
 		name:         startRequest.Request.Name,
 		id:           workloadId,
 		startTime:    time.Now(),
 		startRequest: &startRequest.Request,
-	})
+	}
+
+	// Replace-by-id: a workload id already present in this namespace's
+	// slice is overwritten in place rather than appended a second time.
+	// UPDATE/RESTART's node-side composition always stops the old instance
+	// first (handlers.go replaceWorkload), so this branch is not normally
+	// reached from that path -- but resume-on-registration calls
+	// StartWorkload(existing=true) for every persisted record without a
+	// prior Stop, and a caller-chosen id can legitimately be reused (see
+	// nex-workload-verbs plan D2). Either path hitting an id this agent
+	// already holds must not accumulate a duplicate entry.
+	workloads := a.Workloads.State[startRequest.Request.Namespace]
+	replaced := false
+	for i, w := range workloads {
+		if w.id == workloadId {
+			workloads[i] = newEntry
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		workloads = append(workloads, newEntry)
+	}
+	a.Workloads.State[startRequest.Request.Namespace] = workloads
 
 	err := a.Runner.EmitEvent(startRequest.Request.Namespace, models.WorkloadStartedEvent{
 		Id:           workloadId,

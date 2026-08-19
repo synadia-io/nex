@@ -108,6 +108,44 @@ func TestStartWorkload(t *testing.T) {
 	be.Equal(t, "tester", workloads[0].name)
 }
 
+// TestStartWorkloadSameIdReplaces pins replace-by-id semantics: starting a
+// workload id the agent already holds must overwrite that entry in place,
+// not accumulate a second one. UPDATE/RESTART's node-side composition always
+// stops the old instance before starting the replacement (handlers.go
+// replaceWorkload), so this path is not exercised by the ordinary
+// update/restart flow -- but resume-on-registration
+// (sdk/go/agent/runner.go, handlers.go handleRegisterAgent) calls
+// StartWorkload(existing=true) for every persisted record of a newly
+// registering agent without first calling Stop, and a caller-chosen id can
+// legitimately be reused (see VERBS design D2). Either path hitting an id
+// already present in Workloads.State must replace, not duplicate.
+func TestStartWorkloadSameIdReplaces(t *testing.T) {
+	agt := newInmemAgent(t, true) // seeds "default" with id "abc123", name "tester"
+	agt.Runner = &agent.Runner{
+		EmitEvent: func(string, any) error { return nil },
+	}
+
+	swr, err := agt.StartWorkload("abc123", &models.AgentStartWorkloadRequest{
+		Request: models.StartWorkloadRequest{
+			Description:       "tester-v2",
+			Name:              "tester-v2",
+			Namespace:         "default",
+			RunRequest:        `{"v":2}`,
+			WorkloadLifecycle: "service",
+			WorkloadType:      "inmem",
+		},
+		WorkloadCreds: models.NatsConnectionData{},
+	}, true)
+	be.NilErr(t, err)
+	be.Equal(t, "abc123", swr.Id)
+	be.Equal(t, "tester-v2", swr.Name)
+
+	workloads := agt.Workloads.State["default"]
+	be.Equal(t, 1, len(workloads))
+	be.Equal(t, "tester-v2", workloads[0].name)
+	be.Equal(t, `{"v":2}`, workloads[0].startRequest.RunRequest)
+}
+
 func TestFunctionStartWorkloadAndTrigger(t *testing.T) {
 	server := server.New(&server.Options{
 		Port:      -1,
