@@ -487,6 +487,263 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 	}
 }
 
+// updateStopUnconfirmedMessage is the client-visible outcome when the
+// running instance could not be confirmed stopped. It is not a failure of
+// the stored definition: that has already been persisted (store-first), so
+// the next agent registration starts the NEW definition and the update
+// completes late rather than reverting. The wording is part of the client
+// contract -- callers key remediation off it.
+const updateStopUnconfirmedMessage = "stop unconfirmed; stored definition will apply on next agent registration"
+
+// replaceError carries the micro error code and the operator-facing message
+// alongside a failure, so replaceWorkload can report one without holding a
+// micro.Request and its caller can pass all three to handlerError.
+type replaceError struct {
+	code string
+	msg  string
+	err  error
+}
+
+func (e *replaceError) Error() string { return e.err.Error() }
+
+func newReplaceError(code, msg string, err error) *replaceError {
+	return &replaceError{code: code, msg: msg, err: err}
+}
+
+// handleUpdateWorkload replaces the definition of an existing workload in
+// place, keeping the same workload id.
+//
+// Every node sees every control message (the micro queue group is the
+// node's own id), so this handler first has to establish that a locally
+// registered nexlet actually holds the addressed workload. It answers
+// updated:false when no local nexlet has the id at all, and drops silently
+// when a nexlet has it but under a different namespace -- answering there
+// would confirm the id's existence to a caller with no right to it, which
+// is the same reasoning handleCloneWorkload uses.
+func (n *NexNode) handleUpdateWorkload() func(micro.Request) {
+	return func(r micro.Request) {
+		// $NEX.SVC.<namespace>.control.UPDATE.<workloadId>
+		splitSub := strings.SplitN(r.Subject(), ".", 6)
+		namespace := splitSub[2]
+		workloadID := splitSub[5]
+
+		req := new(models.UpdateWorkloadRequest)
+		err := json.Unmarshal(r.Data(), req)
+		if err != nil {
+			n.handlerError(r, err, models.ErrCodeBadRequest, "failed to unmarshal update workload request")
+			return
+		}
+
+		if namespace != req.Namespace && namespace != models.SystemNamespace {
+			n.handlerError(r, errors.New("namespace mismatch"), models.ErrCodeForbidden, fmt.Sprintf("namespace mismatch: %s != %s", namespace, req.Namespace))
+			return
+		}
+
+		pubKey, err := n.nodeKeypair.PublicKey()
+		if err != nil {
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to get public key from keypair")
+			return
+		}
+
+		notFound := models.UpdateWorkloadResponse{
+			Id:      workloadID,
+			Updated: false,
+			Message: string(models.GenericErrorsWorkloadNotFound),
+		}
+
+		// A nexlet that does not hold the id does not reply at all
+		// (sdk/go/agent/runner.go handleGetWorkload), so "no reply" is the
+		// not-found signal here, not an error.
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), time.Second*3)
+		if err != nil {
+			n.logger.Debug("no local agent holds the workload to update", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
+			n.respondUpdateWorkload(r, notFound)
+			return
+		}
+
+		if getWorkload.Header.Get("Nats-Service-Error") == string(models.GenericErrorsWorkloadNotFound) {
+			n.respondUpdateWorkload(r, notFound)
+			return
+		}
+
+		current := new(models.StartWorkloadRequest)
+		if err := json.Unmarshal(getWorkload.Data, current); err != nil {
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to unmarshal workload definition from agent")
+			return
+		}
+
+		// The nexlet's lookup by id spans every namespace, so without this
+		// check a caller could replace the definition of a workload owned
+		// by another namespace. Silent drop, per the CLONE convention.
+		if current.Namespace != namespace && namespace != models.SystemNamespace {
+			return
+		}
+
+		// UPDATE replaces a definition in place; it does not relocate the
+		// workload. A replacement naming a different namespace would
+		// re-scope the credentials minted for it (log and trigger subjects
+		// are namespace-scoped) while the workload keeps running here under
+		// the old namespace's placement. System callers are not exempt:
+		// relocation is not this verb's job.
+		if req.StartRequest.Namespace != current.Namespace {
+			n.handlerError(r, errors.New("namespace mismatch"), models.ErrCodeForbidden, fmt.Sprintf("update cannot move a workload between namespaces: %s != %s", req.StartRequest.Namespace, current.Namespace))
+			return
+		}
+
+		updated, message, rerr := n.replaceWorkload(workloadID, *current, req.StartRequest)
+		if rerr != nil {
+			n.handlerError(r, rerr.err, rerr.code, rerr.msg)
+			return
+		}
+
+		n.respondUpdateWorkload(r, models.UpdateWorkloadResponse{
+			Id:      workloadID,
+			Updated: updated,
+			Message: message,
+		})
+	}
+}
+
+func (n *NexNode) respondUpdateWorkload(r micro.Request, resp models.UpdateWorkloadResponse) {
+	if err := r.RespondJSON(resp); err != nil {
+		n.logger.Error("failed to respond to update workload request", slog.String("err", err.Error()))
+	}
+}
+
+// replaceWorkload swaps the definition behind workloadID for def, reusing
+// the same workload id, and is the shared core of the workload-replacement
+// control verbs.
+//
+// The step ordering is the correctness content and must not be rearranged:
+//
+//   - validate before persisting, so a rejected definition can never
+//     displace a good stored one;
+//   - mint before persisting, so the nkey in the stored record is the one
+//     the replacement instance actually receives (a record holding a stale
+//     nkey would make a later credential revocation revoke the wrong
+//     identity);
+//   - persist before stopping ("store-first"), so a crash at any point
+//     after this leaves the NEW definition as the one
+//     resume-on-registration will start: the repair path completes the
+//     update instead of silently reverting it;
+//   - start only after a CONFIRMED stop. Starting first is exactly the
+//     dual-writer window this verb exists to close -- two instances of one
+//     workload publishing, advancing the same checkpoints and splitting the
+//     same durable consumer.
+//
+// current is the definition the owning nexlet holds right now. It is read
+// for two things only: detecting a workload-type change (the state key
+// embeds the type) and addressing the stop at the workload's namespace.
+//
+// A false return with a nil error is a legitimate, self-healing outcome
+// rather than a server fault: the new definition is stored, and the next
+// agent registration will bring reality up to it. No lifecycle events are
+// emitted here -- the agent's own stop and start paths emit exactly one
+// WORKLOADSTOPPED and one WORKLOADSTARTED, which is what namespace quota
+// accounting expects.
+func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWorkloadRequest) (bool, string, *replaceError) {
+	pubKey, err := n.nodeKeypair.PublicKey()
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to get public key from keypair", err)
+	}
+
+	reg, err := n.registeredAgents.GetByRegisterType(def.WorkloadType)
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeNotFound, "workload type not found", errors.New("workload type not found"))
+	}
+
+	rr, err := jsonschema.UnmarshalJSON(strings.NewReader(def.RunRequest))
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeBadRequest, "failed to unmarshal start request", err)
+	}
+
+	if err := reg.Schema.Validate(rr); err != nil {
+		return false, "", newReplaceError(models.ErrCodeBadRequest, "failed to validate run request", err)
+	}
+
+	// Credentials are handed to a workload only at create time, so a
+	// replacement instance means a fresh mint regardless.
+	wlNatsConn, err := n.handlerMinter.Mint(models.WorkloadCred, def.Namespace, workloadID)
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to mint workload nats connection", err)
+	}
+
+	// "nex_minted_nkey" is a cross-repo contract key name; do not rename.
+	if def.Metadata == nil {
+		def.Metadata = models.StartWorkloadRequestMetadata{}
+	}
+	def.Metadata["nex_minted_nkey"] = wlNatsConn.NatsUserNkey
+
+	// The state key is "<workload_type>_<workload_id>"
+	// (internal/state/nats_kv.go), so a type change has to purge the old
+	// key: leaving it behind would have resume-on-registration start the
+	// stale record as a SECOND instance beside the replacement.
+	//
+	// Purge-then-Put has a crash window in which neither record exists;
+	// Put-then-purge has one in which BOTH do. Neither is atomic, and the
+	// second window resurrects the dual writer this verb exists to prevent,
+	// so the loss window is the one to take.
+	if current.WorkloadType != def.WorkloadType {
+		if err := n.state.RemoveWorkload(current.WorkloadType, workloadID); err != nil {
+			return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to remove previous workload state", err)
+		}
+	}
+
+	// STORE-FIRST. Nothing has been stopped yet, so a failed Put simply
+	// aborts the update with the old instance still running.
+	if err := n.state.StoreWorkload(workloadID, def); err != nil {
+		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to persist updated workload definition", err)
+	}
+
+	stopReqB, err := json.Marshal(models.StopWorkloadRequest{Namespace: current.Namespace})
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to marshal stop workload request", err)
+	}
+
+	stopped := false
+	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadID), stopReqB, natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
+	if err == nil && msgs != nil {
+		msgs(func(m *nats.Msg, e error) bool {
+			if e == nil && m.Data != nil && string(m.Data) != "null" {
+				swresp := new(models.StopWorkloadResponse)
+				if uerr := json.Unmarshal(m.Data, swresp); uerr == nil && swresp.Stopped {
+					stopped = true
+					return false
+				}
+			}
+			return true
+		})
+	}
+
+	if !stopped {
+		n.logger.Warn("workload update aborted before start: stop not confirmed", slog.String("workload_id", workloadID))
+		return false, updateStopUnconfirmedMessage, nil
+	}
+
+	aReqB, err := json.Marshal(models.AgentStartWorkloadRequest{
+		Request:       def,
+		WorkloadCreds: *wlNatsConn,
+	})
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to marshal agent start workload request", err)
+	}
+
+	startResp, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, time.Minute)
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to publish start workload request", err)
+	}
+
+	// Past the stop there is nothing to roll back to: the old instance is
+	// gone and the new definition is the stored one. Report the failure
+	// truthfully and let resume-on-registration finish the job.
+	if agentErr := startResp.Header.Get("Nats-Service-Error"); agentErr != "" {
+		n.logger.Error("agent failed to start replacement workload", slog.String("workload_id", workloadID), slog.String("err", agentErr))
+		return false, fmt.Sprintf("workload stopped but replacement failed to start (%s); stored definition will apply on next agent registration", agentErr), nil
+	}
+
+	return true, "", nil
+}
+
 func (n *NexNode) handleNamespacePing() func(micro.Request) {
 	return func(r micro.Request) {
 		// $NEX.control.namespace.WPING
