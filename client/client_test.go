@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,6 +99,96 @@ func TestNexClient_User(t *testing.T) {
 
 	be.Equal(t, sr.Id, str.Id)
 	be.True(t, str.Stopped)
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
+}
+
+// TestNexClient_UpdateAndRestartWorkload is the client round-trip for the
+// UPDATE/RESTART verbs: deploy, restart in place (same definition, rotated
+// credentials), update in place (new definition), then confirm an unknown id
+// surfaces a not-found error rather than hanging or panicking.
+func TestNexClient_UpdateAndRestartWorkload(t *testing.T) {
+	workDir := t.TempDir()
+	server := _test.StartNatsServer(t, workDir)
+	defer server.Shutdown()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// state=true: unlike the other client tests in this file, RESTART reads
+	// the persisted workload record back (there is no per-id state getter --
+	// it iterates GetStateByNamespace, see handleRestartWorkload), so this
+	// test needs the real NATS KV state impl, not the NoState stub the other
+	// tests get away with (StopWorkload/CloneWorkload never read state back).
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, true)
+	be.Equal(t, 1, len(nexNodes))
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	nexClient, err := NewClient(context.Background(), nc, "user")
+	be.NilErr(t, err)
+	be.Nonzero(t, nexClient)
+
+	var ar []*models.AuctionResponse
+	_test.WaitFor(t, 10*time.Second, func() bool {
+		ar, err = nexClient.Auction("user", "inmem", map[string]string{})
+		return err == nil && len(ar) == 1
+	}, "waiting for auction to return 1 result")
+
+	sr, err := nexClient.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "tester",
+		Description:       "My test workload",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+
+	// handleAuctionDeployWorkload responds to the deploy caller and starts
+	// the agent BEFORE persisting node state (see its comment), so
+	// StartWorkload can return before the record RestartWorkload needs is
+	// actually written. Poll rather than assume the record has landed the
+	// instant the deploy call returns -- see node_update_workload_test.go's
+	// deploy() helper for the handler-level equivalent of this wait.
+	var restartResp *models.UpdateWorkloadResponse
+	_test.WaitFor(t, 10*time.Second, func() bool {
+		restartResp, err = nexClient.RestartWorkload(sr.Id)
+		return err == nil && restartResp.Updated
+	}, "waiting for restart to succeed once the workload record is persisted")
+	be.Equal(t, sr.Id, restartResp.Id)
+	be.True(t, restartResp.Updated)
+
+	updateResp, err := nexClient.UpdateWorkload(sr.Id, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "tester-v2",
+		Description:       "My updated test workload",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+	be.Equal(t, sr.Id, updateResp.Id)
+	be.True(t, updateResp.Updated)
+
+	// A separate, short-timeout client for the not-found check: RESTART uses
+	// the CLONE silent-drop convention (no nexlet holds the id -> nobody
+	// replies at all), and natsext.RequestMany's first NextMsg wait is
+	// bounded by the CLIENT'S context deadline -- a single fixed deadline
+	// set once at NewClient time and shared by every call the client makes
+	// -- not by its per-call stall setting. Reusing nexClient here would
+	// make this assertion's wait length depend on how much of nexClient's
+	// own budget the persistence-wait retries above happened to consume.
+	shortClient, err := NewClient(context.Background(), nc, "user", WithDefaultTimeout(5*time.Second))
+	be.NilErr(t, err)
+
+	_, err = shortClient.RestartWorkload("does-not-exist")
+	be.Nonzero(t, err)
+	be.True(t, strings.Contains(err.Error(), "not found"))
 
 	for _, node := range nexNodes {
 		be.NilErr(t, node.Shutdown())
