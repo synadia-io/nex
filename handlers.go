@@ -728,22 +728,38 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 		// the other half of the record's key, so this is a direct read
 		// rather than a scan of every record in the namespace.
 		//
-		// Dropping that scan also drops its namespace filter, which is not
-		// a loss: ownership is enforced above against the definition the
-		// nexlet actually holds, and UPDATE refuses to move a workload
-		// between namespaces (handleUpdateWorkload), so a record whose
-		// namespace disagrees with the live one is not a state any node
-		// write path can produce.
+		// That scan was scoped to the workload's namespace, so the check
+		// below re-applies by hand the filter it gave for free. It is
+		// load-bearing, not tidiness: the key is only (type, id), and
+		// replaceWorkload mints the replacement credential against the
+		// namespace of the definition it is handed -- so replaying a record
+		// belonging to another namespace would issue credentials scoped
+		// into that namespace (log and trigger subjects are
+		// namespace-scoped) and start its definition under this workload's
+		// id, for a caller with every right to restart its OWN workload.
+		//
+		// The divergence is reachable without any out-of-band writer: the
+		// workload id generator is a public node option (WithIDGenerator),
+		// so a deterministic one lets two namespaces collide on one key.
+		// Create-only then correctly refuses the second store, leaving one
+		// namespace's record on file while the other namespace's workload
+		// is the one actually running.
 		storedDef, _, err := n.state.GetWorkloadRecord(current.WorkloadType, workloadID)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to read stored workload definitions")
 			return
 		}
 
-		if storedDef == nil {
-			// The nexlet holds the workload but the node has no persisted
-			// record for it. This is reachable in normal operation, not
-			// just as a bug: handleAuctionDeployWorkload responds to the
+		if storedDef == nil || storedDef.Namespace != current.Namespace {
+			// Either nothing is on file for this workload, or what is under
+			// its key belongs to another namespace and is therefore not
+			// this workload's definition at all. Both mean "nothing to
+			// restart from" and get the identical answer, which also keeps
+			// the foreign-record case from becoming an existence oracle for
+			// another tenant's data.
+			//
+			// The empty case is reachable in normal operation, not just as
+			// a bug: handleAuctionDeployWorkload responds to the
 			// deploy caller and starts the agent BEFORE calling
 			// state.StoreWorkload, and does not fail the deploy if that
 			// store errors -- so a workload can legitimately run with no
@@ -859,6 +875,26 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 		return false, "", newReplaceError(models.ErrCodeForbidden,
 			"update cannot change a workload's type; undeploy and deploy instead",
 			fmt.Errorf("workload type mismatch: %s != %s", def.WorkloadType, current.WorkloadType))
+	}
+
+	// The namespace is pinned for the same reason, and the doc comment
+	// above depends on it being pinned HERE rather than in each caller:
+	// this function mints the replacement's credential against
+	// def.Namespace, and a workload credential's log and trigger subjects
+	// are namespace-scoped ($NEX.FEED.<ns>.logs.>). A def naming a
+	// different namespace than the running instance would therefore hand
+	// the replacement authority inside a namespace the workload does not
+	// live in, and address the stop at yet another one (current.Namespace).
+	//
+	// Both existing callers check this before they get here -- UPDATE
+	// rejects a namespace change outright (handleUpdateWorkload) and
+	// RESTART treats a foreign-namespace record as no record at all -- so
+	// this is the invariant made unconditional rather than a new
+	// restriction, and it is what any future caller inherits.
+	if current.Namespace != def.Namespace {
+		return false, "", newReplaceError(models.ErrCodeForbidden,
+			"update cannot move a workload between namespaces; undeploy and deploy instead",
+			fmt.Errorf("workload namespace mismatch: %s != %s", def.Namespace, current.Namespace))
 	}
 
 	pubKey, err := n.nodeKeypair.PublicKey()
@@ -1205,7 +1241,16 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 				newest, newestRevision, rerr := n.state.GetWorkloadRecord(registrationRequest.RegisterType, workloadID)
 				switch {
 				case rerr != nil:
-					n.logger.Error("failed to persist re-minted workload nkey; stored nkey is stale — credential fencing against this record would revoke the wrong key", slog.String("err", rerr.Error()), slog.String("workload_id", workloadID))
+					// The only definition in hand is the one that just LOST
+					// the CAS, so it is known-stale: a writer demonstrably
+					// replaced it. Resuming from it would start the reverted
+					// definition -- the silent revert this whole path exists
+					// to prevent, reached through the error branch instead
+					// of the happy one. Drop the workload and let the next
+					// registration resume it from whatever is really on
+					// file.
+					n.logger.Error("failed to re-read workload record after conflict, workload dropped from resume state", slog.String("err", rerr.Error()), slog.String("workload_id", workloadID))
+					continue
 				case newest == nil:
 					n.logger.Warn("workload record removed during resume; not resuming", slog.String("workload_id", workloadID))
 					continue
