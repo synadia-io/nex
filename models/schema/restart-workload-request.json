@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.restart_workload_request",
+  "title": "RestartWorkloadRequest",
+  "type": "object",
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "description": "Namespace of the workload to restart"
+    }
+  },
+  "required": [
+    "namespace"
+  ],
+  "additionalProperties": false
+}
