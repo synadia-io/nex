@@ -54,12 +54,49 @@ type storeWorkloadCall struct {
 // reason on the write side: the UPDATE handler must not persist anything
 // before it has validated the incoming definition (see
 // node_update_workload_test.go).
+// It also carries two one-shot injection hooks used by the
+// lost-update/CAS tests in node_state_conflict_test.go. They exist because
+// the races those tests pin are otherwise only reachable by winning a
+// wall-clock scheduling window: a competing writer has to land between a
+// handler's read of the record and its write of the record. Rather than
+// sleeping and hoping, the hooks make the interleaving exact -- the
+// competing write is performed synchronously at precisely the point in the
+// handler's own call sequence where a real racing writer would have to land
+// for the bug to bite.
 type recordingState struct {
 	models.NexNodeState
 
 	mu          sync.Mutex
 	removeCalls []removeWorkloadCall
 	storeCalls  []storeWorkloadCall
+
+	// beforeStore fires exactly once, immediately before the next
+	// StoreWorkload call is delegated to the wrapped state, and is then
+	// cleared. Every node-side write path reads (or mints) before it
+	// stores, so this is the "a competing writer got there first" moment
+	// for the store-first CAS.
+	beforeStore func()
+	// afterAgentSnapshot fires exactly once, immediately after
+	// GetStateByAgent has produced the resume snapshot, and is then
+	// cleared. That is the exact window in which race (a) lives: the
+	// snapshot is already taken, and anything written after it is what a
+	// snapshot-then-Put resume path would silently revert.
+	afterAgentSnapshot func()
+}
+
+// injectBeforeStore arms the one-shot pre-store hook. See recordingState.
+func (r *recordingState) injectBeforeStore(f func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.beforeStore = f
+}
+
+// injectAfterAgentSnapshot arms the one-shot post-snapshot hook. See
+// recordingState.
+func (r *recordingState) injectAfterAgentSnapshot(f func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.afterAgentSnapshot = f
 }
 
 func (r *recordingState) RemoveWorkload(workloadType, workloadId string) error {
@@ -72,8 +109,32 @@ func (r *recordingState) RemoveWorkload(workloadType, workloadId string) error {
 func (r *recordingState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest, expectedRevision uint64) error {
 	r.mu.Lock()
 	r.storeCalls = append(r.storeCalls, storeWorkloadCall{workloadId: workloadId, request: swr})
+	hook := r.beforeStore
+	r.beforeStore = nil
 	r.mu.Unlock()
+
+	// Fired outside the lock: the hook writes to the same KV bucket, and
+	// nothing about that write goes back through this decorator.
+	if hook != nil {
+		hook()
+	}
+
 	return r.NexNodeState.StoreWorkload(workloadId, swr, expectedRevision)
+}
+
+func (r *recordingState) GetStateByAgent(agentName string) (map[string]models.StartWorkloadRequest, error) {
+	snapshot, err := r.NexNodeState.GetStateByAgent(agentName)
+
+	r.mu.Lock()
+	hook := r.afterAgentSnapshot
+	r.afterAgentSnapshot = nil
+	r.mu.Unlock()
+
+	if hook != nil {
+		hook()
+	}
+
+	return snapshot, err
 }
 
 func (r *recordingState) stores() []storeWorkloadCall {

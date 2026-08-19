@@ -58,6 +58,16 @@ type updateHarness struct {
 
 func newUpdateHarness(t *testing.T, ctx context.Context, schema string) *updateHarness {
 	t.Helper()
+	return newUpdateHarnessWithOptions(t, ctx, schema)
+}
+
+// newUpdateHarnessWithOptions is newUpdateHarness plus caller-supplied node
+// options, appended AFTER the harness's own so they win (options apply in
+// order). Used by the CAS tests in node_state_conflict_test.go, which need a
+// deterministic workload id (nex.WithIDGenerator) so a competing record can
+// be planted at the key a not-yet-issued deploy will land on.
+func newUpdateHarnessWithOptions(t *testing.T, ctx context.Context, schema string, extraOpts ...nex.NexNodeOption) *updateHarness {
+	t.Helper()
 
 	workDir := t.TempDir()
 	s := _test.StartNatsServer(t, workDir)
@@ -82,11 +92,12 @@ func newUpdateHarness(t *testing.T, ctx context.Context, schema string) *updateH
 
 	rec := &recordingState{NexNodeState: sKV}
 
-	nexNodes := _test.StartNexusWithOptions(t, ctx, s.ClientURL(), 1, true,
-		[]nex.NexNodeOption{
-			nex.WithState(rec),
-			nex.WithMinter(newTestSigningMinter(t, s.ClientURL(), _test.Node1Pub)),
-		}, runner)
+	opts := append([]nex.NexNodeOption{
+		nex.WithState(rec),
+		nex.WithMinter(newTestSigningMinter(t, s.ClientURL(), _test.Node1Pub)),
+	}, extraOpts...)
+
+	nexNodes := _test.StartNexusWithOptions(t, ctx, s.ClientURL(), 1, true, opts, runner)
 	be.Equal(t, 1, len(nexNodes))
 
 	js, err := jetstream.New(nc)
