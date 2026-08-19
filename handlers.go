@@ -345,9 +345,14 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
+		// The response to the caller was already sent above, so a store
+		// failure here does not fail the deploy — but it means the
+		// workload's minted nkey (including the metadata this handler just
+		// stamped) is never persisted at all: credential fencing against
+		// this workload later would have no record to revoke against.
 		err = n.state.StoreWorkload(workloadID, *req)
 		if err != nil {
-			n.logger.Warn("failed to store node state", slog.String("err", err.Error()))
+			n.logger.Error("failed to persist minted workload nkey; workload record missing — credential fencing against this workload has nothing to revoke", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
 			return
 		}
 	}
@@ -637,8 +642,14 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 				swr.Metadata = models.StartWorkloadRequestMetadata{}
 			}
 			swr.Metadata["nex_minted_nkey"] = natsConn.NatsUserNkey
+			// The agent below receives (and will use) the freshly minted
+			// credential regardless of whether this store succeeds, so a
+			// failure here leaves the KV record holding the PREVIOUS nkey
+			// while the live credential is the new one — a future fencing
+			// revocation keyed off the stored record would revoke the
+			// wrong identity.
 			if err := n.state.StoreWorkload(workloadID, swr); err != nil {
-				n.logger.Warn("failed to re-store resumed workload state", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
+				n.logger.Error("failed to persist re-minted workload nkey; stored nkey is stale — credential fencing against this record would revoke the wrong key", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
 			}
 
 			aswr := models.AgentStartWorkloadRequest{
