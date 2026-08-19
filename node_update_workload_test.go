@@ -12,6 +12,7 @@ package nex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -102,6 +103,11 @@ func newUpdateHarness(t *testing.T, ctx context.Context, schema string) *updateH
 func (h *updateHarness) deploy(t *testing.T, def models.StartWorkloadRequest) string {
 	t.Helper()
 
+	// Captured before the request goes out: the Put can land at any point
+	// after the ADEPLOY response, so sampling afterwards would sometimes
+	// already include it and wait forever for one more.
+	want := len(h.rec.stores()) + 1
+
 	auctionReqB, err := json.Marshal(models.AuctionRequest{AgentType: def.WorkloadType, AuctionId: nuid.New().Next()})
 	be.NilErr(t, err)
 
@@ -122,7 +128,7 @@ func (h *updateHarness) deploy(t *testing.T, def models.StartWorkloadRequest) st
 	be.NilErr(t, json.Unmarshal(startRespRaw.Data, &startResp))
 	be.Nonzero(t, startResp.Id)
 
-	_test.WaitFor(t, time.Second*10, func() bool { return len(h.rec.stores()) == 1 }, "deploy to persist workload record")
+	_test.WaitFor(t, time.Second*10, func() bool { return len(h.rec.stores()) == want }, "deploy to persist workload record")
 
 	return startResp.Id
 }
@@ -135,10 +141,27 @@ func (h *updateHarness) update(t *testing.T, subjectNS, workloadID string, req m
 	be.NilErr(t, err)
 
 	// Generous timeout: the ownership lookup inside the handler waits on the
-	// nexlet's GETWORKLOAD reply, which for an unknown id never comes.
+	// nexlet's GETWORKLOAD reply.
 	msg, err := h.nc.Request(models.UpdateWorkloadRequestSubject(subjectNS, workloadID), reqB, time.Second*15)
 	be.NilErr(t, err)
 	return msg
+}
+
+// updateExpectSilence issues a raw UPDATE control request that the node must
+// drop without answering, and asserts nothing replied.
+//
+// The client timeout has to exceed the handler's own 3s ownership lookup,
+// or a handler that DID intend to answer would look identical to one that
+// dropped -- the assertion would pass for the wrong reason.
+func (h *updateHarness) updateExpectSilence(t *testing.T, subjectNS, workloadID string, req models.UpdateWorkloadRequest) {
+	t.Helper()
+
+	reqB, err := json.Marshal(req)
+	be.NilErr(t, err)
+
+	_, err = h.nc.Request(models.UpdateWorkloadRequestSubject(subjectNS, workloadID), reqB, time.Second*8)
+	be.Nonzero(t, err)
+	be.True(t, errors.Is(err, nats.ErrTimeout) || errors.Is(err, nats.ErrNoResponders))
 }
 
 // storedRecord reads the node's persisted definition straight out of the KV
@@ -154,20 +177,19 @@ func (h *updateHarness) storedRecord(t *testing.T, ctx context.Context, workload
 	return rec
 }
 
-// startSpy counts STARTWORKLOAD requests reaching the nexlet. It is a plain
-// (non queue-group) subscription, so it observes a copy of every start the
-// node issues without intercepting it.
-type startSpy struct {
-	mu  sync.Mutex
-	n   int
-	sub *nats.Subscription
+// agentSpy counts agent-directed requests the node issues. It is a plain
+// (non queue-group) subscription, so it observes a copy of every such
+// message without intercepting it.
+type agentSpy struct {
+	mu sync.Mutex
+	n  int
 }
 
-func (h *updateHarness) spyOnStarts(t *testing.T) *startSpy {
+func (h *updateHarness) spyOn(t *testing.T, subject string) *agentSpy {
 	t.Helper()
 
-	spy := &startSpy{}
-	sub, err := h.nc.Subscribe(models.AgentAPIStartWorkloadSubscribeSubject(h.nodePK, "*"), func(_ *nats.Msg) {
+	spy := &agentSpy{}
+	sub, err := h.nc.Subscribe(subject, func(_ *nats.Msg) {
 		spy.mu.Lock()
 		spy.n++
 		spy.mu.Unlock()
@@ -175,22 +197,35 @@ func (h *updateHarness) spyOnStarts(t *testing.T) *startSpy {
 	be.NilErr(t, err)
 	be.NilErr(t, h.nc.Flush())
 
-	spy.sub = sub
 	t.Cleanup(func() { _ = sub.Unsubscribe() })
 	return spy
 }
 
-func (s *startSpy) count() int {
+func (h *updateHarness) spyOnStarts(t *testing.T) *agentSpy {
+	t.Helper()
+	return h.spyOn(t, models.AgentAPIStartWorkloadSubscribeSubject(h.nodePK, "*"))
+}
+
+func (h *updateHarness) spyOnStops(t *testing.T) *agentSpy {
+	t.Helper()
+	return h.spyOn(t, models.AgentAPIStopWorkloadSubscribeSubject(h.nodePK))
+}
+
+func (s *agentSpy) count() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.n
 }
 
 func serviceDef(name, runRequest string) models.StartWorkloadRequest {
+	return namespacedDef(models.SystemNamespace, name, runRequest)
+}
+
+func namespacedDef(namespace, name, runRequest string) models.StartWorkloadRequest {
 	return models.StartWorkloadRequest{
 		Description:       name,
 		Name:              name,
-		Namespace:         models.SystemNamespace,
+		Namespace:         namespace,
 		RunRequest:        runRequest,
 		WorkloadLifecycle: "service",
 		WorkloadType:      "inmem",
@@ -245,31 +280,118 @@ func TestNodeUpdateWorkloadInvalidRunRequestDoesNotStore(t *testing.T) {
 	be.Equal(t, 0, spy.count())
 }
 
-// TestNodeUpdateWorkloadUnknownID documents the convention chosen for an
-// UPDATE addressed at a workload no local nexlet holds: the node ANSWERS
-// with updated:false rather than dropping silently. A silent drop is
-// reserved for the case where the workload exists but belongs to another
-// namespace (existence must not leak); a plain unknown id is not a
-// confidentiality question, and answering lets a caller distinguish "nobody
-// has it" from "the request never arrived".
+// TestNodeUpdateWorkloadUnknownID pins the convention for an UPDATE
+// addressed at a workload no local nexlet holds: the node drops it
+// silently, exactly as it drops a workload owned by another namespace
+// (TestNodeUpdateWorkloadCrossNamespaceIsSilentlyDropped).
+//
+// The two cases MUST behave identically. Every node sees every control
+// message, so a caller can count replies; if unknown ids answered and
+// not-yours ids stayed silent, that count would tell the caller which of
+// the two it hit -- an existence oracle for workloads it may not see. The
+// cost is that callers cannot distinguish not-found from unreachable and
+// must read no-responders/timeout as not-found, which is already what
+// CLONE requires of them.
 func TestNodeUpdateWorkloadUnknownID(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	h := newUpdateHarness(t, ctx, commandSchema)
 
-	msg := h.update(t, models.SystemNamespace, nuid.New().Next(), models.UpdateWorkloadRequest{
+	h.updateExpectSilence(t, models.SystemNamespace, nuid.New().Next(), models.UpdateWorkloadRequest{
 		Namespace:    models.SystemNamespace,
 		StartRequest: serviceDef("v2", `{"command":"two"}`),
 	})
 
-	be.Equal(t, "", msg.Header.Get("Nats-Service-Error-Code"))
-
-	resp := models.UpdateWorkloadResponse{}
-	be.NilErr(t, json.Unmarshal(msg.Data, &resp))
-	be.False(t, resp.Updated)
-	be.Equal(t, string(models.GenericErrorsWorkloadNotFound), resp.Message)
 	be.Equal(t, 0, len(h.rec.stores()))
+}
+
+// TestNodeUpdateWorkloadCrossNamespaceIsSilentlyDropped is the security
+// test for the ownership check. The nexlet's lookup by workload id spans
+// every namespace, so the node -- not the nexlet -- is what stops a caller
+// in one namespace from replacing the definition of a workload owned by
+// another. Two workloads in two namespaces make the drop meaningful: the
+// caller's own namespace is populated, so silence cannot be explained away
+// as "this node runs nothing for you".
+func TestNodeUpdateWorkloadCrossNamespaceIsSilentlyDropped(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	h := newUpdateHarness(t, ctx, commandSchema)
+
+	victimID := h.deploy(t, namespacedDef("tenant-a", "victim", `{"command":"one"}`))
+	_ = h.deploy(t, namespacedDef("tenant-b", "attacker-owned", `{"command":"one"}`))
+
+	startSpy := h.spyOnStarts(t)
+	stopSpy := h.spyOnStops(t)
+
+	// tenant-b addresses tenant-a's workload. Subject and body agree, so
+	// the first namespace check passes; only the fetched definition's
+	// namespace exposes the mismatch.
+	h.updateExpectSilence(t, "tenant-b", victimID, models.UpdateWorkloadRequest{
+		Namespace:    "tenant-b",
+		StartRequest: namespacedDef("tenant-b", "hijacked", `{"command":"two"}`),
+	})
+
+	// Untouched: no persist, no stop, no start, and the victim's stored
+	// definition is still its own.
+	be.Equal(t, 2, len(h.rec.stores()))
+	be.Equal(t, 0, len(h.rec.calls()))
+	be.NilErr(t, h.nc.Flush())
+	be.Equal(t, 0, stopSpy.count())
+	be.Equal(t, 0, startSpy.count())
+
+	stored := h.storedRecord(t, ctx, "inmem", victimID)
+	be.Equal(t, "victim", stored.Name)
+	be.Equal(t, "tenant-a", stored.Namespace)
+}
+
+// TestNodeUpdateWorkloadTypeChangeRejected pins the rejection of a
+// workload-type change.
+//
+// A type change cannot be done safely by this verb. The state key embeds
+// the workload type, so the replacement would land on a NEW key beside the
+// surviving old one, and resume-on-registration is scoped per agent type
+// (handleRegisterAgent -> GetStateByAgent) -- so the two records get
+// resumed by two different nexlets with no knowledge of each other. Let the
+// stop go unconfirmed and both instances run: the dual-writer window this
+// verb exists to close, reopened by the verb itself. Purging the old key
+// first only narrows it, and adds a window where the workload is lost.
+//
+// So the rejection must land before anything is persisted, stopped or
+// started -- which is what the assertions below check, not just the 403.
+func TestNodeUpdateWorkloadTypeChangeRejected(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	h := newUpdateHarness(t, ctx, commandSchema)
+	workloadID := h.deploy(t, serviceDef("v1", `{"command":"one"}`))
+
+	startSpy := h.spyOnStarts(t)
+	stopSpy := h.spyOnStops(t)
+
+	newType := serviceDef("v2", `{"command":"two"}`)
+	newType.WorkloadType = "other"
+
+	msg := h.update(t, models.SystemNamespace, workloadID, models.UpdateWorkloadRequest{
+		Namespace:    models.SystemNamespace,
+		StartRequest: newType,
+	})
+
+	be.Equal(t, models.ErrCodeForbidden, msg.Header.Get("Nats-Service-Error-Code"))
+	be.Equal(t, "update cannot change a workload's type; undeploy and deploy instead", msg.Header.Get("Nats-Service-Error"))
+
+	// Nothing happened: only the deploy's store, no purge of the old-type
+	// key, no stop, no start.
+	be.Equal(t, 1, len(h.rec.stores()))
+	be.Equal(t, 0, len(h.rec.calls()))
+	be.NilErr(t, h.nc.Flush())
+	be.Equal(t, 0, stopSpy.count())
+	be.Equal(t, 0, startSpy.count())
+
+	stored := h.storedRecord(t, ctx, "inmem", workloadID)
+	be.Equal(t, "v1", stored.Name)
+	be.Equal(t, "inmem", stored.WorkloadType)
 }
 
 // TestNodeUpdateWorkloadStopUnconfirmedKeepsNewDefinition is the store-first
