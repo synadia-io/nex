@@ -107,6 +107,8 @@ Lifecycle support depends on the nexlet implementation; the agent advertises sup
 
 Stopping a workload follows the reverse path (`StopWorkload` message, optional trigger cleanup, credential revocation).
 
+**Updating and restarting** compose the same `StopWorkload`/`StartWorkload` agent operations node-side instead of following a separate path: `UPDATE` persists a new definition for the existing workload id, stops the running instance, and starts the replacement only once that stop is confirmed, minting fresh credentials each time. `RESTART` re-runs that same stop-then-start sequence against the workload's last stored definition. Both keep the workload on its current node — placement is decided once, at auction time, and neither verb re-auctions or relocates a workload; a definition that changes namespace or workload type is rejected instead. See **Running Workloads** for the full command reference and failure semantics.
+
 ## Namespaces and Tags
 
 - **Namespaces** partition workloads, logs, and events. Nodes default to the `system` namespace for administrative actions; user workloads typically live in `default` or a custom namespace.
@@ -134,7 +136,7 @@ The `nex` CLI is a thin wrapper around the Go client package located at `github.
 Key features:
 
 - Establishes a namespaced control plane client over an existing `*nats.Conn`.
-- Wraps placement auctions (`Auction`), workload lifecycle methods (`StartWorkload`, `StopWorkload`, `CloneWorkload`, `ListWorkloads`), and node operations (`ListNodes`, `GetNodeInfo`, `SetLameduck`).
+- Wraps placement auctions (`Auction`), workload lifecycle methods (`StartWorkload`, `StopWorkload`, `UpdateWorkload`, `RestartWorkload`, `CloneWorkload`, `ListWorkloads`), and node operations (`ListNodes`, `GetNodeInfo`, `SetLameduck`).
 - Provides configurable timeouts and request cadence via functional options (for example `WithDefaultTimeout`, `WithStartWorkloadTimeout`).
 - Supports concurrent request/response fan-out using `natsext.RequestMany`, matching the CLI’s behavior.
 
