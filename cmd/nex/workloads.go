@@ -24,7 +24,9 @@ type Workload struct {
 	Stop  StopWorkload  `cmd:"" name:"stop" help:"Stop a running workload" aliases:"undeploy"`
 	List  ListWorkload  `cmd:"" name:"list" help:"List workloads" aliases:"ls"`
 	// Info  InfoWorkload  `cmd:"" name:"info" help:"Get information about a workload"`
-	Copy CloneWorkload `cmd:"" name:"clone" help:"Copy a workload to another node" aliases:"cp,copy"`
+	Update  UpdateWorkload  `cmd:"" name:"update" help:"Replace a running workload's definition in place, from a Nexfile"`
+	Restart RestartWorkload `cmd:"" name:"restart" help:"Restart a workload from its last stored definition"`
+	Copy    CloneWorkload   `cmd:"" name:"clone" help:"Copy a workload to another node" aliases:"cp,copy"`
 	// Bundle BundleWorkload `cmd:"" help:"Bundles a workload into an OCI artifact" aliases:"build,package"`
 }
 
@@ -44,6 +46,13 @@ type (
 	}
 	StopWorkload struct {
 		WorkloadId string `arg:"" name:"id" help:"ID of the workload to stop"`
+	}
+	UpdateWorkload struct {
+		WorkloadId      string   `arg:"" name:"id" help:"ID of the workload to update"`
+		WorkloadNexfile *os.File `name:"nexfile" short:"f" placeholder:"Nexfile" help:"Nexfile describing the replacement workload definition"`
+	}
+	RestartWorkload struct {
+		WorkloadId string `arg:"" name:"id" help:"ID of the workload to restart"`
 	}
 	ListWorkload struct {
 		AgentType    string   `name:"type" help:"Type of workload" placeholder:"native"`
@@ -88,22 +97,10 @@ func (r *StartWorkload) Run(ctx context.Context, globals *Globals) error {
 		}
 	}
 
-	var nexfile models.Nexfile
 	if r.WorkloadNexfile != nil {
-		defer func() { _ = r.WorkloadNexfile.Close() }()
-
-		data, err := io.ReadAll(r.WorkloadNexfile)
+		nexfile, err := loadNexfile(r.WorkloadNexfile)
 		if err != nil {
 			return err
-		}
-
-		// try to unmarshal as JSON, fallback to YAML
-		err = json.Unmarshal(data, &nexfile)
-		if err != nil {
-			err = yaml.Unmarshal(data, &nexfile)
-			if err != nil {
-				return errors.New("failed to unmarshal Nexfile")
-			}
 		}
 
 		r.WorkloadName = nexfile.Name
@@ -232,6 +229,146 @@ func (s *StopWorkload) Run(ctx context.Context, globals *Globals) error {
 	}
 
 	fmt.Printf("Workload %s successfully stopped\n", stopResponse.Id)
+	return nil
+}
+
+// loadNexfile reads and parses a Nexfile (JSON, falling back to YAML) from
+// f, closing f when done. Shared by `start` and `update`, which both turn a
+// Nexfile into a workload definition; unlike `start`, `update` has no
+// placement step (an auction-picked node whose schema it can validate
+// against client-side) to hang client-side schema validation off of, so it
+// relies entirely on the server-side validation replaceWorkload already
+// performs.
+func loadNexfile(f *os.File) (*models.Nexfile, error) {
+	defer func() { _ = f.Close() }()
+
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+
+	nexfile := &models.Nexfile{}
+	// try to unmarshal as JSON, fallback to YAML
+	if err := json.Unmarshal(data, nexfile); err != nil {
+		if err := yaml.Unmarshal(data, nexfile); err != nil {
+			return nil, errors.New("failed to unmarshal Nexfile")
+		}
+	}
+	return nexfile, nil
+}
+
+func (r *UpdateWorkload) Run(ctx context.Context, globals *Globals) error {
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	if nc == nil {
+		return errors.New("no NATS connection available")
+	}
+
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+
+	// if 'Nexfile' is located in the current directory, use it
+	if r.WorkloadNexfile == nil {
+		if info, err := os.Stat(models.NexfileName); err == nil && !info.IsDir() {
+			f, err := os.Open(models.NexfileName)
+			if err != nil {
+				return err
+			}
+			r.WorkloadNexfile = f
+		}
+	}
+
+	if r.WorkloadNexfile == nil {
+		return errors.New("update requires a replacement definition; provide -f/--nexfile or place a Nexfile in the current directory")
+	}
+
+	nexfile, err := loadNexfile(r.WorkloadNexfile)
+	if err != nil {
+		return err
+	}
+
+	srB, err := json.Marshal(nexfile.StartRequest)
+	if err != nil {
+		return err
+	}
+
+	updateResponse, err := nexClient.UpdateWorkload(r.WorkloadId, &models.StartWorkloadRequest{
+		Namespace:         globals.Namespace,
+		Name:              nexfile.Name,
+		Description:       nexfile.Description,
+		RunRequest:        string(srB),
+		WorkloadType:      nexfile.Type,
+		WorkloadLifecycle: models.WorkloadLifecycle(nexfile.Lifecycle),
+		Tags:              nexfile.AuctionTags,
+	})
+	if err != nil {
+		return err
+	}
+
+	if globals.JSON {
+		updateResponseB, err := json.Marshal(updateResponse)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(updateResponseB))
+		return nil
+	}
+
+	if updateResponse.Updated {
+		fmt.Printf("Workload %s successfully updated\n", updateResponse.Id)
+	} else {
+		fmt.Printf("Workload %s update not yet applied: %s\n", updateResponse.Id, updateResponse.Message)
+	}
+	return nil
+}
+
+func (r *RestartWorkload) Run(ctx context.Context, globals *Globals) error {
+	nc, err := configureNatsConnection(globals)
+	if err != nil {
+		return err
+	}
+
+	if nc == nil {
+		return errors.New("no NATS connection available")
+	}
+
+	var opts []client.ClientOption
+	if globals.NatsTimeout > 0 {
+		opts = append(opts, client.WithDefaultTimeout(globals.NatsTimeout))
+	}
+	nexClient, err := client.NewClient(ctx, nc, globals.Namespace, opts...)
+	if err != nil {
+		return err
+	}
+
+	restartResponse, err := nexClient.RestartWorkload(r.WorkloadId)
+	if err != nil {
+		return err
+	}
+
+	if globals.JSON {
+		restartResponseB, err := json.Marshal(restartResponse)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(restartResponseB))
+		return nil
+	}
+
+	if restartResponse.Updated {
+		fmt.Printf("Workload %s successfully restarted\n", restartResponse.Id)
+	} else {
+		fmt.Printf("Workload %s restart not yet applied: %s\n", restartResponse.Id, restartResponse.Message)
+	}
 	return nil
 }
 
