@@ -515,11 +515,12 @@ func newReplaceError(code, msg string, err error) *replaceError {
 //
 // Every node sees every control message (the micro queue group is the
 // node's own id), so this handler first has to establish that a locally
-// registered nexlet actually holds the addressed workload. It answers
-// updated:false when no local nexlet has the id at all, and drops silently
-// when a nexlet has it but under a different namespace -- answering there
-// would confirm the id's existence to a caller with no right to it, which
-// is the same reasoning handleCloneWorkload uses.
+// registered nexlet actually holds the addressed workload. When it does
+// not -- no nexlet has the id, or one has it under a different namespace --
+// the handler drops the request silently, which is handleCloneWorkload's
+// convention: answering would confirm the id's existence to a caller with
+// no right to it, and answering in one case but not the other would leak
+// the same thing through the reply count.
 func (n *NexNode) handleUpdateWorkload() func(micro.Request) {
 	return func(r micro.Request) {
 		// $NEX.SVC.<namespace>.control.UPDATE.<workloadId>
@@ -545,24 +546,27 @@ func (n *NexNode) handleUpdateWorkload() func(micro.Request) {
 			return
 		}
 
-		notFound := models.UpdateWorkloadResponse{
-			Id:      workloadID,
-			Updated: false,
-			Message: string(models.GenericErrorsWorkloadNotFound),
-		}
-
 		// A nexlet that does not hold the id does not reply at all
 		// (sdk/go/agent/runner.go handleGetWorkload), so "no reply" is the
 		// not-found signal here, not an error.
+		//
+		// Drop silently rather than answering. Every node sees every
+		// control message, so WHICH nodes answer is itself observable to
+		// the caller. If an unknown id answered while an id owned by
+		// another namespace stayed silent (the check below), the reply
+		// count alone would separate "no such workload" from "a workload
+		// you may not see" -- an existence oracle assembled out of the
+		// verb's own error handling. Both cases are therefore silent,
+		// matching handleCloneWorkload; a caller reads no-responders or a
+		// request timeout as not-found, exactly as it already must for
+		// CLONE.
 		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), time.Second*3)
 		if err != nil {
 			n.logger.Debug("no local agent holds the workload to update", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
-			n.respondUpdateWorkload(r, notFound)
 			return
 		}
 
 		if getWorkload.Header.Get("Nats-Service-Error") == string(models.GenericErrorsWorkloadNotFound) {
-			n.respondUpdateWorkload(r, notFound)
 			return
 		}
 
@@ -625,15 +629,23 @@ func (n *NexNode) respondUpdateWorkload(r micro.Request, resp models.UpdateWorkl
 //   - persist before stopping ("store-first"), so a crash at any point
 //     after this leaves the NEW definition as the one
 //     resume-on-registration will start: the repair path completes the
-//     update instead of silently reverting it;
+//     update instead of silently reverting it. That claim depends on the
+//     replacement occupying the SAME state record and resuming under the
+//     SAME nexlet -- which holds only because the workload type and the
+//     namespace are both pinned (see the rejections below and in
+//     handleUpdateWorkload). The KV key is "<workload_type>_<workload_id>"
+//     (internal/state/nats_kv.go) and resume is scoped per agent type
+//     (handleRegisterAgent -> GetStateByAgent), so a type change would
+//     write a second key that a DIFFERENT nexlet resumes independently of
+//     the one still running the old instance;
 //   - start only after a CONFIRMED stop. Starting first is exactly the
 //     dual-writer window this verb exists to close -- two instances of one
 //     workload publishing, advancing the same checkpoints and splitting the
 //     same durable consumer.
 //
 // current is the definition the owning nexlet holds right now. It is read
-// for two things only: detecting a workload-type change (the state key
-// embeds the type) and addressing the stop at the workload's namespace.
+// to enforce the workload-type invariant and to address the stop at the
+// workload's namespace.
 //
 // A false return with a nil error is a legitimate, self-healing outcome
 // rather than a server fault: the new definition is stored, and the next
@@ -642,6 +654,29 @@ func (n *NexNode) respondUpdateWorkload(r micro.Request, resp models.UpdateWorkl
 // WORKLOADSTOPPED and one WORKLOADSTARTED, which is what namespace quota
 // accounting expects.
 func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWorkloadRequest) (bool, string, *replaceError) {
+	// A workload-type change would reopen the dual-writer window this verb
+	// exists to close, and store-first makes it worse rather than better.
+	// The state key embeds the type, so the replacement lands on a NEW key
+	// while the old one survives; resume-on-registration is scoped per
+	// agent type (handleRegisterAgent -> GetStateByAgent), so the two
+	// records are resumed by two different nexlets that know nothing about
+	// each other. If the stop is then unconfirmed, the old-type nexlet
+	// keeps the old instance running while the new-type nexlet starts the
+	// new definition: both live, which is precisely the failure mode this
+	// verb removes. Purging the old key first does not fix it -- it only
+	// narrows the window and adds a crash window where the workload is
+	// lost entirely.
+	//
+	// So the type is pinned, not migrated. Rejecting is also what keeps the
+	// store-first repair path sound (see the doc comment above). Enforced
+	// here rather than in the caller because every caller of this function
+	// depends on it, T6's RESTART included.
+	if current.WorkloadType != def.WorkloadType {
+		return false, "", newReplaceError(models.ErrCodeForbidden,
+			"update cannot change a workload's type; undeploy and deploy instead",
+			fmt.Errorf("workload type mismatch: %s != %s", def.WorkloadType, current.WorkloadType))
+	}
+
 	pubKey, err := n.nodeKeypair.PublicKey()
 	if err != nil {
 		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to get public key from keypair", err)
@@ -674,23 +709,11 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 	}
 	def.Metadata["nex_minted_nkey"] = wlNatsConn.NatsUserNkey
 
-	// The state key is "<workload_type>_<workload_id>"
-	// (internal/state/nats_kv.go), so a type change has to purge the old
-	// key: leaving it behind would have resume-on-registration start the
-	// stale record as a SECOND instance beside the replacement.
-	//
-	// Purge-then-Put has a crash window in which neither record exists;
-	// Put-then-purge has one in which BOTH do. Neither is atomic, and the
-	// second window resurrects the dual writer this verb exists to prevent,
-	// so the loss window is the one to take.
-	if current.WorkloadType != def.WorkloadType {
-		if err := n.state.RemoveWorkload(current.WorkloadType, workloadID); err != nil {
-			return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to remove previous workload state", err)
-		}
-	}
-
-	// STORE-FIRST. Nothing has been stopped yet, so a failed Put simply
-	// aborts the update with the old instance still running.
+	// STORE-FIRST. The type is pinned above, so this Put lands on the same
+	// KV key the old definition occupied -- one record, one instance, no
+	// second key for another nexlet to resume. Nothing has been stopped
+	// yet, so a failed Put simply aborts the update with the old instance
+	// still running.
 	if err := n.state.StoreWorkload(workloadID, def); err != nil {
 		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to persist updated workload definition", err)
 	}
@@ -728,20 +751,33 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to marshal agent start workload request", err)
 	}
 
+	// Past the confirmed stop there is nothing to roll back to: the old
+	// instance is gone and the new definition is already the stored one.
+	// Both ways the start can fail -- the nexlet answering with an error,
+	// or not answering at all -- leave that identical state, so both get
+	// the same truthful answer rather than an opaque 500 for one of them.
+	// The update is not lost: resume-on-registration finishes it.
 	startResp, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, time.Minute)
 	if err != nil {
-		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to publish start workload request", err)
+		n.logger.Error("no reply to replacement start workload request", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
+		return false, replacementStartFailedMessage(err.Error()), nil
 	}
 
-	// Past the stop there is nothing to roll back to: the old instance is
-	// gone and the new definition is the stored one. Report the failure
-	// truthfully and let resume-on-registration finish the job.
 	if agentErr := startResp.Header.Get("Nats-Service-Error"); agentErr != "" {
 		n.logger.Error("agent failed to start replacement workload", slog.String("workload_id", workloadID), slog.String("err", agentErr))
-		return false, fmt.Sprintf("workload stopped but replacement failed to start (%s); stored definition will apply on next agent registration", agentErr), nil
+		return false, replacementStartFailedMessage(agentErr), nil
 	}
 
 	return true, "", nil
+}
+
+// replacementStartFailedMessage is the client-visible outcome when the old
+// instance was confirmed stopped but the replacement did not start. Like
+// updateStopUnconfirmedMessage it reports updated:false against an ALREADY
+// stored new definition, so the situation is self-healing on the next agent
+// registration -- but unlike it, nothing is running in the meantime.
+func replacementStartFailedMessage(cause string) string {
+	return fmt.Sprintf("workload stopped but replacement failed to start (%s); stored definition will apply on next agent registration", cause)
 }
 
 func (n *NexNode) handleNamespacePing() func(micro.Request) {
