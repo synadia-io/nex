@@ -346,12 +346,26 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
+		// CREATE-ONLY (expectedRevision 0). This store runs AFTER the
+		// caller already has its workload id back, so a caller can issue an
+		// UPDATE against that id and have it land — store-first and all —
+		// before this line executes. A blind write here would then revert
+		// that update with no signal to anyone, which is precisely what
+		// blocks a control plane from doing deploy-then-update sequences.
+		// Creating rather than putting makes the loss impossible: whoever
+		// occupied the key did so with a definition newer than this one, so
+		// the newer definition is the one that stays.
+		//
 		// The response to the caller was already sent above, so a store
 		// failure here does not fail the deploy — but it means the
 		// workload's minted nkey (including the metadata this handler just
 		// stamped) is never persisted at all: credential fencing against
 		// this workload later would have no record to revoke against.
-		err = n.state.StoreWorkload(workloadID, *req)
+		err = n.state.StoreWorkload(workloadID, *req, 0)
+		if errors.Is(err, models.ErrStateConflict) {
+			n.logger.Warn("workload record already exists (concurrent update) — leaving the newer definition", slog.String("workload_id", workloadID))
+			return
+		}
 		if err != nil {
 			n.logger.Error("failed to persist minted workload nkey; workload record missing — credential fencing against this workload has nothing to revoke", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
 			return
@@ -495,6 +509,19 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 // completes late rather than reverting. The wording is part of the client
 // contract -- callers key remediation off it.
 const updateStopUnconfirmedMessage = "stop unconfirmed; stored definition will apply on next agent registration"
+
+// updateConcurrentModificationMessage is the client-visible outcome when the
+// store-first compare-and-swap lost to another writer: the record changed
+// between this handler reading it and writing it back.
+//
+// Unlike updateStopUnconfirmedMessage this one is NOT self-healing, and the
+// difference is the point of separate wording. Nothing was persisted,
+// stopped or started -- the abort lands before the stop -- so the workload
+// is exactly as it was, and the definition now on file is somebody else's.
+// The caller has to look at the current record and decide whether its
+// change still applies, which is why the message says retry rather than
+// promising a later repair. The wording is part of the client contract.
+const updateConcurrentModificationMessage = "workload record was modified concurrently; retry"
 
 // replaceError carries the micro error code and the operator-facing message
 // alongside a failure, so replaceWorkload can report one without holding a
@@ -697,17 +724,23 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 
 		// current only establishes ownership; the definition actually
 		// replayed is the STORED one (see the function doc comment above).
-		// The state interface has no per-id getter (models/state.go), so
-		// fetch every record in the workload's namespace and pick this id
-		// out of the map.
-		records, err := n.state.GetStateByNamespace(current.Namespace)
+		// The ownership fetch already told us the workload's type, which is
+		// the other half of the record's key, so this is a direct read
+		// rather than a scan of every record in the namespace.
+		//
+		// Dropping that scan also drops its namespace filter, which is not
+		// a loss: ownership is enforced above against the definition the
+		// nexlet actually holds, and UPDATE refuses to move a workload
+		// between namespaces (handleUpdateWorkload), so a record whose
+		// namespace disagrees with the live one is not a state any node
+		// write path can produce.
+		storedDef, _, err := n.state.GetWorkloadRecord(current.WorkloadType, workloadID)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to read stored workload definitions")
 			return
 		}
 
-		storedDef, ok := records[workloadID]
-		if !ok {
+		if storedDef == nil {
 			// The nexlet holds the workload but the node has no persisted
 			// record for it. This is reachable in normal operation, not
 			// just as a bug: handleAuctionDeployWorkload responds to the
@@ -730,7 +763,7 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 			return
 		}
 
-		updated, message, rerr := n.replaceWorkload(workloadID, *current, storedDef)
+		updated, message, rerr := n.replaceWorkload(workloadID, *current, *storedDef)
 		if rerr != nil {
 			n.handlerError(r, rerr.err, rerr.code, rerr.msg)
 			return
@@ -777,9 +810,19 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 // to enforce the workload-type invariant and to address the stop at the
 // workload's namespace.
 //
-// A false return with a nil error is a legitimate, self-healing outcome
-// rather than a server fault: the new definition is stored, and the next
-// agent registration will bring reality up to it. No lifecycle events are
+// A false return with a nil error is a legitimate outcome rather than a
+// server fault, in one of two shapes distinguished by the returned message:
+//
+//   - the store landed but the swap did not finish (unconfirmed stop, or a
+//     failed replacement start). Self-healing: the new definition is on
+//     file, and the next agent registration brings reality up to it.
+//   - the store-first compare-and-swap LOST to a concurrent writer
+//     (updateConcurrentModificationMessage). Nothing was persisted,
+//     stopped or started -- the abort lands before the stop -- and nothing
+//     will repair it later, because there is nothing half-done to repair.
+//     The caller re-reads and decides.
+//
+// No lifecycle events are
 // emitted here -- the agent's own stop and start paths emit exactly one
 // WORKLOADSTOPPED and one WORKLOADSTARTED, which is what namespace quota
 // accounting expects.
@@ -850,12 +893,37 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 	}
 	def.Metadata["nex_minted_nkey"] = wlNatsConn.NatsUserNkey
 
-	// STORE-FIRST. The type is pinned above, so this Put lands on the same
-	// KV key the old definition occupied -- one record, one instance, no
-	// second key for another nexlet to resume. Nothing has been stopped
-	// yet, so a failed Put simply aborts the update with the old instance
-	// still running.
-	if err := n.state.StoreWorkload(workloadID, def); err != nil {
+	// STORE-FIRST, under compare-and-swap. The type is pinned above, so
+	// this write lands on the same KV key the old definition occupied --
+	// one record, one instance, no second key for another nexlet to resume.
+	// Nothing has been stopped yet, so a failed write simply aborts the
+	// update with the old instance still running.
+	//
+	// The read happens HERE, immediately before the write, rather than at
+	// the top of the verb: everything above this point (validation, the
+	// type check, the mint) can take arbitrarily long, and a revision read
+	// earlier would only widen the window it is meant to close. An absent
+	// record yields revision 0, which is create-only -- the right semantics
+	// for the legitimate "nexlet holds it but nothing was ever persisted"
+	// case (see handleRestartWorkload's stored-record branch), and still a
+	// conflict if someone else creates the record first.
+	_, revision, err := n.state.GetWorkloadRecord(def.WorkloadType, workloadID)
+	if err != nil {
+		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to read stored workload definition", err)
+	}
+
+	// A lost CAS means someone else's definition is on file. Overwriting it
+	// would be the silent revert this whole design exists to prevent, and
+	// retrying here would be worse: the competing writer may itself be
+	// mid-replacement (it stores before it stops), so a retry could stop an
+	// instance the other writer is about to replace. Nothing has been
+	// touched yet, so the honest answer is to abort and let the caller
+	// decide against the newer record.
+	if err := n.state.StoreWorkload(workloadID, def, revision); err != nil {
+		if errors.Is(err, models.ErrStateConflict) {
+			n.logger.Warn("workload update aborted: record changed concurrently", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
+			return false, updateConcurrentModificationMessage, nil
+		}
 		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to persist updated workload definition", err)
 	}
 
@@ -981,6 +1049,25 @@ func (n *NexNode) handleNamespacePing() func(micro.Request) {
 	}
 }
 
+// stampMintedNkey returns swr with the public user nkey of its currently
+// minted credential recorded in metadata, which is the prerequisite for
+// credential fencing: without it nobody knows which nkey to revoke for a
+// given workload. The metadata map is cloned rather than mutated in place,
+// so the caller's copy of swr is never altered behind its back -- the same
+// precaution replaceWorkload takes, and it matters more here because the
+// value being stamped is re-read from state on a retry.
+//
+// "nex_minted_nkey" is a cross-repo contract key name; do not rename.
+func stampMintedNkey(swr models.StartWorkloadRequest, nkey string) models.StartWorkloadRequest {
+	if swr.Metadata == nil {
+		swr.Metadata = models.StartWorkloadRequestMetadata{}
+	} else {
+		swr.Metadata = maps.Clone(swr.Metadata)
+	}
+	swr.Metadata["nex_minted_nkey"] = nkey
+	return swr
+}
+
 func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 	return func(r micro.Request) {
 		// $NEX.SVC.<nodeid>.agent.REGISTER.<agentid>
@@ -1057,8 +1144,37 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			n.logger.Warn("failed to get agent state", slog.String("err", err.Error()))
 		}
 
+		// agentState is a SNAPSHOT, and everything below runs after it: a
+		// mint per record, then a write per record. Any UPDATE that lands
+		// in that window has already stored its new definition, so the
+		// snapshot's copy is stale the moment it is taken. Writing the
+		// snapshot back would revert that definition on disk and — because
+		// the same value is what the agent is told to resume — start the
+		// reverted definition too, which is the silent-revert failure the
+		// store-first design exists to prevent.
+		//
+		// So the snapshot is used for one thing only: the list of workload
+		// ids this agent type owns. Each record's CONTENT is re-read
+		// immediately before it is minted and stamped.
 		state := models.RegisterAgentResponseExistingState{}
-		for workloadID, swr := range agentState {
+		for workloadID := range agentState {
+			// The key is "<workload_type>_<workload_id>" and GetStateByAgent
+			// matched on exactly this prefix, so RegisterType is the type
+			// half of every key it returned.
+			fresh, revision, err := n.state.GetWorkloadRecord(registrationRequest.RegisterType, workloadID)
+			if err != nil {
+				n.logger.Error("failed to re-read workload record, workload dropped from resume state", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
+				continue
+			}
+			if fresh == nil {
+				// Purged between the snapshot and now — an UNDEPLOY the
+				// node confirmed. Resuming it would resurrect a workload
+				// the operator stopped.
+				n.logger.Warn("workload record removed during resume; not resuming", slog.String("workload_id", workloadID))
+				continue
+			}
+			swr := *fresh
+
 			natsConn, err := n.handlerMinter.Mint(models.WorkloadCred, swr.Namespace, workloadID)
 			if err != nil {
 				// Workload is dropped from the agent's resume state — surface it
@@ -1072,17 +1188,39 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			// credential — otherwise a future fencing revocation would
 			// target a stale (no longer valid) nkey. Re-store the record so
 			// the KV copy stays truthful.
-			if swr.Metadata == nil {
-				swr.Metadata = models.StartWorkloadRequestMetadata{}
-			}
-			swr.Metadata["nex_minted_nkey"] = natsConn.NatsUserNkey
+			swr = stampMintedNkey(swr, natsConn.NatsUserNkey)
+
 			// The agent below receives (and will use) the freshly minted
 			// credential regardless of whether this store succeeds, so a
 			// failure here leaves the KV record holding the PREVIOUS nkey
 			// while the live credential is the new one — a future fencing
 			// revocation keyed off the stored record would revoke the
 			// wrong identity.
-			if err := n.state.StoreWorkload(workloadID, swr); err != nil {
+			//
+			// One retry on conflict: the mint above is not instant, so a
+			// writer can still slip in between the re-read and this store.
+			// Re-read and re-stamp the newest record rather than retrying
+			// with the definition we already know is stale.
+			if err := n.state.StoreWorkload(workloadID, swr, revision); errors.Is(err, models.ErrStateConflict) {
+				newest, newestRevision, rerr := n.state.GetWorkloadRecord(registrationRequest.RegisterType, workloadID)
+				switch {
+				case rerr != nil:
+					n.logger.Error("failed to persist re-minted workload nkey; stored nkey is stale — credential fencing against this record would revoke the wrong key", slog.String("err", rerr.Error()), slog.String("workload_id", workloadID))
+				case newest == nil:
+					n.logger.Warn("workload record removed during resume; not resuming", slog.String("workload_id", workloadID))
+					continue
+				default:
+					swr = stampMintedNkey(*newest, natsConn.NatsUserNkey)
+					if err := n.state.StoreWorkload(workloadID, swr, newestRevision); err != nil {
+						// Second conflict: give up on the stamp rather
+						// than loop. The workload is still resumed, from
+						// the newest definition read above, and the
+						// credential the agent gets is the fresh one — only
+						// the KV copy of the nkey is behind.
+						n.logger.Error("failed to persist re-minted workload nkey; stored nkey is stale — credential fencing against this record would revoke the wrong key", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
+					}
+				}
+			} else if err != nil {
 				n.logger.Error("failed to persist re-minted workload nkey; stored nkey is stale — credential fencing against this record would revoke the wrong key", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
 			}
 

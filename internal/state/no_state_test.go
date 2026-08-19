@@ -11,7 +11,7 @@ func TestNoState(t *testing.T) {
 	n := &NoState{}
 	be.Nonzero(t, n)
 
-	be.Zero(t, n.StoreWorkload("asdf", models.StartWorkloadRequest{}))
+	be.Zero(t, n.StoreWorkload("asdf", models.StartWorkloadRequest{}, 0))
 	be.Zero(t, n.RemoveWorkload("asdf", "asdf"))
 
 	s, err := n.GetStateByAgent("asdf")

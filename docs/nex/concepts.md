@@ -202,6 +202,16 @@ Nodes can operate in-memory or attach a persistence backend:
 
 Custom persistence layers can implement the `models.NexNodeState` interface if you need an alternative store.
 
+Records are written with compare-and-swap, not with a blind put: three node
+paths write the same record (the deploy path after it has already answered
+the caller, resume-on-registration's credential re-stamp, and the
+`UPDATE`/`RESTART` store-first write), so a writer that lost a race must be
+told rather than allowed to revert the winner. `GetWorkloadRecord` returns a
+revision, `StoreWorkload` takes the revision it expects (`0` meaning
+create-only), and a lost race comes back as `models.ErrStateConflict`. An
+alternative store has to provide that guarantee — without it, a concurrent
+update can be silently undone.
+
 ## Node and Nexlet Lifecycle
 
 1. **Node startup**

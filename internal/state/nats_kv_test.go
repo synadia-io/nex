@@ -67,7 +67,7 @@ func TestNewKVState(t *testing.T) {
 		RunRequest:        "{}",
 		WorkloadLifecycle: "service",
 		WorkloadType:      "foo",
-	}))
+	}, 0))
 	kl, err = kv.ListKeys(context.TODO())
 	be.NilErr(t, err)
 	be.Equal(t, 1, getChanCount(t, kl.Keys()))
@@ -79,7 +79,7 @@ func TestNewKVState(t *testing.T) {
 		RunRequest:        "{}",
 		WorkloadLifecycle: "service",
 		WorkloadType:      "bar",
-	}))
+	}, 0))
 	kl, err = kv.ListKeys(context.TODO())
 	be.NilErr(t, err)
 	be.Equal(t, 2, getChanCount(t, kl.Keys()))
