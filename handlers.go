@@ -312,6 +312,17 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
+		// Capture the minted workload's PUBLIC user nkey into the stored
+		// request's metadata. This is not a secret (the seed is, and the
+		// seed is never persisted here or elsewhere) -- it is the
+		// prerequisite for future credential fencing (revocation): without
+		// it, nobody knows which nkey to revoke for a given workload.
+		// "nex_minted_nkey" is a cross-repo contract key name; do not rename.
+		if req.Metadata == nil {
+			req.Metadata = models.StartWorkloadRequestMetadata{}
+		}
+		req.Metadata["nex_minted_nkey"] = wlNatsConn.NatsUserNkey
+
 		aReq := new(models.AgentStartWorkloadRequest)
 		aReq.Request = *req
 		aReq.WorkloadCreds = *wlNatsConn
@@ -616,6 +627,20 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 				n.logger.Error("failed to mint workload nats connection, workload dropped from resume state", slog.String("err", err.Error()), slog.String("namespace", swr.Namespace), slog.String("workload_id", workloadID))
 				continue
 			}
+
+			// Creds are re-minted per record on every resume, so the
+			// persisted nkey must be refreshed to track the live
+			// credential — otherwise a future fencing revocation would
+			// target a stale (no longer valid) nkey. Re-store the record so
+			// the KV copy stays truthful.
+			if swr.Metadata == nil {
+				swr.Metadata = models.StartWorkloadRequestMetadata{}
+			}
+			swr.Metadata["nex_minted_nkey"] = natsConn.NatsUserNkey
+			if err := n.state.StoreWorkload(workloadID, swr); err != nil {
+				n.logger.Warn("failed to re-store resumed workload state", slog.String("err", err.Error()), slog.String("workload_id", workloadID))
+			}
+
 			aswr := models.AgentStartWorkloadRequest{
 				Request:       swr,
 				WorkloadCreds: *natsConn,

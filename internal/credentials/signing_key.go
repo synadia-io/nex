@@ -106,6 +106,12 @@ func (m *SigningKeyMinter) Mint(typ models.CredType, namespace, id string) (*mod
 		return nil, err
 	}
 
+	// The JWT (below) is what NATS actually authenticates with; the plain
+	// public nkey is only otherwise derivable by decoding NatsUserSeed. Set
+	// it directly so callers (e.g. workload nkey persistence for future
+	// credential fencing) don't have to re-derive it.
+	ret.NatsUserNkey = pubKp
+
 	claims := jwt.NewUserClaims(pubKp)
 	claims.Subject = pubKp
 	claims.Expires = time.Now().Add(time.Hour * 24 * 365).Unix()
