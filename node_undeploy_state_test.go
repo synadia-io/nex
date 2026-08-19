@@ -13,6 +13,7 @@ package nex_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -82,6 +83,13 @@ type recordingState struct {
 	// snapshot is already taken, and anything written after it is what a
 	// snapshot-then-Put resume path would silently revert.
 	afterAgentSnapshot func()
+
+	// getFailAfter, when >= 0, counts GetWorkloadRecord calls down and
+	// fails the call that reaches zero, once. Read failures are otherwise
+	// unreachable from a test: the backing KV is healthy, so the recovery
+	// branches that handle a failed re-read would never execute.
+	// Negative means disarmed.
+	getFailAfter int
 }
 
 // injectBeforeStore arms the one-shot pre-store hook. See recordingState.
@@ -97,6 +105,31 @@ func (r *recordingState) injectAfterAgentSnapshot(f func()) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.afterAgentSnapshot = f
+}
+
+// failGetWorkloadRecordAfter arms a one-shot read failure: the next skip
+// GetWorkloadRecord calls pass through, and the one after them fails. See
+// recordingState.
+func (r *recordingState) failGetWorkloadRecordAfter(skip int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.getFailAfter = skip + 1
+}
+
+func (r *recordingState) GetWorkloadRecord(workloadType, workloadID string) (*models.StartWorkloadRequest, uint64, error) {
+	r.mu.Lock()
+	fail := false
+	if r.getFailAfter > 0 {
+		r.getFailAfter--
+		fail = r.getFailAfter == 0
+	}
+	r.mu.Unlock()
+
+	if fail {
+		return nil, 0, errors.New("injected state read failure")
+	}
+
+	return r.NexNodeState.GetWorkloadRecord(workloadType, workloadID)
 }
 
 func (r *recordingState) RemoveWorkload(workloadType, workloadId string) error {

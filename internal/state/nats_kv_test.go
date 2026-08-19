@@ -263,3 +263,46 @@ func TestKVStateCreateOnlyAfterRemoveSucceeds(t *testing.T) {
 	be.NilErr(t, err)
 	be.Equal(t, "v2", rec.Name)
 }
+
+// TestKVStateGetStateByAgentPrefixIsExact pins that the agent-type match is
+// on the whole key segment, not on a bare string prefix.
+//
+// The key is "<workload_type>_<workload_id>", so the only correct match for
+// agent type "docker" is the prefix "docker_". Matching "docker" alone also
+// swallows every key of every type that STARTS with it -- "dockerx_wl1" --
+// and the TrimPrefix that follows uses "docker_", which does not match, so
+// the foreign key comes back whole as the workload id.
+//
+// The damage is not confined to this function. Resume then re-reads each id
+// under the REGISTERING type ("docker_dockerx_wl1"), finds nothing, and
+// drops the record as removed -- so a "dockerx" workload silently fails to
+// resume whenever a "docker" agent registers first, and the reason is
+// invisible at the resume call site.
+func TestKVStateGetStateByAgentPrefixIsExact(t *testing.T) {
+	server := startNatsServer(t, t.TempDir())
+	defer server.Shutdown()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+
+	s, err := NewNatsKVState(nc, "test", nil)
+	be.NilErr(t, err)
+
+	// Two agent types where one is a string prefix of the other.
+	be.NilErr(t, s.StoreWorkload("wl1", workloadDef("short", "docker"), 0))
+	be.NilErr(t, s.StoreWorkload("wl2", workloadDef("long", "dockerx"), 0))
+
+	shortState, err := s.GetStateByAgent("docker")
+	be.NilErr(t, err)
+	be.Equal(t, 1, len(shortState))
+	rec, ok := shortState["wl1"]
+	be.True(t, ok)
+	be.Equal(t, "short", rec.Name)
+
+	longState, err := s.GetStateByAgent("dockerx")
+	be.NilErr(t, err)
+	be.Equal(t, 1, len(longState))
+	rec, ok = longState["wl2"]
+	be.True(t, ok)
+	be.Equal(t, "long", rec.Name)
+}

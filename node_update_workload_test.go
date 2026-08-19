@@ -52,6 +52,7 @@ type updateHarness struct {
 	nc     *nats.Conn
 	kv     jetstream.KeyValue
 	rec    *recordingState
+	mint   *recordingMinter
 	agent  *inmem.InMemAgent
 	nodePK string
 }
@@ -92,9 +93,11 @@ func newUpdateHarnessWithOptions(t *testing.T, ctx context.Context, schema strin
 
 	rec := &recordingState{NexNodeState: sKV}
 
+	mint := &recordingMinter{CredVendor: newTestSigningMinter(t, s.ClientURL(), _test.Node1Pub)}
+
 	opts := append([]nex.NexNodeOption{
 		nex.WithState(rec),
-		nex.WithMinter(newTestSigningMinter(t, s.ClientURL(), _test.Node1Pub)),
+		nex.WithMinter(mint),
 	}, extraOpts...)
 
 	nexNodes := _test.StartNexusWithOptions(t, ctx, s.ClientURL(), 1, true, opts, runner)
@@ -105,7 +108,7 @@ func newUpdateHarnessWithOptions(t *testing.T, ctx context.Context, schema strin
 	kv, err := js.KeyValue(ctx, bucketName)
 	be.NilErr(t, err)
 
-	return &updateHarness{nc: nc, kv: kv, rec: rec, agent: inmemAgent, nodePK: _test.Node1Pub}
+	return &updateHarness{nc: nc, kv: kv, rec: rec, mint: mint, agent: inmemAgent, nodePK: _test.Node1Pub}
 }
 
 // deploy runs AUCTION + ADEPLOY and returns the minted workload id, waiting
