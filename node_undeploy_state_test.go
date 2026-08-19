@@ -38,17 +38,28 @@ type removeWorkloadCall struct {
 	workloadId   string
 }
 
+// storeWorkloadCall records one call to recordingState.StoreWorkload.
+type storeWorkloadCall struct {
+	workloadId string
+	request    models.StartWorkloadRequest
+}
+
 // recordingState wraps a models.NexNodeState and records every
-// RemoveWorkload call, so a test can assert a purge was (or was not)
-// attempted. This matters because KV Purge of an already-missing key
-// succeeds silently, so asserting on KV contents alone cannot distinguish
-// "no purge attempted" from "purge attempted against the wrong key" -- the
-// exact way the bug this test pins was invisible.
+// RemoveWorkload and StoreWorkload call, so a test can assert a purge or a
+// persist was (or was not) attempted. This matters because KV Purge of an
+// already-missing key succeeds silently, so asserting on KV contents alone
+// cannot distinguish "no purge attempted" from "purge attempted against the
+// wrong key" -- the exact way the bug TestNodeUndeployUnconfirmedKeepsState
+// pins was invisible. The StoreWorkload recording exists for the same
+// reason on the write side: the UPDATE handler must not persist anything
+// before it has validated the incoming definition (see
+// node_update_workload_test.go).
 type recordingState struct {
 	models.NexNodeState
 
 	mu          sync.Mutex
 	removeCalls []removeWorkloadCall
+	storeCalls  []storeWorkloadCall
 }
 
 func (r *recordingState) RemoveWorkload(workloadType, workloadId string) error {
@@ -56,6 +67,19 @@ func (r *recordingState) RemoveWorkload(workloadType, workloadId string) error {
 	r.removeCalls = append(r.removeCalls, removeWorkloadCall{workloadType: workloadType, workloadId: workloadId})
 	r.mu.Unlock()
 	return r.NexNodeState.RemoveWorkload(workloadType, workloadId)
+}
+
+func (r *recordingState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest) error {
+	r.mu.Lock()
+	r.storeCalls = append(r.storeCalls, storeWorkloadCall{workloadId: workloadId, request: swr})
+	r.mu.Unlock()
+	return r.NexNodeState.StoreWorkload(workloadId, swr)
+}
+
+func (r *recordingState) stores() []storeWorkloadCall {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]storeWorkloadCall(nil), r.storeCalls...)
 }
 
 func (r *recordingState) calls() []removeWorkloadCall {

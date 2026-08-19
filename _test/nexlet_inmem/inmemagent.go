@@ -38,6 +38,15 @@ type InMemAgent struct {
 	// that cannot confirm a stop (e.g. crashed or unreachable).
 	FailStops bool
 
+	// StartRequestSchema is the JSON schema this agent advertises at
+	// registration. The node compiles it and validates every run_request
+	// against it, on both the deploy and the update path. It defaults to
+	// "{}" -- accepts anything -- which is what most tests want. A test
+	// that needs the node's schema validation to actually REJECT a
+	// run_request must register a restrictive schema (see
+	// WithStartRequestSchema), otherwise there is nothing to fail on.
+	StartRequestSchema string
+
 	Logger *slog.Logger
 }
 
@@ -66,6 +75,15 @@ func WithAgentName(name string) InMemAgentOpt {
 func WithWorkloadType(workloadType string) InMemAgentOpt {
 	return func(a *InMemAgent) error {
 		a.WorkloadType = workloadType
+		return nil
+	}
+}
+
+// WithStartRequestSchema overrides the permissive default ("{}") run_request
+// schema this agent registers with the node.
+func WithStartRequestSchema(schema string) InMemAgentOpt {
+	return func(a *InMemAgent) error {
+		a.StartRequestSchema = schema
 		return nil
 	}
 }
@@ -108,10 +126,11 @@ func newInMemAgent(nexus, nodeId string, logger *slog.Logger, opts ...InMemAgent
 	}
 
 	inmemAgent := &InMemAgent{
-		Name:         agentNameDefault,
-		WorkloadType: agentTypeDefault,
-		Nexus:        nexus,
-		Version:      VERSION,
+		Name:               agentNameDefault,
+		WorkloadType:       agentTypeDefault,
+		Nexus:              nexus,
+		Version:            VERSION,
+		StartRequestSchema: "{}",
 		Workloads: Workloads{
 			State: make(map[string][]InMemWorkload),
 		},
@@ -134,13 +153,23 @@ func (a *InMemAgent) Register() (*models.RegisterAgentRequest, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Several tests build an InMemAgent as a plain struct literal rather
+	// than through newInMemAgent, so the zero value has to keep meaning the
+	// permissive schema: the node cannot compile "" and would reject the
+	// registration outright.
+	schema := a.StartRequestSchema
+	if schema == "" {
+		schema = "{}"
+	}
+
 	return &models.RegisterAgentRequest{
 		Description:        "In memory no-op agent",
 		MaxWorkloads:       0,
 		Name:               a.Name,
 		RegisterType:       a.WorkloadType,
 		PublicXkey:         pub,
-		StartRequestSchema: "{}",
+		StartRequestSchema: schema,
 		SupportedLifecycles: []models.WorkloadLifecycle{
 			models.WorkloadLifecycleService,
 			models.WorkloadLifecycleJob,
