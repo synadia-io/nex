@@ -102,6 +102,11 @@ func CloneWorkloadRequestSubject(inNS, inWorkloadID string) string {
 	return fmt.Sprintf("%s.CLONE.%s", ControlAPIPrefix(inNS), inWorkloadID)
 }
 
+// $NEX.SVC.namespace.control.UPDATE.workloadid
+func UpdateWorkloadRequestSubject(inNS, inWorkloadID string) string {
+	return fmt.Sprintf("%s.UPDATE.%s", ControlAPIPrefix(inNS), inWorkloadID)
+}
+
 // $NEX.SVC.system.control.AGENTID.nodeid
 func GetAgentIdByNameSubject(inNodeId string) string {
 	return fmt.Sprintf("%s.AGENTID.%s", ControlAPIPrefix(SystemNamespace), inNodeId)
@@ -125,6 +130,11 @@ func AuctionDeploySubscribeSubject() string {
 // $NEX.SVC.*.control.CLONE.workloadid
 func CloneWorkloadSubscribeSubject() string {
 	return fmt.Sprintf("%s.CLONE.*", ControlAPIPrefix("*"))
+}
+
+// $NEX.SVC.*.control.UPDATE.workloadid
+func UpdateWorkloadSubscribeSubject() string {
+	return fmt.Sprintf("%s.UPDATE.*", ControlAPIPrefix("*"))
 }
 
 // $NEX.SVC.*.control.WPING

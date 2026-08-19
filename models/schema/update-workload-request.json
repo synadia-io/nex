@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "io.nats.nex.v2.update_workload_request",
+  "title": "UpdateWorkloadRequest",
+  "type": "object",
+  "properties": {
+    "namespace": {
+      "type": "string",
+      "description": "Namespace of the workload to update"
+    },
+    "start_request": {
+      "$ref": "./start-workload-request.json",
+      "description": "The replacement workload definition. Applied to the existing workload id in place; it may not move the workload to another namespace."
+    }
+  },
+  "required": [
+    "namespace",
+    "start_request"
+  ],
+  "additionalProperties": false
+}

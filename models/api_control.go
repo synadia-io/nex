@@ -254,3 +254,68 @@ func (j *NodePingResponse) UnmarshalJSON(value []byte) error {
 	*j = NodePingResponse(plain)
 	return nil
 }
+
+type UpdateWorkloadRequest struct {
+	// Namespace of the workload to update
+	Namespace string `json:"namespace"`
+
+	// The replacement workload definition. Applied to the existing workload id in
+	// place; it may not move the workload to another namespace.
+	StartRequest StartWorkloadRequest `json:"start_request"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *UpdateWorkloadRequest) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["namespace"]; raw != nil && !ok {
+		return fmt.Errorf("field namespace in UpdateWorkloadRequest: required")
+	}
+	if _, ok := raw["start_request"]; raw != nil && !ok {
+		return fmt.Errorf("field start_request in UpdateWorkloadRequest: required")
+	}
+	type Plain UpdateWorkloadRequest
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = UpdateWorkloadRequest(plain)
+	return nil
+}
+
+type UpdateWorkloadResponse struct {
+	// Id corresponds to the JSON schema field "id".
+	Id string `json:"id"`
+
+	// Message corresponds to the JSON schema field "message".
+	Message string `json:"message"`
+
+	// Updated corresponds to the JSON schema field "updated".
+	Updated bool `json:"updated"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (j *UpdateWorkloadResponse) UnmarshalJSON(value []byte) error {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(value, &raw); err != nil {
+		return err
+	}
+	if _, ok := raw["id"]; raw != nil && !ok {
+		return fmt.Errorf("field id in UpdateWorkloadResponse: required")
+	}
+	if _, ok := raw["message"]; raw != nil && !ok {
+		return fmt.Errorf("field message in UpdateWorkloadResponse: required")
+	}
+	if _, ok := raw["updated"]; raw != nil && !ok {
+		return fmt.Errorf("field updated in UpdateWorkloadResponse: required")
+	}
+	type Plain UpdateWorkloadResponse
+	var plain Plain
+	if err := json.Unmarshal(value, &plain); err != nil {
+		return err
+	}
+	*j = UpdateWorkloadResponse(plain)
+	return nil
+}
