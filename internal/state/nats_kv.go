@@ -153,8 +153,17 @@ func (n *natsKVState) GetStateByAgent(agentName string) (map[string]models.Start
 	}
 
 	ret := make(map[string]models.StartWorkloadRequest)
+	// The key is "<workload_type>_<workload_id>", so the separator is part
+	// of the match. Matching the bare name would also claim every key of
+	// every OTHER type that merely starts with it -- agent type "docker"
+	// swallowing "dockerx_wl1" -- and the TrimPrefix below (which does
+	// include the separator) would then strip nothing, returning another
+	// type's whole key as if it were a workload id. Resume re-reads that id
+	// under the registering type, finds no such record, and silently drops
+	// a workload that was never its own.
+	prefix := fmt.Sprintf("%s_", agentName)
 	for k := range kl.Keys() {
-		if strings.HasPrefix(k, agentName) {
+		if strings.HasPrefix(k, prefix) {
 			v, err := n.kv.Get(n.ctx, k)
 			if err != nil {
 				return nil, err
@@ -166,7 +175,7 @@ func (n *natsKVState) GetStateByAgent(agentName string) (map[string]models.Start
 				return nil, err
 			}
 
-			ret[strings.TrimPrefix(k, fmt.Sprintf("%s_", agentName))] = swr
+			ret[strings.TrimPrefix(k, prefix)] = swr
 		}
 	}
 	return ret, nil
