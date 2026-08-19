@@ -404,10 +404,10 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
-		err = n.state.RemoveWorkload(ret.WorkloadType, workloadID)
-		if err != nil {
-			n.logger.Warn("failed to delete node state", slog.String("err", err.Error()))
-			return
+		if ret.Stopped {
+			if err := n.state.RemoveWorkload(ret.WorkloadType, workloadID); err != nil {
+				n.logger.Warn("failed to delete node state", slog.String("err", err.Error()))
+			}
 		}
 	}
 }

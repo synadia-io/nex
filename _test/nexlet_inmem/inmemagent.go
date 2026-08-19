@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/synadia-io/nex/sdk/go/agent"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
 
 	"github.com/nats-io/nkeys"
 )
@@ -32,6 +32,11 @@ type InMemAgent struct {
 	XPair        nkeys.KeyPair
 	StartTime    time.Time
 	Runner       *agent.Runner
+
+	// FailStops, when true, makes StopWorkload return an error without
+	// touching agent-side workload state. Tests use it to simulate a nexlet
+	// that cannot confirm a stop (e.g. crashed or unreachable).
+	FailStops bool
 
 	Logger *slog.Logger
 }
@@ -66,22 +71,34 @@ func WithWorkloadType(workloadType string) InMemAgentOpt {
 }
 
 func NewInMemAgent(nexus, nodeId string, logger *slog.Logger, opts ...InMemAgentOpt) (*agent.Runner, error) {
+	runner, _, err := NewInMemAgentWithHandle(nexus, nodeId, logger, opts...)
+	return runner, err
+}
+
+// NewInMemAgentWithHandle behaves like NewInMemAgent but also returns the
+// concrete *InMemAgent alongside its *agent.Runner. The runner alone does
+// not expose the underlying agent, so tests that need to reach in-process
+// test knobs after wiring (e.g. FailStops) must use this constructor.
+func NewInMemAgentWithHandle(nexus, nodeId string, logger *slog.Logger, opts ...InMemAgentOpt) (*agent.Runner, *InMemAgent, error) {
 	inmemAgent, err := newInMemAgent(nexus, nodeId, logger, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	runnerOpts := []agent.RunnerOpt{
 		agent.WithLogger(logger),
 	}
 
 	if !nkeys.IsValidPublicServerKey(nodeId) {
-		return nil, errors.New("node id is not a valid public server key")
+		return nil, nil, errors.New("node id is not a valid public server key")
 	}
 
 	inmemAgent.Runner, err = agent.NewRunner(context.Background(), nexus, nodeId, inmemAgent, runnerOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return inmemAgent.Runner, nil
+	return inmemAgent.Runner, inmemAgent, nil
 }
 
 func newInMemAgent(nexus, nodeId string, logger *slog.Logger, opts ...InMemAgentOpt) (*InMemAgent, error) {
@@ -212,6 +229,10 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 }
 
 func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWorkloadRequest) error {
+	if a.FailStops {
+		return errors.New("injected stop failure")
+	}
+
 	a.Logger.Debug("StopWorkload received", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
 
 	a.Workloads.Lock()

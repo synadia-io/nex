@@ -73,6 +73,15 @@ func StartNatsServer(t testing.TB, workDir string) *server.Server {
 
 func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, state bool, runners ...*agent.Runner) []*nex.NexNode {
 	t.Helper()
+	return StartNexusWithOptions(t, ctx, natsUrl, size, state, nil, runners...)
+}
+
+// StartNexusWithOptions behaves like StartNexus but also applies extraOpts to
+// every constructed node, after the state/runner wiring below -- e.g. to
+// inject a decorator around the real state impl (state=true) for tests that
+// need to observe state calls (see nex.WithState in options.go).
+func StartNexusWithOptions(t testing.TB, ctx context.Context, natsUrl string, size int, state bool, extraOpts []nex.NexNodeOption, runners ...*agent.Runner) []*nex.NexNode {
+	t.Helper()
 
 	showTestLogsEnv, err := strconv.ParseBool(os.Getenv("NEX_TEST_LOGS"))
 	if err != nil {
@@ -130,6 +139,8 @@ func StartNexus(t testing.TB, ctx context.Context, natsUrl string, size int, sta
 			be.NilErr(t, err)
 			opts = append(opts, nex.WithAgentRunner(runner))
 		}
+
+		opts = append(opts, extraOpts...)
 
 		node, err := nex.NewNexNode(opts...)
 		be.NilErr(t, err)
