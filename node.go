@@ -279,6 +279,7 @@ func (n *NexNode) Start() error {
 	errs = errors.Join(errs, n.service.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
 	errs = errors.Join(errs, n.service.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
 	errs = errors.Join(errs, n.service.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, n.service.AddEndpoint("UpdateWorkload", micro.HandlerFunc(n.handleUpdateWorkload()), micro.WithEndpointSubject(models.UpdateWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
 	errs = errors.Join(errs, n.service.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
 
 	if errs != nil {
