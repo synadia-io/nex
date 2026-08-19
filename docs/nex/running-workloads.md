@@ -110,7 +110,17 @@ For JSON output (scripting or automation), include `--json`.
 
 - **Stop**: `nex --namespace default workload stop <workload_id>` gracefully stops the workload using the nexlet’s implementation (`StopWorkload`). Jobs that already exited appear as stopped when listed.
 - **Clone**: `nex --namespace default workload clone <workload_id> --tags region=canary` re-auctions the same definition onto fresh capacity. Append `--stop` to stop the original instance after the clone succeeds.
-- **Redeploy adjustments**: Modify your Nexfile (new command, updated environment, resource tweaks) and re-run `workload start` with the same `--name` if you want to treat it as a replacement. The new workload receives a new ID; stop the old one when you confirm success.
+- **Redeploy adjustments**: To replace a workload's configuration in place (same ID, same node), use `workload update` — see **Update and Restart Workloads** below. Re-running `workload start` with a modified Nexfile is still useful when you want a genuinely new workload alongside the old one (a new ID, possibly a different node); stop the old one once you've confirmed the new one is healthy.
+
+## Update and Restart Workloads
+
+- **Update**: `nex --namespace default workload update <workload_id> --nexfile Nexfile` replaces the workload's definition in place — same workload ID, same node. Supply the replacement definition with `--nexfile`/`-f`, or place a `Nexfile` in the working directory; one of the two is required. The node validates the new `start_request` against the nexlet's schema, persists it, stops the running instance, and — only once that stop is confirmed — starts the replacement with freshly minted credentials.
+  - Update never relocates a workload and never changes its `type`; both are rejected. To move a workload, use `clone`; to change its type, stop it and start a new one.
+  - If the stop can't be confirmed, the command reports `updated:false` with a message explaining why. The new definition is already persisted and takes effect the next time the nexlet registers (an agent or node restart, not a timer) — nothing is torn down in the meantime.
+  - If the stop is confirmed but the replacement fails to start, you also get `updated:false`: the old instance is stopped, the new definition is stored, and nothing is currently running.
+  - Because the new definition is persisted before the old instance is stopped, a node crash mid-update always completes on the next agent registration; it never reverts to the old definition.
+- **Restart**: `nex --namespace default workload restart <workload_id>` stops and restarts the workload using its last **stored** definition, minting fresh credentials for the new instance. If a previous update left the stop unconfirmed or the replacement failed to start, the stored definition is already the new one, so restart finishes that interrupted update instead of reapplying whatever happened to still be running.
+- Both commands report `updated:false` instead of failing outright when the outcome is self-healing; the message explains what happens next. An unknown or cross-namespace workload ID is reported as "workload not found" for both, the same as for `clone`.
 
 ## Observe Logs and Events
 
