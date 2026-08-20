@@ -10,8 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/shirou/gopsutil/v3/process"
-
 	"github.com/synadia-io/nex/internal"
 )
 
@@ -57,16 +55,13 @@ type pidRecord struct {
 	createTime int64
 }
 
-// processCreateTime returns the process start time (ms since epoch) reported by
-// the OS, which together with the pid is a stable identity that survives pid
-// reuse: a recycled pid belongs to a process with a different start time.
-func processCreateTime(pid int) (int64, error) {
-	p, err := process.NewProcess(int32(pid))
-	if err != nil {
-		return 0, err
-	}
-	return p.CreateTime()
-}
+// processStartTime returns an opaque, stable start-time value for the process
+// (its units differ per platform: clock ticks since boot on Linux, microseconds
+// since the epoch on macOS). Together with the pid it is an identity that
+// survives pid reuse -- a recycled pid belongs to a process with a different
+// start time -- which is all the reaper needs. It is defined per platform in
+// reaper_{linux,darwin,other}.go; on platforms without a cheap start-time source
+// it returns an error, which disables reaping there (record/reap become no-ops).
 
 // record notes a freshly spawned workload's pid and start time. If the start
 // time cannot be read there is no safe reuse guard, so the pid is NOT recorded
@@ -75,7 +70,7 @@ func (r *orphanReaper) record(pid int) {
 	if r == nil || r.path == "" {
 		return
 	}
-	ct, err := processCreateTime(pid)
+	ct, err := processStartTime(pid)
 	if err != nil {
 		r.logger.Warn("orphan reaper: could not read process start time; not recording pid", slog.Int("pid", pid), slog.String("err", err.Error()))
 		return
@@ -136,7 +131,7 @@ func (r *orphanReaper) reapOrphans() {
 	}
 
 	for _, rec := range records {
-		ct, err := processCreateTime(rec.pid)
+		ct, err := processStartTime(rec.pid)
 		if err != nil {
 			continue // process already gone -- nothing to reap
 		}
