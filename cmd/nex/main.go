@@ -57,5 +57,9 @@ func main() {
 	err = kctx.Run()
 	if err != nil && !errors.Is(err, models.ErrLameduckShutdown) {
 		fmt.Println("error:", err.Error())
+		// A printed error with exit 0 is invisible to scripts and CI;
+		// lameduck shutdown stays a clean exit because it is a requested
+		// stop, not a failure.
+		os.Exit(1)
 	}
 }
