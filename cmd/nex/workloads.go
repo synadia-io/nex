@@ -228,6 +228,14 @@ func (s *StopWorkload) Run(ctx context.Context, globals *Globals) error {
 		return nil
 	}
 
+	// Stopped:false is a real outcome, not a transport error: no nexlet
+	// confirmed the stop (unknown id, or the stop overran the node's
+	// confirmation budget). Reporting success on it hid exactly the case
+	// where the operator most needs to look.
+	if !stopResponse.Stopped {
+		return fmt.Errorf("workload %s was not confirmed stopped: %s", stopResponse.Id, stopResponse.Message)
+	}
+
 	fmt.Printf("Workload %s successfully stopped\n", stopResponse.Id)
 	return nil
 }
