@@ -81,6 +81,11 @@ func processGone(pid int) bool {
 	return errors.Is(syscall.Kill(pid, syscall.Signal(0)), syscall.ESRCH)
 }
 
+// runningPid returns the pid of the process the workload id currently holds and
+// registers it to be killed when the test ends. A test that fails partway
+// through never reaches its own stop, and these workloads sleep for half a
+// minute: without the cleanup a failing run leaves them behind, and repeated
+// runs accumulate them.
 func runningPid(t testing.TB, s *nexletState, namespace, workloadId string) int {
 	t.Helper()
 
@@ -92,7 +97,12 @@ func runningPid(t testing.TB, s *nexletState, namespace, workloadId string) int 
 	if proc == nil {
 		t.Fatalf("workload %q has no process", workloadId)
 	}
-	return proc.Pid
+
+	pid := proc.Pid
+	t.Cleanup(func() {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+	})
+	return pid
 }
 
 // assertStable re-checks the condition every 50ms for the whole window and
@@ -125,7 +135,7 @@ func TestStopWorkloadIsSynchronous(t *testing.T) {
 	be.Nonzero(t, wl)
 	proc := wl.getProcess()
 	be.Nonzero(t, proc)
-	pid := proc.Pid
+	pid := runningPid(t, a.state, lifecycleNamespace, "wl-sync")
 
 	be.NilErr(t, a.StopWorkload("wl-sync", &models.StopWorkloadRequest{Namespace: lifecycleNamespace}))
 
@@ -315,4 +325,126 @@ func TestStaleGenerationCannotDeleteOrRestart(t *testing.T) {
 	be.True(t, s.deleteGeneration(lifecycleNamespace, "wl-gen", current))
 	be.False(t, s.deleteGeneration(lifecycleNamespace, "wl-gen", stale))
 	be.Equal(t, 0, s.WorkloadCount())
+}
+
+// A restart claim can be overtaken by a stop: the stop finds the claiming
+// generation still under the id, marks it stopping and goes off to kill it,
+// and only then does the restart reach the start path. Spawning there would
+// leave the stop reporting success over a workload it had just brought back --
+// the process would be running the old definition with nothing recorded as
+// running at all.
+func TestRestartOvertakenByStopDoesNotSpawn(t *testing.T) {
+	s := newLifecycleState(t)
+
+	// The claiming generation: its process has exited (that is why a restart
+	// was claimed) and a stop has since marked it stopping.
+	claimed := &NativeProcess{
+		Name:        "overtaken",
+		State:       models.WorkloadStateError,
+		Restarts:    1,
+		MaxRestarts: MAX_RESTARTS,
+	}
+	s.workloads[lifecycleNamespace] = NativeProcesses{"wl-overtaken": claimed}
+	claimed.SetState(models.WorkloadStateStopping)
+
+	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-overtaken", serviceRequest(t, "overtaken", "30"), claimed))
+
+	// Nothing spawned, and the entry the stop is working on is untouched.
+	be.Equal(t, claimed, s.getWorkload(lifecycleNamespace, "wl-overtaken"))
+	be.Equal(t, 1, s.WorkloadCount())
+	if proc := claimed.getProcess(); proc != nil {
+		t.Fatalf("a process was spawned for a restart the stop had already overtaken (pid %d)", proc.Pid)
+	}
+
+	// The same claim, with no stop against it, does spawn.
+	claimed.SetState(models.WorkloadStateError)
+	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-overtaken", serviceRequest(t, "overtaken", "30"), claimed))
+
+	spawned := s.getWorkload(lifecycleNamespace, "wl-overtaken")
+	if spawned == claimed {
+		t.Fatal("the restart reused the claiming generation's NativeProcess")
+	}
+	be.Equal(t, 1, s.WorkloadCount())
+	// The budget carries over from the claim; claimRestart is what counts the
+	// restart, and it counted this one before handing over.
+	be.Equal(t, 1, spawned.Restarts)
+	runningPid(t, s, lifecycleNamespace, "wl-overtaken")
+
+	be.NilErr(t, s.RemoveWorkload(lifecycleNamespace, "wl-overtaken"))
+}
+
+// A restart that exhausts the budget must drop the generation that ran out, not
+// whatever holds the workload id by the time it gets there.
+func TestExhaustedRestartDropsOnlyItsOwnGeneration(t *testing.T) {
+	s := newLifecycleState(t)
+
+	exhausted := &NativeProcess{
+		Name:        "exhausted",
+		State:       models.WorkloadStateError,
+		Restarts:    MAX_RESTARTS,
+		MaxRestarts: MAX_RESTARTS,
+	}
+	replacement := &NativeProcess{Name: "replacement", State: models.WorkloadStateRunning, MaxRestarts: MAX_RESTARTS}
+
+	// The id has already moved on to a start that arrived while the exhausted
+	// generation was on its way to the start path.
+	s.workloads[lifecycleNamespace] = NativeProcesses{"wl-exhausted": replacement}
+
+	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-exhausted", serviceRequest(t, "exhausted", "30"), exhausted))
+	be.Equal(t, replacement, s.getWorkload(lifecycleNamespace, "wl-exhausted"))
+	be.Equal(t, 1, s.WorkloadCount())
+
+	// When it does still hold the id, it is dropped -- by pointer, with nothing
+	// spawned in its place.
+	s.workloads[lifecycleNamespace]["wl-exhausted"] = exhausted
+	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-exhausted", serviceRequest(t, "exhausted", "30"), exhausted))
+	be.Equal(t, 0, s.WorkloadCount())
+	if proc := exhausted.getProcess(); proc != nil {
+		t.Fatalf("a process was spawned for a generation that had exhausted its restarts (pid %d)", proc.Pid)
+	}
+}
+
+// A stop takes seconds, and for all of them its process is still on the host.
+// A start arriving in that window must be refused rather than spawn a second
+// process beside the one being stopped -- if that stop then fails to kill its
+// own process, the new one is orphaned with nothing recording it.
+func TestStartIsRefusedWhileAWorkloadIsStopping(t *testing.T) {
+	a := newLifecycleAgent(t)
+	const id = "wl-stopping"
+
+	_, err := a.StartWorkload(id, serviceRequest(t, "stopping-a", "30"), false)
+	be.NilErr(t, err)
+
+	gen := a.state.getWorkload(lifecycleNamespace, id)
+	be.Nonzero(t, gen)
+	pid := runningPid(t, a.state, lifecycleNamespace, id)
+
+	// Stand in for a stop in flight: the generation is marked stopping while
+	// its process is still alive, which is the state RemoveWorkload leaves it
+	// in for as long as the process takes to go away.
+	gen.SetState(models.WorkloadStateStopping)
+
+	_, err = a.StartWorkload(id, serviceRequest(t, "stopping-b", "31"), false)
+	if err == nil {
+		t.Fatal("expected an error when starting an id whose process is still being stopped")
+	}
+	if !strings.Contains(err.Error(), "stopping") {
+		t.Fatalf("expected the error to say the workload is stopping, got: %v", err)
+	}
+	be.Equal(t, 1, a.state.WorkloadCount())
+	be.Equal(t, gen, a.state.getWorkload(lifecycleNamespace, id))
+	be.Equal(t, pid, runningPid(t, a.state, lifecycleNamespace, id))
+	if processGone(pid) {
+		t.Fatalf("process %d should still be running", pid)
+	}
+
+	// Once the process really is gone the id is free again.
+	gen.SetState(models.WorkloadStateRunning)
+	be.NilErr(t, a.StopWorkload(id, &models.StopWorkloadRequest{Namespace: lifecycleNamespace}))
+	be.True(t, processGone(pid))
+
+	_, err = a.StartWorkload(id, serviceRequest(t, "stopping-c", "32"), false)
+	be.NilErr(t, err)
+	runningPid(t, a.state, lifecycleNamespace, id)
+	be.NilErr(t, a.StopWorkload(id, &models.StopWorkloadRequest{Namespace: lifecycleNamespace}))
 }
