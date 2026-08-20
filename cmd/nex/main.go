@@ -55,11 +55,22 @@ func main() {
 	)
 
 	err = kctx.Run()
-	if err != nil && !errors.Is(err, models.ErrLameduckShutdown) {
+	switch {
+	case err == nil, errors.Is(err, models.ErrLameduckShutdown):
+		// Clean exit. Lameduck shutdown is a requested stop, not a failure.
+	case errors.Is(err, errSilentExit):
+		// The command already reported the outcome on stdout/stderr (e.g. a
+		// --json payload, or an "update not yet applied" line); this only
+		// carries the non-zero exit so scripts and CI can detect it.
+		os.Exit(1)
+	default:
+		// A printed error with exit 0 is invisible to scripts and CI.
 		fmt.Println("error:", err.Error())
-		// A printed error with exit 0 is invisible to scripts and CI;
-		// lameduck shutdown stays a clean exit because it is a requested
-		// stop, not a failure.
 		os.Exit(1)
 	}
 }
+
+// errSilentExit makes a command exit non-zero without main printing an
+// "error:" line, for outcomes the command has already reported in full (a
+// --json payload the caller will parse, or a human-readable status line).
+var errSilentExit = errors.New("command failed")
