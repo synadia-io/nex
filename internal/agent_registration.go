@@ -187,10 +187,34 @@ func (ar *AgentRegistrations) Add(reg *AgentRegistration) error {
 	reg.rwLock = sync.RWMutex{}                   // Ensure the registration has its own lock
 	reg.HealthStatus = AgentUnknown               // Default health status when adding a new registration
 	reg.lastHeartbeatData = models.AgentSummary{} // Initialize last heartbeat data
+	// Seed lastHeartbeat with the registration time so a just-added agent is
+	// not immediately graded Offline (and evicted) before its first heartbeat
+	// lands -- a zero time reads as "decades since last heartbeat".
+	reg.lastHeartbeat = time.Now()
 	go ar.startAgentHeartbeatMonitor(reg)
 
 	ar.Registrations[reg.ID] = reg
 	return nil
+}
+
+// Remove evicts a registration and tears down its heartbeat subscription. It
+// is how a dead agent's ID is freed: without it an offline registration
+// lingers forever and, because every agent instance now registers under a
+// fresh ID, the map would grow without bound. Removing an entry does not
+// disturb a handler that already holds the *AgentRegistration pointer -- Go
+// keeps the struct alive for that reference; the entry simply stops being
+// found by future lookups.
+func (ar *AgentRegistrations) Remove(id string) {
+	ar.rwLock.Lock()
+	defer ar.rwLock.Unlock()
+
+	if sub, ok := ar.heartbeatSubs[id]; ok && sub != nil {
+		if err := sub.Unsubscribe(); err != nil {
+			ar.logger.Error("failed to unsubscribe from agent heartbeat during eviction", slog.String("agent_id", id), slog.String("err", err.Error()))
+		}
+		delete(ar.heartbeatSubs, id)
+	}
+	delete(ar.Registrations, id)
 }
 
 func (ar *AgentRegistrations) startAgentHeartbeatMonitor(a *AgentRegistration) {
@@ -247,18 +271,29 @@ func (ar *AgentRegistrations) startHealthMonitor() {
 			ar.rwLock.Unlock()
 			return
 		case <-ticker.C:
+			var offline []string
 			ar.rwLock.RLock()
-			for _, reg := range ar.Registrations {
+			for id, reg := range ar.Registrations {
 				reg.rwLock.Lock()
 				switch {
 				case time.Since(reg.lastHeartbeat) > 10*time.Second && time.Since(reg.lastHeartbeat) <= 30*time.Second:
 					reg.HealthStatus = AgentDegraded
 				case time.Since(reg.lastHeartbeat) > 30*time.Second:
 					reg.HealthStatus = AgentOffline
+					offline = append(offline, id)
 				}
 				reg.rwLock.Unlock()
 			}
 			ar.rwLock.RUnlock()
+
+			// Evict the dead entries in a second pass, outside the read lock.
+			// A crashed agent's replacement re-registers under a NEW id, so
+			// this offline entry will never receive another heartbeat -- it is
+			// pure garbage, and freeing it keeps the map bounded.
+			for _, id := range offline {
+				ar.logger.Info("evicting offline agent registration", slog.String("agent_id", id))
+				ar.Remove(id)
+			}
 		}
 	}
 }

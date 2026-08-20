@@ -38,8 +38,19 @@ type AgentWatcher struct {
 	ctx         context.Context
 	nc          *nats.Conn
 	nodeKeypair nkeys.KeyPair
+	nodeID      string
 	logger      *slog.Logger
 	emitter     models.EventEmitter
+
+	// minter and idgen let the local-agent restart loop issue a FRESH
+	// instance id and matching credentials on every (re)start. Reusing the
+	// same id across restarts is what made a crashed agent unable to
+	// re-register (the node refuses a duplicate id); a new instance is a new
+	// identity, so it gets a new id and a new mint. May be nil in tests that
+	// only exercise the process-restart mechanics, in which case the id and
+	// credentials are left as they were.
+	minter models.CredVendor
+	idgen  models.IDGen
 
 	initAgentsWg *sync.WaitGroup
 	resetLimit   int
@@ -54,11 +65,14 @@ type AgentWatcher struct {
 	agentCount atomic.Int32
 }
 
-func NewAgentWatcher(ctx context.Context, nc *nats.Conn, kp nkeys.KeyPair, logger *slog.Logger, emitter models.EventEmitter, restarts int, wg *sync.WaitGroup) *AgentWatcher {
+func NewAgentWatcher(ctx context.Context, nc *nats.Conn, kp nkeys.KeyPair, nodeID string, minter models.CredVendor, idgen models.IDGen, logger *slog.Logger, emitter models.EventEmitter, restarts int, wg *sync.WaitGroup) *AgentWatcher {
 	return &AgentWatcher{
 		ctx:          ctx,
 		nc:           nc,
 		nodeKeypair:  kp,
+		nodeID:       nodeID,
+		minter:       minter,
+		idgen:        idgen,
 		logger:       logger,
 		emitter:      emitter,
 		resetLimit:   restarts,
@@ -192,7 +206,7 @@ func (a *AgentWatcher) StopEmbeddedAgent(agentID string) error {
 	return nil
 }
 
-func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.NatsConnectionData) {
+func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess) {
 	fPath := strings.TrimPrefix(ap.Config.Uri, "file://")
 	info, err := os.Stat(fPath)
 	if err != nil || info.IsDir() {
@@ -218,6 +232,28 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 
 			ap.agentLock.Lock()
 
+			// A fresh instance identity per (re)start: a restarted process is
+			// a new instance, so it registers under a new id with matching
+			// credentials rather than reusing the crashed instance's -- which
+			// the node would reject as a duplicate, leaving the agent unable
+			// to rejoin. ap.ID stays the stable slot id (localAgents key, log
+			// continuity); instanceID is what the process registers as. When
+			// no minter is wired (restart-mechanics tests) the slot id and
+			// empty creds are used as-is.
+			instanceID := ap.ID
+			regCreds := &models.NatsConnectionData{}
+			if a.minter != nil && a.idgen != nil {
+				instanceID = a.idgen.Generate(nil)
+				creds, mErr := a.minter.MintRegister(instanceID, a.nodeID)
+				if mErr != nil {
+					a.logger.Error("failed to mint register credentials for agent instance", slog.String("agent", info.Name()), slog.String("err", mErr.Error()))
+					ap.restartCount++
+					ap.agentLock.Unlock()
+					continue
+				}
+				regCreds = creds
+			}
+
 			env := []string{}
 			for k, v := range ap.Config.Env {
 				env = append(env, k+"="+v)
@@ -231,7 +267,7 @@ func (a *AgentWatcher) StartLocalBinaryAgent(ap *AgentProcess, regCreds *models.
 				"NEX_AGENT_NATS_PASSWORD=" + regCreds.NatsUserPassword,
 				"NEX_AGENT_NATS_USER_NKEY=" + regCreds.NatsUserNkey,
 				"NEX_AGENT_NODE_ID=" + ap.HostNode,
-				"NEX_AGENT_ASSIGNED_ID=" + ap.ID,
+				"NEX_AGENT_ASSIGNED_ID=" + instanceID,
 			}...)
 
 			// Start the process
