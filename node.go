@@ -196,7 +196,7 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	// Start(); a bulk Add here would leak tokens (and deadlock
 	// WaitForAgents) for agents whose mint fails and never launch.
 	n.agentStarter = new(sync.WaitGroup)
-	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, n.logger.WithGroup("agent-watcher"), n.eventEmitter, n.agentRestartLimit, n.agentStarter)
+	n.agentWatcher = internal.NewAgentWatcher(n.ctx, n.nc, n.nodeKeypair, pubKey, n.startupMinter, n.idgen, n.logger.WithGroup("agent-watcher"), n.eventEmitter, n.agentRestartLimit, n.agentStarter)
 
 	return n, nil
 }
@@ -367,17 +367,16 @@ func (n *NexNode) Start() error {
 		go n.agentWatcher.StartEmbeddedAgent(id, runner, connData)
 	}
 
-	// start local agents
+	// start local agents. Unlike embedded agents, the register credentials
+	// are NOT minted here: the watcher mints a fresh instance id and matching
+	// credentials on every (re)start (see StartLocalBinaryAgent), so a
+	// crashed local agent can rejoin under a new identity. ap.ID is the
+	// stable slot id used to track and stop the process.
 	for _, agentProcess := range n.localRunners {
 		agentProcess.HostNode = n.id
 		agentProcess.ID = n.idgen.Generate(nil)
-		connData, err := n.startupMinter.MintRegister(agentProcess.ID, n.id)
-		if err != nil {
-			n.logger.Error("failed to mint register", slog.String("err", err.Error()))
-			continue
-		}
 		n.agentStarter.Add(1)
-		go n.agentWatcher.StartLocalBinaryAgent(agentProcess, connData)
+		go n.agentWatcher.StartLocalBinaryAgent(agentProcess)
 	}
 
 	n.agentWatcher.WaitForAgents()
