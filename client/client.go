@@ -33,6 +33,18 @@ const (
 	defaultTimeout      = 90 * time.Second
 	defaultStall        = 2 * time.Second
 	defaultAuctionStall = 1 * time.Second
+
+	// stopReplyTimeout bounds the wait for an UNDEPLOY reply. Stop is
+	// owner-only: only the node holding the workload answers (others
+	// silent-drop, like UPDATE/RESTART), so there is no fast negative to
+	// settle on -- the client waits for the one owner reply or times out. It
+	// must exceed the owning node's worst case: the ownership fetch (3s) plus
+	// the stop-confirmation budget (15s) ~= 18s (handlers.go
+	// ownershipFetchTimeout + stopConfirmBudget). A genuinely unknown id has
+	// no owner, so no node replies and the caller waits this out before
+	// reporting not-found -- kept well under defaultTimeout so a typo is not
+	// a 90s hang. Capped by the caller's own deadline when shorter.
+	stopReplyTimeout = 25 * time.Second
 )
 
 type NexClient interface {
@@ -321,7 +333,13 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 		return nil, n.nexInternalError(err, "failed to marshal stop workload request")
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.UndeployRequestSubject(targetNS, workloadId), reqB, natsext.RequestManyStall(n.requestManyStall))
+	// Owner-only: only the node holding the workload replies, so a shorter,
+	// stop-sized deadline suffices (see stopReplyTimeout) -- no need to hold
+	// the full default. Capped by the caller's context when that is shorter.
+	ctx, cancel := context.WithTimeout(n.ctx, stopReplyTimeout)
+	defer cancel()
+
+	msgs, err := natsext.RequestMany(ctx, n.nc, models.UndeployRequestSubject(targetNS, workloadId), reqB, natsext.RequestManyStall(n.requestManyStall))
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request stop workload")
 	}
@@ -341,12 +359,13 @@ func (n *nexClient) StopWorkload(workloadId string) (*models.StopWorkloadRespons
 				return true
 			}
 			var swresp models.StopWorkloadResponse
-			err = json.Unmarshal(m.Data, &swresp)
-			if err == nil {
-				if swresp.Stopped {
-					_ = json.Unmarshal(m.Data, ret)
-					return false
-				}
+			if json.Unmarshal(m.Data, &swresp) == nil {
+				// The only replier is the owning node, so its answer is
+				// authoritative whether the stop succeeded or not: a
+				// Stopped:false here is "owned, but not confirmed stopped",
+				// not "unknown id". Take it and stop waiting.
+				_ = json.Unmarshal(m.Data, ret)
+				return false
 			}
 		}
 		if e != nil && !errors.Is(e, nats.ErrNoResponders) {
