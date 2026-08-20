@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -421,11 +422,41 @@ func TestNodeShutdownExitCodes(t *testing.T) {
 	})
 }
 
+// failureLogBuffer collects a node's slog output and replays it when the test
+// fails; otherwise the logs vanish with the buffer and a CI-only failure (the
+// auction timeout seen on ubuntu runners) leaves no evidence. The mutex is
+// required: node goroutines still log while t.Cleanup reads.
+type failureLogBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (f *failureLogBuffer) Write(p []byte) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.b.Write(p)
+}
+
+func (f *failureLogBuffer) String() string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.b.String()
+}
+
+func dumpLogsOnFailure(t *testing.T, output *failureLogBuffer) {
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("node logs:\n%s", output.String())
+		}
+	})
+}
+
 func TestNodeDeployCloneUndeploy(t *testing.T) {
 	s := startNatsServer(t)
 	defer s.Shutdown()
 
-	output := new(bytes.Buffer)
+	output := new(failureLogBuffer)
+	dumpLogsOnFailure(t, output)
 	logger := slog.New(slog.NewJSONHandler(output, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	nc, err := nats.Connect(s.ClientURL())
