@@ -12,9 +12,9 @@ import (
 
 	"github.com/carlmjohnson/be"
 	"github.com/nats-io/nats.go"
-	"github.com/synadia-io/nex/sdk/go/agent"
 	"github.com/synadia-io/nex/_test"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
 )
 
 func waitFor(t testing.TB, timeout time.Duration, condition func() bool, msg string) {
@@ -196,12 +196,12 @@ func TestAddWorkloadWithInvalidUri(t *testing.T) {
 
 // TestGetNamespaceWorkloadListSystemAndFilter exercises GetNamespaceWorkloadList
 // without spawning real processes. It verifies three things:
-//   1. The system namespace is administrative and returns workloads across
-//      every stored namespace, while a user namespace returns only its own.
-//   2. The Namespace field on each WorkloadSummary is populated with the
-//      workload's actual owning namespace (sourced from the state map key).
-//   3. The filter argument matches against both workload id and workload
-//      name; an empty filter returns everything.
+//  1. The system namespace is administrative and returns workloads across
+//     every stored namespace, while a user namespace returns only its own.
+//  2. The Namespace field on each WorkloadSummary is populated with the
+//     workload's actual owning namespace (sourced from the state map key).
+//  3. The filter argument matches against both workload id and workload
+//     name; an empty filter returns everything.
 func TestGetNamespaceWorkloadListSystemAndFilter(t *testing.T) {
 	ns := nexletState{
 		Mutex:     sync.Mutex{},
