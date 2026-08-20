@@ -15,6 +15,7 @@ import (
 
 	"disorder.dev/shandler"
 	"github.com/synadia-io/nex/internal"
+	"github.com/synadia-io/nex/internal/retry"
 	"github.com/synadia-io/nex/internal/state"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/orbit.go/natsext"
@@ -336,7 +337,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 			return
 		}
 
-		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, time.Minute)
+		auctionDeploy, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, replacementStartTimeout)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to publish start workload request")
 			return
@@ -438,11 +439,21 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 		}
 
 		// Delete state before replying: the reply is the caller's signal
-		// that the stop is durable, so the record must already be gone
-		// when it lands.
+		// that the stop is durable, so the record must already be gone when
+		// it lands. The process is already confirmed stopped here, so a
+		// purge failure does NOT make the stop untrue -- but a surviving
+		// record is what resume-on-registration would resurrect, so it must
+		// not pass silently. Retry the purge; if it still fails, say so on
+		// the response (Stopped stays true -- the workload IS stopped now)
+		// and log at Error for alerting.
 		if ret.Stopped {
-			if err := n.state.RemoveWorkload(ret.WorkloadType, workloadID); err != nil {
-				n.logger.Warn("failed to delete node state", slog.String("err", err.Error()))
+			_, purgeErr := retry.Do(n.ctx, retry.Short, func() (struct{}, error) {
+				return struct{}{}, n.state.RemoveWorkload(ret.WorkloadType, workloadID)
+			})
+			if purgeErr != nil {
+				n.logger.Error("workload stopped but node state purge failed; it may be resumed on the next agent registration",
+					slog.String("workload_id", workloadID), slog.String("err", purgeErr.Error()))
+				ret.Message = "workload stopped, but node state cleanup failed; it may be resumed on the next agent registration"
 			}
 		}
 
@@ -478,7 +489,7 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 			return
 		}
 
-		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), time.Second*3)
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), ownershipFetchTimeout)
 		if err != nil {
 			n.logger.Debug("failed to find workload request", slog.String("err", err.Error()))
 			return
@@ -513,15 +524,30 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 	}
 }
 
-// stopConfirmBudget is how long the node waits for a nexlet to confirm a
-// stop before giving up on the confirmation. A nexlet's stop is synchronous
-// and honest -- the native nexlet's is bounded at ~5.75s (5s grace, SIGKILL,
-// 750ms confirm) -- so this must comfortably exceed the slowest legitimate
-// stop; without an explicit deadline the RequestMany call inherits the NATS
-// connection's default request timeout (2s), which every
-// not-dead-on-first-signal workload overran. The client's own default
-// timeout (60s, client.NewClient) leaves room above this.
-const stopConfirmBudget = 15 * time.Second
+// The node-side timeout chain for the replacement verbs. Each stage waits on
+// real work, and the sum is the worst case a client deadline must exceed
+// (client.replacementReplyTimeout is sized above it):
+//
+//	ownershipFetchTimeout (3s) + stopConfirmBudget (15s) + replacementStartTimeout (60s) ~= 78s
+const (
+	// ownershipFetchTimeout bounds the GETWORKLOAD round-trip a verb makes to
+	// learn whether a local nexlet holds the addressed workload.
+	ownershipFetchTimeout = 3 * time.Second
+
+	// stopConfirmBudget is how long the node waits for a nexlet to confirm a
+	// stop before giving up on the confirmation. A nexlet's stop is
+	// synchronous and honest -- the native nexlet's is bounded at ~5.75s (5s
+	// grace, SIGKILL, 750ms confirm) -- so this must comfortably exceed the
+	// slowest legitimate stop; without an explicit deadline the RequestMany
+	// call inherits the NATS connection's default request timeout (2s), which
+	// every not-dead-on-first-signal workload overran.
+	stopConfirmBudget = 15 * time.Second
+
+	// replacementStartTimeout bounds the START round-trip to the nexlet for
+	// the replacement instance. It is the largest stage because a start can
+	// include a synchronous artifact fetch.
+	replacementStartTimeout = time.Minute
+)
 
 // updateStopUnconfirmedMessage is the client-visible outcome when the
 // running instance could not be confirmed stopped within stopConfirmBudget.
@@ -625,7 +651,7 @@ func (n *NexNode) handleUpdateWorkload() func(micro.Request) {
 		// matching handleCloneWorkload; a caller reads no-responders or a
 		// request timeout as not-found, exactly as it already must for
 		// CLONE.
-		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), time.Second*3)
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), ownershipFetchTimeout)
 		if err != nil {
 			n.logger.Debug("no local agent holds the workload to update", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
 			return
@@ -659,7 +685,7 @@ func (n *NexNode) handleUpdateWorkload() func(micro.Request) {
 			return
 		}
 
-		updated, message, rerr := n.replaceWorkload(workloadID, *current, req.StartRequest)
+		updated, message, rerr := n.replaceWorkload(workloadID, *current, req.StartRequest, nil)
 		if rerr != nil {
 			n.handlerError(r, rerr.err, rerr.code, rerr.msg)
 			return
@@ -735,7 +761,7 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 		// count cannot be used as an existence oracle. A caller reads
 		// no-responders/timeout as not-found, exactly as it already must for
 		// CLONE and UPDATE.
-		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), time.Second*3)
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), ownershipFetchTimeout)
 		if err != nil {
 			n.logger.Debug("no local agent holds the workload to restart", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
 			return
@@ -781,7 +807,7 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 		// Create-only then correctly refuses the second store, leaving one
 		// namespace's record on file while the other namespace's workload
 		// is the one actually running.
-		storedDef, _, err := n.state.GetWorkloadRecord(current.WorkloadType, workloadID)
+		storedDef, storedRevision, err := n.state.GetWorkloadRecord(current.WorkloadType, workloadID)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to read stored workload definitions")
 			return
@@ -832,12 +858,20 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 		// its store-first write persists the definition as a side effect
 		// where a record was missing (create-only at revision 0, so a
 		// concurrent writer still wins via ErrStateConflict).
+		//
+		// storedRevision pins the CAS to the record this restart actually
+		// read: an UPDATE that commits between that read and the store bumps
+		// the revision and makes the store conflict, rather than letting
+		// RESTART silently overwrite the committed UPDATE with the stale
+		// definition it is replaying. A missing record read as revision 0,
+		// which is the create-only semantics the live-definition fallback
+		// wants.
 		def := storedDef
 		if def == nil {
 			def = current
 		}
 
-		updated, message, rerr := n.replaceWorkload(workloadID, *current, *def)
+		updated, message, rerr := n.replaceWorkload(workloadID, *current, *def, &storedRevision)
 		if rerr != nil {
 			n.handlerError(r, rerr.err, rerr.code, rerr.msg)
 			return
@@ -900,7 +934,13 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 // emitted here -- the agent's own stop and start paths emit exactly one
 // WORKLOADSTOPPED and one WORKLOADSTARTED, which is what namespace quota
 // accounting expects.
-func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWorkloadRequest) (bool, string, *replaceError) {
+// expectedRevision, when non-nil, is the KV revision the caller's def was
+// derived from; the store-first CAS is made against it so a record that
+// changed since is a conflict rather than a silent overwrite. UPDATE passes
+// nil (its def is caller-supplied, unrelated to the record, so the revision
+// is read fresh just before the write); RESTART passes the revision it read
+// with the stored definition it is replaying.
+func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWorkloadRequest, expectedRevision *uint64) (bool, string, *replaceError) {
 	// Defensive: def.Metadata is mutated below (the nkey stamp). def and
 	// current are ordinary struct values, but their Metadata fields are
 	// maps -- reference types -- so if a caller ever constructs def and
@@ -993,17 +1033,33 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 	// Nothing has been stopped yet, so a failed write simply aborts the
 	// update with the old instance still running.
 	//
-	// The read happens HERE, immediately before the write, rather than at
-	// the top of the verb: everything above this point (validation, the
-	// type check, the mint) can take arbitrarily long, and a revision read
-	// earlier would only widen the window it is meant to close. An absent
-	// record yields revision 0, which is create-only -- the right semantics
-	// for the legitimate "nexlet holds it but nothing was ever persisted"
-	// case (see handleRestartWorkload's stored-record branch), and still a
-	// conflict if someone else creates the record first.
-	_, revision, err := n.state.GetWorkloadRecord(def.WorkloadType, workloadID)
-	if err != nil {
-		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to read stored workload definition", err)
+	// The CAS revision. UPDATE's def is the caller's own request, unrelated
+	// to whatever is on file, so it reads the revision HERE, immediately
+	// before the write: everything above (validation, type check, mint) can
+	// take arbitrarily long, and reading earlier would only widen the window
+	// the CAS is meant to close.
+	//
+	// RESTART is different: its def IS the stored record it read earlier, so
+	// it must CAS against the revision of THAT read (passed in as
+	// expectedRevision). Reading fresh here instead would defeat the CAS --
+	// an UPDATE committing between RESTART's read and this point bumps the
+	// revision, a fresh read would pick up the NEW revision, and the store
+	// would SUCCEED and overwrite the committed UPDATE with RESTART's stale
+	// definition: the exact silent revert this design exists to prevent.
+	//
+	// An absent record yields revision 0, which is create-only -- the right
+	// semantics for the legitimate "nexlet holds it but nothing was ever
+	// persisted" case (see handleRestartWorkload's live-definition fallback),
+	// and still a conflict if someone else creates the record first.
+	revision := uint64(0)
+	if expectedRevision != nil {
+		revision = *expectedRevision
+	} else {
+		_, freshRevision, err := n.state.GetWorkloadRecord(def.WorkloadType, workloadID)
+		if err != nil {
+			return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to read stored workload definition", err)
+		}
+		revision = freshRevision
 	}
 
 	// A lost CAS means someone else's definition is on file. Overwriting it
@@ -1065,7 +1121,7 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 	// or not answering at all -- leave that identical state, so both get
 	// the same truthful answer rather than an opaque 500 for one of them.
 	// The update is not lost: resume-on-registration finishes it.
-	startResp, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, time.Minute)
+	startResp, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, replacementStartTimeout)
 	if err != nil {
 		n.logger.Error("no reply to replacement start workload request", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
 		return false, replacementStartFailedMessage(err.Error(), n.storedDefinitionFate()), nil
@@ -1414,7 +1470,7 @@ func (n *NexNode) handleGetAgentIDByName() func(micro.Request) {
 }
 
 func (n *NexNode) handlerError(r micro.Request, err error, code, msg string) {
-	errorID := n.loggerID.Next()
+	errorID := n.loggerID.Generate(nil)
 
 	if msg != "" {
 		n.logger.Error(msg, slog.String("err", err.Error()), slog.String("error_id", errorID))
