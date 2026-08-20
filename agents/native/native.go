@@ -48,7 +48,7 @@ type NativeAgent struct {
 }
 
 //go:generate go tool github.com/atombender/go-jsonschema --struct-name-from-title --package native --tags json --output gen_start_request.go start_request.json
-func NewNativeWorkloadRunner(ctx context.Context, nexus, nodeId string, logger *slog.Logger, ss models.SecretStore) (*agent.Runner, error) {
+func NewNativeWorkloadRunner(ctx context.Context, nexus, nodeId, resourceDir string, logger *slog.Logger, ss models.SecretStore) (*agent.Runner, error) {
 	da, err := newNativeWorkloadAgent(ctx, logger)
 	if err != nil {
 		return nil, err
@@ -69,6 +69,14 @@ func NewNativeWorkloadRunner(ctx context.Context, nexus, nodeId string, logger *
 	}
 
 	da.state = newNexletState(da.ctx, logger, da.runner)
+
+	// Reap any workload processes orphaned by a previous incarnation of this
+	// node (a hard crash left them running) BEFORE resume-on-registration can
+	// replay their definitions and start duplicates. This runs during
+	// construction, strictly before the node's Start()/resume path.
+	da.state.reaper = newOrphanReaper(resourceDir, nodeId, logger)
+	da.state.reaper.reapOrphans()
+
 	return da.runner, nil
 }
 

@@ -14,7 +14,7 @@ import (
 
 func TestNewNativeRunner(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	nn, err := NewNativeWorkloadRunner(context.Background(), "nexus", _test.Node1Pub, logger, nil)
+	nn, err := NewNativeWorkloadRunner(context.Background(), "nexus", _test.Node1Pub, t.TempDir(), logger, nil)
 	be.NilErr(t, err)
 	be.Nonzero(t, nn)
 }
