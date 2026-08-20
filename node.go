@@ -55,9 +55,14 @@ type (
 		signingKey string
 		issuerAcct string
 
-		name      string
-		nexus     string
+		name  string
+		nexus string
+		// tags is read by several control handlers concurrently
+		// (PING/AUCTION/INFO/placement) and written by handleLameduck (the
+		// lameduck flag), so every access goes through tagsMu -- a bare
+		// concurrent map read+write is a fatal runtime error.
 		tags      map[string]string
+		tagsMu    sync.RWMutex
 		nodeState models.NodeState
 
 		agentRestartLimit int
@@ -196,6 +201,33 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 	return n, nil
 }
 
+// setTag sets a node tag under the tags lock. See NexNode.tags.
+func (n *NexNode) setTag(k, v string) {
+	n.tagsMu.Lock()
+	defer n.tagsMu.Unlock()
+	n.tags[k] = v
+}
+
+// tagValue reads a single node tag under the tags lock.
+func (n *NexNode) tagValue(k string) (string, bool) {
+	n.tagsMu.RLock()
+	defer n.tagsMu.RUnlock()
+	v, ok := n.tags[k]
+	return v, ok
+}
+
+// tagsSnapshot returns a copy of the node tags taken under the tags lock, so
+// a handler can serialize or range it without holding the lock across I/O.
+func (n *NexNode) tagsSnapshot() map[string]string {
+	n.tagsMu.RLock()
+	defer n.tagsMu.RUnlock()
+	out := make(map[string]string, len(n.tags))
+	for k, v := range n.tags {
+		out[k] = v
+	}
+	return out
+}
+
 func (n *NexNode) Start() error {
 	version, ok := n.ctx.Value("VERSION").(string)
 	if ok {
@@ -290,7 +322,7 @@ func (n *NexNode) Start() error {
 		Id:    n.id,
 		Name:  n.name,
 		Nexus: n.nexus,
-		Tags:  n.tags,
+		Tags:  n.tagsSnapshot(),
 		Type:  "io.synadia.nex.event.nexnode_started",
 	})
 	if err != nil {
