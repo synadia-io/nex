@@ -187,7 +187,7 @@ func (u Up) Run(ctx context.Context, globals *Globals) error {
 	}
 
 	if !u.DisableNativeStart {
-		nativeAgent, err := native.NewNativeWorkloadRunner(ctx, u.NexusName, nodePub, logger.WithGroup("native-agent"), nil)
+		nativeAgent, err := native.NewNativeWorkloadRunner(ctx, u.NexusName, nodePub, u.ResourceDir, logger.WithGroup("native-agent"), nil)
 		if err != nil {
 			return err
 		}

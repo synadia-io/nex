@@ -42,6 +42,12 @@ type nexletState struct {
 	logger *slog.Logger
 	runner *agent.Runner
 
+	// reaper tracks spawned workload pids so a hard node crash can be cleaned
+	// up on the next startup. Always non-nil; a disabled reaper (no resource
+	// directory, e.g. tests) makes every hook a no-op. NewNativeWorkloadRunner
+	// replaces the default with one bound to the node's resource directory.
+	reaper *orphanReaper
+
 	status    models.AgentState
 	workloads map[string]NativeProcesses
 }
@@ -51,6 +57,7 @@ func newNexletState(ctx context.Context, logger *slog.Logger, runner *agent.Runn
 		ctx:       ctx,
 		logger:    logger,
 		runner:    runner,
+		reaper:    newOrphanReaper("", "", logger),
 		status:    models.AgentStateStarting,
 		workloads: make(map[string]NativeProcesses),
 	}
@@ -374,6 +381,10 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 	workload.setProcess(cmd.Process)
 	workload.SetState(models.WorkloadStateRunning)
 
+	// Record the pid so a hard node crash can reap this process on the next
+	// startup. Under n's lock, like the rest of the spawn.
+	n.reaper.record(cmd.Process.Pid)
+
 	go n.watchWorkload(namespace, workloadId, workload, req)
 
 	n.logger.Debug("workload created", slog.String("namespace", namespace), slog.String("workloadId", workloadId), slog.Bool("restart", workload.Restarts > 0))
@@ -392,11 +403,16 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 // while this generation was on its way out -- acting on the id blindly would
 // then delete or restart on top of a generation this watcher never spawned.
 func (n *nexletState) watchWorkload(namespace, workloadId string, workload *NativeProcess, req *models.AgentStartWorkloadRequest) {
-	pState, err := workload.getProcess().Wait()
+	proc := workload.getProcess()
+	pState, err := proc.Wait()
 
 	// A stop blocks on this; close it as soon as the process is reaped,
 	// whatever is decided below.
 	close(workload.exited)
+
+	// This process has exited (by any path -- clean stop, crash, job exit, or
+	// lameduck), so it no longer needs to be reaped on a future startup.
+	n.reaper.forget(proc.Pid)
 
 	exitCode := -1
 	if pState != nil {
