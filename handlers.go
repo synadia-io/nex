@@ -400,11 +400,46 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			return
 		}
 
+		// Owner-only: a node that does not hold the workload stays SILENT,
+		// exactly like UPDATE/RESTART/CLONE. Otherwise every node answers --
+		// the non-owners fast with "not found" -- and in a multi-node nexus
+		// those fast negatives trip the caller's reply wait before the owning
+		// node's slower stop confirmation (up to stopConfirmBudget) arrives,
+		// so a real stop is misreported as not-found. This is the same
+		// GETWORKLOAD ownership fetch and silent-drop the other verbs use;
+		// only the owning node proceeds to answer, so its slow confirmation
+		// is never raced by anyone else's fast negative.
+		getWorkload, err := n.nc.Request(models.AgentAPIGetWorkloadRequestSubject(pubKey, workloadID), r.Data(), ownershipFetchTimeout)
+		if err != nil {
+			n.logger.Debug("no local agent holds the workload to stop", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
+			return
+		}
+		if getWorkload.Header.Get("Nats-Service-Error") == string(models.GenericErrorsWorkloadNotFound) {
+			return
+		}
+
+		current := new(models.StartWorkloadRequest)
+		if err := json.Unmarshal(getWorkload.Data, current); err != nil {
+			n.handlerError(r, err, models.ErrCodeInternalServerError, "failed to unmarshal workload definition from agent")
+			return
+		}
+
+		// The nexlet's lookup by id spans every namespace, so without this
+		// check a caller could stop a workload owned by another namespace.
+		// Silent drop, per the CLONE/UPDATE convention.
+		if current.Namespace != namespace && namespace != models.SystemNamespace {
+			return
+		}
+
+		// This node owns the workload, so from here it always answers -- with
+		// the stop, or with an honest failure -- and it is the only node that
+		// will. Stopped:false now means "owned, but the stop was not
+		// confirmed", never "unknown id" (that is the silent drop above).
 		ret := &models.StopWorkloadResponse{
 			Id:           workloadID,
-			Message:      string(models.GenericErrorsWorkloadNotFound),
+			Message:      "stop not confirmed",
 			Stopped:      false,
-			WorkloadType: "",
+			WorkloadType: current.WorkloadType,
 		}
 
 		// Explicit deadline sized to a legitimate synchronous stop; the
@@ -414,24 +449,13 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 		stopCtx, stopCancel := context.WithTimeout(n.ctx, stopConfirmBudget)
 		defer stopCancel()
 		msgs, err := natsext.RequestMany(stopCtx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadID), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
-		if err != nil {
-			err = r.RespondJSON(ret)
-			if err != nil {
-				n.logger.Error("failed to respond to stop workload request", slog.String("err", err.Error()))
-			}
-			return
-		}
-
-		if msgs != nil {
+		if err == nil && msgs != nil {
 			msgs(func(m *nats.Msg, e error) bool {
 				if e == nil && m.Data != nil && string(m.Data) != "null" {
 					var swresp models.StopWorkloadResponse
-					err = json.Unmarshal(m.Data, &swresp)
-					if err == nil {
-						if swresp.Stopped {
-							_ = json.Unmarshal(m.Data, ret)
-							return false
-						}
+					if json.Unmarshal(m.Data, &swresp) == nil && swresp.Stopped {
+						_ = json.Unmarshal(m.Data, ret)
+						return false
 					}
 				}
 				return true
