@@ -149,20 +149,30 @@ func (a *NativeAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 func (a *NativeAgent) StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
 	a.logger.Debug("start workload request received", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
 
-	if running := a.state.RunningWorkload(req.Request.Namespace, workloadId); running != nil {
+	occupied, running := a.state.WorkloadOccupancy(req.Request.Namespace, workloadId)
+	if occupied != nil {
 		if !existing {
+			// A stop still has a live process under this id. Spawning now would
+			// put a second process beside the one being stopped, so the start is
+			// refused and the caller retries once the stop has finished.
+			if !running {
+				return nil, fmt.Errorf("workload %s is stopping; retry the start once it has stopped", workloadId)
+			}
 			return nil, fmt.Errorf("workload %s is already running; stop it before starting it again", workloadId)
 		}
 
 		// existing is the resume path: the node re-asserts every workload it
 		// has a record of when this nexlet registers. One this nexlet is still
 		// running is adopted as-is rather than spawned a second time under the
-		// same id.
-		a.logger.Debug("adopting already running workload", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
-		return &models.StartWorkloadResponse{
-			Id:   workloadId,
-			Name: running.Name,
-		}, nil
+		// same id. Resume is never blocked -- a generation on its way out falls
+		// through to a fresh start rather than failing the node's replay.
+		if running {
+			a.logger.Debug("adopting already running workload", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
+			return &models.StartWorkloadResponse{
+				Id:   workloadId,
+				Name: occupied.Name,
+			}, nil
+		}
 	}
 
 	if req.Request.Name == "" {

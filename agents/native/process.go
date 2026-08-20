@@ -55,6 +55,16 @@ func (n *NativeProcess) GetState() models.WorkloadState {
 	return n.State
 }
 
+// release retires the command context this generation was spawned with. A
+// generation that never reached the spawn -- one seeded into the state map, or
+// one abandoned before exec -- has no context, and releasing it is a no-op
+// rather than a nil call.
+func (n *NativeProcess) release() {
+	if n.cancel != nil {
+		n.cancel()
+	}
+}
+
 func (n *NativeProcess) setProcess(proc *os.Process) {
 	n.Lock()
 	defer n.Unlock()
@@ -87,7 +97,9 @@ func (n *NativeProcess) waitExit(timeout time.Duration) bool {
 	for {
 		select {
 		case <-n.exited:
-			return true
+			// The watcher has reaped it; confirm rather than assume, so that
+			// "the process is gone" is never reported on trust alone.
+			return processDone(proc)
 		case <-ticker.C:
 			if processDone(proc) {
 				return true
@@ -98,16 +110,16 @@ func (n *NativeProcess) waitExit(timeout time.Duration) bool {
 	}
 }
 
-// isRunning reports whether this generation still holds a live process. A
-// generation that has been claimed but not yet spawned counts as running: the
-// workload id is taken either way.
-func (n *NativeProcess) isRunning() bool {
+// isOccupied reports whether this generation still has a process on the host,
+// including one that is on its way out: a stop can take seconds, and for as long
+// as it does the workload id is taken. A generation that has been claimed but
+// not yet spawned occupies the id too.
+//
+// This is the question a start has to ask. Spawning beside a process that is
+// still being stopped is how a workload ends up with two live processes, and if
+// that stop then fails to kill its own process the new one is orphaned outright.
+func (n *NativeProcess) isOccupied() bool {
 	if n == nil {
-		return false
-	}
-
-	switch n.GetState() {
-	case models.WorkloadStateStopping, models.WorkloadStateStopped:
 		return false
 	}
 
@@ -123,6 +135,22 @@ func (n *NativeProcess) isRunning() bool {
 	}
 
 	return !processDone(proc)
+}
+
+// isRunning reports whether this generation occupies the workload id and is not
+// on its way out. This is the question adoption has to ask: a generation that is
+// being stopped is not something to adopt.
+func (n *NativeProcess) isRunning() bool {
+	if n == nil {
+		return false
+	}
+
+	switch n.GetState() {
+	case models.WorkloadStateStopping, models.WorkloadStateStopped:
+		return false
+	}
+
+	return n.isOccupied()
 }
 
 // processDone reports whether the process has exited and been reaped. Signal 0

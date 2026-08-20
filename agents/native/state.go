@@ -28,6 +28,11 @@ const (
 	// stopPollInterval is how often a stopping workload's process is
 	// re-checked while waiting for it to go away.
 	stopPollInterval = 250 * time.Millisecond
+	// killConfirmWait is how long a killed process gets to disappear. SIGKILL
+	// cannot be caught or ignored, so a process that outlives it is stuck in
+	// the kernel and waiting out another full grace period would not free it --
+	// it would only push the stop past the node's stop budget.
+	killConfirmWait = 3 * stopPollInterval
 )
 
 type nexletState struct {
@@ -63,17 +68,19 @@ func (n *nexletState) getWorkload(namespace, workloadId string) *NativeProcess {
 	return nil
 }
 
-// RunningWorkload returns the generation currently stored for the workload id
-// when it still holds a live process, and nil otherwise.
-func (n *nexletState) RunningWorkload(namespace, workloadId string) *NativeProcess {
+// WorkloadOccupancy reports what is holding a workload id: the generation that
+// still has a process on the host -- including one that is being stopped -- and
+// whether that generation is running rather than on its way out. Both answers
+// come from the same critical section, so a start cannot act on a mix of the two.
+func (n *nexletState) WorkloadOccupancy(namespace, workloadId string) (*NativeProcess, bool) {
 	n.Lock()
 	defer n.Unlock()
 
 	w := n.workloads[namespace][workloadId]
-	if !w.isRunning() {
-		return nil
+	if !w.isOccupied() {
+		return nil, false
 	}
-	return w
+	return w, w.isRunning()
 }
 
 // deleteGeneration removes the workload id only when workload is still the
@@ -215,20 +222,45 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 		maxRestarts = 1
 	}
 	if claimed != nil {
-		if n.workloads[namespace][workloadId] != claimed {
+		// Identity alone is not enough: a stop that arrived after the restart
+		// was claimed still finds the claiming generation under the id, and
+		// marks it stopping under this same lock before releasing it. Spawning
+		// on top of that would leave the stop reporting success over a workload
+		// this restart had just brought back.
+		if n.workloads[namespace][workloadId] != claimed || claimed.GetState() == models.WorkloadStateStopping {
 			n.Unlock()
-			n.logger.Debug("restart abandoned; workload id no longer refers to the generation that claimed it", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
+			n.logger.Debug("restart abandoned; the claiming generation no longer owns the workload id or is being stopped", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
 			return nil
 		}
 		restarts, maxRestarts = claimed.Restarts, claimed.MaxRestarts
-	}
 
-	if restarts >= maxRestarts {
-		n.logger.Error("max restarts reached", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
-		n.Unlock()
-		// RemoveWorkload is synchronous, and the lock is already released:
-		// it stops and drops the generation that ran out of restarts.
-		return n.RemoveWorkload(namespace, workloadId)
+		if restarts >= maxRestarts {
+			n.logger.Error("max restarts reached", slog.String("workloadId", workloadId), slog.String("namespace", namespace), slog.Int("restarts", restarts))
+
+			// The claimed generation's process has already exited -- that is
+			// why a restart was claimed -- so there is nothing to stop, and
+			// dropping it here under the lock that just confirmed its identity
+			// is what keeps a start that arrives in the meantime from being
+			// torn down in its place. Going by workload id instead would stop
+			// and delete whatever holds the id by then.
+			n.dropGenerationLocked(namespace, workloadId, claimed)
+			n.Unlock()
+			claimed.release()
+
+			wse := models.WorkloadStoppedEvent{
+				Id:           workloadId,
+				Namespace:    namespace,
+				WorkloadType: NEXLET_REGISTER_TYPE,
+				Error: &models.WorkloadStoppedEventError{
+					Code:    "MAX_RESTARTS",
+					Message: fmt.Sprintf("workload exhausted its %d restarts", maxRestarts),
+				},
+			}
+			if err := n.runner.EmitEvent(namespace, wse); err != nil {
+				n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
+			}
+			return nil
+		}
 	}
 
 	poisonPill, cancel := context.WithCancel(n.ctx)
@@ -445,7 +477,14 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 		return err
 	}
 
-	n.deleteGeneration(namespace, workloadId, workload)
+	if !n.deleteGeneration(namespace, workloadId, workload) {
+		// The generation this stop was asked for is gone, but the id was taken
+		// again while the stop was running -- only possible once this process
+		// was already dead, since a start is refused while one is alive. The
+		// stopped event below still goes out, and for the id it now reads false.
+		n.logger.Warn("stopped workload was replaced before its stop completed; the stopped event does not describe what holds the id now",
+			slog.String("workloadId", workloadId), slog.String("namespace", namespace))
+	}
 
 	wse := models.WorkloadStoppedEvent{
 		Id:           workloadId,
@@ -470,7 +509,7 @@ func (n *nexletState) RemoveWorkload(namespace, workloadId string) error {
 func (n *nexletState) stopProcess(workload *NativeProcess, grace time.Duration) (string, error) {
 	// This generation is finished either way; releasing its command context
 	// retires the exec watchdog that was holding it.
-	defer workload.cancel()
+	defer workload.release()
 
 	proc := workload.getProcess()
 	if proc == nil {
@@ -489,7 +528,7 @@ func (n *nexletState) stopProcess(workload *NativeProcess, grace time.Duration) 
 		// cancelling the command context kills it.
 		n.logger.Error("error stopping process; cancelling context", slog.String("err", err.Error()))
 		reason = err.Error()
-		workload.cancel()
+		workload.release()
 	}
 
 	if workload.waitExit(grace) {
@@ -499,10 +538,10 @@ func (n *nexletState) stopProcess(workload *NativeProcess, grace time.Duration) 
 	n.logger.Warn("timeout exceeded waiting for workload to exit; attempting kill", slog.Int("pid", proc.Pid))
 	if err := proc.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
 		n.logger.Error("error killing process; cancelling context", slog.String("err", err.Error()))
-		workload.cancel()
+		workload.release()
 	}
 
-	if !workload.waitExit(grace) {
+	if !workload.waitExit(killConfirmWait) {
 		return reason, fmt.Errorf("workload process %d did not exit after being killed", proc.Pid)
 	}
 	return "SYSKILL", nil
