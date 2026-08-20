@@ -27,7 +27,7 @@ import (
 
 func (n *NexNode) handlePlacementTagPing() func(micro.Request) {
 	return func(r micro.Request) {
-		err := r.RespondJSON(n.tags)
+		err := r.RespondJSON(n.tagsSnapshot())
 		if err != nil {
 			n.logger.Error("failed to respond to placement tag ping request", slog.String("err", err.Error()))
 			return
@@ -45,7 +45,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 		}
 
 		for k, v := range rep.Filter {
-			if tV, ok := n.tags[k]; !ok || tV != v {
+			if tV, ok := n.tagValue(k); !ok || tV != v {
 				return
 			}
 		}
@@ -65,7 +65,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 		err = r.RespondJSON(models.NodePingResponse{
 			AgentCount: n.registeredAgents.Count(),
 			NodeId:     pubKey,
-			Tags:       n.tags,
+			Tags:       n.tagsSnapshot(),
 			StartTime:  n.startTime,
 			Version:    n.version,
 			Xkey:       pubXKey,
@@ -95,7 +95,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 
 		if req.Tag != nil {
 			for k, v := range req.Tag {
-				if tV, ok := n.tags[k]; !ok || tV != v {
+				if tV, ok := n.tagValue(k); !ok || tV != v {
 					n.logger.Debug("workload tag not satisfied during lameduck", slog.String("node_id", pubKey), slog.String("tag", k), slog.String("value", v))
 					return
 				}
@@ -159,7 +159,7 @@ func (n *NexNode) handleLameduck() func(micro.Request) {
 		n.enterLameduck(delay)
 
 		n.logger.Info("node entering lameduck mode", slog.Any("shutdown_at", time.Now().Add(delay).Format(time.DateTime)))
-		n.tags[models.TagLameDuck] = "true"
+		n.setTag(models.TagLameDuck, "true")
 		err = r.RespondJSON(models.LameduckResponse{
 			Success: true,
 			Message: fmt.Sprintf("node entering lameduck mode, will shutdown at %s", time.Now().Add(delay).Format(time.DateTime)),
@@ -189,7 +189,7 @@ func (n *NexNode) handleNodeInfo() func(micro.Request) {
 			NodeAgentSummaries: n.registeredAgents.AgentSummaries(),
 			NodeId:             pubKey,
 			Xkey:               pubXKey,
-			Tags:               n.tags,
+			Tags:               n.tagsSnapshot(),
 			Uptime:             time.Since(n.startTime).String(),
 			Version:            n.version,
 		})
@@ -222,7 +222,7 @@ func (n *NexNode) handleAuction() func(micro.Request) {
 
 		// If all auction tags aren't satisfied, request is thrown away
 		for k, v := range req.Tags {
-			if tV, ok := n.tags[k]; !ok || tV != v {
+			if tV, ok := n.tagValue(k); !ok || tV != v {
 				n.logger.Log(n.ctx, shandler.LevelTrace, "workload tag not satisfied during auction", slog.String("tag", k), slog.String("value", v))
 				return
 			}
