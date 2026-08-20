@@ -28,7 +28,6 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/nats-io/nats.go/micro"
 	"github.com/nats-io/nkeys"
-	"github.com/nats-io/nuid"
 	sdk "github.com/synadia-io/nex/sdk/go/agent"
 )
 
@@ -43,7 +42,7 @@ type (
 		builddate string
 
 		logger    *slog.Logger
-		loggerID  *nuid.NUID
+		loggerID  *idgen.NuidGen
 		startTime time.Time
 
 		allowRemoteAgentRegistration bool
@@ -122,7 +121,7 @@ func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
 		builddate: "unknown",
 
 		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
-		loggerID:  nuid.New(),
+		loggerID:  idgen.NewNuidGen(),
 		startTime: time.Time{},
 
 		name:  defaultNexNodeName,

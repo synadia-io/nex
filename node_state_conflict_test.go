@@ -59,12 +59,35 @@ type recordingMinter struct {
 
 	mu    sync.Mutex
 	mints []mintCall
+
+	// beforeMint fires exactly once, immediately before the next Mint is
+	// delegated, and is then cleared. replaceWorkload mints AFTER a verb has
+	// read the record it will replay but BEFORE the store-first CAS, so this
+	// is the injection point for a competing writer landing in RESTART's
+	// read-to-store window -- the exact window the CAS-revision fix closes.
+	beforeMint func()
+}
+
+// injectBeforeMint arms the one-shot pre-mint hook. See recordingMinter.
+func (m *recordingMinter) injectBeforeMint(f func()) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.beforeMint = f
 }
 
 func (m *recordingMinter) Mint(typ models.CredType, namespace, id string) (*models.NatsConnectionData, error) {
 	m.mu.Lock()
 	m.mints = append(m.mints, mintCall{typ: typ, namespace: namespace, id: id})
+	hook := m.beforeMint
+	m.beforeMint = nil
 	m.mu.Unlock()
+
+	// Fired outside the lock: the hook writes to the KV bucket, which does
+	// not go back through this minter.
+	if hook != nil {
+		hook()
+	}
+
 	return m.CredVendor.Mint(typ, namespace, id)
 }
 
@@ -463,4 +486,66 @@ func TestNodeResumeFailedRereadDoesNotResumeStaleDefinition(t *testing.T) {
 	// over it.
 	stored := h.storedRecord(t, ctx, "inmem", workloadID)
 	be.Equal(t, "v2-won-the-cas", stored.Name)
+}
+
+// TestNodeRestartRevisionPinnedAgainstConcurrentUpdate pins the RESTART
+// silent-revert: RESTART's store-first CAS must be made against the revision
+// it read the stored definition at, NOT a revision re-read later.
+//
+// RESTART reads the stored record (revision R) and replays it. replaceWorkload
+// then mints and does the store-first CAS. The defect was that replaceWorkload
+// re-read a FRESH revision immediately before the store: a concurrent UPDATE
+// committing in the window between RESTART's read and that re-read bumped the
+// record R -> R+1, the fresh read picked up R+1, and the CAS SUCCEEDED --
+// overwriting the acknowledged UPDATE (def2) with RESTART's now-stale replay
+// (def1). An updated:true reported for a full revert of a committed update.
+//
+// The competing UPDATE is injected via the pre-mint hook, which fires inside
+// replaceWorkload after RESTART has already read the record but before the
+// CAS -- exactly the window a real racing UPDATE has to land in. With the
+// revision pinned to RESTART's own read, the CAS now conflicts: the update
+// survives, nothing is stopped or started, and the caller is told to retry.
+//
+// Before the fix this test fails at the Updated assertion (RESTART reports
+// updated:true) and at the stored-name assertion (the update is reverted).
+func TestNodeRestartRevisionPinnedAgainstConcurrentUpdate(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	h := newUpdateHarness(t, ctx, commandSchema)
+	workloadID := h.deploy(t, serviceDef("v1-restart-replay", `{"command":"one"}`))
+
+	// The competing UPDATE lands after RESTART has read the record to replay
+	// but before its store-first CAS -- the read-to-store window the pinned
+	// revision closes.
+	h.mint.injectBeforeMint(func() {
+		h.setStoredRecord(t, ctx, "inmem", workloadID, serviceDef("v2-committed-update", `{"command":"two"}`))
+	})
+
+	startSpy := h.spyOnStarts(t)
+	stopSpy := h.spyOnStops(t)
+
+	msg := h.restart(t, models.SystemNamespace, workloadID, models.RestartWorkloadRequest{
+		Namespace: models.SystemNamespace,
+	})
+
+	// A lost CAS is a legitimate outcome, not a server fault.
+	be.Equal(t, "", msg.Header.Get("Nats-Service-Error-Code"))
+
+	resp := models.UpdateWorkloadResponse{}
+	be.NilErr(t, json.Unmarshal(msg.Data, &resp))
+	be.Equal(t, workloadID, resp.Id)
+	be.False(t, resp.Updated)
+	be.Equal(t, "workload record was modified concurrently; retry", resp.Message)
+
+	// The decisive assertion: the committed UPDATE SURVIVED. Before the fix
+	// this holds "v1-restart-replay" -- the revert.
+	stored := h.storedRecord(t, ctx, "inmem", workloadID)
+	be.Equal(t, "v2-committed-update", stored.Name)
+	be.Equal(t, `{"command":"two"}`, stored.RunRequest)
+
+	// The abort lands before the stop, so the running instance is untouched.
+	be.NilErr(t, h.nc.Flush())
+	be.Equal(t, 0, stopSpy.count())
+	be.Equal(t, 0, startSpy.count())
 }

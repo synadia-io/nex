@@ -19,7 +19,18 @@ import (
 )
 
 const (
-	defaultTimeout      = 60 * time.Second
+	// defaultTimeout is the per-client request deadline shared by every verb
+	// (including UPDATE/RESTART). It must EXCEED the node's worst-case
+	// handling of a replacement verb, or a slow-but-succeeding update is
+	// abandoned by the client and misreported as not-found. The node worst
+	// case is the ownership fetch (3s) + the stop-confirmation budget (15s) +
+	// the replacement-start wait (60s) ~= 78s (see handlers.go's
+	// ownershipFetchTimeout / stopConfirmBudget / replacementStartTimeout),
+	// so this sits above that. It only bounds the MAX wait: verbs that get a
+	// reply (or a no-responders) return as soon as it settles, so raising it
+	// does not slow the common case. A caller can still override via
+	// WithDefaultTimeout.
+	defaultTimeout      = 90 * time.Second
 	defaultStall        = 2 * time.Second
 	defaultAuctionStall = 1 * time.Second
 )
@@ -654,6 +665,11 @@ func (n *nexClient) requestWorkloadReplacement(subject string, reqB []byte) (*mo
 	}
 
 	if resp == nil {
+		// No reply within the client deadline. Under silent-drop this is
+		// indistinguishable from an unknown id, so it is reported as
+		// not-found -- the deadline (defaultTimeout) is sized above the
+		// node's worst-case replacement handling so a slow-but-succeeding
+		// update replies before this point rather than being misreported.
 		return nil, n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
 	}
 
