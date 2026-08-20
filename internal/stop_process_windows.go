@@ -28,6 +28,26 @@ func StopProcess(proc *os.Process) error {
 	return nil
 }
 
+// KillProcess forcibly terminates the process. On Windows this kills the
+// process itself; tree termination would require a Job object, which the
+// graceful CREATE_NEW_PROCESS_GROUP + CTRL_BREAK path above does not set up.
+func KillProcess(proc *os.Process) error {
+	if proc == nil {
+		return os.ErrProcessDone
+	}
+	return proc.Kill()
+}
+
+// ProcessGroupAlive reports whether the process is still present. Windows has
+// no cheap process-group liveness probe here, so this checks the process
+// itself; the sweep it guards is a no-op once the process has exited.
+func ProcessGroupAlive(proc *os.Process) bool {
+	if proc == nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
+}
+
 func SysProcAttr() *syscall.SysProcAttr {
 	return &windows.SysProcAttr{
 		CreationFlags: windows.CREATE_NEW_PROCESS_GROUP,

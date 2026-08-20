@@ -518,12 +518,7 @@ func (n *nexletState) stopProcess(workload *NativeProcess, grace time.Duration) 
 	}
 
 	reason := ""
-	if err := internal.StopProcess(proc); err != nil {
-		if errors.Is(err, os.ErrProcessDone) {
-			n.logger.Debug("process already exited", slog.Int("pid", proc.Pid))
-			return "", nil
-		}
-
+	if err := internal.StopProcess(proc); err != nil && !errors.Is(err, os.ErrProcessDone) {
 		// The signal did not land on a process that is still around;
 		// cancelling the command context kills it.
 		n.logger.Error("error stopping process; cancelling context", slog.String("err", err.Error()))
@@ -531,20 +526,47 @@ func (n *nexletState) stopProcess(workload *NativeProcess, grace time.Duration) 
 		workload.release()
 	}
 
-	if workload.waitExit(grace) {
-		return reason, nil
+	// Give the leader grace to exit on the graceful signal; if it does not,
+	// kill the whole group.
+	if !workload.waitExit(grace) {
+		n.logger.Warn("timeout exceeded waiting for workload to exit; killing process group", slog.Int("pid", proc.Pid))
+		if err := internal.KillProcess(proc); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			n.logger.Error("error killing process group; cancelling context", slog.String("err", err.Error()))
+			workload.release()
+		}
+		if !workload.waitExit(killConfirmWait) {
+			return reason, fmt.Errorf("workload process %d did not exit after being killed", proc.Pid)
+		}
+		reason = "SYSKILL"
 	}
 
-	n.logger.Warn("timeout exceeded waiting for workload to exit; attempting kill", slog.Int("pid", proc.Pid))
-	if err := proc.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
-		n.logger.Error("error killing process; cancelling context", slog.String("err", err.Error()))
-		workload.release()
+	// The leader is gone, but a grandchild that ignored the graceful signal (a
+	// shell wrapper's child, say) can outlive it inside the same process
+	// group. Sweep the group and wait for it to drain, so a workload reported
+	// stopped never leaves a survivor still running and publishing.
+	if !n.waitProcessGroupGone(proc, killConfirmWait) {
+		return reason, fmt.Errorf("workload process group %d did not fully exit after being killed", proc.Pid)
 	}
+	return reason, nil
+}
 
-	if !workload.waitExit(killConfirmWait) {
-		return reason, fmt.Errorf("workload process %d did not exit after being killed", proc.Pid)
+// waitProcessGroupGone kills any remaining members of proc's process group and
+// waits, bounded by timeout, until the group is empty. The group id stays valid
+// while any member holds it, so the repeated group kill targets exactly this
+// workload's descendants; once the last one exits the group id yields ESRCH and
+// this returns true.
+func (n *nexletState) waitProcessGroupGone(proc *os.Process, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for {
+		if !internal.ProcessGroupAlive(proc) {
+			return true
+		}
+		_ = internal.KillProcess(proc)
+		if time.Now().After(deadline) {
+			return !internal.ProcessGroupAlive(proc)
+		}
+		time.Sleep(stopPollInterval)
 	}
-	return "SYSKILL", nil
 }
 
 func (n *nexletState) SetLameduckMode(before time.Duration) error {
