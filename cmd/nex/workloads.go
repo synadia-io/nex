@@ -219,19 +219,22 @@ func (s *StopWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
+	// Stopped:false is a real outcome, not a transport error: no nexlet
+	// confirmed the stop (unknown id, or the stop overran the node's
+	// confirmation budget). It must exit non-zero in BOTH modes so a script
+	// that adds --json does not silently lose failure detection.
 	if globals.JSON {
 		stopResponseB, err := json.Marshal(stopResponse)
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(stopResponseB))
+		if !stopResponse.Stopped {
+			return errSilentExit
+		}
 		return nil
 	}
 
-	// Stopped:false is a real outcome, not a transport error: no nexlet
-	// confirmed the stop (unknown id, or the stop overran the node's
-	// confirmation budget). Reporting success on it hid exactly the case
-	// where the operator most needs to look.
 	if !stopResponse.Stopped {
 		return fmt.Errorf("workload %s was not confirmed stopped: %s", stopResponse.Id, stopResponse.Message)
 	}
@@ -322,21 +325,29 @@ func (r *UpdateWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
+	// Updated:false means the replacement did not take effect now (stop
+	// unconfirmed, replacement start failed, or a lost CAS). Some cases are
+	// self-healing on the next agent registration, but from the caller's
+	// point of view the operation did not do what was asked, so it exits
+	// non-zero in both modes.
 	if globals.JSON {
 		updateResponseB, err := json.Marshal(updateResponse)
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(updateResponseB))
+		if !updateResponse.Updated {
+			return errSilentExit
+		}
 		return nil
 	}
 
 	if updateResponse.Updated {
 		fmt.Printf("Workload %s successfully updated\n", updateResponse.Id)
-	} else {
-		fmt.Printf("Workload %s update not yet applied: %s\n", updateResponse.Id, updateResponse.Message)
+		return nil
 	}
-	return nil
+	fmt.Fprintf(os.Stderr, "Workload %s update not yet applied: %s\n", updateResponse.Id, updateResponse.Message)
+	return errSilentExit
 }
 
 func (r *RestartWorkload) Run(ctx context.Context, globals *Globals) error {
@@ -363,21 +374,25 @@ func (r *RestartWorkload) Run(ctx context.Context, globals *Globals) error {
 		return err
 	}
 
+	// Updated:false exits non-zero in both modes, same rationale as update.
 	if globals.JSON {
 		restartResponseB, err := json.Marshal(restartResponse)
 		if err != nil {
 			return err
 		}
 		fmt.Println(string(restartResponseB))
+		if !restartResponse.Updated {
+			return errSilentExit
+		}
 		return nil
 	}
 
 	if restartResponse.Updated {
 		fmt.Printf("Workload %s successfully restarted\n", restartResponse.Id)
-	} else {
-		fmt.Printf("Workload %s restart not yet applied: %s\n", restartResponse.Id, restartResponse.Message)
+		return nil
 	}
-	return nil
+	fmt.Fprintf(os.Stderr, "Workload %s restart not yet applied: %s\n", restartResponse.Id, restartResponse.Message)
+	return errSilentExit
 }
 
 func (r *ListWorkload) Run(ctx context.Context, globals *Globals) error {
@@ -511,6 +526,12 @@ func (r *CloneWorkload) Run(ctx context.Context, globals *Globals) error {
 			stopErr = sErr
 		case stopResp.Stopped:
 			stopped = true
+		default:
+			// Stopped:false with no transport error was previously dropped:
+			// the clone succeeded and the original was left running with no
+			// indication. Surface it -- the operator asked to stop the
+			// original and it did not stop.
+			stopErr = fmt.Errorf("original workload %s was not confirmed stopped: %s", r.WorkloadId, stopResp.Message)
 		}
 	}
 
@@ -521,7 +542,10 @@ func (r *CloneWorkload) Run(ctx context.Context, globals *Globals) error {
 		}
 		fmt.Println(string(respB))
 		if stopErr != nil {
-			return stopErr
+			// Keep the JSON payload clean on stdout; the stop failure goes to
+			// stderr and only the non-zero exit rides back through main.
+			fmt.Fprintf(os.Stderr, "%v\n", stopErr)
+			return errSilentExit
 		}
 		return nil
 	}
