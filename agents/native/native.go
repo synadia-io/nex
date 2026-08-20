@@ -12,8 +12,8 @@ import (
 
 	"github.com/goombaio/namegenerator"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nex/sdk/go/agent"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
 )
 
 //go:embed start_request.json
@@ -148,6 +148,22 @@ func (a *NativeAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 
 func (a *NativeAgent) StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
 	a.logger.Debug("start workload request received", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
+
+	if running := a.state.RunningWorkload(req.Request.Namespace, workloadId); running != nil {
+		if !existing {
+			return nil, fmt.Errorf("workload %s is already running; stop it before starting it again", workloadId)
+		}
+
+		// existing is the resume path: the node re-asserts every workload it
+		// has a record of when this nexlet registers. One this nexlet is still
+		// running is adopted as-is rather than spawned a second time under the
+		// same id.
+		a.logger.Debug("adopting already running workload", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
+		return &models.StartWorkloadResponse{
+			Id:   workloadId,
+			Name: running.Name,
+		}, nil
+	}
 
 	if req.Request.Name == "" {
 		seed := time.Now().UTC().UnixNano()
