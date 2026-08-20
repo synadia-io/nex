@@ -86,7 +86,9 @@ func processGone(pid int) bool {
 // through never reaches its own stop, and these workloads sleep for half a
 // minute: without the cleanup a failing run leaves them behind, and repeated
 // runs accumulate them.
-func runningPid(t testing.TB, s *nexletState, namespace, workloadId string) int {
+// The concrete *testing.T (not testing.TB) lets staticcheck see Fatalf as
+// terminating, so the nil checks above the proc.Pid read satisfy SA5011.
+func runningPid(t *testing.T, s *nexletState, namespace, workloadId string) int {
 	t.Helper()
 
 	wl := s.getWorkload(namespace, workloadId)
