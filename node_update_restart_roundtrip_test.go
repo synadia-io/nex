@@ -58,7 +58,9 @@ func (h *updateHarness) undeploy(t *testing.T, namespace, workloadID string) mod
 	reqB, err := json.Marshal(req)
 	be.NilErr(t, err)
 
-	msg, err := h.nc.Request(models.UndeployRequestSubject(namespace, workloadID), reqB, time.Second*5)
+	// 20s covers the node's stop worst case (ownership fetch 3s + stop
+	// confirmation budget 15s); a tighter timeout is flaky under -race load.
+	msg, err := h.nc.Request(models.UndeployRequestSubject(namespace, workloadID), reqB, time.Second*20)
 	be.NilErr(t, err)
 
 	resp := models.StopWorkloadResponse{}

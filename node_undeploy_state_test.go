@@ -287,7 +287,9 @@ func TestNodeUndeployUnconfirmedKeepsState(t *testing.T) {
 	stopReqB, err := json.Marshal(stopReq)
 	be.NilErr(t, err)
 
-	stopRespRaw, err := nc.Request(models.UndeployRequestSubject(models.SystemNamespace, startWorkloadResp.Id), stopReqB, time.Second*5)
+	// 20s covers the node's stop worst case (ownership fetch 3s + stop
+	// confirmation budget 15s); a tighter timeout is flaky under -race load.
+	stopRespRaw, err := nc.Request(models.UndeployRequestSubject(models.SystemNamespace, startWorkloadResp.Id), stopReqB, time.Second*20)
 	be.NilErr(t, err)
 
 	stopResp := models.StopWorkloadResponse{}
@@ -307,7 +309,7 @@ func TestNodeUndeployUnconfirmedKeepsState(t *testing.T) {
 	// Now let the stop succeed.
 	inmemAgent.FailStops = false
 
-	stopRespRaw2, err := nc.Request(models.UndeployRequestSubject(models.SystemNamespace, startWorkloadResp.Id), stopReqB, time.Second*5)
+	stopRespRaw2, err := nc.Request(models.UndeployRequestSubject(models.SystemNamespace, startWorkloadResp.Id), stopReqB, time.Second*20)
 	be.NilErr(t, err)
 
 	stopResp2 := models.StopWorkloadResponse{}
