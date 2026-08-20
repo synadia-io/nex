@@ -429,16 +429,19 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			})
 		}
 
-		err = r.RespondJSON(ret)
-		if err != nil {
-			n.logger.Error("failed to respond to stop workload request", slog.String("err", err.Error()))
-			return
-		}
-
+		// Delete state before replying: the reply is the caller's signal
+		// that the stop is durable, so the record must already be gone
+		// when it lands.
 		if ret.Stopped {
 			if err := n.state.RemoveWorkload(ret.WorkloadType, workloadID); err != nil {
 				n.logger.Warn("failed to delete node state", slog.String("err", err.Error()))
 			}
+		}
+
+		err = r.RespondJSON(ret)
+		if err != nil {
+			n.logger.Error("failed to respond to stop workload request", slog.String("err", err.Error()))
+			return
 		}
 	}
 }
