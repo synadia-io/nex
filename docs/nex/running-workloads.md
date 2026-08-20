@@ -126,15 +126,17 @@ For JSON output (scripting or automation), include `--json`.
 
 Workload logs, metrics, and events stream through NATS subjects prefixed with `$NEX.FEED.<namespace>`. Use the NATS CLI or your preferred tooling to subscribe:
 
-```bash
-# Workload stdout/stderr
-nats --context nex-dev sub "$NEX.FEED.default.logs.>"
+Use single quotes so your shell does not expand `$NEX`:
 
-# Workload lifecycle events (started/stopped/triggered)
-nats --context nex-dev sub "$NEX.FEED.default.event.>"
+```bash
+# Workload stdout/stderr (subject: $NEX.FEED.<ns>.logs.<workload_id>.<stdout|stderr>)
+nats --context nex-dev sub '$NEX.FEED.default.logs.>'
+
+# Workload lifecycle events (subject: $NEX.FEED.<ns>.events.<EVENT_TYPE>)
+nats --context nex-dev sub '$NEX.FEED.default.events.>'
 ```
 
-To filter a specific workload, replace `>` with the workload ID. Combine these subscriptions with `nex workload list` to correlate state changes during rollouts or incident response.
+To follow a single workload's logs, keep the trailing wildcard rather than replacing it — the id is a subject token, not the whole tail: `'$NEX.FEED.default.logs.<workload_id>.>'`. Events are keyed by event type (the workload id is in the payload, not the subject), so filter events by parsing the messages. Combine these subscriptions with `nex workload list` to correlate state changes during rollouts or incident response.
 
 ## Handling Common Scenarios
 
