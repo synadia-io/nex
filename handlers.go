@@ -1,6 +1,7 @@
 package nex
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"disorder.dev/shandler"
 	"github.com/synadia-io/nex/internal"
+	"github.com/synadia-io/nex/internal/state"
 	"github.com/synadia-io/nex/models"
 	"github.com/synadia-io/orbit.go/natsext"
 
@@ -404,7 +406,13 @@ func (n *NexNode) handleStopWorkload() func(micro.Request) {
 			WorkloadType: "",
 		}
 
-		msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadID), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
+		// Explicit deadline sized to a legitimate synchronous stop; the
+		// connection's default request timeout (2s) that would otherwise
+		// apply is shorter than the native nexlet's bounded stop. See
+		// stopConfirmBudget.
+		stopCtx, stopCancel := context.WithTimeout(n.ctx, stopConfirmBudget)
+		defer stopCancel()
+		msgs, err := natsext.RequestMany(stopCtx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadID), r.Data(), natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 		if err != nil {
 			err = r.RespondJSON(ret)
 			if err != nil {
@@ -505,13 +513,39 @@ func (n *NexNode) handleCloneWorkload() func(micro.Request) {
 	}
 }
 
+// stopConfirmBudget is how long the node waits for a nexlet to confirm a
+// stop before giving up on the confirmation. A nexlet's stop is synchronous
+// and honest -- the native nexlet's is bounded at ~5.75s (5s grace, SIGKILL,
+// 750ms confirm) -- so this must comfortably exceed the slowest legitimate
+// stop; without an explicit deadline the RequestMany call inherits the NATS
+// connection's default request timeout (2s), which every
+// not-dead-on-first-signal workload overran. The client's own default
+// timeout (60s, client.NewClient) leaves room above this.
+const stopConfirmBudget = 15 * time.Second
+
 // updateStopUnconfirmedMessage is the client-visible outcome when the
-// running instance could not be confirmed stopped. It is not a failure of
-// the stored definition: that has already been persisted (store-first), so
-// the next agent registration starts the NEW definition and the update
-// completes late rather than reverting. The wording is part of the client
-// contract -- callers key remediation off it.
-const updateStopUnconfirmedMessage = "stop unconfirmed; stored definition will apply on next agent registration"
+// running instance could not be confirmed stopped within stopConfirmBudget.
+// The stop was already dispatched and cannot be recalled, so the honest
+// report is that the workload may still go down without a replacement; what
+// happens after that depends on whether this node persists state, which
+// storedDefinitionFate spells out. The "stop unconfirmed" prefix is part of
+// the client contract -- callers key remediation off it.
+func updateStopUnconfirmedMessage(fate string) string {
+	return "stop unconfirmed; the nexlet may still complete it, leaving the workload stopped; " + fate
+}
+
+// storedDefinitionFate is the tail every replacement-failure message carries:
+// what becomes of the already-persisted new definition. On a node with real
+// state the next agent registration applies it (self-healing, late). A node
+// running without persistence (the default) stored nothing, and promising
+// otherwise is how a destroyed workload gets mistaken for a recoverable one
+// -- say so, and say what to do instead.
+func (n *NexNode) storedDefinitionFate() string {
+	if _, stateless := n.state.(*state.NoState); stateless {
+		return "this node runs without persistent state, so the new definition was not stored; redeploy the workload"
+	}
+	return "stored definition will apply on next agent registration"
+}
 
 // updateConcurrentModificationMessage is the client-visible outcome when the
 // store-first compare-and-swap lost to another writer: the record changed
@@ -646,10 +680,10 @@ func (n *NexNode) respondUpdateWorkload(r micro.Request, resp models.UpdateWorkl
 }
 
 // handleRestartWorkload restarts an existing workload from its STORED
-// definition, reusing the same workload id and reusing UpdateWorkloadResponse
-// as the reply type (a restart is an update whose replacement definition
-// happens to be the one already on file, so no new response shape earns its
-// keep).
+// definition -- falling back to the live one when nothing is on file --
+// reusing the same workload id and reusing UpdateWorkloadResponse as the
+// reply type (a restart is an update whose replacement definition happens to
+// be the one already on file, so no new response shape earns its keep).
 //
 // Subject parsing, namespace agreement, and the ownership-fetch/silent-drop
 // convention are identical to handleUpdateWorkload -- see its comment for why
@@ -753,27 +787,24 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 			return
 		}
 
-		if storedDef == nil || storedDef.Namespace != current.Namespace {
-			// Either nothing is on file for this workload, or what is under
-			// its key belongs to another namespace and is therefore not
-			// this workload's definition at all. Both mean "nothing to
-			// restart from" and get the identical answer, which also keeps
-			// the foreign-record case from becoming an existence oracle for
-			// another tenant's data.
+		if storedDef != nil && storedDef.Namespace != current.Namespace {
+			// What is under this workload's key belongs to another
+			// namespace and is therefore not this workload's definition at
+			// all -- the state a key collision under a deterministic id
+			// generator leaves behind (see the doc comment above). It must
+			// not be replayed, and it must not be OVERWRITTEN either, which
+			// rules out the live-definition fallback below: replaceWorkload
+			// stores def before it stops, and that store would clobber the
+			// other namespace's record. Nothing to restart from is the
+			// truthful answer; updated:false rather than an opaque error,
+			// matching the wording style of updateStopUnconfirmedMessage /
+			// replacementStartFailedMessage.
 			//
-			// The empty case is reachable in normal operation, not just as
-			// a bug: handleAuctionDeployWorkload responds to the
-			// deploy caller and starts the agent BEFORE calling
-			// state.StoreWorkload, and does not fail the deploy if that
-			// store errors -- so a workload can legitimately run with no
-			// stored record at all. Ownership was already established
-			// above, so there is no existence to hide by going silent here;
-			// silence would also be actively misleading, since the client
-			// maps no-responders to "not found" and the workload plainly
-			// does exist. Report the true state instead: nothing to restart
-			// from, and updated:false is truthful rather than an opaque
-			// error, matching the wording style of
-			// updateStopUnconfirmedMessage / replacementStartFailedMessage.
+			// This does make the foreign-record case distinguishable from
+			// the empty one (which restarts fine, below). That
+			// distinguishability is reachable only through WithIDGenerator
+			// collisions -- ids are otherwise random -- and the alternative
+			// was leaking another tenant's record into this one's key.
 			n.respondUpdateWorkload(r, models.UpdateWorkloadResponse{
 				Id:      workloadID,
 				Updated: false,
@@ -782,7 +813,31 @@ func (n *NexNode) handleRestartWorkload() func(micro.Request) {
 			return
 		}
 
-		updated, message, rerr := n.replaceWorkload(workloadID, *current, *storedDef)
+		// Nothing on file: restart from the definition the owning nexlet is
+		// running -- the one the ownership fetch above already returned.
+		//
+		// The empty case is normal operation, not just a bug path: a node
+		// running without --state (the default) persists nothing at all,
+		// and even a stateful node can hold a running workload with no
+		// record, because handleAuctionDeployWorkload responds to the
+		// deploy caller and starts the agent BEFORE calling
+		// state.StoreWorkload and does not fail the deploy if that store
+		// errors. Replying "nothing to restart" here made RESTART useless
+		// on every stateless node. The stored-record preference (see the
+		// doc comment above) exists to finish interrupted UPDATEs; with no
+		// record there is no divergence to arbitrate and the live
+		// definition is the only truth there is. replaceWorkload clones
+		// def's metadata up front, so aliasing current into both arguments
+		// is safe -- its comment anticipates exactly this call shape -- and
+		// its store-first write persists the definition as a side effect
+		// where a record was missing (create-only at revision 0, so a
+		// concurrent writer still wins via ErrStateConflict).
+		def := storedDef
+		if def == nil {
+			def = current
+		}
+
+		updated, message, rerr := n.replaceWorkload(workloadID, *current, *def)
 		if rerr != nil {
 			n.handlerError(r, rerr.err, rerr.code, rerr.msg)
 			return
@@ -971,8 +1026,12 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 		return false, "", newReplaceError(models.ErrCodeInternalServerError, "failed to marshal stop workload request", err)
 	}
 
+	// The explicit deadline is load-bearing: without it RequestMany falls
+	// back to the connection's default request timeout (2s), which is
+	// shorter than a legitimate synchronous stop -- see stopConfirmBudget.
 	stopped := false
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadID), stopReqB, natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
+	stopCtx, stopCancel := context.WithTimeout(n.ctx, stopConfirmBudget)
+	msgs, err := natsext.RequestMany(stopCtx, n.nc, models.AgentAPIStopWorkloadRequestSubject(pubKey, workloadID), stopReqB, natsext.RequestManyMaxMessages(n.registeredAgents.Count()))
 	if err == nil && msgs != nil {
 		msgs(func(m *nats.Msg, e error) bool {
 			if e == nil && m.Data != nil && string(m.Data) != "null" {
@@ -985,10 +1044,11 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 			return true
 		})
 	}
+	stopCancel()
 
 	if !stopped {
 		n.logger.Warn("workload update aborted before start: stop not confirmed", slog.String("workload_id", workloadID))
-		return false, updateStopUnconfirmedMessage, nil
+		return false, updateStopUnconfirmedMessage(n.storedDefinitionFate()), nil
 	}
 
 	aReqB, err := json.Marshal(models.AgentStartWorkloadRequest{
@@ -1008,12 +1068,12 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 	startResp, err := n.nc.Request(models.AgentAPIStartWorkloadRequestSubject(pubKey, reg.ID, workloadID), aReqB, time.Minute)
 	if err != nil {
 		n.logger.Error("no reply to replacement start workload request", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
-		return false, replacementStartFailedMessage(err.Error()), nil
+		return false, replacementStartFailedMessage(err.Error(), n.storedDefinitionFate()), nil
 	}
 
 	if agentErr := startResp.Header.Get("Nats-Service-Error"); agentErr != "" {
 		n.logger.Error("agent failed to start replacement workload", slog.String("workload_id", workloadID), slog.String("err", agentErr))
-		return false, replacementStartFailedMessage(agentErr), nil
+		return false, replacementStartFailedMessage(agentErr, n.storedDefinitionFate()), nil
 	}
 
 	return true, "", nil
@@ -1021,11 +1081,11 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 
 // replacementStartFailedMessage is the client-visible outcome when the old
 // instance was confirmed stopped but the replacement did not start. Like
-// updateStopUnconfirmedMessage it reports updated:false against an ALREADY
-// stored new definition, so the situation is self-healing on the next agent
-// registration -- but unlike it, nothing is running in the meantime.
-func replacementStartFailedMessage(cause string) string {
-	return fmt.Sprintf("workload stopped but replacement failed to start (%s); stored definition will apply on next agent registration", cause)
+// updateStopUnconfirmedMessage it reports updated:false, and nothing is
+// running in the meantime; whether the situation self-heals depends on
+// whether a new definition was actually persisted, which fate spells out.
+func replacementStartFailedMessage(cause, fate string) string {
+	return fmt.Sprintf("workload stopped but replacement failed to start (%s); %s", cause, fate)
 }
 
 func (n *NexNode) handleNamespacePing() func(micro.Request) {

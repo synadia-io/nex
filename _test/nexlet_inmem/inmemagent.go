@@ -38,6 +38,12 @@ type InMemAgent struct {
 	// that cannot confirm a stop (e.g. crashed or unreachable).
 	FailStops bool
 
+	// StopDelay makes StopWorkload sleep before doing its work, simulating a
+	// nexlet whose stop is synchronous and slow -- the native nexlet's is
+	// bounded at ~5.75s (grace + SIGKILL + confirm). Tests use it to prove
+	// the node's stop-confirmation wait outlasts a legitimate slow stop.
+	StopDelay time.Duration
+
 	// StartRequestSchema is the JSON schema this agent advertises at
 	// registration. The node compiles it and validates every run_request
 	// against it, on both the deploy and the update path. It defaults to
@@ -283,6 +289,9 @@ func (a *InMemAgent) StartWorkload(workloadId string, startRequest *models.Agent
 func (a *InMemAgent) StopWorkload(workloadId string, stopRequest *models.StopWorkloadRequest) error {
 	if a.FailStops {
 		return errors.New("injected stop failure")
+	}
+	if a.StopDelay > 0 {
+		time.Sleep(a.StopDelay)
 	}
 
 	a.Logger.Debug("StopWorkload received", slog.String("workloadId", workloadId), slog.String("namespace", stopRequest.Namespace))
