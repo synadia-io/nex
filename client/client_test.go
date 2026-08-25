@@ -1215,3 +1215,64 @@ func TestNexClient_CloneWorkload_StopOrig_CrossNamespace(t *testing.T) {
 		be.NilErr(t, node.Shutdown())
 	}
 }
+
+// TestNexClient_TimeoutIsPerRequestNotPerClient pins that defaultTimeout is a
+// per-request budget, not a client-lifetime deadline. The old NewClient
+// wrapped its context in one WithTimeout at construction: a client older than
+// the budget (or one whose earlier calls consumed it) had every subsequent
+// RequestMany fail instantly on the expired context -- and
+// requestWorkloadReplacement mapped that expiry to "workload not found",
+// misreporting a real, running workload as missing.
+func TestNexClient_TimeoutIsPerRequestNotPerClient(t *testing.T) {
+	workDir := t.TempDir()
+	server := _test.StartNatsServer(t, workDir)
+	defer server.Shutdown()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// state=true for the same reason as TestNexClient_UpdateAndRestartWorkload.
+	nexNodes := _test.StartNexus(t, ctx, server.ClientURL(), 1, true)
+	be.Equal(t, 1, len(nexNodes))
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	// A 2s budget: comfortably enough for any single inmem round-trip, but
+	// far less than this test's own lifetime.
+	nexClient, err := NewClient(context.Background(), nc, "user", WithDefaultTimeout(2*time.Second))
+	be.NilErr(t, err)
+
+	var ar []*models.AuctionResponse
+	_test.WaitFor(t, 10*time.Second, func() bool {
+		ar, err = nexClient.Auction("user", "inmem", map[string]string{})
+		return err == nil && len(ar) == 1
+	}, "waiting for auction to return 1 result")
+
+	sr, err := nexClient.StartWorkload(ar[0].BidderId, &models.StartWorkloadRequest{
+		Namespace:         "user",
+		Name:              "long-lived-client",
+		Description:       "per-request timeout test workload",
+		RunRequest:        "{}",
+		WorkloadType:      "inmem",
+		WorkloadLifecycle: models.WorkloadLifecycleService,
+	})
+	be.NilErr(t, err)
+
+	// Outlive the whole budget, then use the SAME client against the real,
+	// still-running workload. A per-client deadline fails here with a bogus
+	// not-found; a per-request budget succeeds.
+	time.Sleep(2500 * time.Millisecond)
+
+	var restartResp *models.UpdateWorkloadResponse
+	_test.WaitFor(t, 10*time.Second, func() bool {
+		restartResp, err = nexClient.RestartWorkload(sr.Id)
+		return err == nil && restartResp.Updated
+	}, "waiting for restart to succeed on an aged client")
+	be.Equal(t, sr.Id, restartResp.Id)
+
+	for _, node := range nexNodes {
+		be.NilErr(t, node.Shutdown())
+	}
+}

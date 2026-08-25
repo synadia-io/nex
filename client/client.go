@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	// defaultTimeout is the per-client request deadline shared by every verb
-	// (including UPDATE/RESTART). It must EXCEED the node's worst-case
+	// defaultTimeout is the PER-REQUEST budget applied to every verb
+	// (including UPDATE/RESTART) via requestCtx -- each call gets the full
+	// budget, however old the client is. It must EXCEED the node's worst-case
 	// handling of a replacement verb, or a slow-but-succeeding update is
 	// abandoned by the client and misreported as not-found. The node worst
 	// case is the ownership fetch (3s) + the stop-confirmation budget (15s) +
@@ -59,6 +60,12 @@ type NexClient interface {
 	CloneWorkload(id string, tags map[string]string) (*models.StartWorkloadResponse, error)
 	UpdateWorkload(id string, req *models.StartWorkloadRequest) (*models.UpdateWorkloadResponse, error)
 	RestartWorkload(id string) (*models.UpdateWorkloadResponse, error)
+
+	// Close releases the client's context resources. Every client registers
+	// a cancellation child on the caller's context; a long-lived program
+	// creating many clients off one parent context accumulates those until
+	// Close is called (a one-shot CLI can skip it).
+	Close()
 }
 
 type nexClient struct {
@@ -99,18 +106,35 @@ func NewClient(ctx context.Context, nc *nats.Conn, namespace string, opts ...Cli
 		}
 	}
 
-	// Set context timeout using configured default timeout
-	if _, ok := ctx.Deadline(); !ok {
-		ctx, cancel = context.WithTimeoutCause(ctx, client.defaultTimeout, errors.New("default nex client timeout exceeded"))
-	}
+	// The client context carries CANCELLATION only. defaultTimeout is a
+	// per-request budget applied by requestCtx: stamping it here as one
+	// deadline made it a client-LIFETIME budget -- absolute wall-clock from
+	// construction, shared by every call -- so a client older than the
+	// budget (or one whose earlier calls had consumed it) failed every
+	// subsequent request instantly on the expired context, and the
+	// silent-drop verbs then misreported real workloads as not found.
+	ctx, cancel = context.WithCancel(ctx)
 	client.ctx = ctx
 	client.cancel = cancel
 
 	return client, nil
 }
 
+func (n *nexClient) Close() {
+	n.cancel()
+}
+
+// requestCtx derives one request's context: the per-request defaultTimeout
+// budget on top of the client's cancellation (and any deadline the caller's
+// own context carries, which stays in force when shorter).
+func (n *nexClient) requestCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeoutCause(n.ctx, n.defaultTimeout, errors.New("nex client request timeout exceeded"))
+}
+
 func (n *nexClient) GetNexusPTags() (map[string]string, error) {
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingPTagRequestSubject(n.namespace), []byte{}, natsext.RequestManyStall(n.requestManyStall))
+	reqCtx, reqCancel := n.requestCtx()
+	defer reqCancel()
+	msgs, err := natsext.RequestMany(reqCtx, n.nc, models.PingPTagRequestSubject(n.namespace), []byte{}, natsext.RequestManyStall(n.requestManyStall))
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +237,9 @@ func (n *nexClient) ListNodes(filter map[string]string) ([]*models.NodePingRespo
 		return nil, n.nexInternalError(err, "failed to marshal list nodes request")
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
+	reqCtx, reqCancel := n.requestCtx()
+	defer reqCancel()
+	msgs, err := natsext.RequestMany(reqCtx, n.nc, models.PingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request list nodes")
 	}
@@ -253,7 +279,9 @@ func (n *nexClient) Auction(namespace, typ string, tags map[string]string) ([]*m
 		return nil, n.nexInternalError(err, "failed to marshal auction request")
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.AuctionRequestSubject(namespace), auctionRequestB, natsext.RequestManyStall(n.auctionRequestManyStall))
+	reqCtx, reqCancel := n.requestCtx()
+	defer reqCancel()
+	msgs, err := natsext.RequestMany(reqCtx, n.nc, models.AuctionRequestSubject(namespace), auctionRequestB, natsext.RequestManyStall(n.auctionRequestManyStall))
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request auction")
 	}
@@ -451,7 +479,9 @@ func (n *nexClient) ListWorkloads(filter []string) ([]*models.AgentListWorkloads
 		return nil, n.nexInternalError(err, "failed to marshal list workloads request")
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
+	reqCtx, reqCancel := n.requestCtx()
+	defer reqCancel()
+	msgs, err := natsext.RequestMany(reqCtx, n.nc, models.NamespacePingRequestSubject(n.namespace), reqB, natsext.RequestManyStall(n.requestManyStall))
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request list workloads")
 	}
@@ -507,7 +537,9 @@ func (n *nexClient) CloneWorkload(id string, tags map[string]string) (*models.St
 		return nil, n.nexInternalError(err, "failed to marshal clone request")
 	}
 
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(n.requestManyStall))
+	reqCtx, reqCancel := n.requestCtx()
+	defer reqCancel()
+	msgs, err := natsext.RequestMany(reqCtx, n.nc, models.CloneWorkloadRequestSubject(n.namespace, id), cloneReqB, natsext.RequestManyStall(n.requestManyStall))
 	if err != nil {
 		return nil, n.nexInternalError(err, "workload not found")
 	}
@@ -654,7 +686,9 @@ func (n *nexClient) RestartWorkload(id string) (*models.UpdateWorkloadResponse, 
 // window means not-found rather than a real error. Mirrors CloneWorkload's
 // RequestMany + nexNotFoundError handling.
 func (n *nexClient) requestWorkloadReplacement(subject string, reqB []byte) (*models.UpdateWorkloadResponse, error) {
-	msgs, err := natsext.RequestMany(n.ctx, n.nc, subject, reqB, natsext.RequestManyStall(n.requestManyStall))
+	reqCtx, reqCancel := n.requestCtx()
+	defer reqCancel()
+	msgs, err := natsext.RequestMany(reqCtx, n.nc, subject, reqB, natsext.RequestManyStall(n.requestManyStall))
 	if err != nil {
 		return nil, n.nexInternalError(err, "failed to request workload replacement")
 	}
@@ -684,10 +718,18 @@ func (n *nexClient) requestWorkloadReplacement(subject string, reqB []byte) (*mo
 	}
 
 	if resp == nil {
-		// No reply within the client deadline. Under silent-drop this is
-		// indistinguishable from an unknown id, so it is reported as
-		// not-found -- the deadline (defaultTimeout) is sized above the
-		// node's worst-case replacement handling so a slow-but-succeeding
+		// A canceled CLIENT is not evidence about the workload: the request
+		// never ran its budget, so claiming not-found would be a fabricated
+		// negative. Only silence across the full per-request budget below
+		// earns that answer.
+		if cerr := n.ctx.Err(); cerr != nil {
+			return nil, n.nexInternalError(cerr, "client context ended before any node replied")
+		}
+
+		// No reply within this request's full budget. Under silent-drop this
+		// is indistinguishable from an unknown id, so it is reported as
+		// not-found -- the per-request budget (defaultTimeout) is sized above
+		// the node's worst-case replacement handling so a slow-but-succeeding
 		// update replies before this point rather than being misreported.
 		return nil, n.nexNotFoundError(errors.New(string(models.GenericErrorsWorkloadNotFound)), "workload not found")
 	}
