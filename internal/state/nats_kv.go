@@ -63,29 +63,63 @@ func NewNatsKVState(nc *nats.Conn, bucketName string, logger *slog.Logger) (*nat
 // as a wrong-last-sequence API error, which is mapped to
 // models.ErrStateConflict here so no caller has to reach into jetstream's
 // error taxonomy to tell a conflict from a genuine failure.
-func (n *natsKVState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest, expectedRevision uint64) error {
+func (n *natsKVState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest, expectedRevision uint64) (uint64, error) {
 	n.Lock()
 	defer n.Unlock()
 
 	swrB, err := json.Marshal(swr)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	key := fmt.Sprintf("%s_%s", swr.WorkloadType, workloadId)
+	var revision uint64
 	if expectedRevision == 0 {
-		_, err = n.kv.Create(n.ctx, key, swrB)
+		revision, err = n.kv.Create(n.ctx, key, swrB)
 	} else {
-		_, err = n.kv.Update(n.ctx, key, swrB, expectedRevision)
+		revision, err = n.kv.Update(n.ctx, key, swrB, expectedRevision)
 	}
 	if err != nil {
 		if isRevisionConflict(err) {
-			return fmt.Errorf("%w: %s (key %s, expected revision %d)", models.ErrStateConflict, err.Error(), key, expectedRevision)
+			return 0, fmt.Errorf("%w: %s (key %s, expected revision %d)", models.ErrStateConflict, err.Error(), key, expectedRevision)
 		}
-		return err
+		return 0, err
 	}
 
-	return nil
+	return revision, nil
+}
+
+// RemoveWorkloadAtRevision deletes the record only while it is still at
+// revision -- see models.NexNodeState. Delete (not Purge) is deliberate: it
+// is the operation jetstream can make conditional, and the tombstone it
+// leaves reads back as not-found like a purge does.
+func (n *natsKVState) RemoveWorkloadAtRevision(workloadType, workloadId string, revision uint64) error {
+	n.Lock()
+	defer n.Unlock()
+
+	key := fmt.Sprintf("%s_%s", workloadType, workloadId)
+	err := n.kv.Delete(n.ctx, key, jetstream.LastRevision(revision))
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, jetstream.ErrKeyNotFound) || errors.Is(err, jetstream.ErrKeyDeleted):
+		// Already gone -- the caller is undoing its own create, and "gone"
+		// is exactly the state it wants.
+		return nil
+	case isRevisionConflict(err):
+		// A delete or purge tombstone also bumps the key's last sequence, so
+		// a conflict alone cannot distinguish "a newer definition is on file"
+		// (must survive) from "someone already removed the record" (the
+		// caller's desired end state). Read to tell them apart. Called while
+		// holding n's mutex -- safe only because GetWorkloadRecord takes no
+		// lock; if it ever grows one, this becomes a self-deadlock.
+		rec, _, gerr := n.GetWorkloadRecord(workloadType, workloadId)
+		if gerr == nil && rec == nil {
+			return nil
+		}
+		return fmt.Errorf("%w: %s (key %s, expected revision %d)", models.ErrStateConflict, err.Error(), key, revision)
+	}
+	return err
 }
 
 // isRevisionConflict reports whether err is JetStream's "you wrote against a

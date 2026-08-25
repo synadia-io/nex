@@ -364,7 +364,7 @@ func (n *NexNode) handleAuctionDeployWorkload() func(micro.Request) {
 		// workload's minted nkey (including the metadata this handler just
 		// stamped) is never persisted at all: credential fencing against
 		// this workload later would have no record to revoke against.
-		err = n.state.StoreWorkload(workloadID, *req, 0)
+		_, err = n.state.StoreWorkload(workloadID, *req, 0)
 		if errors.Is(err, models.ErrStateConflict) {
 			n.logger.Warn("workload record already exists (concurrent update) — leaving the newer definition", slog.String("workload_id", workloadID))
 			return
@@ -1093,7 +1093,25 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 	// instance the other writer is about to replace. Nothing has been
 	// touched yet, so the honest answer is to abort and let the caller
 	// decide against the newer record.
-	if err := n.state.StoreWorkload(workloadID, def, revision); err != nil {
+	//
+	// created marks the revision-0 case: this write BROUGHT the record into
+	// existence rather than replacing a committed one. That distinction
+	// decides what an unconfirmed stop leaves behind, below -- and it is
+	// load-bearing precisely because revision 0 cannot tell "never
+	// persisted" from "purged by a concurrent UNDEPLOY moments ago" (a
+	// purged key reads back as revision 0, and create-only succeeds over
+	// the purge tombstone).
+	//
+	// Known residual: "revision != 0 implies a committed record" is not
+	// transitively sound. A second replacement verb whose fresh read lands
+	// on ANOTHER verb's in-flight create (itself about to be rolled back)
+	// CAS-updates with created=false, and its leftover write can still be
+	// resumed after a concurrent UNDEPLOY. Reaching that takes three
+	// overlapping verbs on one workload id inside the stop-confirm window;
+	// closing it would need provenance on the record, not a revision flag.
+	created := revision == 0
+	storedRevision, err := n.state.StoreWorkload(workloadID, def, revision)
+	if err != nil {
 		if errors.Is(err, models.ErrStateConflict) {
 			n.logger.Warn("workload update aborted: record changed concurrently", slog.String("workload_id", workloadID), slog.String("err", err.Error()))
 			return false, updateConcurrentModificationMessage, nil
@@ -1128,6 +1146,32 @@ func (n *NexNode) replaceWorkload(workloadID string, current, def models.StartWo
 
 	if !stopped {
 		n.logger.Warn("workload update aborted before start: stop not confirmed", slog.String("workload_id", workloadID))
+
+		// Leaving the stored definition for resume-on-registration to finish
+		// is only sound when it REPLACED a committed record: the workload was
+		// then unquestionably supposed to exist. A record this verb CREATED
+		// proves no such thing -- the unconfirmed stop may mean a concurrent
+		// UNDEPLOY already stopped the workload and purged its record, and a
+		// leftover create is exactly what resume would resurrect against the
+		// operator's explicit stop. Roll the create back, revision-checked so
+		// a competing writer's newer record survives (a conflict or an
+		// already-gone key both mean someone else owns the key now, which is
+		// the leave-it-alone answer either way).
+		//
+		// Note this branch is also every STATELESS node's unconfirmed stop
+		// (NoState reads every record as revision 0) and the legitimate
+		// running-with-no-record case on stateful nodes; for both, the
+		// rollback is a no-op and the message below is the accurate one --
+		// nothing was stored, and the workload may well still be running, so
+		// the old "redeploy the workload" advice would have risked a
+		// duplicate.
+		if created {
+			if derr := n.state.RemoveWorkloadAtRevision(def.WorkloadType, workloadID, storedRevision); derr != nil && !errors.Is(derr, models.ErrStateConflict) {
+				n.logger.Error("failed to roll back created workload record after unconfirmed stop; it may be resumed on the next agent registration",
+					slog.String("workload_id", workloadID), slog.String("err", derr.Error()))
+			}
+			return false, updateStopUnconfirmedMessage("no definition was stored; if the workload is still running it keeps its previous definition"), nil
+		}
 		return false, updateStopUnconfirmedMessage(n.storedDefinitionFate()), nil
 	}
 
@@ -1391,7 +1435,7 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			// writer can still slip in between the re-read and this store.
 			// Re-read and re-stamp the newest record rather than retrying
 			// with the definition we already know is stale.
-			if err := n.state.StoreWorkload(workloadID, swr, revision); errors.Is(err, models.ErrStateConflict) {
+			if _, err := n.state.StoreWorkload(workloadID, swr, revision); errors.Is(err, models.ErrStateConflict) {
 				newest, newestRevision, rerr := n.state.GetWorkloadRecord(registrationRequest.RegisterType, workloadID)
 				switch {
 				case rerr != nil:
@@ -1410,7 +1454,7 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 					continue
 				default:
 					swr = stampMintedNkey(*newest, natsConn.NatsUserNkey)
-					if err := n.state.StoreWorkload(workloadID, swr, newestRevision); err != nil {
+					if _, err := n.state.StoreWorkload(workloadID, swr, newestRevision); err != nil {
 						// Second conflict: give up on the stamp rather
 						// than loop. The workload is still resumed, from
 						// the newest definition read above, and the
