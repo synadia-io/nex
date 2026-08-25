@@ -154,34 +154,19 @@ func (a *NativeAgent) Heartbeat() (*models.AgentHeartbeat, error) {
 	}, nil
 }
 
+// startWorkloadError shapes a start failure for the reply surface: a guard
+// refusal already names the workload and reads as the answer itself, so it
+// passes through verbatim; every other failure gets the workload id prefixed
+// for context.
+func startWorkloadError(workloadId string, err error) error {
+	if errors.Is(err, errStartRefused) {
+		return err
+	}
+	return fmt.Errorf("failed to run workload %s: %w", workloadId, err)
+}
+
 func (a *NativeAgent) StartWorkload(workloadId string, req *models.AgentStartWorkloadRequest, existing bool) (*models.StartWorkloadResponse, error) {
 	a.logger.Debug("start workload request received", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
-
-	occupied, running := a.state.WorkloadOccupancy(req.Request.Namespace, workloadId)
-	if occupied != nil {
-		if !existing {
-			// A stop still has a live process under this id. Spawning now would
-			// put a second process beside the one being stopped, so the start is
-			// refused and the caller retries once the stop has finished.
-			if !running {
-				return nil, fmt.Errorf("workload %s is stopping; retry the start once it has stopped", workloadId)
-			}
-			return nil, fmt.Errorf("workload %s is already running; stop it before starting it again", workloadId)
-		}
-
-		// existing is the resume path: the node re-asserts every workload it
-		// has a record of when this nexlet registers. One this nexlet is still
-		// running is adopted as-is rather than spawned a second time under the
-		// same id. Resume is never blocked -- a generation on its way out falls
-		// through to a fresh start rather than failing the node's replay.
-		if running {
-			a.logger.Debug("adopting already running workload", slog.String("workloadId", workloadId), slog.String("namespace", req.Request.Namespace))
-			return &models.StartWorkloadResponse{
-				Id:   workloadId,
-				Name: occupied.Name,
-			}, nil
-		}
-	}
 
 	if req.Request.Name == "" {
 		seed := time.Now().UTC().UnixNano()
@@ -189,9 +174,24 @@ func (a *NativeAgent) StartWorkload(workloadId string, req *models.AgentStartWor
 		req.Request.Name = nameGenerator.Generate()
 	}
 
+	// The occupancy decision (refuse a taken id, adopt on resume) is made by
+	// the state layer inside the same critical section as the insert -- see
+	// AddWorkload/ResumeWorkload. Deciding it here, outside that lock, was the
+	// TOCTOU window that let two racing starts both pass.
+	if existing {
+		name, err := a.state.ResumeWorkload(req.Request.Namespace, workloadId, req)
+		if err != nil {
+			return nil, startWorkloadError(workloadId, err)
+		}
+		return &models.StartWorkloadResponse{
+			Id:   workloadId,
+			Name: name,
+		}, nil
+	}
+
 	err := a.state.AddWorkload(req.Request.Namespace, workloadId, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to run workload %s: %w", workloadId, err)
+		return nil, startWorkloadError(workloadId, err)
 	}
 
 	return &models.StartWorkloadResponse{
