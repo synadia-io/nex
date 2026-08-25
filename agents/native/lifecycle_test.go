@@ -1,3 +1,5 @@
+//go:build !windows
+
 package native
 
 import (
@@ -105,6 +107,13 @@ func runningPid(t *testing.T, s *nexletState, namespace, workloadId string) int 
 		_ = syscall.Kill(pid, syscall.SIGKILL)
 	})
 	return pid
+}
+
+// startWorkloadErr adapts startWorkload's (name, error) return for the
+// claimed-restart tests, which only care about the error.
+func startWorkloadErr(s *nexletState, namespace, workloadId string, req *models.AgentStartWorkloadRequest, claimed *NativeProcess) error {
+	_, err := s.startWorkload(namespace, workloadId, req, claimed, false)
+	return err
 }
 
 // assertStable re-checks the condition every 50ms for the whole window and
@@ -306,7 +315,7 @@ func TestStaleGenerationCannotDeleteOrRestart(t *testing.T) {
 
 	// A restart that reaches the start path after its generation stopped
 	// owning the id is dropped rather than spawned beside the replacement.
-	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-gen", serviceRequest(t, "stale", "30"), stale))
+	be.NilErr(t, startWorkloadErr(s, lifecycleNamespace, "wl-gen", serviceRequest(t, "stale", "30"), stale))
 	be.Equal(t, current, s.getWorkload(lifecycleNamespace, "wl-gen"))
 	be.Equal(t, 1, s.WorkloadCount())
 
@@ -349,7 +358,7 @@ func TestRestartOvertakenByStopDoesNotSpawn(t *testing.T) {
 	s.workloads[lifecycleNamespace] = NativeProcesses{"wl-overtaken": claimed}
 	claimed.SetState(models.WorkloadStateStopping)
 
-	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-overtaken", serviceRequest(t, "overtaken", "30"), claimed))
+	be.NilErr(t, startWorkloadErr(s, lifecycleNamespace, "wl-overtaken", serviceRequest(t, "overtaken", "30"), claimed))
 
 	// Nothing spawned, and the entry the stop is working on is untouched.
 	be.Equal(t, claimed, s.getWorkload(lifecycleNamespace, "wl-overtaken"))
@@ -360,7 +369,7 @@ func TestRestartOvertakenByStopDoesNotSpawn(t *testing.T) {
 
 	// The same claim, with no stop against it, does spawn.
 	claimed.SetState(models.WorkloadStateError)
-	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-overtaken", serviceRequest(t, "overtaken", "30"), claimed))
+	be.NilErr(t, startWorkloadErr(s, lifecycleNamespace, "wl-overtaken", serviceRequest(t, "overtaken", "30"), claimed))
 
 	spawned := s.getWorkload(lifecycleNamespace, "wl-overtaken")
 	if spawned == claimed {
@@ -392,14 +401,14 @@ func TestExhaustedRestartDropsOnlyItsOwnGeneration(t *testing.T) {
 	// generation was on its way to the start path.
 	s.workloads[lifecycleNamespace] = NativeProcesses{"wl-exhausted": replacement}
 
-	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-exhausted", serviceRequest(t, "exhausted", "30"), exhausted))
+	be.NilErr(t, startWorkloadErr(s, lifecycleNamespace, "wl-exhausted", serviceRequest(t, "exhausted", "30"), exhausted))
 	be.Equal(t, replacement, s.getWorkload(lifecycleNamespace, "wl-exhausted"))
 	be.Equal(t, 1, s.WorkloadCount())
 
 	// When it does still hold the id, it is dropped -- by pointer, with nothing
 	// spawned in its place.
 	s.workloads[lifecycleNamespace]["wl-exhausted"] = exhausted
-	be.NilErr(t, s.startWorkload(lifecycleNamespace, "wl-exhausted", serviceRequest(t, "exhausted", "30"), exhausted))
+	be.NilErr(t, startWorkloadErr(s, lifecycleNamespace, "wl-exhausted", serviceRequest(t, "exhausted", "30"), exhausted))
 	be.Equal(t, 0, s.WorkloadCount())
 	if proc := exhausted.getProcess(); proc != nil {
 		t.Fatalf("a process was spawned for a generation that had exhausted its restarts (pid %d)", proc.Pid)

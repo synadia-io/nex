@@ -75,20 +75,18 @@ func (n *nexletState) getWorkload(namespace, workloadId string) *NativeProcess {
 	return nil
 }
 
-// WorkloadOccupancy reports what is holding a workload id: the generation that
-// still has a process on the host -- including one that is being stopped -- and
-// whether that generation is running rather than on its way out. Both answers
-// come from the same critical section, so a start cannot act on a mix of the two.
-func (n *nexletState) WorkloadOccupancy(namespace, workloadId string) (*NativeProcess, bool) {
-	n.Lock()
-	defer n.Unlock()
+// errStartRefused marks the occupancy-guard refusals (id already running, or
+// still being stopped). Callers match it with errors.Is to pass the guard's
+// message through verbatim instead of wrapping it -- the message already
+// names the workload. startRefusedError carries the message untouched so the
+// exact wording (part of the agent's reply surface) is preserved.
+var errStartRefused = errors.New("start refused")
 
-	w := n.workloads[namespace][workloadId]
-	if !w.isOccupied() {
-		return nil, false
-	}
-	return w, w.isRunning()
-}
+type startRefusedError struct{ msg string }
+
+func (e *startRefusedError) Error() string { return e.msg }
+
+func (e *startRefusedError) Is(target error) bool { return target == errStartRefused }
 
 // deleteGeneration removes the workload id only when workload is still the
 // generation stored for it. A stop or an exit that lands after the id has been
@@ -203,8 +201,22 @@ func (n *nexletState) GetNamespaceWorkloadList(ns string, filter []string) (*mod
 	return ret, nil
 }
 
+// AddWorkload starts a fresh generation for a workload id. The occupancy
+// guard lives inside startWorkload's critical section, atomic with the map
+// insert: checking here and inserting there is the TOCTOU window that let two
+// racing starts both pass and the loser's process run untracked.
 func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.AgentStartWorkloadRequest) error {
-	return n.startWorkload(namespace, workloadId, req, nil)
+	_, err := n.startWorkload(namespace, workloadId, req, nil, false)
+	return err
+}
+
+// ResumeWorkload is AddWorkload for the node's resume-on-registration replay
+// (existing=true): a generation still running under the id is adopted as-is
+// -- its name is the answer -- rather than spawned a second time. A
+// generation on its way out falls through to a fresh spawn, so resume is
+// never blocked. The decision is made under the same lock hold as the insert.
+func (n *nexletState) ResumeWorkload(namespace, workloadId string, req *models.AgentStartWorkloadRequest) (string, error) {
+	return n.startWorkload(namespace, workloadId, req, nil, true)
 }
 
 // startWorkload spawns a generation of a workload. claimed is the generation
@@ -214,11 +226,41 @@ func (n *nexletState) AddWorkload(namespace, workloadId string, req *models.Agen
 // its way in, and is dropped rather than spawned: a restart must never bring
 // back a workload the user already stopped, nor run beside the one that
 // replaced it.
-func (n *nexletState) startWorkload(namespace, workloadId string, req *models.AgentStartWorkloadRequest, claimed *NativeProcess) error {
+func (n *nexletState) startWorkload(namespace, workloadId string, req *models.AgentStartWorkloadRequest, claimed *NativeProcess, existing bool) (string, error) {
 	n.Lock()
 	if _, ok := n.workloads[namespace]; !ok {
 		n.workloads[namespace] = make(NativeProcesses)
 		n.logger.Debug("namespace created", slog.String("namespace", namespace))
+	}
+
+	// The occupancy decision, under the same lock hold as the insert below.
+	// A start requested from outside must not land beside a generation that
+	// still has a process on the host; the resume replay adopts a running
+	// generation instead of spawning a second one. claimed starts (restarts)
+	// have their own identity check further down.
+	if claimed == nil {
+		if occupied := n.workloads[namespace][workloadId]; occupied.isOccupied() {
+			switch {
+			case !existing && !occupied.isRunning():
+				// A stop still has a live process under this id. Spawning now
+				// would put a second process beside the one being stopped, so
+				// the start is refused and the caller retries once the stop
+				// has finished.
+				n.Unlock()
+				return "", &startRefusedError{msg: fmt.Sprintf("workload %s is stopping; retry the start once it has stopped", workloadId)}
+			case !existing:
+				n.Unlock()
+				return "", &startRefusedError{msg: fmt.Sprintf("workload %s is already running; stop it before starting it again", workloadId)}
+			case occupied.isRunning():
+				// Resume: adopt the generation this nexlet is still running
+				// rather than spawning a second one under the same id.
+				n.Unlock()
+				n.logger.Debug("adopting already running workload", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
+				return occupied.Name, nil
+			}
+			// existing && !running: a generation on its way out; fall through
+			// to a fresh spawn rather than failing the node's replay.
+		}
 	}
 
 	// The restart budget belongs to the restart chain: it carries over from the
@@ -237,7 +279,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 		if n.workloads[namespace][workloadId] != claimed || claimed.GetState() == models.WorkloadStateStopping {
 			n.Unlock()
 			n.logger.Debug("restart abandoned; the claiming generation no longer owns the workload id or is being stopped", slog.String("workloadId", workloadId), slog.String("namespace", namespace))
-			return nil
+			return "", nil
 		}
 		restarts, maxRestarts = claimed.Restarts, claimed.MaxRestarts
 
@@ -266,7 +308,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 			if err := n.runner.EmitEvent(namespace, wse); err != nil {
 				n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 			}
-			return nil
+			return "", nil
 		}
 	}
 
@@ -295,13 +337,13 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 	if err != nil {
 		n.dropGenerationLocked(namespace, workloadId, workload)
 		n.Unlock()
-		return err
+		return "", err
 	}
 
 	if !strings.HasPrefix(startReq.Uri, "file://") && !strings.HasPrefix(startReq.Uri, "nats://") {
 		n.dropGenerationLocked(namespace, workloadId, workload)
 		n.Unlock()
-		return fmt.Errorf("invalid uri; must be prefixed with file:// for local binary or nats:// to fetch an artifact: %s", startReq.Uri)
+		return "", fmt.Errorf("invalid uri; must be prefixed with file:// for local binary or nats:// to fetch an artifact: %s", startReq.Uri)
 	}
 
 	var nc *nats.Conn
@@ -313,7 +355,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 			n.logger.Error("error connecting to nats", slog.String("err", err.Error()))
 			n.dropGenerationLocked(namespace, workloadId, workload)
 			n.Unlock()
-			return fmt.Errorf("failed to make a nats connection to retrieve runnable artifact: %w", err)
+			return "", fmt.Errorf("failed to make a nats connection to retrieve runnable artifact: %w", err)
 		}
 	}
 
@@ -321,7 +363,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 	if err != nil {
 		n.dropGenerationLocked(namespace, workloadId, workload)
 		n.Unlock()
-		return fmt.Errorf("failed to retrieve artifact: %w", err)
+		return "", fmt.Errorf("failed to retrieve artifact: %w", err)
 	}
 	if nc != nil {
 		nc.Close()
@@ -336,7 +378,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 				n.dropGenerationLocked(namespace, workloadId, workload)
 				n.logger.Error("error retrieving secret", slog.String("err", err.Error()), slog.String("secret_key", secretKey), slog.String("namespace", namespace))
 				n.Unlock()
-				return fmt.Errorf("failed to retrieve namespace secret %s: %w", secretKey, err)
+				return "", fmt.Errorf("failed to retrieve namespace secret %s: %w", secretKey, err)
 			}
 			env = append(env, k+"="+string(secretValue))
 		} else {
@@ -352,7 +394,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 				n.dropGenerationLocked(namespace, workloadId, workload)
 				n.logger.Error("error retrieving secret", slog.String("err", err.Error()), slog.String("secret_key", secretKey), slog.String("namespace", namespace))
 				n.Unlock()
-				return fmt.Errorf("failed to retrieve namespace secret %s: %w", secretKey, err)
+				return "", fmt.Errorf("failed to retrieve namespace secret %s: %w", secretKey, err)
 			}
 			argv = append(argv, string(secretValue))
 		} else {
@@ -376,7 +418,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 	if err := cmd.Start(); err != nil {
 		n.dropGenerationLocked(namespace, workloadId, workload)
 		n.Unlock()
-		return fmt.Errorf("failed to start native binary: %w", err)
+		return "", fmt.Errorf("failed to start native binary: %w", err)
 	}
 	workload.setProcess(cmd.Process)
 	workload.SetState(models.WorkloadStateRunning)
@@ -393,7 +435,7 @@ func (n *nexletState) startWorkload(namespace, workloadId string, req *models.Ag
 	if err := n.runner.EmitEvent(namespace, models.WorkloadStartedEvent{Id: workloadId, Namespace: namespace, WorkloadType: NEXLET_REGISTER_TYPE}); err != nil {
 		n.logger.Error("error emitting workload stopped event", slog.String("err", err.Error()))
 	}
-	return nil
+	return req.Request.Name, nil
 }
 
 // watchWorkload owns one generation of a workload from the moment its process
@@ -460,7 +502,7 @@ func (n *nexletState) watchWorkload(namespace, workloadId string, workload *Nati
 	}
 
 	n.logger.Debug("workload process exited unexpectedly; attempting restart", slog.String("workloadId", workloadId), slog.String("namespace", namespace), slog.Int("exit_code", exitCode), slog.Int("restarts", workload.Restarts))
-	if err := n.startWorkload(namespace, workloadId, req, workload); err != nil {
+	if _, err := n.startWorkload(namespace, workloadId, req, workload, false); err != nil {
 		n.logger.Error("error restarting workload", slog.String("err", err.Error()))
 	}
 }
