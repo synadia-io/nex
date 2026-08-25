@@ -158,14 +158,31 @@ func (ar *AgentRegistrations) GetByRegisterType(registerType string) (*AgentRegi
 	return nil, fmt.Errorf("no agent registrations found for type: %s", registerType)
 }
 
+// GetByRegisterName prefers a Healthy match: while a crashed instance's
+// registration lingers Offline (up to agentHardEvictAfter) beside its
+// same-Name replacement, map iteration order would otherwise pick between
+// corpse and replacement at random.
 func (ar *AgentRegistrations) GetByRegisterName(registerName string) (*AgentRegistration, error) {
 	ar.rwLock.RLock()
 	defer ar.rwLock.RUnlock()
 
+	var fallback *AgentRegistration
 	for _, reg := range ar.Registrations {
-		if reg.RegisterRequest.Name == registerName {
+		if reg.RegisterRequest.Name != registerName {
+			continue
+		}
+		reg.rwLock.RLock()
+		healthy := reg.HealthStatus == AgentHealthy
+		reg.rwLock.RUnlock()
+		if healthy {
 			return reg, nil
 		}
+		if fallback == nil {
+			fallback = reg
+		}
+	}
+	if fallback != nil {
+		return fallback, nil
 	}
 
 	return nil, fmt.Errorf("no agents registered with name: %s", registerName)
@@ -271,29 +288,71 @@ func (ar *AgentRegistrations) startHealthMonitor() {
 			ar.rwLock.Unlock()
 			return
 		case <-ticker.C:
-			var offline []string
-			ar.rwLock.RLock()
-			for id, reg := range ar.Registrations {
-				reg.rwLock.Lock()
-				switch {
-				case time.Since(reg.lastHeartbeat) > 10*time.Second && time.Since(reg.lastHeartbeat) <= 30*time.Second:
-					reg.HealthStatus = AgentDegraded
-				case time.Since(reg.lastHeartbeat) > 30*time.Second:
-					reg.HealthStatus = AgentOffline
-					offline = append(offline, id)
-				}
-				reg.rwLock.Unlock()
-			}
-			ar.rwLock.RUnlock()
-
-			// Evict the dead entries in a second pass, outside the read lock.
-			// A crashed agent's replacement re-registers under a NEW id, so
-			// this offline entry will never receive another heartbeat -- it is
-			// pure garbage, and freeing it keeps the map bounded.
-			for _, id := range offline {
-				ar.logger.Info("evicting offline agent registration", slog.String("agent_id", id))
-				ar.Remove(id)
-			}
+			ar.sweep()
 		}
 	}
 }
+
+// sweep is one health-monitor pass: grade every registration by heartbeat
+// age and evict the ones silent past the hard TTL. Extracted from the ticker
+// loop so the policy is testable without waiting out real tickers.
+//
+// The grading is two-stage on purpose. Offline (30s) only EXCLUDES the agent
+// from placement (GetByRegisterType filters on Healthy) -- it is fully
+// recoverable, because the heartbeat subscription stays up and the next
+// heartbeat re-grades the agent. Eviction is not recoverable: agents register
+// exactly once at startup, so evicting a live-but-briefly-silent agent (a
+// >30s NATS outage, a heartbeat starved behind a slow synchronous start)
+// orphans it until its process restarts. Only silence past agentHardEvictAfter
+// is treated as death.
+func (ar *AgentRegistrations) sweep() {
+	var dead []string
+	ar.rwLock.RLock()
+	for id, reg := range ar.Registrations {
+		reg.rwLock.Lock()
+		switch {
+		case time.Since(reg.lastHeartbeat) > 10*time.Second && time.Since(reg.lastHeartbeat) <= 30*time.Second:
+			reg.HealthStatus = AgentDegraded
+		case time.Since(reg.lastHeartbeat) > 30*time.Second:
+			reg.HealthStatus = AgentOffline
+			if time.Since(reg.lastHeartbeat) > agentHardEvictAfter {
+				dead = append(dead, id)
+			}
+		}
+		reg.rwLock.Unlock()
+	}
+	ar.rwLock.RUnlock()
+
+	// Evict the dead entries in a second pass, outside the read lock.
+	// A crashed agent's replacement re-registers under a NEW id, so an
+	// entry silent this long will never receive another heartbeat -- it is
+	// pure garbage, and freeing it keeps the map bounded.
+	for _, id := range dead {
+		// Re-check under the reg lock: a heartbeat landing between the
+		// grading pass and this eviction re-graded the agent alive, and
+		// evicting it then would orphan a live agent permanently.
+		ar.rwLock.RLock()
+		reg := ar.Registrations[id]
+		ar.rwLock.RUnlock()
+		if reg != nil {
+			reg.rwLock.RLock()
+			revived := time.Since(reg.lastHeartbeat) <= agentHardEvictAfter
+			reg.rwLock.RUnlock()
+			if revived {
+				continue
+			}
+		}
+		ar.logger.Info("evicting dead agent registration", slog.String("agent_id", id))
+		ar.Remove(id)
+	}
+}
+
+// agentHardEvictAfter is how long an agent may be silent before its
+// registration is evicted outright. Eviction is PERMANENT for the agent
+// instance -- agents register exactly once at startup, so an evicted live
+// agent has no way back until its process restarts -- which is why this is
+// minutes, not the 30s Offline threshold: Offline already excludes the agent
+// from placement, costs nothing to keep, and heals itself on the next
+// heartbeat. Only an agent silent this long is treated as genuinely dead (its
+// replacement registers under a new id) and dropped to keep the map bounded.
+const agentHardEvictAfter = 10 * time.Minute
