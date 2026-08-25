@@ -1265,6 +1265,17 @@ func (n *NexNode) handleRegisterAgent() func(micro.Request) {
 			return
 		}
 
+		// The state record key is "<register_type>_<workload_id>" and
+		// GetStateByAgent matches on the "<register_type>_" prefix, so a "_"
+		// inside the type makes keys ambiguous: type "a" would claim type
+		// "a_b"'s records, and the re-read defense rebuilds the same colliding
+		// key -- resume would start another agent type's workload. Refusing
+		// the separator here is what keeps that matching sound.
+		if strings.Contains(registrationRequest.RegisterType, "_") {
+			n.handlerError(r, errors.New("register_type must not contain '_'"), models.ErrCodeBadRequest, "register_type must not contain '_'")
+			return
+		}
+
 		err = n.aregistrar.RegisterAgent(r.Headers(), registrationRequest)
 		if err != nil {
 			n.handlerError(r, err, models.ErrCodeForbidden, "failed agent registrar check")
