@@ -11,11 +11,11 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/synadia-io/nex/sdk/go/agent"
 	"github.com/synadia-io/nex"
 	testminter "github.com/synadia-io/nex/_test/minter"
 	"github.com/synadia-io/nex/client"
 	"github.com/synadia-io/nex/models"
+	"github.com/synadia-io/nex/sdk/go/agent"
 )
 
 func newInmemAgent(t testing.TB, withState bool) *InMemAgent {
