@@ -13,6 +13,9 @@ import (
 	"github.com/synadia-io/nex/models"
 )
 
+// storeErr discards StoreWorkload's returned revision for assertions that
+// only care about the error.
+func storeErr(_ uint64, err error) error { return err }
 func startNatsServer(t testing.TB, workDir string) *server.Server {
 	t.Helper()
 
@@ -61,26 +64,26 @@ func TestNewKVState(t *testing.T) {
 	be.NilErr(t, err)
 	be.Equal(t, 0, getChanCount(t, kl.Keys()))
 
-	be.NilErr(t, s.StoreWorkload("workload1", models.StartWorkloadRequest{
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", models.StartWorkloadRequest{
 		Description:       "foogoo",
 		Name:              "foogoo",
 		Namespace:         "goo",
 		RunRequest:        "{}",
 		WorkloadLifecycle: "service",
 		WorkloadType:      "foo",
-	}, 0))
+	}, 0)))
 	kl, err = kv.ListKeys(context.TODO())
 	be.NilErr(t, err)
 	be.Equal(t, 1, getChanCount(t, kl.Keys()))
 
-	be.NilErr(t, s.StoreWorkload("workload2", models.StartWorkloadRequest{
+	be.NilErr(t, storeErr(s.StoreWorkload("workload2", models.StartWorkloadRequest{
 		Description:       "goo",
 		Name:              "goo",
 		Namespace:         "goo",
 		RunRequest:        "{}",
 		WorkloadLifecycle: "service",
 		WorkloadType:      "bar",
-	}, 0))
+	}, 0)))
 	kl, err = kv.ListKeys(context.TODO())
 	be.NilErr(t, err)
 	be.Equal(t, 2, getChanCount(t, kl.Keys()))
@@ -142,7 +145,7 @@ func TestKVStateGetWorkloadRecordRoundTrip(t *testing.T) {
 	be.Zero(t, rec)
 	be.Equal(t, uint64(0), rev)
 
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("v1", "foo"), 0))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("v1", "foo"), 0)))
 
 	rec, rev, err = s.GetWorkloadRecord("foo", "workload1")
 	be.NilErr(t, err)
@@ -151,7 +154,7 @@ func TestKVStateGetWorkloadRecordRoundTrip(t *testing.T) {
 	be.True(t, rev > 0)
 
 	// A successful CAS write advances the revision.
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("v2", "foo"), rev))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("v2", "foo"), rev)))
 
 	rec2, rev2, err := s.GetWorkloadRecord("foo", "workload1")
 	be.NilErr(t, err)
@@ -182,9 +185,9 @@ func TestKVStateCreateOnlyRejectsExistingKey(t *testing.T) {
 	s, err := NewNatsKVState(nc, "test", nil)
 	be.NilErr(t, err)
 
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("winner", "foo"), 0))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("winner", "foo"), 0)))
 
-	err = s.StoreWorkload("workload1", workloadDef("loser", "foo"), 0)
+	_, err = s.StoreWorkload("workload1", workloadDef("loser", "foo"), 0)
 	be.Nonzero(t, err)
 	be.True(t, errors.Is(err, models.ErrStateConflict))
 
@@ -208,7 +211,7 @@ func TestKVStateUpdateRejectsStaleRevision(t *testing.T) {
 	s, err := NewNatsKVState(nc, "test", nil)
 	be.NilErr(t, err)
 
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("v1", "foo"), 0))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("v1", "foo"), 0)))
 
 	// Both writers read the same revision -- the interleaving the blind Put
 	// could not survive.
@@ -218,9 +221,9 @@ func TestKVStateUpdateRejectsStaleRevision(t *testing.T) {
 	be.NilErr(t, err)
 	be.Equal(t, revA, revB)
 
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("winner", "foo"), revA))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("winner", "foo"), revA)))
 
-	err = s.StoreWorkload("workload1", workloadDef("loser", "foo"), revB)
+	_, err = s.StoreWorkload("workload1", workloadDef("loser", "foo"), revB)
 	be.Nonzero(t, err)
 	be.True(t, errors.Is(err, models.ErrStateConflict))
 
@@ -230,7 +233,7 @@ func TestKVStateUpdateRejectsStaleRevision(t *testing.T) {
 
 	// Re-reading yields the winner's revision, which the loser can retry
 	// against -- the documented recovery for a conflict.
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("retried", "foo"), rev))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("retried", "foo"), rev)))
 	rec, _, err = s.GetWorkloadRecord("foo", "workload1")
 	be.NilErr(t, err)
 	be.Equal(t, "retried", rec.Name)
@@ -250,7 +253,7 @@ func TestKVStateCreateOnlyAfterRemoveSucceeds(t *testing.T) {
 	s, err := NewNatsKVState(nc, "test", nil)
 	be.NilErr(t, err)
 
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("v1", "foo"), 0))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("v1", "foo"), 0)))
 	be.NilErr(t, s.RemoveWorkload("foo", "workload1"))
 
 	rec, rev, err := s.GetWorkloadRecord("foo", "workload1")
@@ -258,7 +261,7 @@ func TestKVStateCreateOnlyAfterRemoveSucceeds(t *testing.T) {
 	be.Zero(t, rec)
 	be.Equal(t, uint64(0), rev)
 
-	be.NilErr(t, s.StoreWorkload("workload1", workloadDef("v2", "foo"), 0))
+	be.NilErr(t, storeErr(s.StoreWorkload("workload1", workloadDef("v2", "foo"), 0)))
 	rec, _, err = s.GetWorkloadRecord("foo", "workload1")
 	be.NilErr(t, err)
 	be.Equal(t, "v2", rec.Name)
@@ -289,8 +292,8 @@ func TestKVStateGetStateByAgentPrefixIsExact(t *testing.T) {
 	be.NilErr(t, err)
 
 	// Two agent types where one is a string prefix of the other.
-	be.NilErr(t, s.StoreWorkload("wl1", workloadDef("short", "docker"), 0))
-	be.NilErr(t, s.StoreWorkload("wl2", workloadDef("long", "dockerx"), 0))
+	be.NilErr(t, storeErr(s.StoreWorkload("wl1", workloadDef("short", "docker"), 0)))
+	be.NilErr(t, storeErr(s.StoreWorkload("wl2", workloadDef("long", "dockerx"), 0)))
 
 	shortState, err := s.GetStateByAgent("docker")
 	be.NilErr(t, err)
@@ -305,4 +308,47 @@ func TestKVStateGetStateByAgentPrefixIsExact(t *testing.T) {
 	rec, ok = longState["wl2"]
 	be.True(t, ok)
 	be.Equal(t, "long", rec.Name)
+}
+
+// TestKVStateRemoveWorkloadAtRevision pins the rollback contract the
+// replacement verbs rely on (models.NexNodeState.RemoveWorkloadAtRevision):
+// the delete lands only while the record is still at the caller's revision, a
+// moved-on record survives with ErrStateConflict, and an already-gone record
+// is success -- the caller is undoing its own create and "gone" is the state
+// it wants.
+func TestKVStateRemoveWorkloadAtRevision(t *testing.T) {
+	server := startNatsServer(t, t.TempDir())
+	defer server.Shutdown()
+
+	nc, err := nats.Connect(server.ClientURL())
+	be.NilErr(t, err)
+
+	s, err := NewNatsKVState(nc, "test", nil)
+	be.NilErr(t, err)
+
+	revA, err := s.StoreWorkload("workload1", workloadDef("v1", "foo"), 0)
+	be.NilErr(t, err)
+
+	// A newer write moved the record on; the rollback must lose and the
+	// newer definition must survive.
+	revB, err := s.StoreWorkload("workload1", workloadDef("v2", "foo"), revA)
+	be.NilErr(t, err)
+
+	err = s.RemoveWorkloadAtRevision("foo", "workload1", revA)
+	be.True(t, errors.Is(err, models.ErrStateConflict))
+
+	rec, _, err := s.GetWorkloadRecord("foo", "workload1")
+	be.NilErr(t, err)
+	be.Equal(t, "v2", rec.Name)
+
+	// At the current revision the delete lands, and repeating it (or racing
+	// a purge) is success: the record is gone either way.
+	be.NilErr(t, s.RemoveWorkloadAtRevision("foo", "workload1", revB))
+
+	rec, rev, err := s.GetWorkloadRecord("foo", "workload1")
+	be.NilErr(t, err)
+	be.Zero(t, rec)
+	be.Equal(t, uint64(0), rev)
+
+	be.NilErr(t, s.RemoveWorkloadAtRevision("foo", "workload1", revB))
 }

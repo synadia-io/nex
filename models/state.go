@@ -47,12 +47,26 @@ type NexNodeState interface {
 	// from GetWorkloadRecord, which is why its not-found revision is 0: the
 	// value round-trips into the create-only case without a special branch
 	// at the call site.
-	StoreWorkload(workloadId string, swr StartWorkloadRequest, expectedRevision uint64) error
+	//
+	// On success the revision of the written record is returned -- what a
+	// writer that may have to undo its own write passes to
+	// RemoveWorkloadAtRevision (the replacement verbs roll back a record
+	// they CREATED when the stop they gate on is never confirmed, so a
+	// workload a concurrent UNDEPLOY purged cannot be resurrected by their
+	// leftover write).
+	StoreWorkload(workloadId string, swr StartWorkloadRequest, expectedRevision uint64) (uint64, error)
 
 	// RemoveWorkload deletes the record for (workloadType, workloadId). It
 	// is unconditional: a purge is only ever issued for a stop the node has
 	// already confirmed, so there is no stale read to guard against.
 	RemoveWorkload(workloadType, workloadId string) error
+
+	// RemoveWorkloadAtRevision deletes the record only while it is still at
+	// revision -- the rollback half of StoreWorkload's returned revision. A
+	// record that moved on belongs to a newer writer and is left untouched
+	// (ErrStateConflict); a record already gone is success, because the only
+	// caller is undoing its own create and "gone" is the desired end state.
+	RemoveWorkloadAtRevision(workloadType, workloadId string, revision uint64) error
 
 	// GetWorkloadRecord returns the stored definition for (workloadType,
 	// workloadID) together with the revision to pass back to StoreWorkload.

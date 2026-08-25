@@ -8,12 +8,19 @@ type NoState struct{}
 
 // StoreWorkload discards the record. expectedRevision is ignored: nothing
 // is stored, so nothing can conflict, and NoState therefore never returns
-// models.ErrStateConflict.
-func (n *NoState) StoreWorkload(workloadId string, nf models.StartWorkloadRequest, expectedRevision uint64) error {
-	return nil
+// models.ErrStateConflict. The returned revision is 0 -- there is no record
+// a rollback could target.
+func (n *NoState) StoreWorkload(workloadId string, nf models.StartWorkloadRequest, expectedRevision uint64) (uint64, error) {
+	return 0, nil
 }
 
 func (n *NoState) RemoveWorkload(workloadType, workloadId string) error {
+	return nil
+}
+
+// RemoveWorkloadAtRevision succeeds vacuously: nothing is ever stored, so the
+// record is always already "gone", which the interface documents as success.
+func (n *NoState) RemoveWorkloadAtRevision(workloadType, workloadId string, revision uint64) error {
 	return nil
 }
 

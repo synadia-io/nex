@@ -90,6 +90,20 @@ type recordingState struct {
 	// branches that handle a failed re-read would never execute.
 	// Negative means disarmed.
 	getFailAfter int
+
+	// beforeGetRecord fires exactly once, immediately before the next
+	// GetWorkloadRecord call is delegated, and is then cleared. RESTART
+	// reads the stored record right after its ownership fetch, so this is
+	// the injection point for a competing UNDEPLOY purge landing in that
+	// window -- what drives RESTART into its live-definition fallback.
+	beforeGetRecord func()
+}
+
+// injectBeforeGetRecord arms the one-shot pre-read hook. See recordingState.
+func (r *recordingState) injectBeforeGetRecord(f func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.beforeGetRecord = f
 }
 
 // injectBeforeStore arms the one-shot pre-store hook. See recordingState.
@@ -123,7 +137,16 @@ func (r *recordingState) GetWorkloadRecord(workloadType, workloadID string) (*mo
 		r.getFailAfter--
 		fail = r.getFailAfter == 0
 	}
+	hook := r.beforeGetRecord
+	r.beforeGetRecord = nil
 	r.mu.Unlock()
+
+	// Fired outside the lock: the hook drives node requests that write to
+	// the same KV bucket, and nothing about those goes back through this
+	// decorator's own lock.
+	if hook != nil {
+		hook()
+	}
 
 	if fail {
 		return nil, 0, errors.New("injected state read failure")
@@ -139,7 +162,7 @@ func (r *recordingState) RemoveWorkload(workloadType, workloadId string) error {
 	return r.NexNodeState.RemoveWorkload(workloadType, workloadId)
 }
 
-func (r *recordingState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest, expectedRevision uint64) error {
+func (r *recordingState) StoreWorkload(workloadId string, swr models.StartWorkloadRequest, expectedRevision uint64) (uint64, error) {
 	r.mu.Lock()
 	r.storeCalls = append(r.storeCalls, storeWorkloadCall{workloadId: workloadId, request: swr})
 	hook := r.beforeStore
