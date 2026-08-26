@@ -22,6 +22,17 @@ Schemas in [`models/schema/`](https://github.com/synadia-io/nex/tree/main/models
 (e.g. `update-workload-request.json`). Errors are returned as NATS micro
 service errors (`Nats-Service-Error` / `Nats-Service-Error-Code` headers).
 
+## Identity: workload ID vs name
+
+The workload **ID** is the only identity: node-minted at deploy, unique,
+stable across `UPDATE` and `RESTART`, the token every verb addresses, and
+(for container nexlets) the container's name. The workload **name** is a
+label: caller-supplied or auto-generated, never checked for uniqueness
+(`CLONE` duplicates it by design), and changeable in place by `UPDATE` while
+the ID stays put. Tooling must treat names as display text — resolving a
+name to an ID is a client-side convenience that has to handle ambiguity, not
+something the API guarantees.
+
 ## Namespaces
 
 The `<namespace>` token scopes every verb:
