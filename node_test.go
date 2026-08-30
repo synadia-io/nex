@@ -599,3 +599,100 @@ func TestNodeDeployCloneUndeploy(t *testing.T) {
 	be.Equal(t, startWorkloadResp.Id, stopWorkloadResp.Id)
 	be.True(t, stopWorkloadResp.Stopped)
 }
+
+// TestNodeControlServiceRebuildsAfterUnexpectedStop proves the node's control
+// micro service recovers on its own after an unexpected stop (which nats.go
+// micro does itself on a connection close or an async endpoint error), and
+// that a graceful Shutdown does NOT rebuild it.
+func TestNodeControlServiceRebuildsAfterUnexpectedStop(t *testing.T) {
+	s := startNatsServer(t)
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	kp, err := nkeys.CreateServer()
+	be.NilErr(t, err)
+	pub, err := kp.PublicKey()
+	be.NilErr(t, err)
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	nn, err := NewNexNode(WithNatsConn(nc), WithLogger(logger), WithNodeKeyPair(kp))
+	be.NilErr(t, err)
+	be.NilErr(t, nn.Start())
+	be.NilErr(t, nn.IsReady(10*time.Second))
+
+	infoSubj := models.NodeInfoRequestSubject(models.SystemNamespace, pub)
+
+	// Endpoint serves before the stop.
+	_, err = nc.Request(infoSubj, nil, time.Second)
+	be.NilErr(t, err)
+
+	// Simulate micro auto-stopping the service. Its DoneHandler must rebuild.
+	nn.serviceMu.Lock()
+	old := nn.service
+	nn.serviceMu.Unlock()
+	be.NilErr(t, old.Stop())
+	be.True(t, old.Stopped())
+
+	// Endpoint serves again once the rebuild lands.
+	served := false
+	for i := 0; i < 100; i++ {
+		if _, rerr := nc.Request(infoSubj, nil, 200*time.Millisecond); rerr == nil {
+			served = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	be.True(t, served)
+
+	// A fresh, non-stopped service replaced the old one.
+	nn.serviceMu.Lock()
+	rebuilt := nn.service
+	nn.serviceMu.Unlock()
+	be.True(t, rebuilt != old)
+	be.True(t, !rebuilt.Stopped())
+
+	// Graceful shutdown gates the rebuild off and leaves the service stopped.
+	be.NilErr(t, nn.Shutdown())
+	be.True(t, nn.shuttingDown.Load())
+	be.True(t, rebuilt.Stopped())
+}
+
+// TestNodeBuildServiceRefusesCommitDuringShutdown proves the rebuild path
+// cannot commit (or leak) a new control service once a graceful shutdown has
+// begun -- closing the shutdown-vs-rebuild race.
+func TestNodeBuildServiceRefusesCommitDuringShutdown(t *testing.T) {
+	s := startNatsServer(t)
+	defer s.Shutdown()
+
+	nc, err := nats.Connect(s.ClientURL())
+	be.NilErr(t, err)
+	defer nc.Close()
+
+	kp, err := nkeys.CreateServer()
+	be.NilErr(t, err)
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	nn, err := NewNexNode(WithNatsConn(nc), WithLogger(logger), WithNodeKeyPair(kp))
+	be.NilErr(t, err)
+	be.NilErr(t, nn.Start())
+	be.NilErr(t, nn.IsReady(10*time.Second))
+
+	nn.serviceMu.Lock()
+	committed := nn.service
+	nn.serviceMu.Unlock()
+
+	// Shutdown has begun; a concurrent rebuild attempt must not commit.
+	nn.shuttingDown.Store(true)
+	be.NilErr(t, nn.buildMicroService())
+
+	nn.serviceMu.Lock()
+	after := nn.service
+	nn.serviceMu.Unlock()
+	be.True(t, after == committed) // unchanged; the freshly-built service was stopped, not committed
+
+	nn.shuttingDown.Store(false)
+	be.NilErr(t, nn.Shutdown())
+}
