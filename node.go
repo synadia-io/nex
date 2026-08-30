@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/synadia-io/nex/internal"
@@ -98,6 +99,16 @@ type (
 		nodeShutdown          chan struct{}
 		shutdownMu            sync.RWMutex
 		shutdownDueToLameduck bool
+
+		// shuttingDown gates the control-service DoneHandler. nats.go micro
+		// stops the service itself on a connection close or an async endpoint
+		// error, and a stopped service cannot be resumed -- so every stop
+		// triggers a rebuild EXCEPT the intentional one during Shutdown().
+		shuttingDown atomic.Bool
+		// rebuilding ensures at most one rebuild loop runs at a time.
+		rebuilding atomic.Bool
+		// serviceMu guards service, which the rebuild loop reassigns at runtime.
+		serviceMu sync.Mutex
 	}
 )
 
@@ -106,6 +117,12 @@ const (
 	defaultNexNodeNexus          = "nexus"
 	defaultAuctionTTLMapDuration = time.Second * 10
 	defaultAgentWatcherRestarts  = 3
+
+	// Control micro-service rebuild backoff. The node retries forever so it
+	// recovers from any transient without operator action; the delay grows
+	// exponentially (jittered) from base to cap.
+	serviceRebuildBaseBackoff = 250 * time.Millisecond
+	serviceRebuildMaxBackoff  = 30 * time.Second
 )
 
 func NewNexNode(opts ...NexNodeOption) (*NexNode, error) {
@@ -282,40 +299,8 @@ func (n *NexNode) Start() error {
 		return err
 	}
 
-	n.service, err = micro.AddService(n.nc, micro.Config{
-		Name:        "nexnode",
-		Version:     n.version,
-		Description: fmt.Sprintf("Commit: %s | Build date: %s", n.commit, n.builddate),
-	})
-	if err != nil {
+	if err := n.buildMicroService(); err != nil {
 		return err
-	}
-
-	var errs error
-	// System only endpoints
-	errs = errors.Join(errs, n.service.AddEndpoint("PingPlacementTags", micro.HandlerFunc(n.handlePlacementTagPing()), micro.WithEndpointSubject(models.PingPTagSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIDByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
-	// System only agent endpoints
-	if n.allowRemoteAgentRegistration {
-		n.logger.Warn("remote registration enabled. agents can remotely register to this node")
-		errs = errors.Join(errs, n.service.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIInitRemoteRegisterSubscribeSubject(n.nexus)), micro.WithEndpointQueueGroup(n.nexus)))
-	}
-	errs = errors.Join(errs, n.service.AddEndpoint("RegisterAgent", micro.HandlerFunc(n.handleRegisterAgent()), micro.WithEndpointSubject(models.AgentAPIRegisterSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
-	// User endpoints
-	errs = errors.Join(errs, n.service.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("UpdateWorkload", micro.HandlerFunc(n.handleUpdateWorkload()), micro.WithEndpointSubject(models.UpdateWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("RestartWorkload", micro.HandlerFunc(n.handleRestartWorkload()), micro.WithEndpointSubject(models.RestartWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-	errs = errors.Join(errs, n.service.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
-
-	if errs != nil {
-		return errs
 	}
 
 	err = n.eventEmitter.EmitEvent(n.id, models.NexNodeStartedEvent{
@@ -329,14 +314,6 @@ func (n *NexNode) Start() error {
 		n.logger.Error("failed to emit nex node started event", slog.String("err", err.Error()))
 	}
 	go n.heartbeat()
-
-	for _, e := range n.service.Info().Endpoints {
-		if e.QueueGroup != micro.DefaultQueueGroup {
-			n.logger.Debug("Subscribed to nats subject", slog.String("subject", e.Subject), slog.String("queue_group", e.QueueGroup))
-		} else {
-			n.logger.Debug("Subscribed to nats subject", slog.String("subject", e.Subject))
-		}
-	}
 
 	// TODO(cred-refresh): agent/workload creds minted here (via
 	// n.minter.MintRegister / Mint) are currently one-shot with a ~1y TTL and
@@ -405,6 +382,140 @@ func (n *NexNode) IsReady(timeout time.Duration) error {
 	return fmt.Errorf("node not ready after %s", timeout)
 }
 
+// buildMicroService creates the node's control micro service and registers
+// every control endpoint on it. It runs at startup and again on every rebuild.
+// A fresh micro.AddService is required each time: nats.go micro has no resume,
+// so once a service stops its subscriptions are gone for good.
+func (n *NexNode) buildMicroService() error {
+	svc, err := micro.AddService(n.nc, micro.Config{
+		Name:        defaultNexNodeName,
+		Version:     n.version,
+		Description: fmt.Sprintf("Commit: %s | Build date: %s", n.commit, n.builddate),
+		DoneHandler: n.onServiceStopped,
+	})
+	if err != nil {
+		return err
+	}
+
+	var errs error
+	// System only endpoints
+	errs = errors.Join(errs, svc.AddEndpoint("PingPlacementTags", micro.HandlerFunc(n.handlePlacementTagPing()), micro.WithEndpointSubject(models.PingPTagSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("PingNexus", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.PingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("PingNode", micro.HandlerFunc(n.handlePing()), micro.WithEndpointSubject(models.DirectPingSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("GetNodeInfo", micro.HandlerFunc(n.handleNodeInfo()), micro.WithEndpointSubject(models.NodeInfoSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("SetLameduck", micro.HandlerFunc(n.handleLameduck()), micro.WithEndpointSubject(models.LameduckSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("GetAgentIdByName", micro.HandlerFunc(n.handleGetAgentIDByName()), micro.WithEndpointSubject(models.GetAgentIdByNameSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	// System only agent endpoints
+	if n.allowRemoteAgentRegistration {
+		n.logger.Warn("remote registration enabled. agents can remotely register to this node")
+		errs = errors.Join(errs, svc.AddEndpoint("RegisterRemoteAgent", micro.HandlerFunc(n.handleRegisterRemoteAgent()), micro.WithEndpointSubject(models.AgentAPIInitRemoteRegisterSubscribeSubject(n.nexus)), micro.WithEndpointQueueGroup(n.nexus)))
+	}
+	errs = errors.Join(errs, svc.AddEndpoint("RegisterAgent", micro.HandlerFunc(n.handleRegisterAgent()), micro.WithEndpointSubject(models.AgentAPIRegisterSubscribeSubject(n.id)), micro.WithEndpointQueueGroup(n.id)))
+	// User endpoints
+	errs = errors.Join(errs, svc.AddEndpoint("AuctionRequest", micro.HandlerFunc(n.handleAuction()), micro.WithEndpointSubject(models.AuctionSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("StopWorkload", micro.HandlerFunc(n.handleStopWorkload()), micro.WithEndpointSubject(models.UndeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("AuctionDeployWorkload", micro.HandlerFunc(n.handleAuctionDeployWorkload()), micro.WithEndpointSubject(models.AuctionDeploySubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("CloneWorkload", micro.HandlerFunc(n.handleCloneWorkload()), micro.WithEndpointSubject(models.CloneWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("UpdateWorkload", micro.HandlerFunc(n.handleUpdateWorkload()), micro.WithEndpointSubject(models.UpdateWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("RestartWorkload", micro.HandlerFunc(n.handleRestartWorkload()), micro.WithEndpointSubject(models.RestartWorkloadSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+	errs = errors.Join(errs, svc.AddEndpoint("NamespacePingRequest", micro.HandlerFunc(n.handleNamespacePing()), micro.WithEndpointSubject(models.NamespacePingSubscribeSubject()), micro.WithEndpointQueueGroup(n.id)))
+
+	if errs != nil {
+		// Don't leak a partially-registered service. Its DoneHandler fires on
+		// Stop but is ignored: onServiceStopped only rebuilds for the service
+		// that is currently committed to n.service, which this one never was.
+		_ = svc.Stop()
+		return errs
+	}
+
+	n.serviceMu.Lock()
+	if n.shuttingDown.Load() {
+		// A graceful shutdown began while we were (re)building. Don't commit
+		// or leak the new service; Shutdown already stopped the old one.
+		n.serviceMu.Unlock()
+		_ = svc.Stop()
+		return nil
+	}
+	n.service = svc
+	n.serviceMu.Unlock()
+
+	for _, e := range svc.Info().Endpoints {
+		if e.QueueGroup != micro.DefaultQueueGroup {
+			n.logger.Debug("Subscribed to nats subject", slog.String("subject", e.Subject), slog.String("queue_group", e.QueueGroup))
+		} else {
+			n.logger.Debug("Subscribed to nats subject", slog.String("subject", e.Subject))
+		}
+	}
+	return nil
+}
+
+// onServiceStopped is the control service's micro DoneHandler. nats.go micro
+// stops the service itself on a connection close or an async endpoint error,
+// and a stopped service cannot be resumed -- so unless we are shutting down on
+// purpose, rebuild a fresh one. Runs on micro's async dispatcher, so it hands
+// off to a goroutine.
+func (n *NexNode) onServiceStopped(stopped micro.Service) {
+	if n.shuttingDown.Load() {
+		return
+	}
+	// Only rebuild for the service currently committed to n.service. A service
+	// that failed endpoint registration, or an old one already replaced by a
+	// prior rebuild, stops without triggering a new rebuild.
+	n.serviceMu.Lock()
+	current := n.service
+	n.serviceMu.Unlock()
+	if stopped != current {
+		return
+	}
+	n.logger.Warn("control micro service stopped unexpectedly; rebuilding")
+	go n.rebuildServiceForever()
+}
+
+// rebuildServiceForever re-creates the control micro service, retrying forever
+// with jittered exponential backoff so the node recovers from any transient
+// without operator action. It returns only on success, on graceful shutdown,
+// or if the NATS connection is closed for good -- which, given
+// MaxReconnects(-1), only a graceful Shutdown() produces.
+func (n *NexNode) rebuildServiceForever() {
+	if !n.rebuilding.CompareAndSwap(false, true) {
+		return // a rebuild loop is already running
+	}
+	defer n.rebuilding.Store(false)
+
+	delay := serviceRebuildBaseBackoff
+	for {
+		if n.shuttingDown.Load() || n.ctx.Err() != nil {
+			return
+		}
+		if n.nc.IsClosed() {
+			// Only reachable if the connection was closed without going through
+			// Shutdown(); there is nothing to rebuild onto and it will not
+			// reopen. A process supervisor must restart the node.
+			n.logger.Error("nats connection closed; cannot rebuild control micro service")
+			return
+		}
+
+		if err := n.buildMicroService(); err == nil {
+			n.logger.Info("control micro service rebuilt")
+			return
+		} else {
+			n.logger.Error("failed to rebuild control micro service; retrying",
+				slog.String("err", err.Error()), slog.Duration("backoff", delay))
+		}
+
+		select {
+		case <-n.ctx.Done():
+			return
+		case <-time.After(retry.Jitter(delay)):
+		}
+		if delay > serviceRebuildMaxBackoff/2 { // overflow-safe doubling
+			delay = serviceRebuildMaxBackoff
+		} else {
+			delay *= 2
+		}
+	}
+}
+
 func (n *NexNode) Shutdown() error {
 	if n.nodeState == models.NodeStateStopping {
 		n.logger.Warn("nex node already shutting down")
@@ -420,9 +531,19 @@ func (n *NexNode) Shutdown() error {
 
 	n.agentWatcher.Shutdown()
 
-	err := n.service.Stop()
-	if err != nil {
-		n.logger.Error("failed to stop micro service", slog.String("err", err.Error()))
+	// Set the gate and read the live service under the same lock buildMicroService
+	// commits under, so an in-flight rebuild cannot commit a new service this
+	// shutdown then misses: whichever wins the lock, both the old and any
+	// newly-built service end up stopped. Stop() runs OUTSIDE the lock because it
+	// fires the DoneHandler, which also takes serviceMu.
+	n.serviceMu.Lock()
+	n.shuttingDown.Store(true)
+	svc := n.service
+	n.serviceMu.Unlock()
+	if svc != nil {
+		if err := svc.Stop(); err != nil {
+			n.logger.Error("failed to stop micro service", slog.String("err", err.Error()))
+		}
 	}
 
 	pubKey, err := n.nodeKeypair.PublicKey()
