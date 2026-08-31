@@ -737,7 +737,7 @@ func (a *Runner) handleReceivedEvent() func(micro.Request) {
 }
 
 func handlerError[T models.StopWorkloadResponse | models.StartWorkloadResponse](logger *slog.Logger, r micro.Request, e error, code string, payload T) {
-	logger.Debug("error handling micro request", slog.String("err", e.Error()), slog.String("code", code))
+	logger.Error("error handling micro request", slog.String("err", e.Error()), slog.String("code", code))
 
 	payloadB, err := json.Marshal(payload)
 	if err != nil {
