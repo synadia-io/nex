@@ -69,7 +69,7 @@ func (n *NexNode) handlePing() func(micro.Request) {
 			StartTime:  n.startTime,
 			Version:    n.version,
 			Xkey:       pubXKey,
-			State:      n.nodeState,
+			State:      n.getNodeState(),
 		})
 		if err != nil {
 			n.logger.Error("failed to respond to node info request", slog.String("err", err.Error()))
