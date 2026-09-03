@@ -62,9 +62,17 @@ type (
 		// (PING/AUCTION/INFO/placement) and written by handleLameduck (the
 		// lameduck flag), so every access goes through tagsMu -- a bare
 		// concurrent map read+write is a fatal runtime error.
-		tags      map[string]string
-		tagsMu    sync.RWMutex
-		nodeState models.NodeState
+		tags   map[string]string
+		tagsMu sync.RWMutex
+		// nodeState is read by the control handlers (handlePing embeds it in the
+		// PING/INFO response) concurrently with the writes made during startup
+		// (Start), lameduck (enterLameduck), and shutdown (Shutdown). Every
+		// access goes through getNodeState/setNodeState (or the atomic
+		// transitionToStopping); a bare read+write pair is a -race violation.
+		// nodeStateMu is a LEAF lock: never acquire another lock while holding
+		// it, and never hold it across a blocking call.
+		nodeState   models.NodeState
+		nodeStateMu sync.RWMutex
 
 		agentRestartLimit int
 		// Embedded agents
@@ -245,6 +253,40 @@ func (n *NexNode) tagsSnapshot() map[string]string {
 	return out
 }
 
+// getNodeState returns the current node state under the state lock. See
+// NexNode.nodeState.
+func (n *NexNode) getNodeState() models.NodeState {
+	n.nodeStateMu.RLock()
+	defer n.nodeStateMu.RUnlock()
+	return n.nodeState
+}
+
+// setNodeState sets the node state under the state lock. See NexNode.nodeState.
+func (n *NexNode) setNodeState(s models.NodeState) {
+	n.nodeStateMu.Lock()
+	defer n.nodeStateMu.Unlock()
+	n.nodeState = s
+}
+
+// transitionToStopping atomically moves nodeState to Stopping unless it is
+// already Stopping, closing the check-then-set window that Shutdown relies on to
+// guard against a double shutdown. It returns whether the node was already
+// stopping (so the caller can bail out) and whether the prior state was Lameduck
+// (so the caller can record a lameduck-driven shutdown). The nodeState lock is a
+// leaf lock, so callers must take shutdownMu only after this returns.
+func (n *NexNode) transitionToStopping() (alreadyStopping, wasLameduck bool) {
+	n.nodeStateMu.Lock()
+	defer n.nodeStateMu.Unlock()
+	switch n.nodeState {
+	case models.NodeStateStopping:
+		return true, false
+	case models.NodeStateLameduck:
+		wasLameduck = true
+	}
+	n.nodeState = models.NodeStateStopping
+	return false, wasLameduck
+}
+
 func (n *NexNode) Start() error {
 	version, ok := n.ctx.Value("VERSION").(string)
 	if ok {
@@ -367,14 +409,14 @@ func (n *NexNode) Start() error {
 	}
 
 	n.logger.Info("nex node ready")
-	n.nodeState = models.NodeStateRunning
+	n.setNodeState(models.NodeStateRunning)
 	return nil
 }
 
 func (n *NexNode) IsReady(timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if n.nodeState == models.NodeStateRunning {
+		if n.getNodeState() == models.NodeStateRunning {
 			return nil
 		}
 		time.Sleep(25 * time.Millisecond)
@@ -517,17 +559,22 @@ func (n *NexNode) rebuildServiceForever() {
 }
 
 func (n *NexNode) Shutdown() error {
-	if n.nodeState == models.NodeStateStopping {
+	// Atomically claim the shutdown: transitionToStopping moves nodeState to
+	// Stopping and reports the prior state in one critical section, so two
+	// concurrent Shutdown calls cannot both pass the "already stopping" guard.
+	alreadyStopping, wasLameduck := n.transitionToStopping()
+	if alreadyStopping {
 		n.logger.Warn("nex node already shutting down")
 		return nil
 	}
 
-	if n.nodeState == models.NodeStateLameduck {
+	// shutdownMu is taken only AFTER transitionToStopping releases nodeStateMu:
+	// nodeStateMu is a leaf lock and must never nest another lock.
+	if wasLameduck {
 		n.shutdownMu.Lock()
 		n.shutdownDueToLameduck = true
 		n.shutdownMu.Unlock()
 	}
-	n.nodeState = models.NodeStateStopping
 
 	n.agentWatcher.Shutdown()
 
@@ -600,7 +647,7 @@ func (n *NexNode) WaitForShutdown() error {
 }
 
 func (n *NexNode) enterLameduck(delay time.Duration) {
-	n.nodeState = models.NodeStateLameduck
+	n.setNodeState(models.NodeStateLameduck)
 
 	go func() {
 		time.Sleep(delay)
