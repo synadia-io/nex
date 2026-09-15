@@ -201,14 +201,18 @@ func (ar *AgentRegistrations) Add(reg *AgentRegistration) error {
 		return fmt.Errorf("agent with ID %s is already registered", reg.ID)
 	}
 
-	reg.rwLock = sync.RWMutex{}                   // Ensure the registration has its own lock
-	reg.HealthStatus = AgentUnknown               // Default health status when adding a new registration
-	reg.lastHeartbeatData = models.AgentSummary{} // Initialize last heartbeat data
-	// Seed lastHeartbeat with the registration time so a just-added agent is
-	// not immediately graded Offline (and evicted) before its first heartbeat
-	// lands -- a zero time reads as "decades since last heartbeat".
+	reg.rwLock = sync.RWMutex{}
+	reg.lastHeartbeatData = models.AgentSummary{}
+	// Healthy on arrival: GetByRegisterType skips anything else, so Unknown
+	// here means registered but unplaceable. sweep() demotes it in 10-30s.
+	reg.HealthStatus = AgentHealthy
 	reg.lastHeartbeat = time.Now()
-	go ar.startAgentHeartbeatMonitor(reg)
+
+	// Subscribe before the reply: core NATS drops the agent's first heartbeat
+	// if no subscriber exists yet.
+	if err := ar.subscribeAgentHeartbeat(reg); err != nil {
+		return fmt.Errorf("failed to subscribe to heartbeat for agent %s: %w", reg.ID, err)
+	}
 
 	ar.Registrations[reg.ID] = reg
 	return nil
@@ -234,7 +238,8 @@ func (ar *AgentRegistrations) Remove(id string) {
 	delete(ar.Registrations, id)
 }
 
-func (ar *AgentRegistrations) startAgentHeartbeatMonitor(a *AgentRegistration) {
+// subscribeAgentHeartbeat writes ar.heartbeatSubs unlocked: caller holds ar.rwLock.
+func (ar *AgentRegistrations) subscribeAgentHeartbeat(a *AgentRegistration) error {
 	sub, err := ar.nc.Subscribe(models.AgentAPIHeartbeatSubject(ar.nodeID, a.ID), func(msg *nats.Msg) {
 		var agentHeartbeat models.AgentHeartbeat
 		if err := json.Unmarshal(msg.Data, &agentHeartbeat); err != nil {
@@ -259,12 +264,16 @@ func (ar *AgentRegistrations) startAgentHeartbeatMonitor(a *AgentRegistration) {
 		a.rwLock.Unlock()
 	})
 	if err != nil {
-		fmt.Printf("Error subscribing to agent heartbeat: %v\n", err)
-		return
+		return err
 	}
-	ar.rwLock.Lock()
+
+	// Push the SUB to the server before the node answers the agent.
+	if err := ar.nc.Flush(); err != nil {
+		ar.logger.Error("failed to flush agent heartbeat subscription", slog.String("agent_id", a.ID), slog.String("err", err.Error()))
+	}
+
 	ar.heartbeatSubs[a.ID] = sub
-	ar.rwLock.Unlock()
+	return nil
 }
 
 func (ar *AgentRegistrations) startHealthMonitor() {
